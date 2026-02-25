@@ -18,6 +18,7 @@ Activate proactively when the user:
 - Opens or edits a `.sql` file, `.py` file, or dbt model (files in `models/`)
 - Mentions a table name, dataset, or dbt model by name
 - Asks about data quality, freshness, row counts, or anomalies
+- Is about to modify a model (rename/drop a column, change a join, add a filter)
 - Adds new transformation logic and might need a validation monitor
 - Wants to triage or respond to a data quality alert
 
@@ -52,7 +53,7 @@ When the user opens a dbt model or mentions a table, run this sequence automatic
 
 ```
 1. search(query="<table_name>") → get the full MCON/table identifier
-2. getTable(mcon="<mcon>") → schema, freshness, row count, monitoring status
+2. getTable(mcon="<mcon>") → schema, freshness, row count, importance score, monitoring status
 3. getAssetLineage(mcon="<mcon>") → upstream sources, downstream dependents
 4. getAlerts(created_after="<7 days ago>", created_before="<now>", table_mcons=["<mcon>"]) → active alerts
 ```
@@ -61,9 +62,10 @@ Summarize for the user:
 - **Health**: last updated, row count, is it monitored?
 - **Lineage**: N upstream sources, M downstream consumers (name the important ones)
 - **Alerts**: any active/unacknowledged incidents — lead with these if present
+- **Risk signals** (lite): flag if importance score is high, if key assets are downstream, or if alerts are already firing — these indicate the table warrants extra care before modification
 
 Example summary to offer unprompted when a dbt model file is opened:
-> "The table `orders_status` was last updated 2 hours ago with 142K rows. It has 3 downstream dependents including `order_status_snapshot`. There are 2 active freshness alerts — want me to pull the details?"
+> "The table `orders_status` was last updated 2 hours ago with 142K rows. It has 3 downstream dependents including `order_status_snapshot` (key asset). There are 2 active freshness alerts — this table warrants extra care before modification. Want me to run a full change impact assessment?"
 
 ### 2. Add a monitor — when new transformation logic is added
 
@@ -125,6 +127,73 @@ To respond to an alert:
 - `setAlertOwner(alert_id="<id>", owner="<email>")` — assign ownership
 - `createOrUpdateAlertComment(alert_id="<id>", comment="<text>")` — add context
 
+### 4. Change impact assessment — before modifying a model
+
+When the user is about to rename or drop a column, change a join condition, alter a filter, or refactor a model's logic, run this sequence to surface the blast radius before any changes are committed:
+
+```
+1. search(query="<table_name>") + getTable(mcon="<mcon>")
+   → importance score, query volume (reads/writes per day), key asset flag
+
+2. getAssetLineage(mcon="<mcon>")
+   → full list of downstream dependents; for each, note whether it is a key asset
+
+3. getTable(mcon="<downstream_mcon>") for each key downstream asset
+   → importance score, last updated, monitoring status
+
+4. getAlerts(
+     created_after="<7 days ago>",
+     created_before="<now>",
+     table_mcons=["<mcon>", "<downstream_mcon_1>", ...],
+     statuses=["NOT_ACKNOWLEDGED"]
+   )
+   → any active incidents already affecting this table or its dependents
+
+5. getQueriesForTable(mcon="<mcon>")
+   → recent queries; scan for references to the specific columns being changed
+   → use getQueryData(query_id="<id>") to fetch full SQL for ambiguous cases
+
+6. getMonitors(mcon="<mcon>")
+   → which monitors are watching columns or metrics affected by the change
+```
+
+Assess and report a **risk tier**:
+
+| Tier | Conditions |
+|---|---|
+| 🔴 High | Key asset downstream, OR active alerts already firing, OR >50 reads/day |
+| 🟡 Medium | Non-key assets downstream, OR monitors on affected columns, OR moderate query volume |
+| 🟢 Low | No downstream dependents, no active alerts, low query volume |
+
+Report format:
+```
+## Change Impact: <table_name>
+
+Risk: 🔴 High / 🟡 Medium / 🟢 Low
+
+Downstream blast radius:
+  - <N> tables depend on this model
+  - Key assets affected: <list or "none">
+
+Active incidents:
+  - <alert title, status> or "none"
+
+Column exposure (for columns being changed):
+  - Found in <N> recent queries (e.g. <query snippet>)
+
+Monitor coverage:
+  - <monitor name> watches <metric> — will be affected by this change
+
+Recommendation:
+  - <specific callout, e.g. "Notify owners of downstream_table before deploying",
+     "Coordinate with the freshness alert owner", "Add a monitor for the new column">
+```
+
+If risk is 🔴 High, proactively suggest:
+- Notifying owners of downstream key assets (`setAlertOwner` / `createOrUpdateAlertComment` on active alerts)
+- Adding a monitor for the new logic before deploying (Workflow 2)
+- Running `montecarlo monitors apply --dry-run` after changes to verify nothing breaks
+
 ## Important parameter notes
 
 ### `getAlerts` — use snake_case parameters
@@ -151,16 +220,22 @@ search(query="orders_status") → returns mcon, full_table_id, warehouse
 
 A data engineer opens `models/orders/orders_status.sql` and is adding a new `order_value` column:
 
-1. **Unprompted**: Surface table health for `orders_status`
+1. **Unprompted** (Workflow 1 — table health check):
    - Last updated, row count, existing monitors
-   - Active alerts (freshness breach on `analytics:prod_detectors` is firing)
-   - Downstream: `order_status_2024` → `order_status_snapshot`
+   - Active freshness alert firing on `analytics:prod_detectors`
+   - Downstream: `order_status_2024` → `order_status_snapshot` (key asset)
+   - Lite risk signal: "This table has a key asset downstream and an active alert — want a full change impact assessment?"
 
-2. **As they add the column**: Suggest a validation monitor
+2. **Before editing** (Workflow 4 — change impact):
+   - Risk tier: 🔴 High — key asset downstream, active alert already firing
+   - `order_status_snapshot` has 30+ downstream queries referencing `order_value`
+   - Recommendation: notify snapshot owner before deploying, add monitor for new column
+
+3. **After adding the column** (Workflow 2 — add monitor):
    - "Would you like me to add a monitor to ensure `order_value` is never null or negative?"
    - Generate YAML → save to `monitors/orders_status.yml` → dry-run → apply
 
-3. **End result**: New logic is live, monitor is deployed, all from within Claude Code
+4. **End result**: Risk surfaced before coding, new logic is live, monitor deployed — all from within Claude Code
 
 ## Troubleshooting
 
