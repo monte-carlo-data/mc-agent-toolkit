@@ -46,14 +46,7 @@ MCP keys are separate from standard API keys. Standard keys work for the CLI; MC
 Copy the skill file to your editor's skills directory. For Claude Code:
 
 ```bash
-mkdir -p ~/.claude/skills/monte-carlo
-curl -fsSL https://raw.githubusercontent.com/monte-carlo-data/mc-claude-plugin/master/skills/monte-carlo/SKILL.md \
-  -o ~/.claude/skills/monte-carlo/SKILL.md
-```
-
-Or from a local clone:
-
-```bash
+git@github.com:monte-carlo-data/monte-carlo-editor-skill.git
 mkdir -p ~/.claude/skills/monte-carlo
 cp skills/monte-carlo/SKILL.md ~/.claude/skills/monte-carlo/SKILL.md
 ```
@@ -101,7 +94,7 @@ You don't need to ask for it — the skill activates automatically.
 
 **Workflow 3 — Alert triage:** When you ask about data quality issues. Lists open alerts, checks table state, traces lineage to find the root cause or blast radius.
 
-**Workflow 4 — Change impact assessment: Fires automatically before any SQL edit — including filter changes, bugfixes, reverts, and parameter tweaks, not just schema changes. Surfaces downstream blast radius, active incidents, column exposure in recent queries, and monitor coverage. Reports a risk tier (High / Medium / Low) and translates the findings into a specific code recommendation. If the MC data suggests your planned approach is risky, Claude will recommend a safer alternative and explain why — citing the specific tables, alert counts, and read volumes it found.
+**Workflow 4 — Change impact assessment:** Fires automatically before any SQL edit — including filter changes, bugfixes, reverts, and parameter tweaks, not just schema changes. Surfaces downstream blast radius, active incidents, column exposure in recent queries, and monitor coverage. Reports a risk tier (High / Medium / Low) and translates the findings into a specific code recommendation. If the MC data suggests your planned approach is risky, Claude will recommend a safer alternative and explain why — citing the specific tables, alert counts, and read volumes it found.
 
 ### Deploying generated monitors
 
