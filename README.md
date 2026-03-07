@@ -43,7 +43,7 @@ MCP keys are separate from standard API keys. Standard keys work for the CLI; MC
 
 ### Step 2 — Install the skill
 
-Copy the skill file to your editor's skills directory. For Claude Code:
+(Will update once this repo is made public) Copy the skill file to your editor's skills directory. For Claude Code:
 
 ```bash
 git@github.com:monte-carlo-data/monte-carlo-editor-skill.git
