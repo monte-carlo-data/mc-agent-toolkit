@@ -408,27 +408,3 @@ MC uses MCONs (Monte Carlo Object Names) as table identifiers. Always use `searc
 ```
 search(query="orders_status") → returns mcon, full_table_id, warehouse
 ```
-
-## Demo scenario
-
-A data engineer opens `models/orders/orders_status.sql` and is adding a new `order_value` column:
-
-1. **Unprompted** (Workflow 1 — table health check):
-   - Last updated, row count, existing monitors
-   - Active freshness alert firing on `analytics:prod_detectors`
-   - Downstream: `order_status_2024` → `order_status_snapshot` (key asset)
-   - Lite risk signal: "This table has a key asset downstream and an active alert — want a full change impact assessment?"
-
-2. **Before editing** (Workflow 4 — change impact):
-   - Risk tier: 🔴 High — key asset downstream, active alert already firing
-   - `order_status_snapshot` has 30+ downstream queries referencing `order_value`
-   - Recommendation: notify snapshot owner before deploying, add monitor for new column
-
-3. **After adding the column** (Workflow 2 — add monitor):
-   - "Would you like me to add a monitor to ensure `order_value` is never null or negative?"
-   - Generate YAML → save to `monitors/orders_status.yml` → dry-run → apply
-
-4. **End result**: Risk surfaced before coding, new logic is live, monitor deployed — all from within Claude Code
-
-## Troubleshooting
-See [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) for common setup and runtime issues.
