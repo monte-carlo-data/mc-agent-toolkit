@@ -78,23 +78,33 @@ for impact assessment purposes.
 
 ## Pre-edit gate — check before modifying any file
 
-**Before calling Edit, Write, or MultiEdit on any `.sql` or dbt model file,
-you MUST check:**
+**Before calling Edit, Write, or MultiEdit on any `.sql` or dbt model
+file, you MUST check:**
 
-1. Has Workflow 4 (change impact assessment) been run for this table
-   in the current session?
+1. Has the synthesis step been run for THIS SPECIFIC CHANGE in the
+   current prompt?
 2. **If YES** → proceed with the edit
-3. **If NO** → stop immediately, run Workflow 4, present the full report,
-   then ask: "Workflow 4 complete. Do you want to proceed with the change?"
+3. **If NO** → stop immediately, run Workflow 4, present the full
+   report with synthesis connected to this specific change, then ask:
+   "Workflow 4 complete. Do you want to proceed with the change?"
 
-This check is MANDATORY regardless of:
-- How simple or small the change appears
-- Whether the user is asking directly and explicitly
-- Whether Workflow 1 already ran — **Workflow 1 ≠ Workflow 4**
+**Important: "Workflow 4 already ran this session" is NOT sufficient
+to proceed.** Each distinct change prompt requires its own synthesis
+step connecting the MC findings to that specific change.
 
-The only exception: if the user explicitly acknowledges the risk and
-confirms they want to skip the assessment (e.g. "I know the risks,
-just make the change") — in that case proceed but note the skipped assessment.
+The synthesis must reference the specific columns, filters, or logic
+being changed in the current prompt — not just general table health.
+
+Example:
+- ✅ "Given 34 downstream models depend on is_paying_workspace,
+     adding 'MC Internal' to the exclusion list will exclude these
+     workspaces from all downstream health scores and exports.
+     Confirm?"
+- ❌ "Workflow 4 already ran. Making the edit now."
+
+The only exception: if the user explicitly acknowledges the risk
+and confirms they want to skip (e.g. "I know the risks, just make
+the change") — proceed but note the skipped assessment.
 
 ## Available MCP tools
 
@@ -147,26 +157,26 @@ Example summary to offer unprompted when a dbt model file is opened:
 
 **Auto-escalation rule — after completing steps 1–4 above:**
 
-```
-IF any of the following are true → run Workflow 4 immediately, do not ask:
+First, check whether the user has expressed intent to modify the model
+in this session (e.g. mentioned a change, asked to add/edit/fix something).
+
+IF change intent has been expressed AND any of the following are true:
   - One or more active/unacknowledged alerts exist on the table
   - One or more downstream dependents are key assets
   - The table's importance score is above 0.8
+→ Ask the user before running Workflow 4:
+  "This is a high-importance table with [N active alerts / key asset
+  dependents / importance score 0.989]. Do you want me to run a full
+  change impact assessment before proceeding? (yes/no)"
+→ Wait for confirmation. If yes → run Workflow 4.
+  If no → proceed but note: "Skipping impact assessment at your request."
 
-OTHERWISE → surface the health summary and offer Workflow 4 as an option
-```
-
-When auto-escalating, tell the user explicitly:
-> "This table has [alerts / key asset dependents / high importance] — running a full change impact assessment before you proceed."
-
-Do not silently run Workflow 4 without narrating the reason.
-
-When auto-escalating from Workflow 1 to Workflow 4, and after the full
-impact report is presented, carry the health check findings into the
-code suggestion:
-- Reference the specific alerts found when explaining why you recommend
-  a particular approach
-- Do not write code that ignores active alerts without flagging the risk
+IF risk signals exist but NO change intent has been expressed:
+→ Surface the health summary and note the risk signals only:
+  "This is a high-importance table with key asset dependents. When
+  you're ready to make changes, say 'run impact assessment' or just
+  describe your change and I'll run it automatically."
+→ Do NOT run Workflow 4. Do NOT ask about running Workflow 4.
 
 ### New model creation variant
 
@@ -420,6 +430,20 @@ Explicitly connect each key finding to a specific recommendation:
   → Suggest backward-compatible transition (add new column, deprecate old one)
   → Explain: "This table has [N] reads/day — a column rename without a
      transition period would break downstream consumers immediately"
+
+- Column renames, even inside CTEs:
+  → Never assume a CTE-internal rename is safe. Always check:
+    1. Does this column appear in the final SELECT, directly or
+       via a CTE that feeds into the final SELECT?
+    2. If yes — treat as a breaking change. Recommend a
+       backward-compatible transition: add the correctly-named
+       column, keep the old one temporarily, remove in a
+       follow-up PR.
+    3. If truly internal and never surfaces in output — confirm
+       this explicitly before proceeding.
+  → Explain: "Even though this column is defined in a CTE, if it
+    surfaces in the final SELECT it is a public output column —
+    renaming it breaks any downstream model selecting it by name."
 
 Always end the synthesis with one clear, specific recommendation in plain English:
 "Given the above, I recommend: [specific action]"
