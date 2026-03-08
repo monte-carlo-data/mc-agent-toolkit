@@ -62,6 +62,11 @@ This applies whenever the user expresses intent to modify a model — including 
 - "Create [models/dbt models] for…" (when modifying existing referenced tables)
 - "Increase / decrease / change [max_tokens/threshold/date constant/numeric parameter]…"
 - Any change to a hardcoded value, constant, or configuration parameter within SQL
+- "Drop / remove / delete [column/field/table]"
+- "Rename [column/field] to [new name]"
+- "Add [column]" (short imperative form, e.g. "add a created_at column")
+- Any single-verb imperative command targeting a column, table, or model
+  (e.g. "drop X", "rename Y", "add Z", "remove W")
 
 Parameter changes (threshold values, date constants, numeric limits) appear
 safe but silently change model output. Treat them the same as logic changes
@@ -70,6 +75,26 @@ for impact assessment purposes.
 **Do not write or edit any SQL until the change impact assessment (Workflow 4) has been presented to the user.** The assessment must come first — not after the edit, not in parallel.
 
 ---
+
+## Pre-edit gate — check before modifying any file
+
+**Before calling Edit, Write, or MultiEdit on any `.sql` or dbt model file,
+you MUST check:**
+
+1. Has Workflow 4 (change impact assessment) been run for this table
+   in the current session?
+2. **If YES** → proceed with the edit
+3. **If NO** → stop immediately, run Workflow 4, present the full report,
+   then ask: "Workflow 4 complete. Do you want to proceed with the change?"
+
+This check is MANDATORY regardless of:
+- How simple or small the change appears
+- Whether the user is asking directly and explicitly
+- Whether Workflow 1 already ran — **Workflow 1 ≠ Workflow 4**
+
+The only exception: if the user explicitly acknowledges the risk and
+confirms they want to skip the assessment (e.g. "I know the risks,
+just make the change") — in that case proceed but note the skipped assessment.
 
 ## Available MCP tools
 
