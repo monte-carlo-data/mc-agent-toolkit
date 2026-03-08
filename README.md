@@ -84,18 +84,6 @@ In Claude Code, paste:
 
 Claude will call `testConnection` and confirm your credentials are working.
 
-## How to use it
-
-Open your dbt project (or any data engineering codebase) in your editor. From there, you can either reference a few models or tables you plan to work on — or just prompt the editor with the change you want to make. The skill activates automatically based on what you're doing; no special commands needed.
-
-**Workflow 1 — Table health check:** Opens when you reference a `.sql` file, dbt model, or table name. Surfaces freshness, row count, importance, lineage, and active alerts. Auto-escalates to a full impact assessment if the table has active alerts, key asset dependents, or high importance.
-
-**Workflow 2 — Monitor generation:** After you add new transformation logic (a column, filter, or business rule), suggests and deploys a validation, metric, comparison, or custom SQL monitor as code.
-
-**Workflow 3 — Alert triage:** When you ask about data quality issues. Lists open alerts, checks table state, traces lineage to find the root cause or blast radius.
-
-**Workflow 4 — Change impact assessment:** Fires automatically before any SQL edit — including filter changes, bugfixes, reverts, and parameter tweaks, not just schema changes. Surfaces downstream blast radius, active incidents, column exposure in recent queries, and monitor coverage. Reports a risk tier (High / Medium / Low) and translates the findings into a specific code recommendation. If the MC data suggests your planned approach is risky, Claude will recommend a safer alternative and explain why — citing the specific tables, alert counts, and read volumes it found.
-
 ### Step 5 — Configure tool permissions (recommended)
 
 By default Claude Code will prompt for permission on each Monte Carlo
@@ -107,9 +95,7 @@ Add the following to `.claude/settings.local.json` in your project:
 ```json
 {
   "allowedTools": [
-    "mcp__monte-carlo__*",
-    // or add each tool individually
-    // "mcp__monte-carlo__getTable",
+    "mcp__monte-carlo__*"
   ]
 }
 ```
@@ -123,6 +109,18 @@ claude --dangerously-skip-permissions
 ```
 This bypasses all permission checks including file edits and CLI
 commands. Only use this in a safe, non-production environment.
+
+## How to use it
+
+Open your dbt project (or any data engineering codebase) in your editor. From there, you can either reference a few models or tables you plan to work on — or just prompt the editor with the change you want to make. The skill activates automatically based on what you're doing; no special commands needed.
+
+**Workflow 1 — Table health check:** Opens when you reference a `.sql` file, dbt model, or table name. Surfaces freshness, row count, importance, lineage, and active alerts. Auto-escalates to a full impact assessment if the table has active alerts, key asset dependents, or high importance.
+
+**Workflow 2 — Monitor generation:** After you add new transformation logic (a column, filter, or business rule), suggests and deploys a validation, metric, comparison, or custom SQL monitor as code.
+
+**Workflow 3 — Alert triage:** When you ask about data quality issues. Lists open alerts, checks table state, traces lineage to find the root cause or blast radius.
+
+**Workflow 4 — Change impact assessment:** Fires automatically before any SQL edit — including filter changes, bugfixes, reverts, and parameter tweaks, not just schema changes. Surfaces downstream blast radius, active incidents, column exposure in recent queries, and monitor coverage. Reports a risk tier (High / Medium / Low) and translates the findings into a specific code recommendation. If the MC data suggests your planned approach is risky, Claude will recommend a safer alternative and explain why — citing the specific tables, alert counts, and read volumes it found.
 
 ### Deploying generated monitors
 
