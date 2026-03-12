@@ -13,7 +13,7 @@ Public Claude Code skills by [Monte Carlo Data](https://www.montecarlodata.com/)
 ### safe-change
 Automatically activates when a dbt model, SQL file, or table is referenced. Surfaces Monte Carlo context — table health, active alerts, lineage, blast radius — before any code is written, and uses those findings to shape code recommendations.
 
-Requires the [Monte Carlo MCP Server](https://docs.getmontecarlo.com/docs/mcp-server). See [Installation](plugins/monte-carlo/skills/safe-change/README.md#setup) and [Usage](plugins/monte-carlo/skills/safe-change/README.md#how-to-use-it).
+See [Introduction](plugins/monte-carlo/skills/safe-change/README.md), [Installation](plugins/monte-carlo/skills/safe-change/README.md#setup) and [Usage](plugins/monte-carlo/skills/safe-change/README.md#how-to-use-it). Requires the [Monte Carlo MCP Server](https://docs.getmontecarlo.com/docs/mcp-server).
 
 ### generate-validation-notebook
 

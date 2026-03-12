@@ -10,7 +10,7 @@ description: |
 version: 1.0.0
 ---
 
-# Monte Carlo — AI Editor Skill
+# Monte Carlo Safe Change Skill
 
 This skill brings Monte Carlo's data observability context directly into your editor. When you're modifying a dbt model or SQL pipeline, use it to surface table health, lineage, active alerts, and to generate monitors-as-code without leaving Claude Code.
 
