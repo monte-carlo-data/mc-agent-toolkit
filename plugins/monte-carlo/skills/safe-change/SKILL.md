@@ -182,7 +182,7 @@ IF risk signals exist but NO change intent has been expressed:
   describe your change and I'll run it automatically."
 → Do NOT run Workflow 4. Do NOT ask about running Workflow 4.
 
-### New model creation variant
+#### New model creation variant
 
 When the user is creating a new .sql dbt model file (not editing an existing one):
 
@@ -291,7 +291,7 @@ To respond to an alert:
 
 **Trigger:** Any expressed intent to add, rename, drop, or change a column, join, filter, or model logic. Run this immediately — before writing any code — even if the user hasn't asked for it.
 
-### Bugfixes and reverts require impact assessment too
+#### Bugfixes and reverts require impact assessment too
 
 When the user says "fix", "revert", "restore", or "undo", run this workflow
 before writing any code — even if the change seems small or safe.
@@ -349,7 +349,7 @@ Assess and report a **risk tier**:
 | 🟡 Medium | Non-key assets downstream, OR monitors on affected columns, OR moderate query volume |
 | 🟢 Low | No downstream dependents, no active alerts, low query volume |
 
-### Multi-model changes
+#### Multi-model changes
 
 When the user is changing multiple models in the same session or same domain
 (e.g., 3 timeseries models, 4 criticality_score models):
@@ -401,7 +401,7 @@ If risk is 🔴 High:
    - Adding a monitor for the new logic before deploying (Workflow 2)
    - Running `montecarlo monitors apply --dry-run` after changes to verify nothing breaks
 
-### Synthesis: translate findings into code recommendations
+#### Synthesis: translate findings into code recommendations
 
 After presenting the impact report, use the findings to shape your code suggestion.
 Do not present MC data and then write code as if the data wasn't there.
