@@ -557,27 +557,6 @@ metadata:
     - **Status:** <merge_timestamp or "Not yet merged" or "N/A (local)">
     ## Changes
     <brief description based on diff analysis>
-    ## Table of Contents
-    <For each model, list only the query cells that will actually be generated, in the order they appear in the notebook:>
-    <For NEW models, the order is:>
-    - **`<SCHEMA>.<TABLE_NAME>`** _(new)_
-      - Total Row Count
-      - Sample Data Preview
-      - Core Segmentation Counts
-      - Uniqueness Check
-      - NULL Rate Check
-      - Time-Axis Continuity  _(only if incremental or time field detected)_
-    <For MODIFIED models, the order is:>
-    - **`<SCHEMA>.<TABLE_NAME>`** _(modified)_
-      - Total Row Count
-      - Sample Data Preview
-      - Core Segmentation Counts
-      - Changed Field Distribution  _(only if triggered)_
-      - Uniqueness Check  _(only if triggered)_
-      - NULL Rate Check  _(only if triggered)_
-      - Time-Axis Continuity  _(only if triggered)_
-      - Before/After Comparison
-      - Row Count Comparison
     ## Changed Models
     - `<SCHEMA>.<TABLE_NAME>` (from `<file_path>`)
     ## How to Use
