@@ -4,7 +4,7 @@ Bring Monte Carlo data observability into your editor — automatically, before 
 
 ## What this does
 
-When you reference a dbt model or table, Monte Carlo context comes to you: table health, active alerts, lineage, and downstream blast radius. Your AI editor uses that context to shape the code it writes — not just surface it. If you try to rename a column with 500 downstream dependents, the editor recommends a safe transition strategy and explains why, citing the specific MC data it found. When you add new logic, it generates and deploys the right monitor for your logic — validation, metric, comparison, or custom SQL — before you merge.
+When you reference a dbt model or table, Monte Carlo context comes to you: table health, active alerts, lineage, and downstream blast radius. Your AI editor uses that context to shape the code it writes — not just surface it. If you try to rename a column with 500 downstream dependents, the editor recommends a safe transition strategy and explains why, citing the specific MC data it found. When you add new logic, it generates and deploys the right monitor for your logic — validation, metric, comparison, or custom SQL — before you merge. When you're done with a change, it generates targeted validation queries — tailored to the specific columns, filters, and business logic you modified — so you can verify the change behaved as intended before merging.
 
 ## Editor & Stack Compatibility
 
@@ -33,23 +33,17 @@ Core workflows — table health check, change impact assessment, alert triage, a
 
 ## Setup
 
-### Step 1 — Obtain an MCP server key
+### Step 1 — Install the skill
+
+See [installation options](https://github.com/monte-carlo-data/mcd-skills#installation) in the main repository README.
+
+### Step 2 — Obtain an MCP server key
 
 1. Go to **Monte Carlo → Settings → API Keys**
 2. Click **Add** and select type **MCP Server**
 3. Copy the key — it has two parts: `KEY_ID` and `KEY_SECRET`
 
 MCP keys are separate from standard API keys. Standard keys work for the CLI; MCP keys work for the editor integration.
-
-### Step 2 — Install the skill
-
-(Will update once this repo is made public) Copy the skill file to your editor's skills directory. For Claude Code:
-
-```bash
-git@github.com:monte-carlo-data/monte-carlo-editor-skill.git
-mkdir -p ~/.claude/skills/monte-carlo
-cp skills/monte-carlo/SKILL.md ~/.claude/skills/monte-carlo/SKILL.md
-```
 
 ### Step 3 — Configure your MCP server
 
@@ -123,6 +117,8 @@ Open your dbt project (or any data engineering codebase) in your editor. From th
 **Workflow 3 — Alert triage:** When you ask about data quality issues. Lists open alerts, checks table state, traces lineage to find the root cause or blast radius.
 
 **Workflow 4 — Change impact assessment:** Fires automatically before any SQL edit — including filter changes, bugfixes, reverts, and parameter tweaks, not just schema changes. Surfaces downstream blast radius, active incidents, column exposure in recent queries, and monitor coverage. Reports a risk tier (High / Medium / Low) and translates the findings into a specific code recommendation. If the MC data suggests your planned approach is risky, Claude will recommend a safer alternative and explain why — citing the specific tables, alert counts, and read volumes it found.
+
+**Workflow 5 — Change validation queries:** After you've made a change and are ready to test it, say something like "generate validation queries" or "validate this change". Claude generates 3–5 targeted SQL queries based on the Workflow 4 findings and the diff — null checks, before/after row counts, distribution checks — using the exact column names, filter logic, and business rules from your change. Queries are saved to `validation/<table_name>_<timestamp>.sql` with inline comments explaining what a passing result looks like for each check. Does not activate automatically; only runs when you ask.
 
 ### Deploying generated monitors
 
