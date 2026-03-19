@@ -5,11 +5,9 @@ node_modules/
 .DS_Store
 .venv/
 target/
+# CLAUDE.md is intentionally committed at repo root
 **/CLAUDE.md
+!CLAUDE.md
+.claude/
 
-# Demo runtime artifacts (keep locally, don't commit)
-demo/.claude/
-demo/models/
-demo/monitors/
-demo/montecarlo.yml
-demo/target/
+temp/*
