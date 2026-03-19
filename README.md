@@ -4,22 +4,10 @@ Public Claude Code skills by [Monte Carlo Data](https://www.montecarlodata.com/)
 
 ## Installation
 
-**Option A — Manual (copy skill files directly):**
+**Option A — Install script:**
 
 ```bash
-# safe-change
-mkdir -p ~/.claude/skills/monte-carlo-safe-change
-curl -o ~/.claude/skills/monte-carlo-safe-change/SKILL.md \
-  https://raw.githubusercontent.com/monte-carlo-data/mcd-skills/main/safe-change/SKILL.md
-
-# generate-validation-notebook (includes required Python scripts)
-mkdir -p ~/.claude/skills/monte-carlo-generate-validation-notebook/scripts
-curl -o ~/.claude/skills/monte-carlo-generate-validation-notebook/SKILL.md \
-  https://raw.githubusercontent.com/monte-carlo-data/mcd-skills/main/generate-validation-notebook/SKILL.md
-curl -o ~/.claude/skills/monte-carlo-generate-validation-notebook/scripts/generate_notebook_url.py \
-  https://raw.githubusercontent.com/monte-carlo-data/mcd-skills/main/generate-validation-notebook/scripts/generate_notebook_url.py
-curl -o ~/.claude/skills/monte-carlo-generate-validation-notebook/scripts/resolve_dbt_schema.py \
-  https://raw.githubusercontent.com/monte-carlo-data/mcd-skills/main/generate-validation-notebook/scripts/resolve_dbt_schema.py
+bash <(curl -fsSL https://raw.githubusercontent.com/monte-carlo-data/monte-carlo-claude-plugin/main/install.sh)
 ```
 
 **Option B — via [skills.sh](https://skills.sh) CLI:**
