@@ -5,22 +5,24 @@ Monte Carlo's official toolkit for AI coding agents. Contains skills and plugins
 ## Prerequisites
 
 - A [Monte Carlo](https://www.montecarlodata.com) account with Editor role or above
-- The **Monte Carlo MCP server** configured (required by the `safe-change` plugin/skill)
+- The [Monte Carlo MCP server](https://docs.getmontecarlo.com/docs/mcp-server) configured (required by the `safe-change` plugin/skill)
+      <details>
+      <summary>Click to expand - Configure Monte Carlo MCP Server</summary>
+      
+      1. Obtain an MCP server key:
+         — Go to Monte Carlo → Settings → API Keys, click Add.
+         - Select type MCP Server. Copy the `KEY_ID` and `KEY_SECRET`.
+      
+      2. Configure the MCP server 
+         — Run `cp .mcp.json.example <mcp-config-path>/.mcp.json` to either:
+            - Project-level: `.mcp.json` at your project root (recommended — keeps config scoped to the project)
+            - Global: `~/.claude/claude.json` (path depends on your coding agent; applies to all projects)
+         - Replace `<KEY_ID>` and `<KEY_SECRET>` with your MCP key values.
+  
+      3. Verify — In Claude Code, ask: "Test my Monte Carlo connection". Claude will call `testConnection` and confirm
+         your credentials are working.
+      </details>
 
-### Setting up the MCP server
-
-1. **Obtain an MCP server key** — Go to **Monte Carlo → Settings → API Keys**, click **Add**, and select type **MCP Server**. Copy the `KEY_ID` and `KEY_SECRET`.
-
-   > MCP keys are separate from standard API keys. Standard keys work for the CLI; MCP keys work for the editor integration.
-
-2. **Configure the MCP server** — run `cp .mcp.json.example <mcp-configuration-path>/.mcp.json` to either:
-   - **Project-level:** `.mcp.json` at your project root (recommended — keeps config scoped to the project)
-   - **Global:** `~/.claude/claude.json` (applies to all projects)
-
-
-   Replace `<KEY_ID>` and `<KEY_SECRET>` with your MCP key values.
-
-3. **Verify** — In Claude Code, ask: *"Test my Monte Carlo connection"*. Claude will call `testConnection` and confirm your credentials are working.
 
 ## Installing plugins (recommended)
 
