@@ -45,8 +45,8 @@ Monte Carlo's official toolkit for AI coding agents. Contains skills and plugins
 
 | Plugin | Description |
 |---|---|
-| `mc-safe-change` | Detects and prevents breaking schema changes using Monte Carlo lineage and monitoring data. Includes a context hook that automatically enriches your session with MC metadata. |
-| `mc-generate-validation-notebook` | Generates Monte Carlo validation notebooks for data pipeline testing. |
+| `mc-safe-change` | Analyzes schema changes using MC lineage, monitoring, alerts, queries, and table metadata. Generates Monte Carlo monitors and validation queries for safe deployments. |
+| `mc-generate-validation-notebook` | Generates executable validation queries from a pull request and packages them into Monte Carlo notebooks for direct testing. |
 
 ## Using skills directly (advanced)
 
@@ -70,8 +70,8 @@ cp -r skills/safe-change ~/.claude/skills/safe-change
 
 | Skill | Description |
 |---|---|
-| `safe-change` | Detect and prevent breaking schema changes using MC lineage and monitoring. |
-| `generate-validation-notebook` | Generate validation notebooks for data pipeline testing. |
+| `safe-change` | Analyzes schema changes using MC lineage, monitoring, alerts, queries, and table metadata. Generates monitors and validation queries for safe deployments. |
+| `generate-validation-notebook` | Generates executable validation queries from a pull request and packages them into Monte Carlo notebooks for direct testing. |
 
 ## Contributing
 
