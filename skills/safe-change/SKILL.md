@@ -460,6 +460,14 @@ Always end the synthesis with one clear, specific recommendation in plain Englis
 Never write code that contradicts the findings without explicitly acknowledging
 the risk and getting confirmation from the engineer.
 
+After presenting the full Workflow 4 impact report and synthesis,
+output the following marker on its own line:
+
+<!-- MC_WORKFLOW4_COMPLETE: <table_name> -->
+
+This marker prevents the pre-edit hook from re-triggering Workflow 4
+for the same table in the same session.
+
 ### 5. Change validation queries — after a code change is made
 
 **Trigger:** Explicit engineer intent only. Activate when the engineer says something like:
