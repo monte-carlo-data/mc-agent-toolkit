@@ -40,7 +40,7 @@ All content files are already on the branch (untracked):
 
 ## Phases
 
-### Phase 1: Fix run_evals.py and commit everything
+### ~~Phase 1: Fix run_evals.py and commit everything~~ ✓
 
 **Goal:** Fix the one broken file, verify install and commands, and batch-commit all changes.
 
