@@ -8,7 +8,7 @@ import os
 sys.path.insert(0, os.path.dirname(__file__))
 
 from lib.safe_run import safe_run
-from lib.cache import get_workflow4_state
+from lib.cache import get_impact_check_state
 
 
 def _get_staged_model_tables(cwd: str) -> list[str]:
@@ -46,8 +46,8 @@ def main():
     if not staged_tables:
         return
 
-    # Only prompt if Workflow 4 ran for at least one staged table
-    w4_tables = [t for t in staged_tables if get_workflow4_state(t) == "verified"]
+    # Only prompt if impact assessment ran for at least one staged table
+    w4_tables = [t for t in staged_tables if get_impact_check_state(t) == "verified"]
     if not w4_tables:
         return
 
@@ -55,7 +55,7 @@ def main():
     message = f"Committing changes to {table_list}. Run validation queries before committing? (yes / no)"
 
     # Monitor coverage reminder: The spec says to include a passive nudge
-    # ("Workflow 4 found no monitor coverage...") when W4 found a gap and
+    # ("impact assessment found no monitor coverage...") when W4 found a gap and
     # the engineer declined the offer. In Phase 1, the hook has no reliable
     # way to detect this from cache alone (the gap info lives in the
     # transcript/conversation context, not in temp files). Deferred until

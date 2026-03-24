@@ -24,8 +24,8 @@ class TestTurnEndHook:
             main()
         assert capsys.readouterr().out == ""
 
-    def test_edits_without_workflow4_silent(self, capsys):
-        """Edits without Workflow 4 should not prompt."""
+    def test_edits_without_impact_check_silent(self, capsys):
+        """Edits without impact assessment should not prompt."""
         cache.add_edited_table("test_session", "orders")
 
         from turn_end_hook import main
@@ -33,11 +33,11 @@ class TestTurnEndHook:
             main()
         assert capsys.readouterr().out == ""
 
-    def test_edits_with_workflow4_prompts(self, capsys):
-        """Edits + Workflow 4 verified should produce validation prompt."""
+    def test_edits_with_impact_check_prompts(self, capsys):
+        """Edits + impact assessment verified should produce validation prompt."""
         cache.add_edited_table("test_session", "orders")
-        cache.mark_workflow4_injected("orders")
-        cache.mark_workflow4_verified("orders")
+        cache.mark_impact_check_injected("orders")
+        cache.mark_impact_check_verified("orders")
 
         from turn_end_hook import main
         with patch("sys.stdin", StringIO(_make_stdin())):
@@ -52,8 +52,8 @@ class TestTurnEndHook:
     def test_stop_hook_active_exits_silently(self, capsys):
         """If stop_hook_active is true, exit silently to prevent infinite loop."""
         cache.add_edited_table("test_session", "orders")
-        cache.mark_workflow4_injected("orders")
-        cache.mark_workflow4_verified("orders")
+        cache.mark_impact_check_injected("orders")
+        cache.mark_impact_check_verified("orders")
 
         from turn_end_hook import main
         with patch("sys.stdin", StringIO(_make_stdin(stop_hook_active=True))):
@@ -64,8 +64,8 @@ class TestTurnEndHook:
     def test_moves_to_pending_validation(self, capsys):
         """After prompting, tables should move to pending validation."""
         cache.add_edited_table("test_session", "orders")
-        cache.mark_workflow4_injected("orders")
-        cache.mark_workflow4_verified("orders")
+        cache.mark_impact_check_injected("orders")
+        cache.mark_impact_check_verified("orders")
 
         from turn_end_hook import main
         with patch("sys.stdin", StringIO(_make_stdin())):
@@ -77,8 +77,8 @@ class TestTurnEndHook:
     def test_multiple_tables_in_prompt(self, capsys):
         cache.add_edited_table("test_session", "orders")
         cache.add_edited_table("test_session", "customers")
-        cache.mark_workflow4_injected("orders")
-        cache.mark_workflow4_verified("orders")
+        cache.mark_impact_check_injected("orders")
+        cache.mark_impact_check_verified("orders")
 
         from turn_end_hook import main
         with patch("sys.stdin", StringIO(_make_stdin())):
@@ -90,12 +90,16 @@ class TestTurnEndHook:
         assert "orders" in parsed["reason"]
         assert "customers" in parsed["reason"]
 
-    def test_edits_with_only_injected_state_silent(self, capsys):
-        """Edits with only 'injected' (not verified) W4 should not prompt."""
+    def test_edits_with_only_injected_state_prompts(self, capsys):
+        """Edits with 'injected' state should prompt (assessment was triggered)."""
         cache.add_edited_table("test_session", "orders")
-        cache.mark_workflow4_injected("orders")
+        cache.mark_impact_check_injected("orders")
 
         from turn_end_hook import main
         with patch("sys.stdin", StringIO(_make_stdin())):
             main()
-        assert capsys.readouterr().out == ""
+
+        output = capsys.readouterr().out
+        parsed = json.loads(output)
+        assert parsed["decision"] == "block"
+        assert "orders" in parsed["reason"]

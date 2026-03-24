@@ -3,22 +3,22 @@
 All state lives under /tmp/mc_safe_change_*. No external dependencies.
 Cleans up naturally on reboot.
 
-Workflow 4 gate uses three states:
+Impact check gate uses three states:
   absent -> injected (instruction sent, waiting for completion)
-  injected -> verified (MC_WORKFLOW4_COMPLETE marker found in transcript)
+  injected -> verified (MC_IMPACT_CHECK_COMPLETE marker found in transcript)
 """
 import json
 import os
 import time
 
 CACHE_DIR = "/tmp"
-W4_PREFIX = "mc_safe_change_w4_"
+IC_PREFIX = "mc_safe_change_ic_"
 TURN_PREFIX = "mc_safe_change_turn_"
 PENDING_PREFIX = "mc_safe_change_pending_"
 
 
 def _w4_path(table_name: str) -> str:
-    return os.path.join(CACHE_DIR, f"{W4_PREFIX}{table_name}")
+    return os.path.join(CACHE_DIR, f"{IC_PREFIX}{table_name}")
 
 
 def _turn_path(session_id: str) -> str:
@@ -29,9 +29,9 @@ def _pending_path(session_id: str) -> str:
     return os.path.join(CACHE_DIR, f"{PENDING_PREFIX}{session_id}")
 
 
-# --- Workflow 4 three-state marker ---
+# --- Impact check three-state marker ---
 
-def get_workflow4_state(table_name: str) -> str | None:
+def get_impact_check_state(table_name: str) -> str | None:
     """Returns None, 'injected', or 'verified'."""
     path = _w4_path(table_name)
     if not os.path.exists(path):
@@ -44,13 +44,13 @@ def get_workflow4_state(table_name: str) -> str | None:
         return None
 
 
-def mark_workflow4_injected(table_name: str) -> None:
+def mark_impact_check_injected(table_name: str) -> None:
     path = _w4_path(table_name)
     with open(path, "w") as f:
         json.dump({"state": "injected", "timestamp": time.time()}, f)
 
 
-def mark_workflow4_verified(table_name: str) -> None:
+def mark_impact_check_verified(table_name: str) -> None:
     path = _w4_path(table_name)
     # Preserve timestamp from injection
     timestamp = time.time()
@@ -64,7 +64,7 @@ def mark_workflow4_verified(table_name: str) -> None:
         json.dump({"state": "verified", "timestamp": timestamp}, f)
 
 
-def get_marker_age_seconds(table_name: str) -> float:
+def get_impact_check_age_seconds(table_name: str) -> float:
     path = _w4_path(table_name)
     try:
         with open(path, "r") as f:

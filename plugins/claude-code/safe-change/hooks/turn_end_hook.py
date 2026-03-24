@@ -9,7 +9,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 from lib.safe_run import safe_run
 from lib.cache import (
     get_edited_tables,
-    get_workflow4_state,
+    get_impact_check_state,
     move_to_pending_validation,
 )
 
@@ -28,9 +28,9 @@ def main():
     if not tables:
         return
 
-    # Prompt if Workflow 4 was triggered for at least one edited table
+    # Prompt if impact assessment was triggered for at least one edited table
     # "injected" means W4 instruction was sent; "verified" means completion confirmed
-    w4_tables = [t for t in tables if get_workflow4_state(t) in ("injected", "verified")]
+    w4_tables = [t for t in tables if get_impact_check_state(t) in ("injected", "verified")]
     if not w4_tables:
         return
 

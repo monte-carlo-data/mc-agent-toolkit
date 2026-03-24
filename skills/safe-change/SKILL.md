@@ -463,7 +463,7 @@ the risk and getting confirmation from the engineer.
 After presenting the full Workflow 4 impact report and synthesis,
 output the following marker on its own line:
 
-<!-- MC_WORKFLOW4_COMPLETE: <table_name> -->
+<!-- MC_IMPACT_CHECK_COMPLETE: <table_name> -->
 
 This marker prevents the pre-edit hook from re-triggering Workflow 4
 for the same table in the same session.

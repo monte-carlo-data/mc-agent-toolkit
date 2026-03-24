@@ -68,21 +68,21 @@ class TestIsDbtModel:
         sql_file.write_text("SELECT 1 AS id")
         assert is_dbt_model(str(sql_file)) is False
 
-    def test_yml_file_in_models(self, tmp_path):
-        """A .yml file under models/ is a dbt model (schema file)."""
+    def test_yml_file_in_models_not_matched(self, tmp_path):
+        """A .yml file under models/ is NOT a dbt model (tracked separately as schema file)."""
         model_dir = tmp_path / "project" / "models"
         model_dir.mkdir(parents=True)
         yml_file = model_dir / "schema.yml"
         yml_file.write_text("version: 2\nmodels:\n  - name: foo")
-        assert is_dbt_model(str(yml_file)) is True
+        assert is_dbt_model(str(yml_file)) is False
 
-    def test_yaml_file_in_models(self, tmp_path):
-        """A .yaml file under models/ is also a dbt schema file."""
+    def test_yaml_file_in_models_not_matched(self, tmp_path):
+        """A .yaml file under models/ is NOT a dbt model (tracked separately)."""
         model_dir = tmp_path / "project" / "models"
         model_dir.mkdir(parents=True)
         yml_file = model_dir / "schema.yaml"
         yml_file.write_text("version: 2\nmodels:\n  - name: foo")
-        assert is_dbt_model(str(yml_file)) is True
+        assert is_dbt_model(str(yml_file)) is False
 
     def test_non_sql_non_yml_file(self, tmp_path):
         """A .py file under models/ is not a dbt model."""
@@ -101,9 +101,13 @@ class TestIsDbtModel:
         sql_file.write_text("".join(lines))
         assert is_dbt_model(str(sql_file)) is False
 
-    def test_nonexistent_file(self):
-        """A file that doesn't exist returns False."""
-        assert is_dbt_model("/nonexistent/models/foo.sql") is False
+    def test_nonexistent_sql_in_models_is_new_model(self):
+        """A nonexistent .sql file under models/ is treated as a new model."""
+        assert is_dbt_model("/nonexistent/models/foo.sql") is True
+
+    def test_nonexistent_file_outside_models(self):
+        """A nonexistent file outside models/ returns False."""
+        assert is_dbt_model("/nonexistent/scripts/foo.sql") is False
 
 
 class TestExtractTableName:

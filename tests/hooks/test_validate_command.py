@@ -30,8 +30,8 @@ class TestValidateCommand:
     def test_pending_tables_with_w4_generates_instruction(self, capsys):
         cache.add_edited_table("test_session", "orders")
         cache.move_to_pending_validation("test_session")
-        cache.mark_workflow4_injected("orders")
-        cache.mark_workflow4_verified("orders")
+        cache.mark_impact_check_injected("orders")
+        cache.mark_impact_check_verified("orders")
 
         from validate_command import main
         with patch("sys.stdin", StringIO(_make_stdin())):

@@ -29,7 +29,7 @@ class TestPreEditHook:
         assert capsys.readouterr().out == ""
 
     def test_dbt_model_first_edit_injects(self, tmp_path, capsys):
-        """First edit to a dbt model should inject Workflow 4 instruction."""
+        """First edit to a dbt model should inject impact assessment instruction."""
         model_dir = tmp_path / "models"
         model_dir.mkdir()
         sql_file = model_dir / "orders.sql"
@@ -41,8 +41,9 @@ class TestPreEditHook:
 
         output = capsys.readouterr().out
         parsed = json.loads(output)
-        assert "MANDATORY" in parsed["hookSpecificOutput"]["additionalContext"]
-        assert "orders" in parsed["hookSpecificOutput"]["additionalContext"]
+        assert parsed["hookSpecificOutput"]["permissionDecision"] == "deny"
+        assert "BLOCKED" in parsed["hookSpecificOutput"]["permissionDecisionReason"]
+        assert "orders" in parsed["hookSpecificOutput"]["permissionDecisionReason"]
 
     def test_dbt_model_second_edit_within_120s_silent(self, tmp_path, capsys):
         """Second edit within 120s should be silent (injected state, still fresh)."""
@@ -51,7 +52,7 @@ class TestPreEditHook:
         sql_file = model_dir / "orders.sql"
         sql_file.write_text("SELECT * FROM {{ ref('raw') }}")
 
-        cache.mark_workflow4_injected("orders")
+        cache.mark_impact_check_injected("orders")
 
         from pre_edit_hook import main
         with patch("sys.stdin", StringIO(_make_stdin(str(sql_file)))):
@@ -66,8 +67,8 @@ class TestPreEditHook:
         sql_file = model_dir / "orders.sql"
         sql_file.write_text("SELECT * FROM {{ ref('raw') }}")
 
-        cache.mark_workflow4_injected("orders")
-        cache.mark_workflow4_verified("orders")
+        cache.mark_impact_check_injected("orders")
+        cache.mark_impact_check_verified("orders")
 
         from pre_edit_hook import main
         with patch("sys.stdin", StringIO(_make_stdin(str(sql_file)))):
@@ -82,14 +83,14 @@ class TestPreEditHook:
         sql_file = model_dir / "orders.sql"
         sql_file.write_text("SELECT * FROM {{ ref('raw') }}")
 
-        cache.mark_workflow4_injected("orders")
+        cache.mark_impact_check_injected("orders")
 
         # Create transcript with the completion marker
         transcript = tmp_path / "transcript.jsonl"
-        transcript.write_text('{"content": "<!-- MC_WORKFLOW4_COMPLETE: orders -->"}\n')
+        transcript.write_text('{"content": "<!-- MC_IMPACT_CHECK_COMPLETE: orders -->"}\n')
 
         # Age the marker past grace period
-        marker_path = "/tmp/mc_safe_change_w4_orders"
+        marker_path = "/tmp/mc_safe_change_ic_orders"
         with open(marker_path, "r") as f:
             data = json.load(f)
         data["timestamp"] = data["timestamp"] - 200  # 200 seconds ago
@@ -101,7 +102,7 @@ class TestPreEditHook:
             main()
 
         assert capsys.readouterr().out == ""
-        assert cache.get_workflow4_state("orders") == "verified"
+        assert cache.get_impact_check_state("orders") == "verified"
 
     def test_grace_period_expired_no_marker_in_transcript_reinjects(self, tmp_path, capsys):
         """After 120s, if transcript lacks marker, should re-inject."""
@@ -110,14 +111,14 @@ class TestPreEditHook:
         sql_file = model_dir / "orders.sql"
         sql_file.write_text("SELECT * FROM {{ ref('raw') }}")
 
-        cache.mark_workflow4_injected("orders")
+        cache.mark_impact_check_injected("orders")
 
         # Create transcript WITHOUT the completion marker
         transcript = tmp_path / "transcript.jsonl"
         transcript.write_text('{"content": "some other message"}\n')
 
         # Age the marker past grace period
-        marker_path = "/tmp/mc_safe_change_w4_orders"
+        marker_path = "/tmp/mc_safe_change_ic_orders"
         with open(marker_path, "r") as f:
             data = json.load(f)
         data["timestamp"] = data["timestamp"] - 200
@@ -130,14 +131,15 @@ class TestPreEditHook:
 
         output = capsys.readouterr().out
         parsed = json.loads(output)
-        assert "MANDATORY" in parsed["hookSpecificOutput"]["additionalContext"]
+        assert parsed["hookSpecificOutput"]["permissionDecision"] == "deny"
+        assert "BLOCKED" in parsed["hookSpecificOutput"]["permissionDecisionReason"]
 
 
 class TestScanTranscript:
     def test_marker_found(self, tmp_path):
         from pre_edit_hook import _scan_transcript_for_marker
         transcript = tmp_path / "transcript.jsonl"
-        transcript.write_text('line1\n<!-- MC_WORKFLOW4_COMPLETE: orders -->\nline3\n')
+        transcript.write_text('line1\n<!-- MC_IMPACT_CHECK_COMPLETE: orders -->\nline3\n')
         assert _scan_transcript_for_marker(str(transcript), "orders") is True
 
     def test_marker_not_found(self, tmp_path):

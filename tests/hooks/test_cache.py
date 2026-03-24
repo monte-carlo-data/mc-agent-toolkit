@@ -4,10 +4,10 @@ import json
 import pytest
 
 from lib.cache import (
-    get_workflow4_state,
-    mark_workflow4_injected,
-    mark_workflow4_verified,
-    get_marker_age_seconds,
+    get_impact_check_state,
+    mark_impact_check_injected,
+    mark_impact_check_verified,
+    get_impact_check_age_seconds,
     get_edited_tables,
     add_edited_table,
     clear_edited_tables,
@@ -17,29 +17,29 @@ from lib.cache import (
 )
 
 
-class TestWorkflow4State:
+class TestImpactCheckState:
     def test_no_marker_returns_none(self):
-        assert get_workflow4_state("my_table") is None
+        assert get_impact_check_state("my_table") is None
 
     def test_injected_state(self):
-        mark_workflow4_injected("my_table")
-        assert get_workflow4_state("my_table") == "injected"
+        mark_impact_check_injected("my_table")
+        assert get_impact_check_state("my_table") == "injected"
 
     def test_verified_state(self):
-        mark_workflow4_injected("my_table")
-        mark_workflow4_verified("my_table")
-        assert get_workflow4_state("my_table") == "verified"
+        mark_impact_check_injected("my_table")
+        mark_impact_check_verified("my_table")
+        assert get_impact_check_state("my_table") == "verified"
 
     def test_marker_age(self):
-        mark_workflow4_injected("my_table")
-        age = get_marker_age_seconds("my_table")
+        mark_impact_check_injected("my_table")
+        age = get_impact_check_age_seconds("my_table")
         assert 0 <= age < 2  # Should be very recent
 
     def test_different_tables_independent(self):
-        mark_workflow4_injected("table_a")
-        mark_workflow4_verified("table_a")
-        assert get_workflow4_state("table_a") == "verified"
-        assert get_workflow4_state("table_b") is None
+        mark_impact_check_injected("table_a")
+        mark_impact_check_verified("table_a")
+        assert get_impact_check_state("table_a") == "verified"
+        assert get_impact_check_state("table_b") is None
 
 
 class TestEditAccumulator:

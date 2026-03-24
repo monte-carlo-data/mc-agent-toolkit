@@ -10,7 +10,7 @@ from lib.safe_run import safe_run
 from lib.cache import (
     get_pending_validation_tables,
     get_edited_tables,
-    get_workflow4_state,
+    get_impact_check_state,
 )
 
 
@@ -34,8 +34,8 @@ def main():
         print(json.dumps(output))
         return
 
-    # Filter to tables that had Workflow 4
-    w4_tables = [t for t in tables if get_workflow4_state(t) == "verified"]
+    # Filter to tables that had impact assessment
+    w4_tables = [t for t in tables if get_impact_check_state(t) == "verified"]
     if not w4_tables:
         w4_tables = tables  # Fall back to all tables if no W4 tracking
 
