@@ -9,7 +9,7 @@ through the Claude API to check whether the skill would be triggered.
 Usage:
     pip install anthropic
     export ANTHROPIC_API_KEY=sk-ant-...
-    python run_evals.py [--model claude-sonnet-4-5] [--threshold 0.85]
+    python run_evals.py [--model claude-sonnet-4-6] [--threshold 0.85]
 
 Exit codes:
     0 — pass rate meets threshold
@@ -93,8 +93,8 @@ def judge(client: anthropic.Anthropic, model: str, skill_name: str, skill_descri
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Run trigger accuracy evals for the montecarlo-push-ingestion skill")
-    parser.add_argument("--model", default="claude-sonnet-4-5", help="Claude model to use as judge")
+    parser = argparse.ArgumentParser(description="Run trigger accuracy evals for the push-ingestion skill")
+    parser.add_argument("--model", default="claude-sonnet-4-6", help="Claude model to use as judge")
     parser.add_argument("--threshold", type=float, default=0.85, help="Minimum pass rate to exit 0 (default: 0.85)")
     parser.add_argument("--evals", default=str(EVALS_DIR / "trigger-evals.json"), help="Path to eval cases JSON")
     args = parser.parse_args()

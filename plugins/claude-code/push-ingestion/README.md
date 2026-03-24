@@ -42,7 +42,7 @@ You need two separate Monte Carlo API keys:
 2. **GraphQL API key** — for verification queries
    Create at: https://getmontecarlo.com/settings/api
 
-See [`skills/push-ingestion/references/prerequisites.md`](skills/push-ingestion/references/prerequisites.md) for full setup instructions.
+See [`prerequisites.md`](../../../skills/push-ingestion/references/prerequisites.md) for full setup instructions.
 
 ## Installation
 

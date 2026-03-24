@@ -1,6 +1,6 @@
 # Skill Trigger Evals
 
-This directory contains the trigger accuracy eval set for the `montecarlo-push-ingestion` skill.
+This directory contains the trigger accuracy eval set for the `push-ingestion` skill.
 
 ## What it tests
 
@@ -16,21 +16,19 @@ The eval runner asks Claude to act as a judge: given the skill's description and
 pip install anthropic
 export ANTHROPIC_API_KEY=sk-ant-...
 
-python push-ingestion/evals/run_evals.py
+# From repo root:
+python plugins/claude-code/push-ingestion/evals/run_evals.py
+
+# Or from this directory:
+python run_evals.py
 ```
 
 Options:
 ```
---model      Claude model to use as judge (default: claude-sonnet-4-5)
+--model      Claude model to use as judge (default: claude-sonnet-4-6)
 --threshold  Minimum pass rate to exit 0   (default: 0.85)
 --evals      Path to eval cases JSON       (default: trigger-evals.json)
 ```
-
-## CI
-
-The eval runs automatically on every PR that touches `push-ingestion/skills/` or `push-ingestion/evals/`. It requires an `ANTHROPIC_API_KEY` secret configured in the repo settings.
-
-A pass rate below 85% fails the check.
 
 ## Adding new cases
 
