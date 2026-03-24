@@ -8,7 +8,7 @@ import os
 sys.path.insert(0, os.path.dirname(__file__))
 
 from lib.safe_run import safe_run
-from lib.cache import get_impact_check_state
+from lib.cache import get_impact_check_state, has_monitor_gap
 
 
 def _get_staged_model_tables(cwd: str) -> list[str]:
@@ -52,14 +52,16 @@ def main():
         return
 
     table_list = ", ".join(w4_tables)
+    gap_tables = [t for t in w4_tables if has_monitor_gap(t)]
+
     message = f"Committing changes to {table_list}. Run validation queries before committing? (yes / no)"
 
-    # Monitor coverage reminder: The spec says to include a passive nudge
-    # ("impact assessment found no monitor coverage...") when W4 found a gap and
-    # the engineer declined the offer. In Phase 1, the hook has no reliable
-    # way to detect this from cache alone (the gap info lives in the
-    # transcript/conversation context, not in temp files). Deferred until
-    # we add transcript scanning for monitor coverage state.
+    if gap_tables:
+        gap_list = ", ".join(gap_tables)
+        message += (
+            f"\n\nMonitor coverage: the impact assessment found no custom monitors "
+            f"on {gap_list}. Generate monitor definitions before committing? (yes / no)"
+        )
 
     output = {
         "hookSpecificOutput": {

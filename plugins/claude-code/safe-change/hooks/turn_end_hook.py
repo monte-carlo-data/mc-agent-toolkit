@@ -10,6 +10,7 @@ from lib.safe_run import safe_run
 from lib.cache import (
     get_edited_tables,
     get_impact_check_state,
+    has_monitor_gap,
     move_to_pending_validation,
 )
 
@@ -34,7 +35,10 @@ def main():
     if not w4_tables:
         return
 
-    # Build validation prompt
+    # Check for monitor coverage gaps
+    gap_tables = [t for t in tables if has_monitor_gap(t)]
+
+    # Build prompt
     table_list = ", ".join(tables)
     count = len(tables)
     reason = (
@@ -44,6 +48,15 @@ def main():
         f"→ Yes: I'll generate and run queries for all changed models\n"
         f"→ No: You can use /mc-validate anytime to validate changes"
     )
+
+    if gap_tables:
+        gap_list = ", ".join(gap_tables)
+        reason += (
+            f"\n\nMonitor coverage: the impact assessment found no custom monitors "
+            f"on {gap_list}. Would you like to generate monitor definitions?\n\n"
+            f"→ Yes: I'll suggest monitors for the new or changed logic\n"
+            f"→ No: Skip for now"
+        )
 
     # Move tables to pending validation before prompting
     move_to_pending_validation(session_id)
