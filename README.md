@@ -38,6 +38,7 @@ Monte Carlo's official toolkit for AI coding agents. Contains skills and plugins
    ```
    /plugin install mc-safe-change@mcd-agent-toolkit
    /plugin install mc-generate-validation-notebook@mcd-agent-toolkit
+   /plugin install mc-push-ingestion@mcd-agent-toolkit
    ```
 3. Updates — `claude plugin update` pulls in the latest skill and hook changes.
 
@@ -47,6 +48,7 @@ Monte Carlo's official toolkit for AI coding agents. Contains skills and plugins
 |---|---|
 | `mc-safe-change` | Analyzes schema changes using MC lineage, monitoring, alerts, queries, and table metadata. Generates Monte Carlo monitors and validation queries for safe deployments. |
 | `mc-generate-validation-notebook` | Generates executable validation queries from a pull request and packages them into Monte Carlo notebooks for direct testing. |
+| `mc-push-ingestion` | Generates warehouse-specific collection scripts and guides customers through pushing metadata, lineage, and query logs to Monte Carlo. |
 
 ## Using skills directly (advanced)
 
@@ -72,6 +74,7 @@ cp -r skills/safe-change ~/.claude/skills/safe-change
 |---|---|
 | `safe-change` | Analyzes schema changes using MC lineage, monitoring, alerts, queries, and table metadata. Generates monitors and validation queries for safe deployments. |
 | `generate-validation-notebook` | Generates executable validation queries from a pull request and packages them into Monte Carlo notebooks for direct testing. |
+| `push-ingestion` | Generates warehouse-specific collection scripts and guides customers through pushing metadata, lineage, and query logs to Monte Carlo. |
 
 ## Contributing
 
