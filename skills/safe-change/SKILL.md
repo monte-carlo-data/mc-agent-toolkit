@@ -196,12 +196,19 @@ on its own line when the condition is met.
 ### Impact check complete
 
 After the engineer confirms (High/Medium) or after presenting the synthesis (Low),
-output:
+output one marker **for each table covered by the assessment**:
 
 <!-- MC_IMPACT_CHECK_COMPLETE: <table_name> -->
 
-This prevents the pre-edit hook from re-triggering Workflow 4 for the same table
-in the same session.
+When a single change spans multiple tables (e.g. "add column to table_A and include
+it in table_B"), emit a separate marker for every table that was assessed — not just
+the primary one. Example for a two-table change:
+
+<!-- MC_IMPACT_CHECK_COMPLETE: client_hub_master -->
+<!-- MC_IMPACT_CHECK_COMPLETE: finance_funnel_model -->
+
+This prevents the pre-edit hook from re-triggering Workflow 4 for tables already
+covered by the same assessment.
 
 ### Monitor coverage gap
 

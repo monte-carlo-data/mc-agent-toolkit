@@ -60,10 +60,7 @@ def main():
         return
 
     if state == "injected":
-        age = get_impact_check_age_seconds(table_name)
-        if age < GRACE_PERIOD_SECONDS:
-            return
-        # Grace period expired — verify via transcript
+        # Always check transcript for completion marker before allowing edit
         transcript_path = input_data.get("transcript_path", "")
         markers = _scan_transcript_for_markers(transcript_path, table_name)
         if markers["monitor_gap"] and not has_monitor_gap(table_name):
@@ -71,7 +68,35 @@ def main():
         if markers["impact_check"]:
             mark_impact_check_verified(table_name)
             return
-        # Not found in transcript — re-inject (marker will be overwritten below)
+        # Assessment not completed — block without re-injecting if within grace period
+        age = get_impact_check_age_seconds(table_name)
+        if age < GRACE_PERIOD_SECONDS:
+            reason = (
+                f"Monte Carlo safe-change: the impact assessment for {table_name} "
+                f"has not completed yet. Complete the assessment before editing this file."
+            )
+            output = {
+                "hookSpecificOutput": {
+                    "hookEventName": "PreToolUse",
+                    "permissionDecision": "deny",
+                    "permissionDecisionReason": reason,
+                }
+            }
+            print(json.dumps(output))
+            return
+        # Grace period expired and no marker — re-inject full instruction below
+
+    elif state is None:
+        # Skill may have been invoked voluntarily before any edit (no prior hook injection).
+        # Check the transcript for the marker before blocking to avoid a spurious re-trigger.
+        transcript_path = input_data.get("transcript_path", "")
+        if transcript_path:
+            markers = _scan_transcript_for_markers(transcript_path, table_name)
+            if markers["monitor_gap"] and not has_monitor_gap(table_name):
+                mark_monitor_gap(table_name)
+            if markers["impact_check"]:
+                mark_impact_check_verified(table_name)
+                return
 
     # No marker or failed verification — block the edit until impact assessment runs
     mark_impact_check_injected(table_name)

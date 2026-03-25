@@ -42,11 +42,11 @@ class TestPreEditHook:
         output = capsys.readouterr().out
         parsed = json.loads(output)
         assert parsed["hookSpecificOutput"]["permissionDecision"] == "deny"
-        assert "BLOCKED" in parsed["hookSpecificOutput"]["permissionDecisionReason"]
+        assert "impact assessment" in parsed["hookSpecificOutput"]["permissionDecisionReason"]
         assert "orders" in parsed["hookSpecificOutput"]["permissionDecisionReason"]
 
-    def test_dbt_model_second_edit_within_120s_silent(self, tmp_path, capsys):
-        """Second edit within 120s should be silent (injected state, still fresh)."""
+    def test_dbt_model_second_edit_within_120s_blocks(self, tmp_path, capsys):
+        """Second edit within 120s without marker should block (not bypass)."""
         model_dir = tmp_path / "models"
         model_dir.mkdir()
         sql_file = model_dir / "orders.sql"
@@ -54,11 +54,38 @@ class TestPreEditHook:
 
         cache.mark_impact_check_injected("orders")
 
+        # No transcript marker — assessment hasn't completed
+        transcript = tmp_path / "transcript.jsonl"
+        transcript.write_text('{"content": "some other message"}\n')
+
         from pre_edit_hook import main
-        with patch("sys.stdin", StringIO(_make_stdin(str(sql_file)))):
+        with patch("sys.stdin", StringIO(_make_stdin(str(sql_file), transcript_path=str(transcript)))):
+            main()
+
+        output = capsys.readouterr().out
+        parsed = json.loads(output)
+        assert parsed["hookSpecificOutput"]["permissionDecision"] == "deny"
+        assert "not completed yet" in parsed["hookSpecificOutput"]["permissionDecisionReason"]
+
+    def test_dbt_model_second_edit_within_120s_with_marker_passes(self, tmp_path, capsys):
+        """Second edit within 120s with marker in transcript should pass."""
+        model_dir = tmp_path / "models"
+        model_dir.mkdir()
+        sql_file = model_dir / "orders.sql"
+        sql_file.write_text("SELECT * FROM {{ ref('raw') }}")
+
+        cache.mark_impact_check_injected("orders")
+
+        # Transcript has the completion marker
+        transcript = tmp_path / "transcript.jsonl"
+        transcript.write_text('{"content": "<!-- MC_IMPACT_CHECK_COMPLETE: orders -->"}\n')
+
+        from pre_edit_hook import main
+        with patch("sys.stdin", StringIO(_make_stdin(str(sql_file), transcript_path=str(transcript)))):
             main()
 
         assert capsys.readouterr().out == ""
+        assert cache.get_impact_check_state("orders") == "verified"
 
     def test_dbt_model_verified_state_silent(self, tmp_path, capsys):
         """Verified state should always be silent."""
@@ -132,22 +159,33 @@ class TestPreEditHook:
         output = capsys.readouterr().out
         parsed = json.loads(output)
         assert parsed["hookSpecificOutput"]["permissionDecision"] == "deny"
-        assert "BLOCKED" in parsed["hookSpecificOutput"]["permissionDecisionReason"]
+        assert "impact assessment" in parsed["hookSpecificOutput"]["permissionDecisionReason"]
 
 
 class TestScanTranscript:
     def test_marker_found(self, tmp_path):
-        from pre_edit_hook import _scan_transcript_for_marker
+        from pre_edit_hook import _scan_transcript_for_markers
         transcript = tmp_path / "transcript.jsonl"
         transcript.write_text('line1\n<!-- MC_IMPACT_CHECK_COMPLETE: orders -->\nline3\n')
-        assert _scan_transcript_for_marker(str(transcript), "orders") is True
+        result = _scan_transcript_for_markers(str(transcript), "orders")
+        assert result["impact_check"] is True
 
     def test_marker_not_found(self, tmp_path):
-        from pre_edit_hook import _scan_transcript_for_marker
+        from pre_edit_hook import _scan_transcript_for_markers
         transcript = tmp_path / "transcript.jsonl"
         transcript.write_text('line1\nline2\n')
-        assert _scan_transcript_for_marker(str(transcript), "orders") is False
+        result = _scan_transcript_for_markers(str(transcript), "orders")
+        assert result["impact_check"] is False
 
     def test_file_not_found(self):
-        from pre_edit_hook import _scan_transcript_for_marker
-        assert _scan_transcript_for_marker("/nonexistent/path", "orders") is False
+        from pre_edit_hook import _scan_transcript_for_markers
+        result = _scan_transcript_for_markers("/nonexistent/path", "orders")
+        assert result["impact_check"] is False
+
+    def test_monitor_gap_marker(self, tmp_path):
+        from pre_edit_hook import _scan_transcript_for_markers
+        transcript = tmp_path / "transcript.jsonl"
+        transcript.write_text('<!-- MC_MONITOR_GAP: orders -->\n<!-- MC_IMPACT_CHECK_COMPLETE: orders -->\n')
+        result = _scan_transcript_for_markers(str(transcript), "orders")
+        assert result["impact_check"] is True
+        assert result["monitor_gap"] is True
