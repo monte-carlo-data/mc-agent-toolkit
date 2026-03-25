@@ -23,15 +23,17 @@ GRACE_PERIOD_SECONDS = 120
 
 def _scan_transcript_for_markers(transcript_path: str, table_name: str) -> dict:
     """Scan transcript for MC_IMPACT_CHECK_COMPLETE and MC_MONITOR_GAP markers."""
-    ic_marker = f"MC_IMPACT_CHECK_COMPLETE: {table_name}"
-    mg_marker = f"MC_MONITOR_GAP: {table_name}"
+    import re
+    # Anchor with \b after table_name so client_hub doesn't match client_hub_master
+    ic_pattern = re.compile(rf"MC_IMPACT_CHECK_COMPLETE: {re.escape(table_name)}\b")
+    mg_pattern = re.compile(rf"MC_MONITOR_GAP: {re.escape(table_name)}\b")
     found = {"impact_check": False, "monitor_gap": False}
     try:
         with open(transcript_path, "r", encoding="utf-8") as f:
             for line in f:
-                if ic_marker in line:
+                if ic_pattern.search(line):
                     found["impact_check"] = True
-                if mg_marker in line:
+                if mg_pattern.search(line):
                     found["monitor_gap"] = True
     except (OSError, UnicodeDecodeError):
         pass
