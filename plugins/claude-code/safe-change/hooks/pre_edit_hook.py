@@ -103,19 +103,27 @@ def main():
     # No marker or failed verification — block the edit until impact assessment runs
     mark_impact_check_injected(table_name)
 
+    hook_triggered_note = (
+        "This assessment is hook-triggered — only emit MC_IMPACT_CHECK_COMPLETE "
+        "markers for tables whose lineage and monitor coverage were fetched "
+        "directly via Monte Carlo tools."
+    )
+
     if table_name.startswith("macro:"):
         macro_name = table_name.removeprefix("macro:")
         reason = (
             f"Monte Carlo safe-change: this macro ({macro_name}) is inlined into "
             f"models at compile time — changes here affect every model that calls it. "
             f"Identify which models use this macro, then run the change impact "
-            f"assessment for the affected models before editing this file."
+            f"assessment for the affected models before editing this file. "
+            f"{hook_triggered_note}"
         )
     else:
         reason = (
             f"Monte Carlo safe-change: run the change impact assessment "
             f"for {table_name} before editing this file. Present the full "
-            f"impact report and synthesis step, then retry the edit."
+            f"impact report and synthesis step, then retry the edit. "
+            f"{hook_triggered_note}"
         )
 
     output = {

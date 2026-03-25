@@ -1,13 +1,13 @@
 ---
 name: monte-carlo-safe-change
 description: |
-    Automatically activates when a dbt model, SQL file, or table is referenced.
-    Surfaces Monte Carlo context — table health, active alerts, lineage, blast
-    radius — before any code is written, and uses those findings to shape code
-    recommendations. Generates and optionally deploys monitors for new transformation
-    logic. After a change is made, generates targeted SQL validation queries to
-    verify the change behaved as intended. Do not wait to be asked: run the
-    appropriate workflow as soon as a relevant file or table is referenced.
+  Automatically activates when a dbt model, SQL file, or table is referenced.
+  Surfaces Monte Carlo context — table health, active alerts, lineage, blast
+  radius — before any code is written, and uses those findings to shape code
+  recommendations. Generates and optionally deploys monitors for new transformation
+  logic. After a change is made, generates targeted SQL validation queries to
+  verify the change behaved as intended. Do not wait to be asked: run the
+  appropriate workflow as soon as a relevant file or table is referenced.
 version: 1.0.0
 ---
 
@@ -22,6 +22,7 @@ For troubleshooting, see [TROUBLESHOOTING.md](references/TROUBLESHOOTING.md).
 ## When to activate this skill
 
 **Do not wait to be asked.** Run the appropriate workflow automatically whenever the user:
+
 - References or opens a `.sql` file or dbt model (files in `models/`) → run Workflow 1
 - Mentions a table name, dataset, or dbt model name in passing → run Workflow 1
 
@@ -38,15 +39,27 @@ Present the results as context the engineer needs before proceeding — not as a
 ## When NOT to activate this skill
 
 Do not invoke Monte Carlo tools for:
+
 - Seed files (files in seeds/ directory)
 - Analysis files (files in analyses/ directory)
 - One-off or ad-hoc SQL scripts not part of a dbt project
-- Macro files (files in macros/ directory)
 - Configuration files (dbt_project.yml, profiles.yml, packages.yml)
 - Test files unless the user is specifically asking about data quality
 
 If uncertain whether a file is a dbt model, check for {{ ref() }} or {{ source() }}
 Jinja references — if absent, do not activate.
+
+### Macros and snapshots — gate edits, skip auto-context
+
+Macro files (`macros/`) and snapshot files (`snapshots/`) are **not** models, so
+do not auto-fetch Monte Carlo context (Workflow 1) when they are opened. However,
+macros are inlined into every model that calls them at compile time — a one-line
+macro change can silently alter dozens of models. Snapshots control historical
+tracking and are similarly sensitive.
+
+**The pre-edit hook gates these files.** If the hook fires for a macro or snapshot,
+identify which models are affected and run the change impact assessment (Workflow 4)
+for those models before proceeding with the edit.
 
 ---
 
@@ -55,6 +68,7 @@ Jinja references — if absent, do not activate.
 **Before editing or writing any SQL for a dbt model or pipeline, you MUST run Workflow 4.**
 
 This applies whenever the user expresses intent to modify a model — including phrases like:
+
 - "I want to add a column…"
 - "Let me add / I'm adding…"
 - "I'd like to change / update / rename…"
@@ -108,10 +122,11 @@ The synthesis must reference the specific columns, filters, or logic
 being changed in the current prompt — not just general table health.
 
 Example:
+
 - ✅ "Given 34 downstream models depend on is_paying_workspace,
-     adding 'MC Internal' to the exclusion list will exclude these
-     workspaces from all downstream health scores and exports.
-     Confirm?"
+  adding 'MC Internal' to the exclusion list will exclude these
+  workspaces from all downstream health scores and exports.
+  Confirm?"
 - ❌ "Workflow 4 already ran. Making the edit now."
 
 The only exception: if the user explicitly acknowledges the risk
@@ -122,50 +137,55 @@ the change") — proceed but note the skipped assessment.
 
 All tools are available via the `monte-carlo` MCP server.
 
-| Tool | Purpose |
-|---|---|
-| `testConnection` | Verify auth and connectivity |
-| `search` | Find tables/assets by name |
-| `getTable` | Schema, stats, metadata for a table |
-| `getAssetLineage` | Upstream/downstream dependencies (call with mcons array + direction) |
-| `getAlerts` | Active incidents and alerts |
-| `getMonitors` | Monitor configs — filter by table using mcons array |
-| `getQueriesForTable` | Recent query history |
-| `getQueryData` | Full SQL for a specific query |
-| `createValidationMonitorMac` | Generate validation monitors-as-code YAML |
-| `createMetricMonitorMac` | Generate metric monitors-as-code YAML |
-| `createComparisonMonitorMac` | Generate comparison monitors-as-code YAML |
-| `createCustomSqlMonitorMac` | Generate custom SQL monitors-as-code YAML |
-| `getValidationPredicates` | List available validation rule types |
-| `updateAlert` | Update alert status/severity |
-| `setAlertOwner` | Assign alert ownership |
-| `createOrUpdateAlertComment` | Add comments to alerts |
-| `getAudiences` | List notification audiences |
-| `getDomains` | List MC domains |
-| `getUser` | Current user info |
-| `getCurrentTime` | ISO timestamp for API calls |
+| Tool                         | Purpose                                                              |
+| ---------------------------- | -------------------------------------------------------------------- |
+| `testConnection`             | Verify auth and connectivity                                         |
+| `search`                     | Find tables/assets by name                                           |
+| `getTable`                   | Schema, stats, metadata for a table                                  |
+| `getAssetLineage`            | Upstream/downstream dependencies (call with mcons array + direction) |
+| `getAlerts`                  | Active incidents and alerts                                          |
+| `getMonitors`                | Monitor configs — filter by table using mcons array                  |
+| `getQueriesForTable`         | Recent query history                                                 |
+| `getQueryData`               | Full SQL for a specific query                                        |
+| `createValidationMonitorMac` | Generate validation monitors-as-code YAML                            |
+| `createMetricMonitorMac`     | Generate metric monitors-as-code YAML                                |
+| `createComparisonMonitorMac` | Generate comparison monitors-as-code YAML                            |
+| `createCustomSqlMonitorMac`  | Generate custom SQL monitors-as-code YAML                            |
+| `getValidationPredicates`    | List available validation rule types                                 |
+| `updateAlert`                | Update alert status/severity                                         |
+| `setAlertOwner`              | Assign alert ownership                                               |
+| `createOrUpdateAlertComment` | Add comments to alerts                                               |
+| `getAudiences`               | List notification audiences                                          |
+| `getDomains`                 | List MC domains                                                      |
+| `getUser`                    | Current user info                                                    |
+| `getCurrentTime`             | ISO timestamp for API calls                                          |
 
 ## Core workflows
 
 Each workflow has detailed step-by-step instructions in [workflows.md](references/workflows.md).
 
 ### 1. Table health check
+
 **When:** User opens a dbt model or mentions a table.
 **What:** Surfaces health, lineage, alerts, and risk signals. Auto-escalates to Workflow 4 if change intent is detected and risk signals are present.
 
 ### 2. Add a monitor
+
 **When:** New column, filter, or business rule is added to a model.
 **What:** Suggests and generates monitors-as-code YAML using the appropriate `create*MonitorMac` tool. Saves to `monitors/<table_name>.yml`.
 
 ### 3. Alert triage
+
 **When:** User is investigating an active data quality incident.
 **What:** Lists open alerts, checks table state, traces lineage for root cause, reviews recent queries.
 
 ### 4. Change impact assessment — REQUIRED before modifying a model
+
 **When:** Any intent to modify a dbt model's logic, columns, joins, or filters.
 **What:** Surfaces blast radius, downstream dependencies, active incidents, monitor coverage, and query exposure. Produces a risk-tiered report with synthesis connecting findings to specific code recommendations. See [workflows.md](references/workflows.md) for the full assessment sequence, report format, and synthesis rules.
 
 ### 5. Change validation queries
+
 **When:** Explicit engineer request only (e.g. "validate this change", "ready to commit").
 **What:** Generates 3-5 targeted SQL queries to verify the change behaved as intended. Uses Workflow 4 context — requires both impact assessment and file edit in session.
 
@@ -196,19 +216,24 @@ on its own line when the condition is met.
 ### Impact check complete
 
 After the engineer confirms (High/Medium) or after presenting the synthesis (Low),
-output one marker **for each table covered by the assessment**:
+output one marker per assessed table:
 
 <!-- MC_IMPACT_CHECK_COMPLETE: <table_name> -->
 
-When a single change spans multiple tables (e.g. "add column to table_A and include
-it in table_B"), emit a separate marker for every table that was assessed — not just
-the primary one. Example for a two-table change:
+How many markers to emit depends on how the assessment was triggered:
 
-<!-- MC_IMPACT_CHECK_COMPLETE: client_hub_master -->
-<!-- MC_IMPACT_CHECK_COMPLETE: finance_funnel_model -->
+**Hook-triggered** (the pre-edit hook blocked an edit and instructed you to run
+the assessment): Be strict — only emit markers for tables whose lineage **and**
+monitor coverage were fetched directly via Monte Carlo tools in this session. If
+the engineer describes changes to multiple tables but only one was formally
+assessed, emit only one marker. The pre-edit hook will gate the other tables and
+prompt for their own Workflow 4 runs.
 
-This prevents the pre-edit hook from re-triggering Workflow 4 for tables already
-covered by the same assessment.
+**Voluntarily invoked** (the engineer proactively asked for an impact assessment):
+Be looser — emit markers for all tables the assessment meaningfully covered, even
+if some were assessed via lineage context rather than direct MC tool calls. The
+engineer is already safety-conscious; don't force redundant assessments for tables
+they clearly considered.
 
 ### Monitor coverage gap
 
