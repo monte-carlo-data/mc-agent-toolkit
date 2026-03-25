@@ -51,8 +51,9 @@ def main():
     count = len(tables)
     reason = (
         f"You've changed {count} dbt model(s): {table_list}. "
-        f"Would you like to run validation queries to verify these changes "
-        f"behaved as intended?\n\n"
+        f"ASK THE USER whether they would like to run validation queries to "
+        f"verify these changes behaved as intended. Present these options and "
+        f"WAIT for the user to respond — do NOT answer on their behalf:\n\n"
         f"→ Yes: I'll generate and run queries for all changed models\n"
         f"→ No: You can use /mc-validate anytime to validate changes"
     )
@@ -60,8 +61,9 @@ def main():
     if gap_tables:
         gap_list = ", ".join(gap_tables)
         reason += (
-            f"\n\nMonitor coverage: the impact assessment found no custom monitors "
-            f"on {gap_list}. Would you like to generate monitor definitions?\n\n"
+            f"\n\nAlso ask about monitor coverage: the impact assessment found no "
+            f"custom monitors on {gap_list}. Ask the user whether they would like "
+            f"to generate monitor definitions:\n\n"
             f"→ Yes: I'll suggest monitors for the new or changed logic\n"
             f"→ No: Skip for now"
         )
