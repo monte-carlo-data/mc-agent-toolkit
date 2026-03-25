@@ -10,6 +10,7 @@ from lib.safe_run import safe_run
 from lib.cache import (
     get_edited_tables,
     get_impact_check_state,
+    get_pending_validation_tables,
     has_monitor_gap,
     move_to_pending_validation,
 )
@@ -27,6 +28,13 @@ def main():
     tables = get_edited_tables(session_id)
 
     if not tables:
+        return
+
+    # If validation was already prompted (pending tables exist), silently merge
+    # new edits into pending rather than re-prompting. This prevents the double-
+    # prompt when edits occur after the user was already asked about validation.
+    if get_pending_validation_tables(session_id):
+        move_to_pending_validation(session_id)
         return
 
     # Prompt if impact assessment was triggered for at least one edited table

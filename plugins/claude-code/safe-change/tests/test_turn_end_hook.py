@@ -90,6 +90,34 @@ class TestTurnEndHook:
         assert "orders" in parsed["reason"]
         assert "customers" in parsed["reason"]
 
+    def test_pending_validation_exists_merges_silently(self, capsys):
+        """When pending validation already exists, new edits merge silently — no re-prompt."""
+        # Simulate first prompt: orders was prompted and moved to pending
+        cache.add_edited_table("test_session", "orders")
+        cache.move_to_pending_validation("test_session")
+        cache.mark_impact_check_injected("orders")
+        cache.mark_impact_check_verified("orders")
+
+        # Simulate second turn: new model edited + validation files detected
+        cache.add_edited_table("test_session", "client_hub_master")
+        cache.mark_impact_check_injected("client_hub_master")
+        cache.mark_impact_check_verified("client_hub_master")
+
+        from turn_end_hook import main
+        with patch("sys.stdin", StringIO(_make_stdin())):
+            main()
+
+        # Should NOT prompt again
+        assert capsys.readouterr().out == ""
+
+        # New tables should be merged into pending
+        pending = cache.get_pending_validation_tables("test_session")
+        assert "orders" in pending
+        assert "client_hub_master" in pending
+
+        # Turn should be cleared
+        assert cache.get_edited_tables("test_session") == []
+
     def test_edits_with_only_injected_state_prompts(self, capsys):
         """Edits with 'injected' state should prompt (assessment was triggered)."""
         cache.add_edited_table("test_session", "orders")

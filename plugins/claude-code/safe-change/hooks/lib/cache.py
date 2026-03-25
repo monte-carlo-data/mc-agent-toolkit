@@ -139,9 +139,11 @@ def clear_edited_tables(session_id: str) -> None:
 def move_to_pending_validation(session_id: str) -> None:
     tables = get_edited_tables(session_id)
     if tables:
+        existing = get_pending_validation_tables(session_id)
+        merged = list(dict.fromkeys(existing + tables))  # deduplicate, preserve order
         path = _pending_path(session_id)
         with open(path, "w") as f:
-            for t in tables:
+            for t in merged:
                 f.write(t + "\n")
     clear_edited_tables(session_id)
 

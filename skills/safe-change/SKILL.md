@@ -15,9 +15,10 @@ version: 1.0.0
 
 This skill brings Monte Carlo's data observability context directly into your editor. When you're modifying a dbt model or SQL pipeline, use it to surface table health, lineage, active alerts, and to generate monitors-as-code without leaving Claude Code.
 
-For full workflow step-by-step instructions, see [workflows.md](references/workflows.md).
-For MCP parameter details, see [parameters.md](references/parameters.md).
-For troubleshooting, see [TROUBLESHOOTING.md](references/TROUBLESHOOTING.md).
+Reference files live next to this skill file. **Use the Read tool** (not MCP resources) to access them:
+- Full workflow step-by-step instructions: `references/workflows.md` (relative to this file)
+- MCP parameter details: `references/parameters.md` (relative to this file)
+- Troubleshooting: `references/TROUBLESHOOTING.md` (relative to this file)
 
 ## When to activate this skill
 
@@ -162,7 +163,7 @@ All tools are available via the `monte-carlo` MCP server.
 
 ## Core workflows
 
-Each workflow has detailed step-by-step instructions in [workflows.md](references/workflows.md).
+Each workflow has detailed step-by-step instructions in `references/workflows.md` (Read tool).
 
 ### 1. Table health check
 
@@ -182,7 +183,7 @@ Each workflow has detailed step-by-step instructions in [workflows.md](reference
 ### 4. Change impact assessment — REQUIRED before modifying a model
 
 **When:** Any intent to modify a dbt model's logic, columns, joins, or filters.
-**What:** Surfaces blast radius, downstream dependencies, active incidents, monitor coverage, and query exposure. Produces a risk-tiered report with synthesis connecting findings to specific code recommendations. See [workflows.md](references/workflows.md) for the full assessment sequence, report format, and synthesis rules.
+**What:** Surfaces blast radius, downstream dependencies, active incidents, monitor coverage, and query exposure. Produces a risk-tiered report with synthesis connecting findings to specific code recommendations. See `references/workflows.md` for the full assessment sequence, report format, and synthesis rules.
 
 ### 5. Change validation queries
 
