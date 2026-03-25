@@ -9,10 +9,11 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 from lib.safe_run import safe_run
 from lib.cache import get_impact_check_state, has_monitor_gap
+from lib.detect import is_dbt_model, extract_table_name
 
 
 def _get_staged_model_tables(cwd: str) -> list[str]:
-    """Get table names from staged .sql files under models/."""
+    """Get table names from staged dbt SQL files using the detect library."""
     try:
         result = subprocess.run(
             ["git", "diff", "--cached", "--name-only"],
@@ -23,9 +24,9 @@ def _get_staged_model_tables(cwd: str) -> list[str]:
             line = line.strip()
             if not line:
                 continue
-            if "/models/" in line and line.endswith(".sql"):
-                name = os.path.splitext(os.path.basename(line))[0]
-                tables.append(name)
+            full_path = os.path.join(cwd, line)
+            if is_dbt_model(full_path):
+                tables.append(extract_table_name(full_path))
         return tables
     except (subprocess.SubprocessError, OSError):
         return []

@@ -39,7 +39,7 @@ class TestValidateCommand:
         output = capsys.readouterr().out
         parsed = json.loads(output)
         assert "orders" in parsed["hookSpecificOutput"]["additionalContext"]
-        assert "Workflow 5" in parsed["hookSpecificOutput"]["additionalContext"]
+        assert "validation query workflow" in parsed["hookSpecificOutput"]["additionalContext"]
 
     def test_current_turn_tables_used_as_fallback(self, capsys):
         cache.add_edited_table("test_session", "customers")

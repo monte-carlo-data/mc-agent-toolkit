@@ -37,12 +37,12 @@ class TestIsDbtModel:
         assert is_dbt_model(str(sql_file)) is False
 
     def test_sql_file_in_macros(self, tmp_path):
-        """Macros directory should be excluded."""
+        """Macros directory should be gated (not excluded) — macro changes affect all calling models."""
         macro_dir = tmp_path / "project" / "macros"
         macro_dir.mkdir(parents=True)
         sql_file = macro_dir / "helper.sql"
-        sql_file.write_text("SELECT * FROM {{ ref('x') }}")
-        assert is_dbt_model(str(sql_file)) is False
+        sql_file.write_text("{% macro helper() %} SELECT 1 {% endmacro %}")
+        assert is_dbt_model(str(sql_file)) is True
 
     def test_sql_file_in_analyses(self, tmp_path):
         """Analyses directory should be excluded."""
@@ -53,12 +53,12 @@ class TestIsDbtModel:
         assert is_dbt_model(str(sql_file)) is False
 
     def test_sql_file_in_snapshots(self, tmp_path):
-        """Snapshots directory should be excluded."""
+        """Snapshots directory should be gated (not excluded) — snapshots control historical tracking."""
         dir_ = tmp_path / "project" / "snapshots"
         dir_.mkdir(parents=True)
         sql_file = dir_ / "snap.sql"
-        sql_file.write_text("SELECT * FROM {{ ref('x') }}")
-        assert is_dbt_model(str(sql_file)) is False
+        sql_file.write_text("{% snapshot snap %} SELECT * FROM {{ ref('x') }} {% endsnapshot %}")
+        assert is_dbt_model(str(sql_file)) is True
 
     def test_sql_file_without_ref_or_source(self, tmp_path):
         """A .sql file in models/ without ref/source is not a dbt model."""
