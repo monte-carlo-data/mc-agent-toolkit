@@ -4,7 +4,7 @@ import glob
 import pytest
 
 # Add hooks to path so all test files can import lib.*
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "plugins", "claude-code", "safe-change", "hooks"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "hooks"))
 
 
 @pytest.fixture(autouse=True)
