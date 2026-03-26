@@ -302,6 +302,7 @@ When pushed data isn't appearing, work through these five checkpoints in order:
 - **Column lineage expires after 10 days**: unlike table metadata and table lineage (which
   never expire), column lineage has a 10-day TTL, same as pulled column lineage.
 - **Quote SQL identifiers in warehouse queries**: database, schema, and table names must be
-  double-quoted in SQL (e.g. `FROM "{db}".INFORMATION_SCHEMA.TABLES`). Mixed-case or
-  special-character names will break without quoting. The templates already do this correctly —
-  follow the same pattern for all warehouses.
+  quoted to handle mixed-case or special characters. The quoting syntax varies by warehouse —
+  Snowflake and Redshift use double quotes (`"{db}"`), BigQuery/Databricks/Hive use backticks
+  (`` `db` ``). The templates already handle this correctly for each warehouse — follow the
+  same quoting pattern when adapting.
