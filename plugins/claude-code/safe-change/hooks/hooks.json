@@ -1,3 +1,45 @@
 {
-  "hooks": {}
+    "hooks": {
+        "PreToolUse": [
+            {
+                "matcher": "Edit|Write|MultiEdit",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/pre_edit_hook.py"
+                    }
+                ]
+            },
+            {
+                "matcher": "Bash",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/pre_commit_hook.py"
+                    }
+                ]
+            }
+        ],
+        "PostToolUse": [
+            {
+                "matcher": "Edit|Write|MultiEdit",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/post_edit_hook.py"
+                    }
+                ]
+            }
+        ],
+        "Stop": [
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/turn_end_hook.py"
+                    }
+                ]
+            }
+        ]
+    }
 }

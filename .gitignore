@@ -5,6 +5,7 @@ node_modules/
 .DS_Store
 .venv/
 target/
-CLAUDE.md
 .claude/
 temp/
+__pycache__/
+*.pyc

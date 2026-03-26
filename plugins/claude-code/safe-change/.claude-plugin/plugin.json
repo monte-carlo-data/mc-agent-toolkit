@@ -1,7 +1,7 @@
 {
     "name": "mc-safe-change",
     "version": "1.0.0",
-    "description": "Monte Carlo Safe Change — detect and prevent breaking schema changes using Monte Carlo lineage and monitoring data.",
+    "description": "Monte Carlo Safe Change — data observability context and safe change enforcement in your editor",
     "author": {
         "name": "Monte Carlo",
         "url": "https://www.montecarlodata.com"
@@ -15,5 +15,20 @@
         "dbt",
         "schema"
     ],
-    "skills": "./skills/"
+    "skills": "./skills/",
+    "mcpServers": {
+        "monte-carlo": {
+            "command": "npx",
+            "args": [
+                "-y",
+                "mcp-remote",
+                "https://integrations.getmontecarlo.com/mcp/",
+                "--header",
+                "x-mcd-id: ${MCD_ID}",
+                "--header",
+                "x-mcd-token: ${MCD_TOKEN}"
+            ]
+        }
+    },
+    "commands": ["./commands/mc-validate.md"]
 }
