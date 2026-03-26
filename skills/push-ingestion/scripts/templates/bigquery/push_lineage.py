@@ -116,7 +116,7 @@ def push(
         batch_num = i // batch_size + 1
         log.info("Pushing batch %d/%d (%d events) ...", batch_num, total_batches, len(batch))
 
-        result = service.push_custom_lineage(
+        result = service.send_lineage(
             resource_uuid=resource_uuid,
             resource_type=resource_type,
             events=batch,

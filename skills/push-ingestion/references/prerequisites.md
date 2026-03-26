@@ -139,12 +139,12 @@ service = IngestionService(mc_client=Client(session=Session(
 
 ## Environment variable conventions
 
-The collection script templates use these env var names by default:
+The script templates use these env var names by default:
 
 | Variable | Key type | Used by |
 |---|---|---|
-| `MCD_INGEST_ID` | Ingestion key ID | push scripts |
-| `MCD_INGEST_TOKEN` | Ingestion key secret | push scripts |
+| `MCD_INGEST_ID` | Ingestion key ID | push and collect_and_push scripts |
+| `MCD_INGEST_TOKEN` | Ingestion key secret | push and collect_and_push scripts |
 | `MCD_ID` | GraphQL API key ID | verification scripts, slash commands |
 | `MCD_TOKEN` | GraphQL API key secret | verification scripts, slash commands |
 | `MCD_RESOURCE_UUID` | Warehouse UUID | all scripts |

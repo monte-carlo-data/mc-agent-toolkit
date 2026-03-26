@@ -76,10 +76,10 @@ def push(
     for i in range(0, len(entries), batch_size):
         batch = entries[i : i + batch_size]
         log.info("Pushing batch %d–%d of %d entries …", i, i + len(batch), len(entries))
-        result = service.push_custom_query_logs(
+        result = service.send_query_logs(
             resource_uuid=resource_uuid,
             log_type=LOG_TYPE,
-            query_logs=batch,
+            events=batch,
         )
         inv_id = service.extract_invocation_id(result)
         invocation_ids.append(inv_id)

@@ -111,10 +111,10 @@ def push(
         batch_num = i // batch_size + 1
         log.info("Pushing batch %d/%d (%d assets) ...", batch_num, total_batches, len(batch))
 
-        result = service.push_custom_assets(
+        result = service.send_metadata(
             resource_uuid=resource_uuid,
             resource_type=resource_type,
-            assets=batch,
+            events=batch,
         )
         invocation_id = service.extract_invocation_id(result)
         invocation_ids.append(invocation_id)

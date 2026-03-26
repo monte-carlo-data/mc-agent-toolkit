@@ -314,7 +314,7 @@ def main() -> None:
     args = parser.parse_args()
 
     if not args.key_id or not args.key_token:
-        print("ERROR: MCD_ID and MCD_TOKEN must be set", file=sys.stderr)
+        print("ERROR: Provide --key-id/--key-token or set MCD_ID/MCD_TOKEN", file=sys.stderr)
         sys.exit(1)
 
     print(f"\n{'='*60}")
