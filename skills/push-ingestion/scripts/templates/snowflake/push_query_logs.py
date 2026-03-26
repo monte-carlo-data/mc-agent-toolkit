@@ -58,6 +58,12 @@ def _build_query_log_entries(queries: list[dict]) -> list[QueryLogEntry]:
         bytes_scanned = q.get("bytes_scanned")
         rows_produced = q.get("rows_produced")
 
+        extra = {}
+        if warehouse_name is not None:
+            extra["warehouse_name"] = warehouse_name
+        if bytes_scanned is not None:
+            extra["bytes_scanned"] = int(bytes_scanned)
+
         entries.append(
             QueryLogEntry(
                 start_time=start_time,
@@ -66,9 +72,7 @@ def _build_query_log_entries(queries: list[dict]) -> list[QueryLogEntry]:
                 query_id=query_id,
                 user=user_name,
                 returned_rows=int(rows_produced) if rows_produced is not None else None,
-                # Pass warehouse and bytes_scanned as extra kwargs for MC enrichment
-                warehouse_name=warehouse_name,
-                bytes_scanned=int(bytes_scanned) if bytes_scanned is not None else None,
+                extra=extra or None,
             )
         )
     return entries

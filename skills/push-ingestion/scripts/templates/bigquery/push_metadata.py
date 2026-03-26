@@ -48,7 +48,7 @@ def _asset_from_dict(d: dict) -> RelationalAsset:
     fields = [
         AssetField(
             name=f["name"],
-            field_type=f.get("type"),
+            type=f.get("type"),
             description=f.get("description"),
         )
         for f in d.get("fields", [])
@@ -64,16 +64,18 @@ def _asset_from_dict(d: dict) -> RelationalAsset:
     freshness = None
     if d.get("freshness"):
         freshness = AssetFreshness(
-            last_updated_time=d["freshness"].get("last_updated_time"),
+            last_update_time=d["freshness"].get("last_update_time"),
         )
 
     return RelationalAsset(
-        asset_name=d["name"],
-        database=d["database"],  # ← SUBSTITUTE: use project or dataset as database
-        schema=d["schema"],
-        asset_type=d.get("type", "TABLE"),
-        description=d.get("description"),
-        metadata=AssetMetadata(fields=fields),
+        type=d.get("type", "TABLE"),
+        metadata=AssetMetadata(
+            name=d["name"],
+            database=d["database"],  # ← SUBSTITUTE: use project or dataset as database
+            schema=d["schema"],
+            description=d.get("description"),
+        ),
+        fields=fields,
         volume=volume,
         freshness=freshness,
     )

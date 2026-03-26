@@ -42,10 +42,10 @@ _BATCH_SIZE = 500
 
 def _make_ref(database: str, schema: str, table: str) -> LineageAssetRef:
     return LineageAssetRef(
+        type="TABLE",
+        name=table,
         database=database,
         schema=schema,
-        asset_name=table,
-        resource_type=RESOURCE_TYPE,
     )
 
 

@@ -40,11 +40,15 @@ DEFAULT_BATCH_SIZE = 500  # ← SUBSTITUTE: conservative default to stay under 1
 
 
 def _ref_from_dict(d: dict[str, Any]) -> LineageAssetRef:
+    database = d.get("database", "")
+    schema = d.get("schema", "")
+    name = d["asset_name"]
     return LineageAssetRef(
-        database=d.get("database", ""),
-        schema=d.get("schema", ""),
-        asset_name=d["asset_name"],
-        resource_type=RESOURCE_TYPE,
+        type="TABLE",
+        name=name,
+        database=database,
+        schema=schema,
+        asset_id=f"{database}__{schema}__{name}",
     )
 
 
@@ -53,29 +57,30 @@ def _event_from_dict(d: dict[str, Any]) -> LineageEvent:
     sources = [_ref_from_dict(s) for s in d.get("sources", [])]
     destination = _ref_from_dict(d["destination"])
 
-    col_lineage: list[ColumnLineageField] | None = None
+    fields: list[ColumnLineageField] | None = None
     if d.get("column_lineage"):
-        col_lineage = []
+        fields = []
         for cl in d["column_lineage"]:
-            col_lineage.append(
+            src_fields = []
+            for s in cl.get("sources", []):
+                asset_id = f"{s.get('database', '')}__{s.get('schema', '')}__{s['asset_name']}"
+                src_fields.append(
+                    ColumnLineageSourceField(
+                        asset_id=asset_id,
+                        field_name=s["field"],
+                    )
+                )
+            fields.append(
                 ColumnLineageField(
-                    destination_field=cl["destination_field"],
-                    sources=[
-                        ColumnLineageSourceField(
-                            database=s.get("database", ""),
-                            schema=s.get("schema", ""),
-                            asset_name=s["asset_name"],
-                            field=s["field"],
-                        )
-                        for s in cl.get("sources", [])
-                    ],
+                    name=cl["destination_field"],
+                    source_fields=src_fields,
                 )
             )
 
     return LineageEvent(
         sources=sources,
         destination=destination,
-        column_lineage=col_lineage,
+        fields=fields,
     )
 
 

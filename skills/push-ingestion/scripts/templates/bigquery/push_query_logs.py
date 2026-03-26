@@ -42,15 +42,19 @@ def _build_query_log_entries(queries: list[dict]) -> list[QueryLogEntry]:
     """Convert manifest query dicts into QueryLogEntry objects."""
     entries = []
     for q in queries:
+        extra = {}
+        if q.get("total_bytes_billed") is not None:
+            extra["total_bytes_billed"] = q["total_bytes_billed"]
+        if q.get("statement_type") is not None:
+            extra["statement_type"] = q["statement_type"]
+
         entry = QueryLogEntry(
             query_id=q.get("query_id"),
             query_text=q.get("query_text") or "",
             start_time=q.get("start_time"),
             end_time=q.get("end_time"),
             user=q.get("user"),
-            # Pass warehouse-specific extras as keyword arguments
-            total_bytes_billed=q.get("total_bytes_billed"),
-            statement_type=q.get("statement_type"),
+            extra=extra or None,
         )
         entries.append(entry)
     return entries

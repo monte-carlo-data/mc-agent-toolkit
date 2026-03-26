@@ -36,6 +36,14 @@ DEFAULT_BATCH_SIZE = 250  # ← SUBSTITUTE: conservative default to stay under 1
 
 def _entry_from_dict(d: dict[str, Any]) -> QueryLogEntry:
     """Reconstruct a QueryLogEntry from a manifest dict."""
+    extra = {}
+    if d.get("total_task_duration_ms") is not None:
+        extra["total_task_duration_ms"] = d["total_task_duration_ms"]
+    if d.get("read_rows") is not None:
+        extra["read_rows"] = d["read_rows"]
+    if d.get("read_bytes") is not None:
+        extra["read_bytes"] = d["read_bytes"]
+
     return QueryLogEntry(
         query_id=d.get("query_id"),
         query_text=d.get("query_text", ""),
@@ -43,9 +51,7 @@ def _entry_from_dict(d: dict[str, Any]) -> QueryLogEntry:
         end_time=d.get("end_time"),
         user=d.get("user"),
         returned_rows=d.get("returned_rows"),
-        total_task_duration_ms=d.get("total_task_duration_ms"),
-        read_rows=d.get("read_rows"),
-        read_bytes=d.get("read_bytes"),
+        extra=extra or None,
     )
 
 

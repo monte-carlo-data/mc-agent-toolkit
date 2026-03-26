@@ -39,10 +39,10 @@ DEFAULT_BATCH_SIZE = 500  # ← SUBSTITUTE: conservative default to stay under 1
 
 def _ref_from_dict(d: dict[str, Any]) -> LineageAssetRef:
     return LineageAssetRef(
+        type="TABLE",
+        name=d["asset_name"],
         database=d.get("database", ""),
         schema=d.get("schema", ""),
-        asset_name=d["asset_name"],
-        resource_type=RESOURCE_TYPE,
     )
 
 

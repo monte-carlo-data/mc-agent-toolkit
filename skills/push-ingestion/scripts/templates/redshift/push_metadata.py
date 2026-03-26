@@ -45,23 +45,34 @@ def _asset_from_dict(d: dict[str, Any]) -> RelationalAsset:
     fields = [
         AssetField(
             name=f["name"],
-            field_type=f["field_type"],
+            type=f.get("type"),
             description=f.get("description"),
         )
         for f in d.get("fields", [])
     ]
-    return RelationalAsset(
-        asset_name=d["asset_name"],
-        database=d["database"],   # ← SUBSTITUTE: use database as top-level namespace
-        schema=d["schema"],
-        asset_type=d.get("asset_type", "TABLE"),
-        description=d.get("description"),
-        metadata=AssetMetadata(fields=fields),
-        volume=AssetVolume(
+
+    volume = None
+    if d.get("row_count") is not None or d.get("byte_count") is not None:
+        volume = AssetVolume(
             row_count=d.get("row_count"),
             byte_count=d.get("byte_count"),
+        )
+
+    freshness = None
+    if d.get("last_updated") is not None:
+        freshness = AssetFreshness(last_update_time=d.get("last_updated"))
+
+    return RelationalAsset(
+        type=d.get("asset_type", "TABLE"),
+        metadata=AssetMetadata(
+            name=d["asset_name"],
+            database=d["database"],   # ← SUBSTITUTE: use database as top-level namespace
+            schema=d["schema"],
+            description=d.get("description"),
         ),
-        freshness=AssetFreshness(last_updated_time=d.get("last_updated")),
+        fields=fields,
+        volume=volume,
+        freshness=freshness,
     )
 
 
