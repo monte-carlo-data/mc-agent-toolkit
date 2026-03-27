@@ -34,6 +34,7 @@ from pycarlo.features.ingestion import (
 from datetime import datetime, timezone
 
 asset = RelationalAsset(
+    type="TABLE",  # ONLY "TABLE" or "VIEW" — normalize warehouse-native values
     metadata=AssetMetadata(
         database="analytics",
         schema="public",
@@ -74,6 +75,16 @@ Common values:
 - `"bigquery"` — BigQuery
 - `"databricks"` — Databricks Unity Catalog
 - `"redshift"` — Redshift
+
+## Asset type
+
+The `type` parameter on `RelationalAsset` must be one of two values (uppercase):
+- `"TABLE"` — tables, external tables, dynamic tables, materialized views, etc.
+- `"VIEW"` — views, secure views
+
+**Important**: Warehouse-native type values like `"BASE TABLE"` (Snowflake), `"MANAGED"` /
+`"EXTERNAL"` (Databricks), or `"MATERIALIZED_VIEW"` (BigQuery) are **NOT accepted** by the
+MC API and will cause a 400 error. Always normalize to `"TABLE"` or `"VIEW"` before pushing.
 
 ## Field types
 

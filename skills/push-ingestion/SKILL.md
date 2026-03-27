@@ -94,7 +94,7 @@ service.extract_invocation_id(result)
 
 ```python
 RelationalAsset(
-    type="TABLE",  # or "VIEW"
+    type="TABLE",  # ONLY "TABLE" or "VIEW" (uppercase) — normalize warehouse-native values
     metadata=AssetMetadata(
         name="my_table",
         database="analytics",

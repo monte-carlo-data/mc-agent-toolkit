@@ -134,7 +134,7 @@ def collect(
                     "asset_name": table_name,
                     "database": catalog,    # ← SUBSTITUTE: use catalog as database
                     "schema": schema,
-                    "asset_type": row.get("table_type", "TABLE"),
+                    "asset_type": "VIEW" if row.get("table_type", "").upper() == "VIEW" else "TABLE",
                     "description": row.get("comment") or None,
                     "fields": fields,
                     "row_count": row_count,
