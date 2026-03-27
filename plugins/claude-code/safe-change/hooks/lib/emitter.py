@@ -70,7 +70,13 @@ def _get_commit_message():
 
 
 def _get_first_user_message(transcript_path):
-    """Read the first user message from a JSONL transcript."""
+    """Read the first human-authored user message from a JSONL transcript.
+
+    Claude Code transcript format:
+      {"type":"user","message":{"role":"user","content":"the user's message"}}
+
+    Skips system-generated entries (local-command-caveat, /plugin commands).
+    """
     try:
         with open(transcript_path, "r", encoding="utf-8") as f:
             for line in f:
@@ -78,9 +84,15 @@ def _get_first_user_message(transcript_path):
                     entry = json.loads(line)
                 except json.JSONDecodeError:
                     continue
-                if entry.get("role") == "user":
-                    msg = entry.get("message", "")
-                    return msg[:INTENT_MAX_LENGTH] if msg else None
+                if entry.get("type") != "user":
+                    continue
+                msg = entry.get("message", {})
+                content = msg.get("content", "") if isinstance(msg, dict) else ""
+                # Skip system-injected messages (hooks, plugin commands)
+                if content.startswith("<"):
+                    continue
+                if content:
+                    return content[:INTENT_MAX_LENGTH]
     except (OSError, UnicodeDecodeError):
         pass
     return None
@@ -115,7 +127,7 @@ def _extract_intent(session_id, transcript_path):
 
 def _extract_workflow_flags(session_id, edited_tables):
     """Derive workflow boolean flags from cache state."""
-    ic_states = {t: get_impact_check_state(t) for t in edited_tables}
+    ic_states = {t: get_impact_check_state(session_id, t) for t in edited_tables}
     has_pending = bool(get_pending_validation_tables(session_id))
     w4_tables = [t for t in edited_tables if ic_states[t] in ("injected", "verified")]
 
@@ -124,39 +136,111 @@ def _extract_workflow_flags(session_id, edited_tables):
         "edit_gated": any(s in ("injected", "verified") for s in ic_states.values()),
         "validation_prompted": not has_pending and len(w4_tables) > 0,
         "validation_generated": None,
-        "monitor_gap_detected": any(has_monitor_gap(t) for t in edited_tables),
+        "monitor_gap_detected": any(has_monitor_gap(session_id, t) for t in edited_tables),
         "monitor_generated": None,
     }
 
 
+import re
+
+_IMPACT_DATA_RE = re.compile(r"MC_IMPACT_DATA:\s*(\{.*?\})")
+
+
+def _scan_impact_data(transcript_path):
+    """Scan transcript for MC_IMPACT_DATA markers, return dict keyed by table name.
+
+    Marker format (inside assistant message content):
+      <!-- MC_IMPACT_DATA: {"table":"orders","risk_tier":"high",...} -->
+
+    Parses JSONL first to extract content, then searches content for markers.
+    This avoids issues with JSON-escaped quotes in raw JSONL lines.
+
+    Returns: {"orders": {"risk_tier": "high", "downstream_count": 42, ...}, ...}
+    """
+    results = {}
+    try:
+        with open(transcript_path, "r", encoding="utf-8") as f:
+            for line in f:
+                try:
+                    entry = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                msg = entry.get("message", {})
+                content = msg.get("content", "") if isinstance(msg, dict) else ""
+                if not content:
+                    continue
+                for match in _IMPACT_DATA_RE.finditer(content):
+                    try:
+                        data = json.loads(match.group(1))
+                        table = data.pop("table", None)
+                        if table:
+                            results[table] = data
+                    except (json.JSONDecodeError, AttributeError):
+                        continue
+    except (OSError, UnicodeDecodeError):
+        pass
+    return results
+
+
+def _build_changes(edited_tables, impact_data):
+    """Build the changes array, enriching with impact data where available."""
+    changes = []
+    for t in edited_tables:
+        entry = {"table_name": t}
+        if t in impact_data:
+            entry["assessment"] = impact_data[t]
+        changes.append(entry)
+    return changes
+
+
 def _build_event(session_id, transcript_path, edited_tables):
     """Assemble the change event from local cache state."""
+    impact_data = _scan_impact_data(transcript_path)
     return {
         "event_type": "safe_change.turn_completed",
         "event_version": "1.0",
         "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "session_id": session_id,
         "identity": _get_git_identity(),
-        "changes": [{"table_name": t} for t in edited_tables],
+        "changes": _build_changes(edited_tables, impact_data),
         "workflows": _extract_workflow_flags(session_id, edited_tables),
         "intent": _extract_intent(session_id, transcript_path),
     }
 
 
 def _send(event):
-    """POST to MC API. 3s timeout. Silently drop on any failure."""
+    """POST to MC API via a detached subprocess. Never blocks the caller.
+
+    Hooks run as short-lived subprocesses, so daemon threads get killed before
+    completing. Instead, we spawn a detached Python subprocess that outlives
+    the hook process and sends the HTTP request independently.
+    """
     try:
-        req = urllib.request.Request(
-            url=MC_CHANGE_EVENTS_URL,
-            data=json.dumps(event).encode(),
-            headers={
-                "Content-Type": "application/json",
-                "x-mcd-id": os.environ.get("MCD_ID", ""),
-                "x-mcd-token": os.environ.get("MCD_TOKEN", ""),
-            },
-            method="POST",
+        payload = json.dumps(event)
+        # Inline script reads event JSON from stdin and POSTs it
+        script = ";".join([
+            "import json,urllib.request,sys",
+            "d=sys.stdin.buffer.read()",
+            "urllib.request.urlopen(urllib.request.Request("
+            "url=sys.argv[1],"
+            "data=d,"
+            "headers={'Content-Type':'application/json','x-mcd-id':sys.argv[2],'x-mcd-token':sys.argv[3]},"
+            "method='POST'),timeout=3)",
+        ])
+        proc = subprocess.Popen(
+            [
+                "python3", "-c", script,
+                MC_CHANGE_EVENTS_URL,
+                os.environ.get("MCD_ID", ""),
+                os.environ.get("MCD_TOKEN", ""),
+            ],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,  # detach from parent process
         )
-        urllib.request.urlopen(req, timeout=3)
+        proc.stdin.write(payload.encode())
+        proc.stdin.close()
     except Exception:
         pass
 
@@ -207,7 +291,6 @@ def emit(session_id, transcript_path, edited_tables):
             import sys as _sys
             print(json.dumps(event, indent=2), file=_sys.stderr)
             return
-        thread = threading.Thread(target=_send, args=(event,), daemon=True)
-        thread.start()
+        _send(event)
     except Exception:
         pass

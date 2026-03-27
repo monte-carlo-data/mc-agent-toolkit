@@ -1,5 +1,6 @@
 import json
 import os
+import subprocess
 from datetime import datetime
 from unittest.mock import patch, MagicMock
 
@@ -41,15 +42,15 @@ class TestExtractWorkflowFlags:
 
     def test_ic_injected(self):
         """IC was triggered (injected) for a table."""
-        cache.mark_impact_check_injected("orders")
+        cache.mark_impact_check_injected("sess1", "orders")
         result = _extract_workflow_flags("sess1", ["orders"])
         assert result["impact_check_fired"] is True
         assert result["edit_gated"] is True
 
     def test_ic_verified_and_no_pending(self):
         """IC verified, no prior pending -> validation_prompted = True."""
-        cache.mark_impact_check_injected("orders")
-        cache.mark_impact_check_verified("orders")
+        cache.mark_impact_check_injected("sess1", "orders")
+        cache.mark_impact_check_verified("sess1", "orders")
         result = _extract_workflow_flags("sess1", ["orders"])
         assert result["impact_check_fired"] is True
         assert result["edit_gated"] is True
@@ -59,20 +60,20 @@ class TestExtractWorkflowFlags:
         """IC verified but pending already exists -> validation_prompted = False."""
         cache.add_edited_table("sess1", "prior_table")
         cache.move_to_pending_validation("sess1")
-        cache.mark_impact_check_injected("orders")
-        cache.mark_impact_check_verified("orders")
+        cache.mark_impact_check_injected("sess1", "orders")
+        cache.mark_impact_check_verified("sess1", "orders")
         result = _extract_workflow_flags("sess1", ["orders"])
         assert result["validation_prompted"] is False
 
     def test_monitor_gap_detected(self):
-        cache.mark_monitor_gap("orders")
+        cache.mark_monitor_gap("sess1", "orders")
         result = _extract_workflow_flags("sess1", ["orders"])
         assert result["monitor_gap_detected"] is True
 
     def test_mixed_tables(self):
         """Multiple tables, only some have IC state."""
-        cache.mark_impact_check_injected("orders")
-        cache.mark_impact_check_verified("orders")
+        cache.mark_impact_check_injected("sess1", "orders")
+        cache.mark_impact_check_verified("sess1", "orders")
         result = _extract_workflow_flags("sess1", ["orders", "customers"])
         assert result["impact_check_fired"] is True
         assert result["validation_prompted"] is True
@@ -98,8 +99,8 @@ class TestExtractIntent:
         """No commit happened -> fall back to first user message in transcript."""
         transcript = tmp_path / "transcript.jsonl"
         transcript.write_text(
-            '{"role":"user","message":"update the orders model to filter deleted records"}\n'
-            '{"role":"assistant","message":"I will update the model."}\n'
+            '{"type":"user","message":{"role":"user","content":"update the orders model to filter deleted records"}}\n'
+            '{"type":"assistant","message":{"role":"assistant","content":"I will update the model."}}\n'
         )
         cache.set_last_commit_hash("sess1", "same_hash")
         with patch("lib.emitter.subprocess.run") as mock_run:
@@ -114,7 +115,7 @@ class TestExtractIntent:
     def test_transcript_truncated_to_256_chars(self, tmp_path):
         transcript = tmp_path / "transcript.jsonl"
         long_msg = "x" * 500
-        transcript.write_text(f'{{"role":"user","message":"{long_msg}"}}\n')
+        transcript.write_text(f'{{"type":"user","message":{{"role":"user","content":"{long_msg}"}}}}\n')
         cache.set_last_commit_hash("sess1", "same")
         with patch("lib.emitter.subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(stdout="same\n", returncode=0)
@@ -154,20 +155,84 @@ class TestExtractIntent:
     def test_git_failure_falls_back_to_transcript(self, tmp_path):
         """If git commands fail, fall back to transcript."""
         transcript = tmp_path / "transcript.jsonl"
-        transcript.write_text('{"role":"user","message":"fix the bug"}\n')
+        transcript.write_text('{"type":"user","message":{"role":"user","content":"fix the bug"}}\n')
         with patch("lib.emitter.subprocess.run", side_effect=Exception("no git")):
             result = _extract_intent("sess1", str(transcript))
 
         assert result == {"summary": "fix the bug", "source": "transcript"}
 
 
-from lib.emitter import _build_event, _send
+from lib.emitter import _build_event, _build_changes, _scan_impact_data, _send
+
+
+class TestScanImpactData:
+    def _write_transcript(self, tmp_path, content):
+        """Helper: write a transcript with assistant message content."""
+        transcript = tmp_path / "t.jsonl"
+        # Build proper JSONL — json.dumps handles escaping correctly
+        entry = {"type": "assistant", "message": {"role": "assistant", "content": content}}
+        transcript.write_text(json.dumps(entry) + "\n")
+        return str(transcript)
+
+    def test_parses_marker_from_transcript(self, tmp_path):
+        path = self._write_transcript(tmp_path,
+            '<!-- MC_IMPACT_DATA: {"table":"orders","risk_tier":"high","downstream_count":704,"key_asset":true,"monitor_count":2} -->')
+        result = _scan_impact_data(path)
+        assert result == {
+            "orders": {"risk_tier": "high", "downstream_count": 704, "key_asset": True, "monitor_count": 2}
+        }
+
+    def test_multiple_tables(self, tmp_path):
+        path = self._write_transcript(tmp_path,
+            '<!-- MC_IMPACT_DATA: {"table":"orders","risk_tier":"high","downstream_count":10,"key_asset":true,"monitor_count":1} -->\n'
+            '<!-- MC_IMPACT_DATA: {"table":"customers","risk_tier":"low","downstream_count":3,"key_asset":false,"monitor_count":0} -->')
+        result = _scan_impact_data(path)
+        assert "orders" in result
+        assert "customers" in result
+        assert result["orders"]["risk_tier"] == "high"
+        assert result["customers"]["risk_tier"] == "low"
+
+    def test_no_markers_returns_empty(self, tmp_path):
+        path = self._write_transcript(tmp_path, "Just a normal response with no markers.")
+        result = _scan_impact_data(path)
+        assert result == {}
+
+    def test_missing_file_returns_empty(self):
+        result = _scan_impact_data("/nonexistent/path.jsonl")
+        assert result == {}
+
+    def test_malformed_json_skipped(self, tmp_path):
+        path = self._write_transcript(tmp_path,
+            '<!-- MC_IMPACT_DATA: {bad json} -->\n'
+            '<!-- MC_IMPACT_DATA: {"table":"orders","risk_tier":"low","downstream_count":1,"key_asset":false,"monitor_count":0} -->')
+        result = _scan_impact_data(path)
+        assert result == {"orders": {"risk_tier": "low", "downstream_count": 1, "key_asset": False, "monitor_count": 0}}
+
+
+class TestBuildChanges:
+    def test_no_impact_data(self):
+        changes = _build_changes(["orders", "customers"], {})
+        assert changes == [{"table_name": "orders"}, {"table_name": "customers"}]
+
+    def test_with_impact_data(self):
+        impact = {"orders": {"risk_tier": "high", "downstream_count": 704}}
+        changes = _build_changes(["orders", "customers"], impact)
+        assert changes[0] == {"table_name": "orders", "assessment": {"risk_tier": "high", "downstream_count": 704}}
+        assert changes[1] == {"table_name": "customers"}
+
+    def test_all_tables_enriched(self):
+        impact = {
+            "orders": {"risk_tier": "high"},
+            "customers": {"risk_tier": "low"},
+        }
+        changes = _build_changes(["orders", "customers"], impact)
+        assert all("assessment" in c for c in changes)
 
 
 class TestBuildEvent:
     def test_event_structure(self):
-        cache.mark_impact_check_injected("orders")
-        cache.mark_impact_check_verified("orders")
+        cache.mark_impact_check_injected("sess1", "orders")
+        cache.mark_impact_check_verified("sess1", "orders")
 
         with patch("lib.emitter._get_git_identity", return_value={"git_email": "a@b.com", "git_name": "A"}):
             with patch("lib.emitter._extract_intent", return_value=None):
@@ -200,7 +265,7 @@ class TestBuildEvent:
         datetime.fromisoformat(event["timestamp"].replace("Z", "+00:00"))
 
     def test_event_includes_intent_from_commit(self):
-        cache.mark_impact_check_injected("orders")
+        cache.mark_impact_check_injected("sess1", "orders")
         cache.set_last_commit_hash("sess1", "old_hash")
 
         with patch("lib.emitter._get_git_identity", return_value={"git_email": "", "git_name": ""}):
@@ -212,30 +277,32 @@ class TestBuildEvent:
 
 
 class TestSend:
-    def test_posts_to_mc(self):
+    def test_spawns_subprocess_with_event(self):
         event = {"event_type": "test"}
         with patch.dict(os.environ, {"MCD_ID": "id1", "MCD_TOKEN": "tok1"}):
-            with patch("lib.emitter.urllib.request.urlopen") as mock_urlopen:
+            with patch("lib.emitter.subprocess.Popen") as mock_popen:
+                mock_proc = MagicMock()
+                mock_popen.return_value = mock_proc
                 _send(event)
 
-        mock_urlopen.assert_called_once()
-        req = mock_urlopen.call_args[0][0]
-        assert req.method == "POST"
-        body = json.loads(req.data.decode())
-        assert body == event
-        assert req.get_header("X-mcd-id") == "id1"
-        assert req.get_header("X-mcd-token") == "tok1"
-        assert req.get_header("Content-type") == "application/json"
+        mock_popen.assert_called_once()
+        call_args = mock_popen.call_args
+        # Verify detached subprocess
+        assert call_args[1]["start_new_session"] is True
+        assert call_args[1]["stdin"] == subprocess.PIPE
+        # Verify event was written to stdin
+        mock_proc.stdin.write.assert_called_once()
+        written = mock_proc.stdin.write.call_args[0][0]
+        assert json.loads(written.decode()) == event
+        mock_proc.stdin.close.assert_called_once()
+        # Verify credentials passed as args: [python3, -c, script, url, mcd_id, mcd_token]
+        cmd_args = call_args[0][0]
+        assert cmd_args[4] == "id1"  # MCD_ID
+        assert cmd_args[5] == "tok1"  # MCD_TOKEN
 
     def test_silently_drops_on_failure(self):
-        with patch("lib.emitter.urllib.request.urlopen", side_effect=Exception("network")):
+        with patch("lib.emitter.subprocess.Popen", side_effect=Exception("spawn failed")):
             _send({"event_type": "test"})  # should not raise
-
-    def test_timeout_3s(self):
-        with patch("lib.emitter.urllib.request.urlopen") as mock_urlopen:
-            _send({"event_type": "test"})
-        _, kwargs = mock_urlopen.call_args
-        assert kwargs.get("timeout") == 3
 
 
 from lib.emitter import emit, _rate_limit_ok
@@ -265,20 +332,17 @@ class TestRateLimit:
 
 
 class TestEmit:
-    def test_spawns_daemon_thread(self):
-        cache.mark_impact_check_injected("orders")
+    def test_calls_send(self):
+        cache.mark_impact_check_injected("sess1", "orders")
         with patch("lib.emitter._get_git_identity", return_value={"git_email": "", "git_name": ""}):
             with patch("lib.emitter._extract_intent", return_value=None):
-                with patch("lib.emitter.threading.Thread") as mock_thread:
-                    mock_instance = MagicMock()
-                    mock_thread.return_value = mock_instance
+                with patch("lib.emitter._send") as mock_send:
                     with patch.dict(os.environ, {"MCD_ID": "x", "MCD_TOKEN": "y"}):
                         emit("sess1", "/tmp/t.jsonl", ["orders"])
 
-        mock_thread.assert_called_once()
-        _, kwargs = mock_thread.call_args
-        assert kwargs["daemon"] is True
-        mock_instance.start.assert_called_once()
+        mock_send.assert_called_once()
+        event = mock_send.call_args[0][0]
+        assert event["event_type"] == "safe_change.turn_completed"
 
     def test_fail_open_on_build_error(self):
         """emit() should never raise, even if _build_event fails."""
@@ -289,30 +353,29 @@ class TestEmit:
     def test_skips_when_no_mcd_id(self):
         """No MCD_ID -> no event emitted."""
         with patch.dict(os.environ, {}, clear=True):
-            with patch("lib.emitter.threading.Thread") as mock_thread:
+            with patch("lib.emitter._send") as mock_send:
                 emit("sess1", "/tmp/t.jsonl", ["orders"])
-        mock_thread.assert_not_called()
+        mock_send.assert_not_called()
 
     def test_skips_when_disabled(self):
         """MC_EMIT_EVENTS=0 -> no event emitted."""
         with patch.dict(os.environ, {"MC_EMIT_EVENTS": "0", "MCD_ID": "x", "MCD_TOKEN": "y"}):
-            with patch("lib.emitter.threading.Thread") as mock_thread:
+            with patch("lib.emitter._send") as mock_send:
                 emit("sess1", "/tmp/t.jsonl", ["orders"])
-        mock_thread.assert_not_called()
+        mock_send.assert_not_called()
 
     def test_enabled_by_default(self):
         """MC_EMIT_EVENTS not set -> events enabled."""
         with patch("lib.emitter._get_git_identity", return_value={"git_email": "", "git_name": ""}):
             with patch("lib.emitter._extract_intent", return_value=None):
-                with patch("lib.emitter.threading.Thread") as mock_thread:
-                    mock_thread.return_value = MagicMock()
+                with patch("lib.emitter._send") as mock_send:
                     with patch.dict(os.environ, {"MCD_ID": "x", "MCD_TOKEN": "y"}, clear=True):
                         emit("sess1", "/tmp/t.jsonl", ["orders"])
-        mock_thread.assert_called_once()
+        mock_send.assert_called_once()
 
     def test_dry_run_prints_to_stderr(self, capsys):
         """MC_EMIT_EVENTS=dry_run -> prints event JSON to stderr, no HTTP call."""
-        cache.mark_impact_check_injected("orders")
+        cache.mark_impact_check_injected("sess1", "orders")
         with patch("lib.emitter._get_git_identity", return_value={"git_email": "a@b.com", "git_name": "A"}):
             with patch("lib.emitter._extract_intent", return_value=None):
                 with patch("lib.emitter.threading.Thread") as mock_thread:
@@ -335,9 +398,9 @@ class TestEndToEnd:
     def test_dry_run_full_event(self, tmp_path, capsys):
         """Full flow via dry_run: cache setup -> emit -> verify event from stderr."""
         # Set up cache state
-        cache.mark_impact_check_injected("orders")
-        cache.mark_impact_check_verified("orders")
-        cache.mark_monitor_gap("orders")
+        cache.mark_impact_check_injected("sess1", "orders")
+        cache.mark_impact_check_verified("sess1", "orders")
+        cache.mark_monitor_gap("sess1", "orders")
         cache.set_last_commit_hash("sess1", "old_hash")
 
         # Create transcript
