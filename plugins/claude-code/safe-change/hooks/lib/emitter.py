@@ -160,3 +160,26 @@ def _send(event):
         pass
 
 
+def emit(session_id, transcript_path, edited_tables):
+    """Assemble event and send in background thread. Never blocks, never throws.
+
+    Modes (via MC_EMIT_EVENTS env var):
+      "1" / "true" / unset  -> build event, POST in daemon thread (default)
+      "dry_run"             -> build event, print JSON to stderr, no HTTP call
+      "0" / "false" / "no"  -> skip entirely
+    """
+    try:
+        mode = os.environ.get("MC_EMIT_EVENTS", "1").lower()
+        if mode in ("0", "false", "no"):
+            return
+        if not os.environ.get("MCD_ID"):
+            return
+        event = _build_event(session_id, transcript_path, edited_tables)
+        if mode == "dry_run":
+            import sys as _sys
+            print(json.dumps(event, indent=2), file=_sys.stderr)
+            return
+        thread = threading.Thread(target=_send, args=(event,), daemon=True)
+        thread.start()
+    except Exception:
+        pass

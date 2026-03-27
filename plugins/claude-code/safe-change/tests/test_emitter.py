@@ -238,3 +238,71 @@ class TestSend:
         assert kwargs.get("timeout") == 3
 
 
+from lib.emitter import emit
+
+
+class TestEmit:
+    def test_spawns_daemon_thread(self):
+        cache.mark_impact_check_injected("orders")
+        with patch("lib.emitter._get_git_identity", return_value={"git_email": "", "git_name": ""}):
+            with patch("lib.emitter._extract_intent", return_value=None):
+                with patch("lib.emitter.threading.Thread") as mock_thread:
+                    mock_instance = MagicMock()
+                    mock_thread.return_value = mock_instance
+                    with patch.dict(os.environ, {"MCD_ID": "x", "MCD_TOKEN": "y"}):
+                        emit("sess1", "/tmp/t.jsonl", ["orders"])
+
+        mock_thread.assert_called_once()
+        _, kwargs = mock_thread.call_args
+        assert kwargs["daemon"] is True
+        mock_instance.start.assert_called_once()
+
+    def test_fail_open_on_build_error(self):
+        """emit() should never raise, even if _build_event fails."""
+        with patch.dict(os.environ, {"MCD_ID": "x", "MCD_TOKEN": "y"}):
+            with patch("lib.emitter._build_event", side_effect=Exception("boom")):
+                emit("sess1", "/tmp/t.jsonl", ["orders"])  # should not raise
+
+    def test_skips_when_no_mcd_id(self):
+        """No MCD_ID -> no event emitted."""
+        with patch.dict(os.environ, {}, clear=True):
+            with patch("lib.emitter.threading.Thread") as mock_thread:
+                emit("sess1", "/tmp/t.jsonl", ["orders"])
+        mock_thread.assert_not_called()
+
+    def test_skips_when_disabled(self):
+        """MC_EMIT_EVENTS=0 -> no event emitted."""
+        with patch.dict(os.environ, {"MC_EMIT_EVENTS": "0", "MCD_ID": "x", "MCD_TOKEN": "y"}):
+            with patch("lib.emitter.threading.Thread") as mock_thread:
+                emit("sess1", "/tmp/t.jsonl", ["orders"])
+        mock_thread.assert_not_called()
+
+    def test_enabled_by_default(self):
+        """MC_EMIT_EVENTS not set -> events enabled."""
+        with patch("lib.emitter._get_git_identity", return_value={"git_email": "", "git_name": ""}):
+            with patch("lib.emitter._extract_intent", return_value=None):
+                with patch("lib.emitter.threading.Thread") as mock_thread:
+                    mock_thread.return_value = MagicMock()
+                    with patch.dict(os.environ, {"MCD_ID": "x", "MCD_TOKEN": "y"}, clear=True):
+                        emit("sess1", "/tmp/t.jsonl", ["orders"])
+        mock_thread.assert_called_once()
+
+    def test_dry_run_prints_to_stderr(self, capsys):
+        """MC_EMIT_EVENTS=dry_run -> prints event JSON to stderr, no HTTP call."""
+        cache.mark_impact_check_injected("orders")
+        with patch("lib.emitter._get_git_identity", return_value={"git_email": "a@b.com", "git_name": "A"}):
+            with patch("lib.emitter._extract_intent", return_value=None):
+                with patch("lib.emitter.threading.Thread") as mock_thread:
+                    with patch.dict(os.environ, {"MCD_ID": "x", "MC_EMIT_EVENTS": "dry_run"}):
+                        emit("sess1", "/tmp/t.jsonl", ["orders"])
+
+        # No HTTP thread spawned
+        mock_thread.assert_not_called()
+
+        # Event JSON printed to stderr
+        captured = capsys.readouterr()
+        event = json.loads(captured.err)
+        assert event["event_type"] == "safe_change.turn_completed"
+        assert event["session_id"] == "sess1"
+        assert event["identity"]["git_email"] == "a@b.com"
+        assert event["changes"] == [{"table_name": "orders"}]
