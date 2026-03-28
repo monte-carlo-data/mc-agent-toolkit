@@ -312,3 +312,39 @@ When pushed data isn't appearing, work through these five checkpoints in order:
   Snowflake and Redshift use double quotes (`"{db}"`), BigQuery/Databricks/Hive use backticks
   (`` `db` ``). The templates already handle this correctly for each warehouse — follow the
   same quoting pattern when adapting.
+
+## Memory safety
+
+Generated scripts must include a startup memory check. The collection phase loads query history
+rows into memory for parsing — on large warehouses with long lookback windows, this can exhaust
+available RAM and cause the process to be silently killed (SIGKILL / exit 137) with no traceback.
+
+Add this pattern near the top of every generated script, after imports:
+
+```python
+import os
+
+def _check_available_memory(min_gb: float = 2.0) -> None:
+    """Warn if available memory is below the threshold."""
+    try:
+        if hasattr(os, "sysconf"):  # Linux / macOS
+            page_size = os.sysconf("SC_PAGE_SIZE")
+            avail_pages = os.sysconf("SC_AVPHYS_PAGES")
+            avail_gb = (page_size * avail_pages) / (1024 ** 3)
+        else:
+            return  # Windows — skip check
+    except (ValueError, OSError):
+        return
+    if avail_gb < min_gb:
+        print(
+            f"WARNING: Only {avail_gb:.1f} GB of memory available "
+            f"(minimum recommended: {min_gb:.1f} GB). "
+            f"Consider reducing the lookback window or increasing available memory."
+        )
+```
+
+Call `_check_available_memory()` before connecting to the warehouse.
+
+Additionally, when fetching query history:
+- Use `cursor.fetchmany(batch_size)` in a loop instead of `cursor.fetchall()` when possible
+- For very large result sets, consider adding a LIMIT clause and processing in windows
