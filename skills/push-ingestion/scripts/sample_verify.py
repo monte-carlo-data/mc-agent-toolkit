@@ -195,7 +195,7 @@ def verify_table_lineage(
     data = graphql(
         """query GetLineage($mcon: String!) {
              getTableLineage(mcon: $mcon, direction: "upstream", hops: 1) {
-               connectedNodes { mcon displayName }
+               connectedNodes { mcon displayName objectType }
                flattenedEdges { directlyConnectedMcons }
              }
            }""",

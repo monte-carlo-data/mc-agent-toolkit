@@ -32,6 +32,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 
 from pycarlo.core import Client, Session
@@ -185,27 +186,45 @@ def push(
             json.dump(push_result, fh, indent=2)
         return push_result
 
-    client = Client(session=Session(mcd_id=key_id, mcd_token=key_token, scope="Ingestion"))
-    service = IngestionService(mc_client=client)
-
-    invocation_ids: list[str | None] = []
-    total_batches = (len(events) + batch_size - 1) // batch_size or 1
-
+    # Split into batches
+    batches = []
     for i in range(0, len(events), batch_size):
-        batch = events[i : i + batch_size]
-        batch_num = i // batch_size + 1
-        print(f"  Pushing batch {batch_num}/{total_batches} ({len(batch)} events) ...")
+        batches.append(events[i : i + batch_size])
+    total_batches = len(batches)
 
+    def _push_batch(batch: list, batch_num: int) -> str | None:
+        """Push a single batch using a dedicated Session (thread-safe)."""
+        print(f"  Pushing batch {batch_num}/{total_batches} ({len(batch)} events) ...")
+        client = Client(session=Session(mcd_id=key_id, mcd_token=key_token, scope="Ingestion"))
+        service = IngestionService(mc_client=client)
         result = service.send_lineage(
             resource_uuid=resource_uuid,
             resource_type=resource_type,
             events=batch,
         )
         invocation_id = service.extract_invocation_id(result)
-        invocation_ids.append(invocation_id)
-        print(f"    Response: {json.dumps(result, indent=2) if result else '(empty)'}")
         if invocation_id:
-            print(f"    Invocation ID: {invocation_id}")
+            print(f"    Batch {batch_num}: invocation_id={invocation_id}")
+        return invocation_id
+
+    # Push batches in parallel (each thread gets its own pycarlo Session)
+    max_workers = min(4, total_batches)
+    invocation_ids: list[str | None] = [None] * total_batches
+
+    with ThreadPoolExecutor(max_workers=max_workers) as pool:
+        futures = {
+            pool.submit(_push_batch, batch, i + 1): i
+            for i, batch in enumerate(batches)
+        }
+        for future in as_completed(futures):
+            idx = futures[future]
+            try:
+                invocation_ids[idx] = future.result()
+            except Exception as exc:
+                print(f"    ERROR pushing batch {idx + 1}: {exc}")
+                raise
+
+    print(f"  All {total_batches} batches pushed ({max_workers} workers)")
 
     push_result = {
         "resource_uuid": resource_uuid,
@@ -215,6 +234,7 @@ def push(
         "total_events": len(events),
         "batch_count": total_batches,
         "batch_size": batch_size,
+        "edges": edges,  # preserve for downstream validation
     }
     with open(output_file, "w") as fh:
         json.dump(push_result, fh, indent=2)

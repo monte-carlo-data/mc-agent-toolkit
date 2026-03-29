@@ -190,8 +190,9 @@ def _fetch_query_history(conn, lookback_hours: int) -> list[dict]:
           AND EXECUTION_STATUS = 'SUCCESS'
           AND QUERY_TYPE IN ('CREATE_TABLE_AS_SELECT', 'INSERT', 'MERGE', 'CREATE_VIEW')
         ORDER BY START_TIME
+        LIMIT 50000
         """
-        # ← SUBSTITUTE: adjust QUERY_TYPE list or add a WHERE clause to scope to specific databases
+        # ← SUBSTITUTE: adjust QUERY_TYPE list, LIMIT, or add a WHERE clause to scope to specific databases
     )
     columns = [col[0] for col in cursor.description]
     rows = []
