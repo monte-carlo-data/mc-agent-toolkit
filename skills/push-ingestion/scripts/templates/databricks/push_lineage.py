@@ -20,6 +20,7 @@ import argparse
 import json
 import logging
 import os
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from typing import Any
 
@@ -102,31 +103,55 @@ def push(
     events = [_event_from_dict(d) for d in event_dicts]
     log.info("Loaded %d lineage events from %s", len(events), manifest_path)
 
-    client = Client(session=Session(mcd_id=key_id, mcd_token=key_token, scope="Ingestion"))
-    service = IngestionService(mc_client=client)
-
-    pushed_at = datetime.now(timezone.utc).isoformat()
-    invocation_ids: list[str] = []
-
+    # Split into batches
+    batches = []
     for i in range(0, len(events), batch_size):
-        batch = events[i : i + batch_size]
-        log.info("Pushing batch %d–%d of %d events …", i, i + len(batch), len(events))
+        batches.append(events[i : i + batch_size])
+    total_batches = len(batches)
+
+    def _push_batch(batch: list, batch_num: int) -> str | None:
+        """Push a single batch using a dedicated Session (thread-safe)."""
+        log.info("Pushing batch %d/%d (%d events) ...", batch_num, total_batches, len(batch))
+        client = Client(session=Session(mcd_id=key_id, mcd_token=key_token, scope="Ingestion"))
+        service = IngestionService(mc_client=client)
         result = service.send_lineage(
             resource_uuid=resource_uuid,
             resource_type=RESOURCE_TYPE,
             events=batch,
         )
-        inv_id = service.extract_invocation_id(result)
-        invocation_ids.append(inv_id)
-        log.info("Batch pushed — invocation_id=%s", inv_id)
+        invocation_id = service.extract_invocation_id(result)
+        if invocation_id:
+            log.info("Batch %d: invocation_id=%s", batch_num, invocation_id)
+        return invocation_id
 
+    # Push batches in parallel (each thread gets its own pycarlo Session)
+    max_workers = min(4, total_batches)
+    invocation_ids: list[str | None] = [None] * total_batches
+
+    with ThreadPoolExecutor(max_workers=max_workers) as pool:
+        futures = {
+            pool.submit(_push_batch, batch, i + 1): i
+            for i, batch in enumerate(batches)
+        }
+        for future in as_completed(futures):
+            idx = futures[future]
+            try:
+                invocation_ids[idx] = future.result()
+            except Exception as exc:
+                log.error("ERROR pushing batch %d: %s", idx + 1, exc)
+                raise
+
+    log.info("All %d batches pushed (%d workers)", total_batches, max_workers)
+
+    pushed_at = datetime.now(timezone.utc).isoformat()
     summary = {
         "resource_uuid": resource_uuid,
         "resource_type": RESOURCE_TYPE,
         "invocation_ids": invocation_ids,
         "pushed_at": pushed_at,
         "event_count": len(events),
-        "batch_count": len(invocation_ids),
+        "batch_count": total_batches,
+        "batch_size": batch_size,
         "lookback_days": manifest.get("lookback_days"),
         "table_lineage_events": manifest.get("table_lineage_events"),
         "column_lineage_events": manifest.get("column_lineage_events"),
