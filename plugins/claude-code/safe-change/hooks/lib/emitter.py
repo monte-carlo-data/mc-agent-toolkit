@@ -45,6 +45,29 @@ from lib.cache import (
 INTENT_MAX_LENGTH = 256
 
 
+def _extract_content(msg):
+    """Extract text content from a Claude Code message object.
+
+    Content can be a string or a list of content blocks:
+      "content": "hello"
+      "content": [{"type": "text", "text": "hello"}, ...]
+    """
+    if not isinstance(msg, dict):
+        return ""
+    content = msg.get("content", "")
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts = []
+        for block in content:
+            if isinstance(block, dict) and block.get("type") == "text":
+                parts.append(block.get("text", ""))
+            elif isinstance(block, str):
+                parts.append(block)
+        return "\n".join(parts)
+    return ""
+
+
 def _get_current_head():
     """Return current HEAD commit hash, or None."""
     try:
@@ -86,13 +109,11 @@ def _get_first_user_message(transcript_path):
                     continue
                 if entry.get("type") != "user":
                     continue
-                msg = entry.get("message", {})
-                content = msg.get("content", "") if isinstance(msg, dict) else ""
+                content = _extract_content(entry.get("message", {}))
                 # Skip system-injected messages (hooks, plugin commands)
-                if content.startswith("<"):
+                if not content or content.startswith("<"):
                     continue
-                if content:
-                    return content[:INTENT_MAX_LENGTH]
+                return content[:INTENT_MAX_LENGTH]
     except (OSError, UnicodeDecodeError):
         pass
     return None
@@ -165,8 +186,7 @@ def _scan_impact_data(transcript_path):
                     entry = json.loads(line)
                 except json.JSONDecodeError:
                     continue
-                msg = entry.get("message", {})
-                content = msg.get("content", "") if isinstance(msg, dict) else ""
+                content = _extract_content(entry.get("message", {}))
                 if not content:
                     continue
                 for match in _IMPACT_DATA_RE.finditer(content):
@@ -227,6 +247,8 @@ def _send(event):
             "headers={'Content-Type':'application/json','x-mcd-id':sys.argv[2],'x-mcd-token':sys.argv[3]},"
             "method='POST'),timeout=3)",
         ])
+        # TEMPORARY DEBUG: log subprocess errors to file
+        _dbg_err = open("/tmp/mc_send_debug.log", "a")
         proc = subprocess.Popen(
             [
                 "python3", "-c", script,
@@ -236,7 +258,7 @@ def _send(event):
             ],
             stdin=subprocess.PIPE,
             stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stderr=_dbg_err,
             start_new_session=True,  # detach from parent process
         )
         proc.stdin.write(payload.encode())
@@ -279,18 +301,29 @@ def emit(session_id, transcript_path, edited_tables):
       "0" / "false" / "no"  -> skip entirely
     """
     try:
+        # TEMPORARY DEBUG
+        _dbg = lambda msg: open("/tmp/mc_emitter_debug.log", "a").write(f"{msg}\n")
+
         mode = os.environ.get("MC_EMIT_EVENTS", "1").lower()
         if mode in ("0", "false", "no"):
             return
         if not os.environ.get("MCD_ID"):
             return
         if not _rate_limit_ok(session_id):
+            _dbg("[EMITTER] rate limited")
             return
+        _dbg(f"[EMITTER] building event for {edited_tables}")
         event = _build_event(session_id, transcript_path, edited_tables)
+        _dbg(f"[EMITTER] event built, mode={mode}")
         if mode == "dry_run":
             import sys as _sys
             print(json.dumps(event, indent=2), file=_sys.stderr)
             return
+        _dbg("[EMITTER] calling _send")
         _send(event)
-    except Exception:
-        pass
+        _dbg("[EMITTER] _send returned")
+    except Exception as e:
+        try:
+            open("/tmp/mc_emitter_debug.log", "a").write(f"[EMITTER] EXCEPTION: {type(e).__name__}: {e}\n")
+        except Exception:
+            pass

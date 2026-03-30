@@ -36,3 +36,37 @@ def test_safe_run_exits_0_on_keyboard_interrupt():
     with pytest.raises(SystemExit) as exc_info:
         interrupted_fn()
     assert exc_info.value.code == 0
+
+
+def test_safe_run_debug_mode_reraises(monkeypatch):
+    """In debug mode, exceptions propagate instead of being swallowed."""
+    monkeypatch.setenv("MC_SAFE_CHANGE_DEBUG", "1")
+    # Re-import to pick up the env var change
+    import importlib
+    import lib.safe_run as sr
+    importlib.reload(sr)
+
+    @sr.safe_run
+    def bad_fn():
+        raise ValueError("boom")
+
+    with pytest.raises(ValueError, match="boom"):
+        bad_fn()
+
+
+def test_safe_run_debug_mode_prints_traceback(monkeypatch, capsys):
+    """Debug mode prints traceback to stderr."""
+    monkeypatch.setenv("MC_SAFE_CHANGE_DEBUG", "1")
+    import importlib
+    import lib.safe_run as sr
+    importlib.reload(sr)
+
+    @sr.safe_run
+    def bad_fn():
+        raise RuntimeError("debug trace")
+
+    with pytest.raises(RuntimeError):
+        bad_fn()
+
+    captured = capsys.readouterr()
+    assert "debug trace" in captured.err
