@@ -36,8 +36,8 @@ class TestTurnEndHook:
     def test_edits_with_impact_check_prompts(self, capsys):
         """Edits + impact assessment verified should produce validation prompt."""
         cache.add_edited_table("test_session", "orders")
-        cache.mark_impact_check_injected("orders")
-        cache.mark_impact_check_verified("orders")
+        cache.mark_impact_check_injected("test_session", "orders")
+        cache.mark_impact_check_verified("test_session", "orders")
 
         from turn_end_hook import main
         with patch("sys.stdin", StringIO(_make_stdin())):
@@ -52,8 +52,8 @@ class TestTurnEndHook:
     def test_stop_hook_active_exits_silently(self, capsys):
         """If stop_hook_active is true, exit silently to prevent infinite loop."""
         cache.add_edited_table("test_session", "orders")
-        cache.mark_impact_check_injected("orders")
-        cache.mark_impact_check_verified("orders")
+        cache.mark_impact_check_injected("test_session", "orders")
+        cache.mark_impact_check_verified("test_session", "orders")
 
         from turn_end_hook import main
         with patch("sys.stdin", StringIO(_make_stdin(stop_hook_active=True))):
@@ -64,8 +64,8 @@ class TestTurnEndHook:
     def test_moves_to_pending_validation(self, capsys):
         """After prompting, tables should move to pending validation."""
         cache.add_edited_table("test_session", "orders")
-        cache.mark_impact_check_injected("orders")
-        cache.mark_impact_check_verified("orders")
+        cache.mark_impact_check_injected("test_session", "orders")
+        cache.mark_impact_check_verified("test_session", "orders")
 
         from turn_end_hook import main
         with patch("sys.stdin", StringIO(_make_stdin())):
@@ -77,8 +77,8 @@ class TestTurnEndHook:
     def test_multiple_tables_in_prompt(self, capsys):
         cache.add_edited_table("test_session", "orders")
         cache.add_edited_table("test_session", "customers")
-        cache.mark_impact_check_injected("orders")
-        cache.mark_impact_check_verified("orders")
+        cache.mark_impact_check_injected("test_session", "orders")
+        cache.mark_impact_check_verified("test_session", "orders")
 
         from turn_end_hook import main
         with patch("sys.stdin", StringIO(_make_stdin())):
@@ -95,13 +95,13 @@ class TestTurnEndHook:
         # Simulate first prompt: orders was prompted and moved to pending
         cache.add_edited_table("test_session", "orders")
         cache.move_to_pending_validation("test_session")
-        cache.mark_impact_check_injected("orders")
-        cache.mark_impact_check_verified("orders")
+        cache.mark_impact_check_injected("test_session", "orders")
+        cache.mark_impact_check_verified("test_session", "orders")
 
         # Simulate second turn: new model edited + validation files detected
         cache.add_edited_table("test_session", "client_hub_master")
-        cache.mark_impact_check_injected("client_hub_master")
-        cache.mark_impact_check_verified("client_hub_master")
+        cache.mark_impact_check_injected("test_session", "client_hub_master")
+        cache.mark_impact_check_verified("test_session", "client_hub_master")
 
         from turn_end_hook import main
         with patch("sys.stdin", StringIO(_make_stdin())):
@@ -121,7 +121,7 @@ class TestTurnEndHook:
     def test_edits_with_only_injected_state_prompts(self, capsys):
         """Edits with 'injected' state should prompt (assessment was triggered)."""
         cache.add_edited_table("test_session", "orders")
-        cache.mark_impact_check_injected("orders")
+        cache.mark_impact_check_injected("test_session", "orders")
 
         from turn_end_hook import main
         with patch("sys.stdin", StringIO(_make_stdin())):

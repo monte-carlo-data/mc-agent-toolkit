@@ -36,8 +36,8 @@ class TestPreCommitHook:
 
     def test_commit_with_staged_sql_and_w4_prompts(self, capsys):
         """git commit with staged dbt models + W4 should prompt."""
-        cache.mark_impact_check_injected("orders")
-        cache.mark_impact_check_verified("orders")
+        cache.mark_impact_check_injected("test_session", "orders")
+        cache.mark_impact_check_verified("test_session", "orders")
 
         from pre_commit_hook import main
         with patch("sys.stdin", StringIO(_make_stdin())), \
@@ -61,8 +61,8 @@ class TestPreCommitHook:
 
     def test_git_commit_amend_also_caught(self, capsys):
         """git commit --amend should also trigger."""
-        cache.mark_impact_check_injected("orders")
-        cache.mark_impact_check_verified("orders")
+        cache.mark_impact_check_injected("test_session", "orders")
+        cache.mark_impact_check_verified("test_session", "orders")
 
         from pre_commit_hook import main
         with patch("sys.stdin", StringIO(_make_stdin("git commit --amend"))), \

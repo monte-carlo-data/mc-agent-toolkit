@@ -61,8 +61,8 @@ def _validate_session_id(session_id: str) -> str:
     return session_id
 
 
-def _w4_path(table_name: str) -> str:
-    return os.path.join(CACHE_DIR, f"{IC_PREFIX}{table_name}")
+def _w4_path(session_id: str, table_name: str) -> str:
+    return os.path.join(CACHE_DIR, f"{IC_PREFIX}{_validate_session_id(session_id)}_{table_name}")
 
 
 def _turn_path(session_id: str) -> str:
@@ -75,9 +75,9 @@ def _pending_path(session_id: str) -> str:
 
 # --- Impact check three-state marker ---
 
-def get_impact_check_state(table_name: str) -> str | None:
+def get_impact_check_state(session_id: str, table_name: str) -> str | None:
     """Returns None, 'injected', or 'verified'."""
-    path = _w4_path(table_name)
+    path = _w4_path(session_id, table_name)
     if not os.path.exists(path):
         return None
     try:
@@ -88,13 +88,13 @@ def get_impact_check_state(table_name: str) -> str | None:
         return None
 
 
-def mark_impact_check_injected(table_name: str) -> None:
-    path = _w4_path(table_name)
+def mark_impact_check_injected(session_id: str, table_name: str) -> None:
+    path = _w4_path(session_id, table_name)
     _write_secure(path, json.dumps({"state": "injected", "timestamp": time.time()}))
 
 
-def mark_impact_check_verified(table_name: str) -> None:
-    path = _w4_path(table_name)
+def mark_impact_check_verified(session_id: str, table_name: str) -> None:
+    path = _w4_path(session_id, table_name)
     # Preserve timestamp from injection
     timestamp = time.time()
     try:
@@ -106,8 +106,8 @@ def mark_impact_check_verified(table_name: str) -> None:
     _write_secure(path, json.dumps({"state": "verified", "timestamp": timestamp}))
 
 
-def get_impact_check_age_seconds(table_name: str) -> float:
-    path = _w4_path(table_name)
+def get_impact_check_age_seconds(session_id: str, table_name: str) -> float:
+    path = _w4_path(session_id, table_name)
     try:
         with open(path, "r") as f:
             data = json.load(f)
@@ -118,16 +118,16 @@ def get_impact_check_age_seconds(table_name: str) -> float:
 
 # --- Monitor coverage gap marker ---
 
-def _mg_path(table_name: str) -> str:
-    return os.path.join(CACHE_DIR, f"{MG_PREFIX}{table_name}")
+def _mg_path(session_id: str, table_name: str) -> str:
+    return os.path.join(CACHE_DIR, f"{MG_PREFIX}{_validate_session_id(session_id)}_{table_name}")
 
 
-def has_monitor_gap(table_name: str) -> bool:
-    return os.path.exists(_mg_path(table_name))
+def has_monitor_gap(session_id: str, table_name: str) -> bool:
+    return os.path.exists(_mg_path(session_id, table_name))
 
 
-def mark_monitor_gap(table_name: str) -> None:
-    _write_secure(_mg_path(table_name), str(time.time()))
+def mark_monitor_gap(session_id: str, table_name: str) -> None:
+    _write_secure(_mg_path(session_id, table_name), str(time.time()))
 
 
 # --- Turn-level edit accumulator ---

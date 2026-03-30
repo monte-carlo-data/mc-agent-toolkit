@@ -55,8 +55,9 @@ def main():
     if not os.path.exists(file_path):
         return
 
+    session_id = input_data.get("session_id", "unknown")
     table_name = extract_table_name(file_path)
-    state = get_impact_check_state(table_name)
+    state = get_impact_check_state(session_id, table_name)
 
     if state == "verified":
         return
@@ -65,13 +66,13 @@ def main():
         # Always check transcript for completion marker before allowing edit
         transcript_path = input_data.get("transcript_path", "")
         markers = _scan_transcript_for_markers(transcript_path, table_name)
-        if markers["monitor_gap"] and not has_monitor_gap(table_name):
-            mark_monitor_gap(table_name)
+        if markers["monitor_gap"] and not has_monitor_gap(session_id, table_name):
+            mark_monitor_gap(session_id, table_name)
         if markers["impact_check"]:
-            mark_impact_check_verified(table_name)
+            mark_impact_check_verified(session_id, table_name)
             return
         # Assessment not completed — block without re-injecting if within grace period
-        age = get_impact_check_age_seconds(table_name)
+        age = get_impact_check_age_seconds(session_id, table_name)
         if age < GRACE_PERIOD_SECONDS:
             reason = (
                 f"Monte Carlo safe-change: the impact assessment for {table_name} "
@@ -94,14 +95,14 @@ def main():
         transcript_path = input_data.get("transcript_path", "")
         if transcript_path:
             markers = _scan_transcript_for_markers(transcript_path, table_name)
-            if markers["monitor_gap"] and not has_monitor_gap(table_name):
-                mark_monitor_gap(table_name)
+            if markers["monitor_gap"] and not has_monitor_gap(session_id, table_name):
+                mark_monitor_gap(session_id, table_name)
             if markers["impact_check"]:
-                mark_impact_check_verified(table_name)
+                mark_impact_check_verified(session_id, table_name)
                 return
 
     # No marker or failed verification — block the edit until impact assessment runs
-    mark_impact_check_injected(table_name)
+    mark_impact_check_injected(session_id, table_name)
 
     hook_triggered_note = (
         "This assessment is hook-triggered — only emit MC_IMPACT_CHECK_COMPLETE "

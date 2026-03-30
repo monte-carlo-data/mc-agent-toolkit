@@ -35,7 +35,7 @@ def main():
         return
 
     # Filter to tables that had impact assessment
-    w4_tables = [t for t in tables if get_impact_check_state(t) == "verified"]
+    w4_tables = [t for t in tables if get_impact_check_state(session_id, t) == "verified"]
     if not w4_tables:
         w4_tables = tables  # Fall back to all tables if no W4 tracking
 
