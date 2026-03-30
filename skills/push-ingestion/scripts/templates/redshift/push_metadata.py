@@ -6,8 +6,8 @@ to Monte Carlo via the push ingestion API, with configurable batching to keep
 compressed payloads under 1 MB.
 
 Substitution points (search for "← SUBSTITUTE"):
-  - MC_INGEST_KEY_ID / MC_INGEST_KEY_TOKEN : Monte Carlo API credentials
-  - MC_RESOURCE_UUID      : UUID of the Redshift connection in Monte Carlo
+  - MCD_INGEST_ID / MCD_INGEST_TOKEN : Monte Carlo API credentials
+  - MCD_RESOURCE_UUID      : UUID of the Redshift connection in Monte Carlo
   - PUSH_BATCH_SIZE       : number of assets per API call (default 500)
 
 Prerequisites:
@@ -20,6 +20,7 @@ import argparse
 import json
 import logging
 import os
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from typing import Any
 
@@ -45,23 +46,34 @@ def _asset_from_dict(d: dict[str, Any]) -> RelationalAsset:
     fields = [
         AssetField(
             name=f["name"],
-            field_type=f["field_type"],
+            type=f.get("type"),
             description=f.get("description"),
         )
         for f in d.get("fields", [])
     ]
-    return RelationalAsset(
-        asset_name=d["asset_name"],
-        database=d["database"],   # ← SUBSTITUTE: use database as top-level namespace
-        schema=d["schema"],
-        asset_type=d.get("asset_type", "TABLE"),
-        description=d.get("description"),
-        metadata=AssetMetadata(fields=fields),
-        volume=AssetVolume(
+
+    volume = None
+    if d.get("row_count") is not None or d.get("byte_count") is not None:
+        volume = AssetVolume(
             row_count=d.get("row_count"),
             byte_count=d.get("byte_count"),
+        )
+
+    freshness = None
+    if d.get("last_updated") is not None:
+        freshness = AssetFreshness(last_update_time=d.get("last_updated"))
+
+    return RelationalAsset(
+        type=d.get("asset_type", "TABLE"),
+        metadata=AssetMetadata(
+            name=d["asset_name"],
+            database=d["database"],   # ← SUBSTITUTE: use database as top-level namespace
+            schema=d["schema"],
+            description=d.get("description"),
         ),
-        freshness=AssetFreshness(last_updated_time=d.get("last_updated")),
+        fields=fields,
+        volume=volume,
+        freshness=freshness,
     )
 
 
@@ -83,31 +95,54 @@ def push(
     assets = [_asset_from_dict(d) for d in asset_dicts]
     log.info("Loaded %d assets from %s", len(assets), manifest_path)
 
-    client = Client(session=Session(mcd_id=key_id, mcd_token=key_token, scope="Ingestion"))
-    service = IngestionService(mc_client=client)
+    # Split into batches
+    batches = []
+    for i in range(0, max(len(assets), 1), batch_size):
+        batches.append(assets[i : i + batch_size])
+    total_batches = len(batches)
 
-    pushed_at = datetime.now(timezone.utc).isoformat()
-    invocation_ids: list[str] = []
-
-    for i in range(0, len(assets), batch_size):
-        batch = assets[i : i + batch_size]
-        log.info("Pushing batch %d–%d of %d assets …", i, i + len(batch), len(assets))
-        result = service.push_custom_assets(
+    def _push_batch(batch: list, batch_num: int) -> str | None:
+        """Push a single batch using a dedicated Session (thread-safe)."""
+        log.info("Pushing batch %d/%d (%d assets) ...", batch_num, total_batches, len(batch))
+        client = Client(session=Session(mcd_id=key_id, mcd_token=key_token, scope="Ingestion"))
+        service = IngestionService(mc_client=client)
+        result = service.send_metadata(
             resource_uuid=resource_uuid,
             resource_type=RESOURCE_TYPE,
-            assets=batch,
+            events=batch,
         )
-        inv_id = service.extract_invocation_id(result)
-        invocation_ids.append(inv_id)
-        log.info("Batch pushed — invocation_id=%s", inv_id)
+        invocation_id = service.extract_invocation_id(result)
+        if invocation_id:
+            log.info("Batch %d: invocation_id=%s", batch_num, invocation_id)
+        return invocation_id
+
+    # Push batches in parallel (each thread gets its own pycarlo Session)
+    max_workers = min(4, total_batches)
+    invocation_ids: list[str | None] = [None] * total_batches
+
+    with ThreadPoolExecutor(max_workers=max_workers) as pool:
+        futures = {
+            pool.submit(_push_batch, batch, i + 1): i
+            for i, batch in enumerate(batches)
+        }
+        for future in as_completed(futures):
+            idx = futures[future]
+            try:
+                invocation_ids[idx] = future.result()
+            except Exception as exc:
+                log.error("ERROR pushing batch %d: %s", idx + 1, exc)
+                raise
+
+    log.info("All %d batches pushed (%d workers)", total_batches, max_workers)
 
     summary = {
         "resource_uuid": resource_uuid,
         "resource_type": RESOURCE_TYPE,
         "invocation_ids": invocation_ids,
-        "pushed_at": pushed_at,
+        "pushed_at": datetime.now(timezone.utc).isoformat(),
         "asset_count": len(assets),
-        "batch_count": len(invocation_ids),
+        "batch_count": total_batches,
+        "batch_size": batch_size,
     }
 
     push_manifest_path = manifest_path.replace(".json", "_push_result.json")
@@ -121,9 +156,9 @@ def push(
 def main() -> None:
     parser = argparse.ArgumentParser(description="Push Redshift metadata to Monte Carlo from manifest")
     parser.add_argument("--manifest", default="manifest_metadata.json")
-    parser.add_argument("--resource-uuid", default=os.getenv("MC_RESOURCE_UUID"))
-    parser.add_argument("--key-id", default=os.getenv("MC_INGEST_KEY_ID"))
-    parser.add_argument("--key-token", default=os.getenv("MC_INGEST_KEY_TOKEN"))
+    parser.add_argument("--resource-uuid", default=os.getenv("MCD_RESOURCE_UUID"))
+    parser.add_argument("--key-id", default=os.getenv("MCD_INGEST_ID"))
+    parser.add_argument("--key-token", default=os.getenv("MCD_INGEST_TOKEN"))
     parser.add_argument("--batch-size", type=int, default=DEFAULT_BATCH_SIZE)
     args = parser.parse_args()
 

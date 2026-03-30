@@ -33,7 +33,7 @@ query {
 ```graphql
 query {
   getTableLineage(mcon: "<destination-mcon>", direction: "upstream", hops: 1) {
-    connectedNodes { mcon displayName objectId }
+    connectedNodes { mcon displayName objectType }
     flattenedEdges { directlyConnectedMcons }
   }
 }

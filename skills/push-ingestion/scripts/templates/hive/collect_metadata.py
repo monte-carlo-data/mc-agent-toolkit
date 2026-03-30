@@ -32,6 +32,25 @@ from datetime import datetime, timezone
 
 from pyhive import hive
 
+
+def _check_available_memory(min_gb: float = 2.0) -> None:
+    """Warn if available memory is below the threshold."""
+    try:
+        if hasattr(os, "sysconf"):  # Linux / macOS
+            page_size = os.sysconf("SC_PAGE_SIZE")
+            avail_pages = os.sysconf("SC_AVPHYS_PAGES")
+            avail_gb = (page_size * avail_pages) / (1024 ** 3)
+        else:
+            return  # Windows — skip check
+    except (ValueError, OSError):
+        return
+    if avail_gb < min_gb:
+        print(
+            f"WARNING: Only {avail_gb:.1f} GB of memory available "
+            f"(minimum recommended: {min_gb:.1f} GB). "
+            f"Consider reducing the number of databases/tables or increasing available memory."
+        )
+
 # ← SUBSTITUTE: set RESOURCE_TYPE to match your Monte Carlo connection type
 RESOURCE_TYPE = "data-lake"
 
@@ -82,9 +101,16 @@ def _connect(host: str, port: int) -> hive.Connection:
     return hive.connect(host=host, port=port, username="hadoop", auth="NONE")
 
 
-def _fetch_all(cursor, query: str) -> list[tuple]:
+def _fetch_rows(cursor, query: str) -> list[tuple]:
+    """Execute a query and fetch results in memory-safe chunks."""
     cursor.execute(query)
-    return cursor.fetchall()
+    rows: list[tuple] = []
+    while True:
+        chunk = cursor.fetchmany(1000)
+        if not chunk:
+            break
+        rows.extend(chunk)
+    return rows
 
 
 def _parse_describe_formatted(rows: list[tuple]) -> dict:
@@ -180,13 +206,14 @@ def collect(
     Returns:
         Manifest dict with keys: resource_type, collected_at, assets.
     """
+    _check_available_memory()
     print(f"Connecting to HiveServer2 at {hive_host}:{hive_port} ...")
     conn = _connect(hive_host, hive_port)
     cursor = conn.cursor()
     assets: list[dict] = []
 
     print("Collecting table metadata ...")
-    databases = [row[0] for row in _fetch_all(cursor, "SHOW DATABASES")]
+    databases = [row[0] for row in _fetch_rows(cursor, "SHOW DATABASES")]
     print(f"  Found databases: {databases}")
 
     for db in databases:
@@ -194,7 +221,7 @@ def collect(
         if db in ("information_schema",):
             continue
 
-        tables = _fetch_all(cursor, f"SHOW TABLES IN {db}")
+        tables = _fetch_rows(cursor, f"SHOW TABLES IN {db}")
         table_names = [row[0] for row in tables]
         print(f"  {db}: {len(table_names)} table(s)")
 
@@ -203,7 +230,7 @@ def collect(
                 continue
 
             try:
-                desc_rows = _fetch_all(cursor, f"DESCRIBE FORMATTED {db}.{table}")
+                desc_rows = _fetch_rows(cursor, f"DESCRIBE FORMATTED {db}.{table}")
             except Exception as exc:
                 print(f"    WARNING: could not describe {db}.{table}: {exc}")
                 continue
