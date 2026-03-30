@@ -39,6 +39,25 @@ import snowflake.connector
 # ← SUBSTITUTE: set RESOURCE_TYPE to match your Monte Carlo connection type
 RESOURCE_TYPE = "snowflake"
 
+
+def _check_available_memory(min_gb: float = 2.0) -> None:
+    """Warn if available memory is below the threshold."""
+    try:
+        if hasattr(os, "sysconf"):  # Linux / macOS
+            page_size = os.sysconf("SC_PAGE_SIZE")
+            avail_pages = os.sysconf("SC_AVPHYS_PAGES")
+            avail_gb = (page_size * avail_pages) / (1024 ** 3)
+        else:
+            return  # Windows — skip check
+    except (ValueError, OSError):
+        return
+    if avail_gb < min_gb:
+        print(
+            f"WARNING: Only {avail_gb:.1f} GB of memory available "
+            f"(minimum recommended: {min_gb:.1f} GB). "
+            f"Consider reducing the lookback window or increasing available memory."
+        )
+
 # Databases that are Snowflake system databases — skip them
 _SKIP_DATABASES = {"SNOWFLAKE", "SNOWFLAKE_SAMPLE_DATA"}
 
@@ -84,7 +103,13 @@ def _collect_assets(conn) -> list[dict]:
     # --- Discover databases ---
     cursor.execute("SHOW DATABASES")
     # SHOW DATABASES returns (created_on, name, …); column index 1 is the name
-    databases = [row[1] for row in cursor.fetchall() if row[1] not in _SKIP_DATABASES]
+    all_db_rows = []
+    while True:
+        chunk = cursor.fetchmany(1000)
+        if not chunk:
+            break
+        all_db_rows.extend(chunk)
+    databases = [row[1] for row in all_db_rows if row[1] not in _SKIP_DATABASES]
     print(f"  Found {len(databases)} database(s): {databases}")
 
     for db in databases:
@@ -96,7 +121,13 @@ def _collect_assets(conn) -> list[dict]:
             continue
 
         # Column index 1 is the schema name
-        schemas = [row[1] for row in cursor.fetchall() if row[1] not in _SKIP_SCHEMAS]
+        all_schema_rows = []
+        while True:
+            chunk = cursor.fetchmany(1000)
+            if not chunk:
+                break
+            all_schema_rows.extend(chunk)
+        schemas = [row[1] for row in all_schema_rows if row[1] not in _SKIP_SCHEMAS]
 
         # --- Collect tables, volume, and freshness via INFORMATION_SCHEMA ---
         try:
@@ -120,7 +151,12 @@ def _collect_assets(conn) -> list[dict]:
             print(f"  WARNING: could not query INFORMATION_SCHEMA.TABLES in {db}: {exc}")
             continue
 
-        table_rows = cursor.fetchall()
+        table_rows = []
+        while True:
+            chunk = cursor.fetchmany(1000)
+            if not chunk:
+                break
+            table_rows.extend(chunk)
         print(f"  {db}: {len(table_rows)} table(s)")
 
         # Build a set of schema names present in the table result to know which
@@ -146,7 +182,13 @@ def _collect_assets(conn) -> list[dict]:
                 print(f"  WARNING: could not fetch columns for {db}.{schema}: {exc}")
                 continue
 
-            for col_row in cursor.fetchall():
+            all_col_rows = []
+            while True:
+                chunk = cursor.fetchmany(1000)
+                if not chunk:
+                    break
+                all_col_rows.extend(chunk)
+            for col_row in all_col_rows:
                 table_name, col_name, data_type, col_comment = col_row
                 key = (schema, table_name)
                 if key not in columns_by_table:
@@ -208,6 +250,7 @@ def collect(
 
     Returns the manifest dict.
     """
+    _check_available_memory()
     print(f"Connecting to Snowflake account: {account} ...")
     conn = _connect(account, user, password, warehouse)
 

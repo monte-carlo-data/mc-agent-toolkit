@@ -37,10 +37,36 @@ RESOURCE_TYPE = "databricks"
 LOOKBACK_DAYS: int = int(os.getenv("LOOKBACK_DAYS", "30"))  # ← SUBSTITUTE
 
 
+def _check_available_memory(min_gb: float = 2.0) -> None:
+    """Warn if available memory is below the threshold."""
+    try:
+        if hasattr(os, "sysconf"):  # Linux / macOS
+            page_size = os.sysconf("SC_PAGE_SIZE")
+            avail_pages = os.sysconf("SC_AVPHYS_PAGES")
+            avail_gb = (page_size * avail_pages) / (1024 ** 3)
+        else:
+            return  # Windows — skip check
+    except (ValueError, OSError):
+        return
+    if avail_gb < min_gb:
+        log.warning(
+            "Only %.1f GB of memory available (minimum recommended: %.1f GB). "
+            "Consider reducing the collection scope or increasing available memory.",
+            avail_gb,
+            min_gb,
+        )
+
+
 def _query(cursor: Any, sql_text: str) -> list[dict[str, Any]]:
     cursor.execute(sql_text)
     cols = [d[0] for d in cursor.description]
-    return [dict(zip(cols, row)) for row in cursor.fetchall()]
+    rows = []
+    while True:
+        chunk = cursor.fetchmany(1000)
+        if not chunk:
+            break
+        rows.extend(dict(zip(cols, row)) for row in chunk)
+    return rows
 
 
 def _parse_full_name(full_name: str) -> tuple[str, str, str]:
@@ -67,7 +93,8 @@ def collect_table_lineage(cursor: Any, lookback_days: int) -> list[dict[str, Any
           AND source_table_full_name IS NOT NULL
           AND target_table_full_name IS NOT NULL
         GROUP BY source_table_full_name, target_table_full_name, created_by
-        """,  # ← SUBSTITUTE: adjust lookback_days or add catalog/schema filters
+        LIMIT 50000
+        """,  # ← SUBSTITUTE: adjust lookback_days, LIMIT, or add catalog/schema filters
     )
 
     events: list[dict[str, Any]] = []
@@ -99,7 +126,8 @@ def collect_column_lineage(cursor: Any, lookback_days: int) -> list[dict[str, An
         WHERE event_time >= DATEADD(DAY, -{lookback_days}, CURRENT_TIMESTAMP())
           AND source_table_full_name IS NOT NULL
           AND target_table_full_name IS NOT NULL
-        """,  # ← SUBSTITUTE: add catalog/schema filters if needed
+        LIMIT 50000
+        """,  # ← SUBSTITUTE: adjust LIMIT or add catalog/schema filters if needed
     )
 
     # Group by destination table so we can build one event per destination
@@ -147,6 +175,7 @@ def collect(
     lookback_days: int = LOOKBACK_DAYS,
 ) -> list[dict[str, Any]]:
     """Connect to Databricks, collect lineage, write a JSON manifest, and return events."""
+    _check_available_memory(min_gb=2.0)
     collected_at = datetime.now(timezone.utc).isoformat()
 
     with sql.connect(

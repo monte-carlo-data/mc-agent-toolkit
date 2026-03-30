@@ -39,10 +39,36 @@ BATCH_SIZE: int = int(os.getenv("BATCH_SIZE", "200"))               # ← SUBSTI
 MAX_QUERIES: int = int(os.getenv("MAX_QUERIES", "10000"))           # ← SUBSTITUTE
 
 
+def _check_available_memory(min_gb: float = 2.0) -> None:
+    """Warn if available memory is below the threshold."""
+    try:
+        if hasattr(os, "sysconf"):  # Linux / macOS
+            page_size = os.sysconf("SC_PAGE_SIZE")
+            avail_pages = os.sysconf("SC_AVPHYS_PAGES")
+            avail_gb = (page_size * avail_pages) / (1024 ** 3)
+        else:
+            return  # Windows — skip check
+    except (ValueError, OSError):
+        return
+    if avail_gb < min_gb:
+        log.warning(
+            "Only %.1f GB of memory available (minimum recommended: %.1f GB). "
+            "Consider reducing the collection scope or increasing available memory.",
+            avail_gb,
+            min_gb,
+        )
+
+
 def _dictfetch(cursor: Any, sql: str, params: tuple | None = None) -> list[dict[str, Any]]:
     cursor.execute(sql, params)
     cols = [d.name for d in cursor.description]
-    return [dict(zip(cols, row)) for row in cursor.fetchall()]
+    rows = []
+    while True:
+        chunk = cursor.fetchmany(1000)
+        if not chunk:
+            break
+        rows.extend(dict(zip(cols, row)) for row in chunk)
+    return rows
 
 
 def _safe_isoformat(dt: Any) -> str | None:
@@ -120,6 +146,7 @@ def collect(
     max_queries: int = MAX_QUERIES,
 ) -> list[dict[str, Any]]:
     """Connect to Redshift, collect query logs, write a JSON manifest, and return entries."""
+    _check_available_memory()
     collected_at = datetime.now(timezone.utc).isoformat()
 
     conn = psycopg2.connect(

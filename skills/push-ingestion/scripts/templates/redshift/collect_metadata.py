@@ -44,10 +44,36 @@ SCHEMA_EXCLUSIONS: set[str] = {  # ← SUBSTITUTE: add internal schemas
 }
 
 
+def _check_available_memory(min_gb: float = 2.0) -> None:
+    """Warn if available memory is below the threshold."""
+    try:
+        if hasattr(os, "sysconf"):  # Linux / macOS
+            page_size = os.sysconf("SC_PAGE_SIZE")
+            avail_pages = os.sysconf("SC_AVPHYS_PAGES")
+            avail_gb = (page_size * avail_pages) / (1024 ** 3)
+        else:
+            return  # Windows — skip check
+    except (ValueError, OSError):
+        return
+    if avail_gb < min_gb:
+        log.warning(
+            "Only %.1f GB of memory available (minimum recommended: %.1f GB). "
+            "Consider reducing the collection scope or increasing available memory.",
+            avail_gb,
+            min_gb,
+        )
+
+
 def _dictfetch(cursor: Any, sql: str, params: tuple | None = None) -> list[dict[str, Any]]:
     cursor.execute(sql, params)
     cols = [d.name for d in cursor.description]
-    return [dict(zip(cols, row)) for row in cursor.fetchall()]
+    rows = []
+    while True:
+        chunk = cursor.fetchmany(1000)
+        if not chunk:
+            break
+        rows.extend(dict(zip(cols, row)) for row in chunk)
+    return rows
 
 
 def collect_databases(cursor: Any) -> list[str]:
@@ -102,6 +128,7 @@ def collect(
     port: int = 5439,
 ) -> list[dict[str, Any]]:
     """Connect to Redshift, collect metadata, write a JSON manifest, and return asset dicts."""
+    _check_available_memory()
     collected_at = datetime.now(timezone.utc).isoformat()
     assets: list[dict[str, Any]] = []
 
