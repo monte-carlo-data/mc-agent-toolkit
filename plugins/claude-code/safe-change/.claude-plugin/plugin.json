@@ -1,6 +1,6 @@
 {
   "name": "mc-safe-change",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Monte Carlo Safe Change — data observability context and safe change enforcement in your editor",
   "author": {
     "name": "Monte Carlo",
