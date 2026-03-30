@@ -8,8 +8,8 @@ into batches to stay under the 1 MB compressed limit.
 Can be run standalone via CLI or imported (use the ``push()`` function).
 
 Substitution points (search for "← SUBSTITUTE"):
-  - MC_INGEST_KEY_ID / MC_INGEST_KEY_TOKEN : Monte Carlo API credentials
-  - MC_RESOURCE_UUID      : UUID of the BigQuery connection in Monte Carlo
+  - MCD_INGEST_ID / MCD_INGEST_TOKEN : Monte Carlo API credentials
+  - MCD_RESOURCE_UUID      : UUID of the BigQuery connection in Monte Carlo
 
 Prerequisites:
   pip install pycarlo
@@ -21,6 +21,7 @@ import argparse
 import json
 import logging
 import os
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 
 from pycarlo.core import Client, Session
@@ -48,7 +49,7 @@ def _asset_from_dict(d: dict) -> RelationalAsset:
     fields = [
         AssetField(
             name=f["name"],
-            field_type=f.get("type"),
+            type=f.get("type"),
             description=f.get("description"),
         )
         for f in d.get("fields", [])
@@ -64,16 +65,18 @@ def _asset_from_dict(d: dict) -> RelationalAsset:
     freshness = None
     if d.get("freshness"):
         freshness = AssetFreshness(
-            last_updated_time=d["freshness"].get("last_updated_time"),
+            last_update_time=d["freshness"].get("last_update_time"),
         )
 
     return RelationalAsset(
-        asset_name=d["name"],
-        database=d["database"],  # ← SUBSTITUTE: use project or dataset as database
-        schema=d["schema"],
-        asset_type=d.get("type", "TABLE"),
-        description=d.get("description"),
-        metadata=AssetMetadata(fields=fields),
+        type=d.get("type", "TABLE"),
+        metadata=AssetMetadata(
+            name=d["name"],
+            database=d["database"],  # ← SUBSTITUTE: use project or dataset as database
+            schema=d["schema"],
+            description=d.get("description"),
+        ),
+        fields=fields,
         volume=volume,
         freshness=freshness,
     )
@@ -100,26 +103,45 @@ def push(
     assets = [_asset_from_dict(d) for d in asset_dicts]
     log.info("Loaded %d asset(s) from %s", len(assets), input_file)
 
-    client = Client(session=Session(mcd_id=key_id, mcd_token=key_token, scope="Ingestion"))
-    service = IngestionService(mc_client=client)
-
-    invocation_ids: list[str | None] = []
-    total_batches = (len(assets) + batch_size - 1) // batch_size or 1
-
+    # Split into batches
+    batches = []
     for i in range(0, max(len(assets), 1), batch_size):
-        batch = assets[i : i + batch_size]
-        batch_num = i // batch_size + 1
-        log.info("Pushing batch %d/%d (%d assets) ...", batch_num, total_batches, len(batch))
+        batches.append(assets[i : i + batch_size])
+    total_batches = len(batches)
 
-        result = service.push_custom_assets(
+    def _push_batch(batch: list, batch_num: int) -> str | None:
+        """Push a single batch using a dedicated Session (thread-safe)."""
+        log.info("Pushing batch %d/%d (%d assets) ...", batch_num, total_batches, len(batch))
+        client = Client(session=Session(mcd_id=key_id, mcd_token=key_token, scope="Ingestion"))
+        service = IngestionService(mc_client=client)
+        result = service.send_metadata(
             resource_uuid=resource_uuid,
             resource_type=resource_type,
-            assets=batch,
+            events=batch,
         )
         invocation_id = service.extract_invocation_id(result)
-        invocation_ids.append(invocation_id)
         if invocation_id:
-            log.info("  Invocation ID: %s", invocation_id)
+            log.info("  Batch %d: invocation_id=%s", batch_num, invocation_id)
+        return invocation_id
+
+    # Push batches in parallel (each thread gets its own pycarlo Session)
+    max_workers = min(4, total_batches)
+    invocation_ids: list[str | None] = [None] * total_batches
+
+    with ThreadPoolExecutor(max_workers=max_workers) as pool:
+        futures = {
+            pool.submit(_push_batch, batch, i + 1): i
+            for i, batch in enumerate(batches)
+        }
+        for future in as_completed(futures):
+            idx = futures[future]
+            try:
+                invocation_ids[idx] = future.result()
+            except Exception as exc:
+                log.error("ERROR pushing batch %d: %s", idx + 1, exc)
+                raise
+
+    log.info("All %d batches pushed (%d workers)", total_batches, max_workers)
 
     push_result = {
         "resource_uuid": resource_uuid,
@@ -141,9 +163,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="Push BigQuery metadata from a manifest to Monte Carlo",
     )
-    parser.add_argument("--resource-uuid", default=os.getenv("MC_RESOURCE_UUID"))
-    parser.add_argument("--key-id", default=os.getenv("MC_INGEST_KEY_ID"))
-    parser.add_argument("--key-token", default=os.getenv("MC_INGEST_KEY_TOKEN"))
+    parser.add_argument("--resource-uuid", default=os.getenv("MCD_RESOURCE_UUID"))
+    parser.add_argument("--key-id", default=os.getenv("MCD_INGEST_ID"))
+    parser.add_argument("--key-token", default=os.getenv("MCD_INGEST_TOKEN"))
     parser.add_argument("--input-file", default="metadata_output.json")
     parser.add_argument("--output-file", default="metadata_push_result.json")
     parser.add_argument(

@@ -104,9 +104,9 @@ Other useful metric names:
 query GetTableLineage($mcon: String!) {
   getTableLineage(mcon: $mcon, direction: "upstream", hops: 1) {
     connectedNodes {
-      objectId
-      displayName
       mcon
+      displayName
+      objectType
     }
     flattenedEdges {
       directlyConnectedMcons

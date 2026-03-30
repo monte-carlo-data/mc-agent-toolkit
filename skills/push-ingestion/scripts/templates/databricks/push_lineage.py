@@ -6,8 +6,8 @@ events to Monte Carlo via the push ingestion API, with configurable batching to
 keep compressed payloads under 1 MB.
 
 Substitution points (search for "← SUBSTITUTE"):
-  - MC_INGEST_KEY_ID / MC_INGEST_KEY_TOKEN : Monte Carlo API credentials
-  - MC_RESOURCE_UUID      : UUID of the Databricks connection in Monte Carlo
+  - MCD_INGEST_ID / MCD_INGEST_TOKEN : Monte Carlo API credentials
+  - MCD_RESOURCE_UUID      : UUID of the Databricks connection in Monte Carlo
   - PUSH_BATCH_SIZE       : number of events per API call (default 500)
 
 Prerequisites:
@@ -20,6 +20,7 @@ import argparse
 import json
 import logging
 import os
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from typing import Any
 
@@ -40,11 +41,15 @@ DEFAULT_BATCH_SIZE = 500  # ← SUBSTITUTE: conservative default to stay under 1
 
 
 def _ref_from_dict(d: dict[str, Any]) -> LineageAssetRef:
+    database = d.get("database", "")
+    schema = d.get("schema", "")
+    name = d["asset_name"]
     return LineageAssetRef(
-        database=d.get("database", ""),
-        schema=d.get("schema", ""),
-        asset_name=d["asset_name"],
-        resource_type=RESOURCE_TYPE,
+        type="TABLE",
+        name=name,
+        database=database,
+        schema=schema,
+        asset_id=f"{database}__{schema}__{name}",
     )
 
 
@@ -53,29 +58,30 @@ def _event_from_dict(d: dict[str, Any]) -> LineageEvent:
     sources = [_ref_from_dict(s) for s in d.get("sources", [])]
     destination = _ref_from_dict(d["destination"])
 
-    col_lineage: list[ColumnLineageField] | None = None
+    fields: list[ColumnLineageField] | None = None
     if d.get("column_lineage"):
-        col_lineage = []
+        fields = []
         for cl in d["column_lineage"]:
-            col_lineage.append(
+            src_fields = []
+            for s in cl.get("sources", []):
+                asset_id = f"{s.get('database', '')}__{s.get('schema', '')}__{s['asset_name']}"
+                src_fields.append(
+                    ColumnLineageSourceField(
+                        asset_id=asset_id,
+                        field_name=s["field"],
+                    )
+                )
+            fields.append(
                 ColumnLineageField(
-                    destination_field=cl["destination_field"],
-                    sources=[
-                        ColumnLineageSourceField(
-                            database=s.get("database", ""),
-                            schema=s.get("schema", ""),
-                            asset_name=s["asset_name"],
-                            field=s["field"],
-                        )
-                        for s in cl.get("sources", [])
-                    ],
+                    name=cl["destination_field"],
+                    source_fields=src_fields,
                 )
             )
 
     return LineageEvent(
         sources=sources,
         destination=destination,
-        column_lineage=col_lineage,
+        fields=fields,
     )
 
 
@@ -97,31 +103,55 @@ def push(
     events = [_event_from_dict(d) for d in event_dicts]
     log.info("Loaded %d lineage events from %s", len(events), manifest_path)
 
-    client = Client(session=Session(mcd_id=key_id, mcd_token=key_token, scope="Ingestion"))
-    service = IngestionService(mc_client=client)
-
-    pushed_at = datetime.now(timezone.utc).isoformat()
-    invocation_ids: list[str] = []
-
+    # Split into batches
+    batches = []
     for i in range(0, len(events), batch_size):
-        batch = events[i : i + batch_size]
-        log.info("Pushing batch %d–%d of %d events …", i, i + len(batch), len(events))
-        result = service.push_custom_lineage(
+        batches.append(events[i : i + batch_size])
+    total_batches = len(batches)
+
+    def _push_batch(batch: list, batch_num: int) -> str | None:
+        """Push a single batch using a dedicated Session (thread-safe)."""
+        log.info("Pushing batch %d/%d (%d events) ...", batch_num, total_batches, len(batch))
+        client = Client(session=Session(mcd_id=key_id, mcd_token=key_token, scope="Ingestion"))
+        service = IngestionService(mc_client=client)
+        result = service.send_lineage(
             resource_uuid=resource_uuid,
             resource_type=RESOURCE_TYPE,
             events=batch,
         )
-        inv_id = service.extract_invocation_id(result)
-        invocation_ids.append(inv_id)
-        log.info("Batch pushed — invocation_id=%s", inv_id)
+        invocation_id = service.extract_invocation_id(result)
+        if invocation_id:
+            log.info("Batch %d: invocation_id=%s", batch_num, invocation_id)
+        return invocation_id
 
+    # Push batches in parallel (each thread gets its own pycarlo Session)
+    max_workers = min(4, total_batches)
+    invocation_ids: list[str | None] = [None] * total_batches
+
+    with ThreadPoolExecutor(max_workers=max_workers) as pool:
+        futures = {
+            pool.submit(_push_batch, batch, i + 1): i
+            for i, batch in enumerate(batches)
+        }
+        for future in as_completed(futures):
+            idx = futures[future]
+            try:
+                invocation_ids[idx] = future.result()
+            except Exception as exc:
+                log.error("ERROR pushing batch %d: %s", idx + 1, exc)
+                raise
+
+    log.info("All %d batches pushed (%d workers)", total_batches, max_workers)
+
+    pushed_at = datetime.now(timezone.utc).isoformat()
     summary = {
         "resource_uuid": resource_uuid,
         "resource_type": RESOURCE_TYPE,
         "invocation_ids": invocation_ids,
         "pushed_at": pushed_at,
         "event_count": len(events),
-        "batch_count": len(invocation_ids),
+        "batch_count": total_batches,
+        "batch_size": batch_size,
         "lookback_days": manifest.get("lookback_days"),
         "table_lineage_events": manifest.get("table_lineage_events"),
         "column_lineage_events": manifest.get("column_lineage_events"),
@@ -138,9 +168,9 @@ def push(
 def main() -> None:
     parser = argparse.ArgumentParser(description="Push Databricks lineage to Monte Carlo from manifest")
     parser.add_argument("--manifest", default="manifest_lineage.json")
-    parser.add_argument("--resource-uuid", default=os.getenv("MC_RESOURCE_UUID"))
-    parser.add_argument("--key-id", default=os.getenv("MC_INGEST_KEY_ID"))
-    parser.add_argument("--key-token", default=os.getenv("MC_INGEST_KEY_TOKEN"))
+    parser.add_argument("--resource-uuid", default=os.getenv("MCD_RESOURCE_UUID"))
+    parser.add_argument("--key-id", default=os.getenv("MCD_INGEST_ID"))
+    parser.add_argument("--key-token", default=os.getenv("MCD_INGEST_TOKEN"))
     parser.add_argument("--batch-size", type=int, default=DEFAULT_BATCH_SIZE)
     args = parser.parse_args()
 

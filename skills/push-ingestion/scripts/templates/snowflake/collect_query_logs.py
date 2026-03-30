@@ -39,6 +39,25 @@ import snowflake.connector
 # ← SUBSTITUTE: set LOG_TYPE to match your warehouse type (query logs use log_type, not resource_type)
 LOG_TYPE = "snowflake"
 
+
+def _check_available_memory(min_gb: float = 2.0) -> None:
+    """Warn if available memory is below the threshold."""
+    try:
+        if hasattr(os, "sysconf"):  # Linux / macOS
+            page_size = os.sysconf("SC_PAGE_SIZE")
+            avail_pages = os.sysconf("SC_AVPHYS_PAGES")
+            avail_gb = (page_size * avail_pages) / (1024 ** 3)
+        else:
+            return  # Windows — skip check
+    except (ValueError, OSError):
+        return
+    if avail_gb < min_gb:
+        print(
+            f"WARNING: Only {avail_gb:.1f} GB of memory available "
+            f"(minimum recommended: {min_gb:.1f} GB). "
+            f"Consider reducing the lookback window or increasing available memory."
+        )
+
 # How many hours to look back from the trailing-edge cutoff
 # ← SUBSTITUTE: adjust to match your collection cadence (e.g. 2 for every-2-hours runs)
 _WINDOW_HOURS = 25
@@ -88,7 +107,12 @@ def _fetch_query_history(conn) -> list[dict]:
         #   to restrict collection to a specific database or warehouse
     )
     columns = [col[0] for col in cursor.description]
-    rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
+    rows = []
+    while True:
+        chunk = cursor.fetchmany(1000)
+        if not chunk:
+            break
+        rows.extend(dict(zip(columns, row)) for row in chunk)
     cursor.close()
     return rows
 
@@ -111,6 +135,7 @@ def collect(
 
     Returns the manifest dict.
     """
+    _check_available_memory()
     print(f"Connecting to Snowflake account: {account} ...")
     conn = snowflake.connector.connect(
         account=account,

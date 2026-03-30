@@ -11,9 +11,9 @@ Can be run standalone via CLI or imported (use the ``push()`` function).
 
 Substitution points
 -------------------
-- MC_INGEST_KEY_ID    (env) / --key-id        (CLI) : Monte Carlo ingestion key ID
-- MC_INGEST_KEY_TOKEN (env) / --key-token      (CLI) : Monte Carlo ingestion key token
-- MC_RESOURCE_UUID    (env) / --resource-uuid  (CLI) : MC resource UUID for this connection
+- MCD_INGEST_ID    (env) / --key-id        (CLI) : Monte Carlo ingestion key ID
+- MCD_INGEST_TOKEN (env) / --key-token      (CLI) : Monte Carlo ingestion key token
+- MCD_RESOURCE_UUID    (env) / --resource-uuid  (CLI) : MC resource UUID for this connection
 
 Prerequisites
 -------------
@@ -21,9 +21,9 @@ Prerequisites
 
 Usage (table-level):
     python push_lineage.py \\
-        --key-id  <MC_INGEST_KEY_ID> \\
-        --key-token <MC_INGEST_KEY_TOKEN> \\
-        --resource-uuid <MC_RESOURCE_UUID> \\
+        --key-id  <MCD_INGEST_ID> \\
+        --key-token <MCD_INGEST_TOKEN> \\
+        --resource-uuid <MCD_RESOURCE_UUID> \\
         --input-file lineage_output.json
 
 Usage (column-level):
@@ -33,6 +33,7 @@ Usage (column-level):
 import argparse
 import json
 import os
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from pycarlo.core import Client, Session
 from pycarlo.features.ingestion import IngestionService
@@ -177,55 +178,62 @@ def push(
         events = _build_table_lineage(edges_data)
         label = "table-level"
 
-    n = len(events)
-    batches = (n + batch_size - 1) // batch_size if n else 0
+    print(f"Loaded {len(events)} {label} lineage event(s) from manifest")
 
-    if batches > 1:
-        print(f"Pushing {n} {label} lineage event(s) to Monte Carlo in {batches} batch(es) of up to {batch_size} ...")
-    else:
-        print(f"Pushing {n} {label} lineage event(s) to Monte Carlo ...")
+    if not events:
+        print("No lineage events to push.")
+        manifest["resource_uuid"] = resource_uuid
+        manifest["invocation_id"] = None
+        return None
 
-    client = Client(
-        session=Session(mcd_id=key_id, mcd_token=key_token, scope="Ingestion")
-    )
-    service = IngestionService(mc_client=client)
+    # Split into batches
+    batch_list = []
+    for i in range(0, len(events), batch_size):
+        batch_list.append(events[i : i + batch_size])
+    total_batches = len(batch_list)
 
-    invocation_ids: list[str] = []
-    for b in range(batches):
-        lo = b * batch_size
-        hi = min(lo + batch_size, n)
-        part = events[lo:hi]
-        try:
-            result = service.send_lineage(
-                resource_uuid=resource_uuid,
-                resource_type=resource_type,
-                events=part,
-            )
-        except Exception as exc:
-            print(f"  ERROR pushing batch {b + 1}/{batches}: {exc}")
-            raise
-        iid = service.extract_invocation_id(result)
-        if iid:
-            invocation_ids.append(iid)
-        if batches > 1:
-            print(f"  Batch {b + 1}/{batches}: {len(part)} events — response: {json.dumps(result) if result else '(empty)'}")
-        elif result is not None:
-            print(f"Response: {json.dumps(result, indent=2)}")
+    def _push_batch(batch: list, batch_num: int) -> str | None:
+        """Push a single batch using a dedicated Session (thread-safe)."""
+        print(f"  Pushing batch {batch_num}/{total_batches} ({len(batch)} events) ...")
+        client = Client(session=Session(mcd_id=key_id, mcd_token=key_token, scope="Ingestion"))
+        service = IngestionService(mc_client=client)
+        result = service.send_lineage(
+            resource_uuid=resource_uuid,
+            resource_type=resource_type,
+            events=batch,
+        )
+        invocation_id = service.extract_invocation_id(result)
+        if invocation_id:
+            print(f"    Batch {batch_num}: invocation_id={invocation_id}")
+        return invocation_id
 
-    last_id = invocation_ids[-1] if invocation_ids else None
-    if last_id and batches <= 1:
-        print(f"Invocation ID: {last_id}")
-    elif len(invocation_ids) > 1:
-        print(f"Invocation IDs ({len(invocation_ids)} batches): {invocation_ids}")
+    # Push batches in parallel (each thread gets its own pycarlo Session)
+    max_workers = min(4, total_batches)
+    invocation_ids: list[str | None] = [None] * total_batches
+
+    with ThreadPoolExecutor(max_workers=max_workers) as pool:
+        futures = {
+            pool.submit(_push_batch, batch, i + 1): i
+            for i, batch in enumerate(batch_list)
+        }
+        for future in as_completed(futures):
+            idx = futures[future]
+            try:
+                invocation_ids[idx] = future.result()
+            except Exception as exc:
+                print(f"    ERROR pushing batch {idx + 1}: {exc}")
+                raise
+
+    print(f"  All {total_batches} batches pushed ({max_workers} workers)")
 
     manifest["resource_uuid"] = resource_uuid
-    manifest["invocation_id"] = last_id
-    if len(invocation_ids) > 1:
+    manifest["invocation_id"] = invocation_ids[-1] if invocation_ids else None
+    if len([i for i in invocation_ids if i]) > 1:
         manifest["invocation_ids"] = invocation_ids
     elif "invocation_ids" in manifest:
         del manifest["invocation_ids"]
 
-    return last_id
+    return manifest.get("invocation_id")
 
 
 def main() -> None:
@@ -234,18 +242,18 @@ def main() -> None:
     )
     parser.add_argument(
         "--key-id",
-        default=os.environ.get("MC_INGEST_KEY_ID"),
-        help="Monte Carlo ingestion key ID (env: MC_INGEST_KEY_ID)",
+        default=os.environ.get("MCD_INGEST_ID"),
+        help="Monte Carlo ingestion key ID (env: MCD_INGEST_ID)",
     )
     parser.add_argument(
         "--key-token",
-        default=os.environ.get("MC_INGEST_KEY_TOKEN"),
-        help="Monte Carlo ingestion key token (env: MC_INGEST_KEY_TOKEN)",
+        default=os.environ.get("MCD_INGEST_TOKEN"),
+        help="Monte Carlo ingestion key token (env: MCD_INGEST_TOKEN)",
     )
     parser.add_argument(
         "--resource-uuid",
-        default=os.environ.get("MC_RESOURCE_UUID"),
-        help="Monte Carlo resource UUID for this Hive connection (env: MC_RESOURCE_UUID)",
+        default=os.environ.get("MCD_RESOURCE_UUID"),
+        help="Monte Carlo resource UUID for this Hive connection (env: MCD_RESOURCE_UUID)",
     )
     parser.add_argument(
         "--input-file",
@@ -274,9 +282,9 @@ def main() -> None:
     args = parser.parse_args()
 
     if not args.key_id or not args.key_token:
-        parser.error("--key-id and --key-token are required (or set MC_INGEST_KEY_ID / MC_INGEST_KEY_TOKEN)")
+        parser.error("--key-id and --key-token are required (or set MCD_INGEST_ID / MCD_INGEST_TOKEN)")
     if not args.resource_uuid:
-        parser.error("--resource-uuid is required (or set MC_RESOURCE_UUID)")
+        parser.error("--resource-uuid is required (or set MCD_RESOURCE_UUID)")
 
     with open(args.input_file) as fh:
         manifest = json.load(fh)

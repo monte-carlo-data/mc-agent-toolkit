@@ -1,6 +1,6 @@
 {
     "name": "mc-safe-change",
-    "version": "1.0.0",
+    "version": "1.1.1",
     "description": "Monte Carlo Safe Change — detect and prevent breaking schema changes using Monte Carlo lineage and monitoring data.",
     "author": {
         "name": "Monte Carlo",
