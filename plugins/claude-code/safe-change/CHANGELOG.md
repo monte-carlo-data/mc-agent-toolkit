@@ -5,6 +5,21 @@ All notable changes to the Monte Carlo Safe Change plugin will be documented in 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.2] - 2026-03-30
+
+### Changed
+
+- Migrate MCP server from header-based auth (`npx mcp-remote` + env vars) to zero-config HTTP/OAuth
+- Plugin now bundles `.mcp.json` with HTTP transport — no manual key setup required
+- Auto-approve MCP tool calls via `permissions.allow` for both plugin-bundled and standalone server prefixes
+- Update all setup docs to OAuth-first flow; legacy header-based auth moved to collapsible fallback sections
+
+### Fixed
+
+- Use `permissions.allow` instead of `allowedTools` in `settings.json` (was silently ignored)
+- Restore `commands` field in `plugin.json` (accidentally removed in initial branch)
+- Track plugin `.mcp.json` in git via `.gitignore` negation rule
+
 ## [1.1.1] - 2026-03-30
 
 ### Fixed
