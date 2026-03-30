@@ -44,12 +44,12 @@ def main():
 
     # Prompt if impact assessment was triggered for at least one edited table
     # "injected" means W4 instruction was sent; "verified" means completion confirmed
-    w4_tables = [t for t in tables if get_impact_check_state(t) in ("injected", "verified")]
+    w4_tables = [t for t in tables if get_impact_check_state(session_id, t) in ("injected", "verified")]
     if not w4_tables:
         return
 
     # Check for monitor coverage gaps
-    gap_tables = [t for t in tables if has_monitor_gap(t)]
+    gap_tables = [t for t in tables if has_monitor_gap(session_id, t)]
 
     # Build prompt
     table_list = ", ".join(tables)

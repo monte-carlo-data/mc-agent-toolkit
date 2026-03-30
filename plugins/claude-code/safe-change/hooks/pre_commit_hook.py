@@ -41,6 +41,7 @@ def main():
     if "git commit" not in command:
         return
 
+    session_id = input_data.get("session_id", "unknown")
     cwd = input_data.get("cwd", ".")
     staged_tables = _get_staged_model_tables(cwd)
 
@@ -48,12 +49,12 @@ def main():
         return
 
     # Only prompt if impact assessment ran for at least one staged table
-    w4_tables = [t for t in staged_tables if get_impact_check_state(t) == "verified"]
+    w4_tables = [t for t in staged_tables if get_impact_check_state(session_id, t) == "verified"]
     if not w4_tables:
         return
 
     table_list = ", ".join(w4_tables)
-    gap_tables = [t for t in w4_tables if has_monitor_gap(t)]
+    gap_tables = [t for t in w4_tables if has_monitor_gap(session_id, t)]
 
     message = f"Committing changes to {table_list}. Run validation queries before committing? (yes / no)"
 
