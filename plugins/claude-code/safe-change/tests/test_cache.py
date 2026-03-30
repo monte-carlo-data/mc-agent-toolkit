@@ -25,27 +25,27 @@ from lib.cache import (
 
 class TestImpactCheckState:
     def test_no_marker_returns_none(self):
-        assert get_impact_check_state("my_table") is None
+        assert get_impact_check_state("test_session", "my_table") is None
 
     def test_injected_state(self):
-        mark_impact_check_injected("my_table")
-        assert get_impact_check_state("my_table") == "injected"
+        mark_impact_check_injected("test_session", "my_table")
+        assert get_impact_check_state("test_session", "my_table") == "injected"
 
     def test_verified_state(self):
-        mark_impact_check_injected("my_table")
-        mark_impact_check_verified("my_table")
-        assert get_impact_check_state("my_table") == "verified"
+        mark_impact_check_injected("test_session", "my_table")
+        mark_impact_check_verified("test_session", "my_table")
+        assert get_impact_check_state("test_session", "my_table") == "verified"
 
     def test_marker_age(self):
-        mark_impact_check_injected("my_table")
-        age = get_impact_check_age_seconds("my_table")
+        mark_impact_check_injected("test_session", "my_table")
+        age = get_impact_check_age_seconds("test_session", "my_table")
         assert 0 <= age < 2  # Should be very recent
 
     def test_different_tables_independent(self):
-        mark_impact_check_injected("table_a")
-        mark_impact_check_verified("table_a")
-        assert get_impact_check_state("table_a") == "verified"
-        assert get_impact_check_state("table_b") is None
+        mark_impact_check_injected("test_session", "table_a")
+        mark_impact_check_verified("test_session", "table_a")
+        assert get_impact_check_state("test_session", "table_a") == "verified"
+        assert get_impact_check_state("test_session", "table_b") is None
 
 
 class TestEditAccumulator:
@@ -131,8 +131,8 @@ class TestFilePermissions:
         return stat.S_IMODE(os.stat(path).st_mode)
 
     def test_impact_check_file_is_owner_only(self):
-        mark_impact_check_injected("perm_test_table")
-        path = os.path.join(CACHE_DIR, f"{IC_PREFIX}perm_test_table")
+        mark_impact_check_injected("test_session", "perm_test_table")
+        path = os.path.join(CACHE_DIR, f"{IC_PREFIX}test_session_perm_test_table")
         assert self._get_perms(path) == 0o600
 
     def test_turn_file_is_owner_only(self):

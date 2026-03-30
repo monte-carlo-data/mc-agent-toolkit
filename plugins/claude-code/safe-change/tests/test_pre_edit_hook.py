@@ -52,7 +52,7 @@ class TestPreEditHook:
         sql_file = model_dir / "orders.sql"
         sql_file.write_text("SELECT * FROM {{ ref('raw') }}")
 
-        cache.mark_impact_check_injected("orders")
+        cache.mark_impact_check_injected("test_session", "orders")
 
         # No transcript marker — assessment hasn't completed
         transcript = tmp_path / "transcript.jsonl"
@@ -74,7 +74,7 @@ class TestPreEditHook:
         sql_file = model_dir / "orders.sql"
         sql_file.write_text("SELECT * FROM {{ ref('raw') }}")
 
-        cache.mark_impact_check_injected("orders")
+        cache.mark_impact_check_injected("test_session", "orders")
 
         # Transcript has the completion marker
         transcript = tmp_path / "transcript.jsonl"
@@ -85,7 +85,7 @@ class TestPreEditHook:
             main()
 
         assert capsys.readouterr().out == ""
-        assert cache.get_impact_check_state("orders") == "verified"
+        assert cache.get_impact_check_state("test_session", "orders") == "verified"
 
     def test_dbt_model_verified_state_silent(self, tmp_path, capsys):
         """Verified state should always be silent."""
@@ -94,8 +94,8 @@ class TestPreEditHook:
         sql_file = model_dir / "orders.sql"
         sql_file.write_text("SELECT * FROM {{ ref('raw') }}")
 
-        cache.mark_impact_check_injected("orders")
-        cache.mark_impact_check_verified("orders")
+        cache.mark_impact_check_injected("test_session", "orders")
+        cache.mark_impact_check_verified("test_session", "orders")
 
         from pre_edit_hook import main
         with patch("sys.stdin", StringIO(_make_stdin(str(sql_file)))):
@@ -110,14 +110,14 @@ class TestPreEditHook:
         sql_file = model_dir / "orders.sql"
         sql_file.write_text("SELECT * FROM {{ ref('raw') }}")
 
-        cache.mark_impact_check_injected("orders")
+        cache.mark_impact_check_injected("test_session", "orders")
 
         # Create transcript with the completion marker
         transcript = tmp_path / "transcript.jsonl"
         transcript.write_text('{"content": "<!-- MC_IMPACT_CHECK_COMPLETE: orders -->"}\n')
 
         # Age the marker past grace period
-        marker_path = "/tmp/mc_safe_change_ic_orders"
+        marker_path = "/tmp/mc_safe_change_ic_test_session_orders"
         with open(marker_path, "r") as f:
             data = json.load(f)
         data["timestamp"] = data["timestamp"] - 200  # 200 seconds ago
@@ -129,7 +129,7 @@ class TestPreEditHook:
             main()
 
         assert capsys.readouterr().out == ""
-        assert cache.get_impact_check_state("orders") == "verified"
+        assert cache.get_impact_check_state("test_session", "orders") == "verified"
 
     def test_grace_period_expired_no_marker_in_transcript_reinjects(self, tmp_path, capsys):
         """After 120s, if transcript lacks marker, should re-inject."""
@@ -138,14 +138,14 @@ class TestPreEditHook:
         sql_file = model_dir / "orders.sql"
         sql_file.write_text("SELECT * FROM {{ ref('raw') }}")
 
-        cache.mark_impact_check_injected("orders")
+        cache.mark_impact_check_injected("test_session", "orders")
 
         # Create transcript WITHOUT the completion marker
         transcript = tmp_path / "transcript.jsonl"
         transcript.write_text('{"content": "some other message"}\n')
 
         # Age the marker past grace period
-        marker_path = "/tmp/mc_safe_change_ic_orders"
+        marker_path = "/tmp/mc_safe_change_ic_test_session_orders"
         with open(marker_path, "r") as f:
             data = json.load(f)
         data["timestamp"] = data["timestamp"] - 200
