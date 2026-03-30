@@ -16,5 +16,6 @@
         "schema"
     ],
     "skills": "./skills/",
-    "mcpServers": "./.mcp.json"
+    "mcpServers": "./.mcp.json",
+    "commands": ["./commands/mc-validate.md"]
 }

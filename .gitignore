@@ -1,6 +1,7 @@
 .env
 *.key
 .mcp.json
+!plugins/**/.mcp.json
 node_modules/
 .DS_Store
 .venv/

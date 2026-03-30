@@ -1,3 +1,8 @@
 {
-  "allowedTools": ["mcp__monte-carlo__*"]
+    "permissions": {
+        "allow": [
+            "mcp__plugin_mc-safe-change_monte-carlo__*",
+            "mcp__monte-carlo-mcp__*"
+        ]
+    }
 }
