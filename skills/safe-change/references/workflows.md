@@ -380,7 +380,26 @@ Use the correct SQL dialect for the warehouse type. Key differences:
 | Redshift | `DATEDIFF('day', a, b)` | `GETDATE()` | |
 | Databricks | `DATEDIFF(a, b)` | `CURRENT_TIMESTAMP()` | |
 
-For the dev database, use the placeholder `<YOUR_DEV_DATABASE>` with a comment instructing the engineer to replace it. Do not guess the dev database name.
+**Dev database resolution — do this once per session, then cache the result:**
+
+Attempt to resolve the dev database automatically before generating any queries:
+
+1. Read `dbt_project.yml` from the repo root to find the `profile:` field.
+2. Read `~/.dbt/profiles.yml` and look up that profile's outputs:
+   - Check `outputs.dev` first (BigQuery: `dataset`; all others: `database`).
+   - If no `database`/`dataset` there, fall back to the output named by `config.target` (the profile default).
+   - If both have a value, `dev` takes precedence over the default.
+3. Branch based on what you found:
+   - **Resolved unambiguously** → ask the engineer to confirm before using it:
+     > "I found your dev database is `<name>` (from `~/.dbt/profiles.yml`, `<profile>.outputs.dev`). Does that look right, or would you like to use a different one?"
+     Wait for their response. Use the confirmed name in all generated SQL.
+   - **Multiple profiles and no `dbt_project.yml` to disambiguate** → list the profiles found and ask the engineer to choose one, then resolve as above.
+   - **No `database`/`dataset` found anywhere, or files missing** → ask the engineer directly:
+     > "What's your dev database name? (I couldn't find one in `~/.dbt/profiles.yml`.)"
+     Wait for their response. Use the provided name in all generated SQL.
+   - **Engineer skips or declines to answer** → fall back to the placeholder `<YOUR_DEV_DATABASE>` with a comment instructing them to replace it before running.
+
+Once confirmed for the session, reuse the same dev database name for all subsequent tables — do not ask again.
 
 ---
 
@@ -452,9 +471,10 @@ Validation queries for: <fully_qualified_table>
 Change type: <change type from Step 1>
 Generated: <timestamp>
 Workflow 4 risk tier: <tier from this session>
+Dev database: <confirmed dev database, or YOUR_DEV_DATABASE if not resolved>
 
 Instructions:
-1. Replace <YOUR_DEV_DATABASE> with your personal or branch database
+1. <Omit if dev database was confirmed. Otherwise: Replace <YOUR_DEV_DATABASE> with your personal or branch database>
 2. Run the row count comparison first
 3. Run change-specific queries to validate intended behavior
 4. Unexpected results should be investigated before merging
@@ -462,15 +482,40 @@ Instructions:
 ```
 
 Then tell the engineer:
-> "Validation queries saved to `validation/<table_name>_<timestamp>.sql`.
-> Replace `<YOUR_DEV_DATABASE>` with your dev database and run in Snowflake
-> or your preferred SQL client to verify the change behaved as expected."
+> "Validation queries saved to `validation/<table_name>_<timestamp>.sql`. Run in Snowflake or your preferred SQL client to verify the change behaved as expected."
+> If the dev database was not resolved, append: "Replace `<YOUR_DEV_DATABASE>` with your dev database before running."
+
+---
+
+### Step 7 — Offer to execute queries (if warehouse MCP available)
+
+After saving the file, check whether any available MCP tool can execute SQL queries against the warehouse. Look for tools with names matching patterns like `mcp__*__query`, `mcp__*__execute_sql`, `mcp__*__run_query`, `mcp__*__read_query`, etc.
+
+**If a matching tool is found:**
+
+1. Ask the engineer:
+   > "I found a warehouse MCP tool (`<tool_name>`) that can run these queries directly. Want me to execute them now?"
+2. If they accept, run each query **one at a time, sequentially**:
+   - Before executing, verify the query is read-only (`SELECT` or `WITH ... SELECT`). Never execute anything else.
+   - Present the result in a readable table format.
+   - Interpret the result against the "what healthy looks like" / "what would indicate a problem" comments from Step 5.
+   - If a result looks concerning, flag it and ask whether to continue with the remaining queries.
+3. After all queries complete, provide a summary:
+   ```
+   Validation results for analytics.prod.client_hub:
+   ✅ Query 1 — Row count comparison: PASSED (263 rows in both)
+   ⚠️ Query 2 — New column null check: 12 NULLs found (expected 0)
+   ✅ Query 3 — Value range check: PASSED
+   ```
+4. If any query errors out (e.g. table not found, permission denied), report the error and move on to the next query — do not stop entirely.
+
+**If no matching tool is found:**
+
+Skip this step silently. The engineer will run the saved `.sql` file manually, as described in Step 6.
 
 ---
 
 ### What this workflow does NOT do
-- Does not execute queries (Phase 2)
-- Does not require warehouse MCP connection
 - Does not generate Monte Carlo notebook YAML
 - Does not trigger automatically — only on explicit engineer request
 - Does not activate if Workflow 4 has not run for this table in this session
