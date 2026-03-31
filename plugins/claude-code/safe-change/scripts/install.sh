@@ -13,5 +13,5 @@ if [ -d "$SKILL_PATH" ]; then
 fi
 
 echo "✓ Post-install cleanup complete."
-echo "  Ensure MCD_ID and MCD_TOKEN are set in your shell profile."
+echo "  Run /mcp in Claude Code to authenticate with Monte Carlo."
 echo "  Restart Claude Code to activate."

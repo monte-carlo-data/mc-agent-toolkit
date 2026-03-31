@@ -14,4 +14,4 @@ else
 fi
 
 echo "✓ Post-uninstall cleanup complete."
-echo "  Remove MCD_ID and MCD_TOKEN from your shell profile if no longer needed."
+echo "  Done."

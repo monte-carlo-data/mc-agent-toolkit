@@ -4,24 +4,23 @@ Monte Carlo's official toolkit for AI coding agents. Contains skills and plugins
 
 ## Prerequisites
 
-- An [Monte Carlo](https://www.montecarlodata.com) account with Editor role or above
-- [Monte Carlo MCP server](https://docs.getmontecarlo.com/docs/mcp-server) configured (required by the `safe-change` plugin/skill)
-      <details>
-      <summary>Click to expand - Configure Monte Carlo MCP Server</summary>
-      
-      1. Obtain an MCP server key:
-         — Go to Monte Carlo → Settings → API Keys, click Add.
-         - Select type MCP Server. Copy the `KEY_ID` and `KEY_SECRET`.
-      
-      2. Configure the MCP server 
-         — Run `cp .mcp.json.example <mcp-config-path>/.mcp.json` to either:
-            - Project-level: `.mcp.json` at your project root (recommended — keeps config scoped to the project)
-            - Global: `~/.claude/claude.json` (path depends on your coding agent; applies to all projects)
-         - Replace `<KEY_ID>` and `<KEY_SECRET>` with your MCP key values.
-  
-      3. Verify — In Claude Code, ask: "Test my Monte Carlo connection". Claude will call `testConnection` and confirm
-         your credentials are working.
-      </details>
+- A [Monte Carlo](https://www.montecarlodata.com) account with Editor role or above
+- Monte Carlo MCP server — configure with:
+  ```
+  claude mcp add --transport http monte-carlo-mcp https://integrations.getmontecarlo.com/mcp
+  ```
+  Then authenticate: run `/mcp` in Claude Code, select `monte-carlo-mcp`, and complete the OAuth flow in your browser.
+
+  > **Note:** The `mc-safe-change` plugin bundles its own MCP server, so if you install the plugin you can skip this step.
+
+  See [official docs](https://docs.getmontecarlo.com/docs/mcp-server#option-1-oauth-21-recommended-for-mcp-clients-that-support-http-transport) for other MCP clients and advanced options.
+
+  <details>
+  <summary>Legacy: header-based auth (for MCP clients without HTTP transport)</summary>
+
+  If your MCP client doesn't support HTTP transport, use `.mcp.json.example` with `npx mcp-remote` and header-based authentication. See the [MCP server docs](https://docs.getmontecarlo.com/docs/mcp-server) for details.
+
+  </details>
 
 
 ## Installing plugins (recommended)

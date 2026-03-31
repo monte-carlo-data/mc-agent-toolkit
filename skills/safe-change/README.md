@@ -33,44 +33,29 @@ Core workflows — table health check, change impact assessment, alert triage, a
 
 ## Setup
 
-### Step 1 — Install the skill
+### Step 1 — Configure the Monte Carlo MCP server (recommended)
 
-See [installation options](https://github.com/monte-carlo-data/mcd-skills#installation) in the main repository README.
-
-### Step 2 — Obtain an MCP server key
-
-1. Go to **Monte Carlo → Settings → API Keys**
-2. Click **Add** and select type **MCP Server**
-3. Copy the key — it has two parts: `KEY_ID` and `KEY_SECRET`
-
-MCP keys are separate from standard API keys. Standard keys work for the CLI; MCP keys work for the editor integration.
-
-### Step 3 — Configure your MCP server
-
-Add the Monte Carlo MCP server to your project `.mcp.json` or global `~/.claude/claude.json`:
-
-```json
-{
-  "mcpServers": {
-    "monte-carlo": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "mcp-remote",
-        "https://integrations.getmontecarlo.com/mcp/",
-        "--header",
-        "x-mcd-id: <KEY_ID>",
-        "--header",
-        "x-mcd-token: <KEY_SECRET>",
-        "--header",
-        "x-mcd-source: editor-skill-1.0"
-      ]
-    }
-  }
-}
+```
+claude mcp add --transport http monte-carlo-mcp https://integrations.getmontecarlo.com/mcp
 ```
 
-Replace `<KEY_ID>` and `<KEY_SECRET>` with your MCP key values. See `.mcp.json.example` for a copy-paste template.
+This registers the Monte Carlo MCP server with Claude Code. See the [official docs](https://docs.getmontecarlo.com/docs/mcp-server#option-1-oauth-21-recommended-for-mcp-clients-that-support-http-transport) for other MCP clients.
+
+> **Note:** This step is optional if you install the plugin (Step 2), which bundles its own MCP server. However, configuring the standalone server first is recommended — it's available across all projects and won't be removed if you uninstall the plugin.
+
+### Step 2 — Install the plugin
+
+See [installation options](https://github.com/monte-carlo-data/mcd-skills#installation) in the main repository README. The plugin bundles hooks, commands, and tool permissions on top of the skill. If you configured the MCP server in Step 1, the plugin will use that alongside its own bundled server.
+
+### Step 3 — Authenticate with Monte Carlo
+
+In Claude Code, run:
+
+```
+/mcp
+```
+
+Select the Monte Carlo server (`monte-carlo-mcp` if standalone, or `monte-carlo` if plugin-bundled) and follow the browser-based OAuth flow to log in with your Monte Carlo account.
 
 ### Step 4 — Verify the connection
 
@@ -80,31 +65,26 @@ In Claude Code, paste:
 
 Claude will call `testConnection` and confirm your credentials are working.
 
-### Step 5 — Configure tool permissions (recommended)
+### Step 5 — Configure tool permissions (standalone only)
 
-By default Claude Code will prompt for permission on each Monte Carlo
-MCP tool call. To allow the skill to run without interruption, choose
-one of the following:
+If you're using the standalone MCP server (Step 1) **without** the plugin, add this to `.claude/settings.local.json` in your project:
 
-**Option A — Add to allow list (recommended)**
-Add the following to `.claude/settings.local.json` in your project:
 ```json
 {
-  "allowedTools": [
-    "mcp__monte-carlo__*"
-  ]
+  "permissions": {
+    "allow": ["mcp__monte-carlo-mcp__*"]
+  }
 }
 ```
 
-This allows all Monte Carlo read operations without prompting, while
-keeping write operations (file edits, CLI commands) under your control.
+The plugin handles this automatically — no manual configuration needed.
 
-**Option B — Skip all permissions (use with caution)**
-```bash
-claude --dangerously-skip-permissions
-```
-This bypasses all permission checks including file edits and CLI
-commands. Only use this in a safe, non-production environment.
+<details>
+<summary>Legacy: header-based auth (for MCP clients without HTTP transport)</summary>
+
+If your MCP client doesn't support HTTP transport, configure the MCP server using `.mcp.json.example` with `npx mcp-remote` and header-based authentication. You'll need an MCP server key from Monte Carlo → Settings → API Keys. See the [MCP server docs](https://docs.getmontecarlo.com/docs/mcp-server) for details.
+
+</details>
 
 ## How to use it
 
