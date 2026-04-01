@@ -217,9 +217,12 @@ on its own line when the condition is met.
 ### Impact check complete
 
 After the engineer confirms (High/Medium) or after presenting the synthesis (Low),
-output one marker per assessed table:
+output one marker per assessed table. **IMPORTANT: use only the table/model name, not the full MCON:**
 
-<!-- MC_IMPACT_CHECK_COMPLETE: <table_name> -->
+<!-- MC_IMPACT_CHECK_COMPLETE: orders -->
+<!-- MC_IMPACT_CHECK_COMPLETE: client_hub -->
+
+(Use the model filename without .sql extension — NOT "acme.analytics.orders" or "prod.public.client_hub")
 
 How many markers to emit depends on how the assessment was triggered:
 
@@ -240,8 +243,9 @@ they clearly considered.
 
 When Workflow 4 finds zero custom monitors on a table's affected columns, output:
 
-<!-- MC_MONITOR_GAP: <table_name> -->
+<!-- MC_MONITOR_GAP: orders -->
 
-This allows the plugin's hooks to remind the engineer about monitor coverage at
-commit time. Only output this marker when the gap is specifically about the
-columns or logic being changed — not for general table-level monitor absence.
+Use only the table/model name (NOT the full MCON). This allows the plugin's hooks 
+to remind the engineer about monitor coverage at commit time. Only output this 
+marker when the gap is specifically about the columns or logic being changed — 
+not for general table-level monitor absence.
