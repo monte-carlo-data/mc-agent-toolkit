@@ -1,9 +1,36 @@
 # Changelog
 
-All notable changes to the Monte Carlo Safe Change plugin will be documented in this file.
+All notable changes to the Monte Carlo Prevent plugin will be documented in this file.
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [1.0.0] - 2026-04-01
+
+### Changed
+
+- Rename plugin from `mc-safe-change` to `mc-prevent`
+- Rename skill from `monte-carlo-safe-change` to `monte-carlo-prevent`
+- Reset version to 1.0.0 as a fresh identity
+
+### Upgrade instructions
+
+Claude Code treats this as a new plugin. Existing users must uninstall the old
+plugin and install the new one:
+
+```bash
+# 1. Uninstall the old plugin
+claude plugin remove mc-safe-change
+
+# 2. Install the new plugin (see README for instructions)
+```
+
+The install script automatically cleans up leftover `safe-change` skill and
+cache files.
+
+---
+
+_Entries below predate the rename from `mc-safe-change` to `mc-prevent`._
 
 ## [1.1.2] - 2026-03-30
 

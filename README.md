@@ -11,7 +11,7 @@ Monte Carlo's official toolkit for AI coding agents. Contains skills and plugins
   ```
   Then authenticate: run `/mcp` in Claude Code, select `monte-carlo-mcp`, and complete the OAuth flow in your browser.
 
-  > **Note:** The `mc-safe-change` plugin bundles its own MCP server, so if you install the plugin you can skip this step.
+  > **Note:** The `mc-prevent` plugin bundles its own MCP server, so if you install the plugin you can skip this step.
 
   See [official docs](https://docs.getmontecarlo.com/docs/mcp-server#option-1-oauth-21-recommended-for-mcp-clients-that-support-http-transport) for other MCP clients and advanced options.
 
@@ -35,7 +35,7 @@ Monte Carlo's official toolkit for AI coding agents. Contains skills and plugins
    ```
 2. Install a plugin:
    ```
-   /plugin install mc-safe-change@mcd-agent-toolkit
+   /plugin install mc-prevent@mcd-agent-toolkit
    /plugin install mc-generate-validation-notebook@mcd-agent-toolkit
    /plugin install mc-push-ingestion@mcd-agent-toolkit
    ```
@@ -45,7 +45,7 @@ Monte Carlo's official toolkit for AI coding agents. Contains skills and plugins
 
 | Plugin | Description |
 |---|---|
-| `mc-safe-change` | Analyzes schema changes using MC lineage, monitoring, alerts, queries, and table metadata. Generates Monte Carlo monitors and validation queries for safe deployments. |
+| `mc-prevent` | Analyzes schema changes using MC lineage, monitoring, alerts, queries, and table metadata. Generates Monte Carlo monitors and validation queries to prevent data incidents. |
 | `mc-generate-validation-notebook` | Generates executable validation queries from a pull request and packages them into Monte Carlo notebooks for direct testing. |
 | `mc-push-ingestion` | Generates warehouse-specific collection scripts and guides customers through pushing metadata, lineage, and query logs to Monte Carlo. |
 
@@ -56,7 +56,7 @@ Skills can also be used standalone without the plugin wrapper. This section is f
 ### skills.sh (Vercel CLI)
 
 ```bash
-npx skills add monte-carlo-data/mcd-agent-toolkit --skill safe-change
+npx skills add monte-carlo-data/mcd-agent-toolkit --skill prevent
 ```
 
 ### Manual installation
@@ -64,14 +64,14 @@ npx skills add monte-carlo-data/mcd-agent-toolkit --skill safe-change
 Copy to `~/.claude/skills/` or `.agents/skills/`:
 
 ```bash
-cp -r skills/safe-change ~/.claude/skills/safe-change
+cp -r skills/prevent ~/.claude/skills/prevent
 ```
 
 ## Available skills
 
 | Skill | Description |
 |---|---|
-| `safe-change` | Analyzes schema changes using MC lineage, monitoring, alerts, queries, and table metadata. Generates monitors and validation queries for safe deployments. |
+| `prevent` | Analyzes schema changes using MC lineage, monitoring, alerts, queries, and table metadata. Generates monitors and validation queries to prevent data incidents. |
 | `generate-validation-notebook` | Generates executable validation queries from a pull request and packages them into Monte Carlo notebooks for direct testing. |
 | `push-ingestion` | Generates warehouse-specific collection scripts and guides customers through pushing metadata, lineage, and query logs to Monte Carlo. |
 

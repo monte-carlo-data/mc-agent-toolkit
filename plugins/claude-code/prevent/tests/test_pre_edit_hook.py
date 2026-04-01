@@ -117,7 +117,7 @@ class TestPreEditHook:
         transcript.write_text('{"content": "<!-- MC_IMPACT_CHECK_COMPLETE: orders -->"}\n')
 
         # Age the marker past grace period
-        marker_path = "/tmp/mc_safe_change_ic_test_session_orders"
+        marker_path = "/tmp/mc_prevent_ic_test_session_orders"
         with open(marker_path, "r") as f:
             data = json.load(f)
         data["timestamp"] = data["timestamp"] - 200  # 200 seconds ago
@@ -145,7 +145,7 @@ class TestPreEditHook:
         transcript.write_text('{"content": "some other message"}\n')
 
         # Age the marker past grace period
-        marker_path = "/tmp/mc_safe_change_ic_test_session_orders"
+        marker_path = "/tmp/mc_prevent_ic_test_session_orders"
         with open(marker_path, "r") as f:
             data = json.load(f)
         data["timestamp"] = data["timestamp"] - 200

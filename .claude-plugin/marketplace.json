@@ -7,8 +7,8 @@
     },
     "plugins": [
         {
-            "name": "mc-safe-change",
-            "source": "./plugins/claude-code/safe-change",
+            "name": "mc-prevent",
+            "source": "./plugins/claude-code/prevent",
             "description": "Detect and prevent breaking schema changes using MC lineage and monitoring."
         },
         {

@@ -75,7 +75,7 @@ def main():
         age = get_impact_check_age_seconds(session_id, table_name)
         if age < GRACE_PERIOD_SECONDS:
             reason = (
-                f"Monte Carlo safe-change: the impact assessment for {table_name} "
+                f"Monte Carlo Prevent: the impact assessment for {table_name} "
                 f"has not completed yet. Complete the assessment before editing this file."
             )
             output = {
@@ -113,7 +113,7 @@ def main():
     if table_name.startswith("macro:"):
         macro_name = table_name.removeprefix("macro:")
         reason = (
-            f"Monte Carlo safe-change: this macro ({macro_name}) is inlined into "
+            f"Monte Carlo Prevent: this macro ({macro_name}) is inlined into "
             f"models at compile time — changes here affect every model that calls it. "
             f"Identify which models use this macro, then run the change impact "
             f"assessment for the affected models before editing this file. "
@@ -121,7 +121,7 @@ def main():
         )
     else:
         reason = (
-            f"Monte Carlo safe-change: run the change impact assessment "
+            f"Monte Carlo Prevent: run the change impact assessment "
             f"for {table_name} before editing this file. Present the full "
             f"impact report and synthesis step, then retry the edit. "
             f"{hook_triggered_note}"
