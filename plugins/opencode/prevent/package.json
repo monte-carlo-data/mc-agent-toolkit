@@ -13,6 +13,10 @@
     "url": "https://github.com/monte-carlo-data/mcd-agent-toolkit"
   },
   "license": "Apache-2.0",
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
   "keywords": [
     "opencode",
     "monte-carlo",
