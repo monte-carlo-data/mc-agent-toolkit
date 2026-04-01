@@ -1,7 +1,28 @@
-# Cursor Plugin (Planned)
+# Cursor Plugins
 
-This directory is reserved for future Cursor editor support.
+Monte Carlo plugins for the Cursor editor.
 
-Cursor uses `.cursor/rules/` files rather than a plugin marketplace. The adapter here will reference or inline content from the shared `skills/` directory at the repo root.
+## Available Plugins
 
-See `plugins/claude-code/` for an example of how editor-specific plugins wrap the shared skills.
+| Plugin | Description |
+|---|---|
+| `mc-prevent` | Detect and prevent breaking schema changes using Monte Carlo lineage and monitoring data. |
+
+## Installation
+
+Install via GitHub:
+
+```
+/add-plugin monte-carlo-data/mcd-agent-toolkit
+```
+
+Then authenticate with Monte Carlo by configuring the MCP server in Cursor settings.
+
+## Architecture
+
+Each Cursor plugin is a thin adapter wrapping shared skills and hook logic:
+
+- **Skills** — symlinked from `skills/` at the repo root (shared with Claude Code)
+- **Hook lib** — symlinked from `hooks/prevent/lib/` (shared decision logic)
+- **Adapter hooks** — Cursor-specific JSON parsing and output formatting
+- **MCP config** — Monte Carlo MCP server connection

@@ -1,0 +1,15 @@
+{
+    "$schema": "https://cursor.com/plugins/marketplace.schema.json",
+    "name": "mcd-agent-toolkit",
+    "owner": {
+        "name": "Monte Carlo",
+        "email": "support@montecarlodata.com"
+    },
+    "plugins": [
+        {
+            "name": "mc-prevent",
+            "source": "./plugins/cursor/prevent",
+            "description": "Detect and prevent breaking schema changes using MC lineage and monitoring."
+        }
+    ]
+}

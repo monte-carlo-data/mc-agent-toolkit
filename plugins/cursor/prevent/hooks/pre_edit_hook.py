@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""PreToolUse hook (Claude Code adapter): gate ensuring impact assessment runs before editing dbt SQL."""
+"""preToolUse hook (Cursor adapter): gate ensuring impact assessment runs before editing dbt SQL."""
 import json
 import sys
 import os
@@ -14,18 +14,15 @@ from lib.protocol import HookInput, evaluate_pre_edit
 def main():
     raw = json.load(sys.stdin)
     inp = HookInput(
-        session_id=raw.get("session_id", "unknown"),
+        session_id=raw.get("conversation_id", "unknown"),
         file_path=raw.get("tool_input", {}).get("file_path", ""),
         transcript_path=raw.get("transcript_path", ""),
     )
     result = evaluate_pre_edit(inp)
     if result.action == "deny":
         print(json.dumps({
-            "hookSpecificOutput": {
-                "hookEventName": "PreToolUse",
-                "permissionDecision": "deny",
-                "permissionDecisionReason": result.reason,
-            }
+            "permission": "deny",
+            "user_message": result.reason,
         }))
 
 

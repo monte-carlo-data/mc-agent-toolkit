@@ -41,6 +41,15 @@ Monte Carlo's official toolkit for AI coding agents. Contains skills and plugins
    ```
 3. Updates — `claude plugin update` pulls in the latest skill and hook changes.
 
+### Cursor
+
+1. Install the plugin:
+   ```
+   /add-plugin monte-carlo-data/mcd-agent-toolkit
+   ```
+2. Select the `mc-prevent` plugin when prompted.
+3. Authenticate with Monte Carlo via the MCP server settings in Cursor.
+
 ## Available plugins
 
 | Plugin | Description |

@@ -1,4 +1,4 @@
-"""CC adapter tests for pre_commit_hook — tests JSON format only."""
+"""Cursor adapter tests for pre_commit_hook — tests JSON format only."""
 import json
 import pytest
 from unittest.mock import patch
@@ -9,15 +9,16 @@ from lib.protocol import HookOutput
 
 def _make_stdin(command="git commit -m 'test'"):
     return json.dumps({
-        "session_id": "test_session",
+        "conversation_id": "test_conv",
+        "command": command,
         "cwd": "/project",
-        "tool_input": {"command": command},
+        "hook_event_name": "beforeShellExecution",
     })
 
 
-class TestPreCommitHookCCAdapter:
+class TestPreCommitHookCursorAdapter:
     def test_context_output_format(self, capsys):
-        """Context result should produce CC additionalContext format."""
+        """Context result should produce Cursor agent_message format."""
         ctx_result = HookOutput(action="context", context="Run validation?")
         with patch("pre_commit_hook.evaluate_pre_commit", return_value=ctx_result), \
              patch("sys.stdin", StringIO(_make_stdin())):
@@ -25,8 +26,7 @@ class TestPreCommitHookCCAdapter:
             main()
 
         output = json.loads(capsys.readouterr().out)
-        assert output["hookSpecificOutput"]["hookEventName"] == "PreToolUse"
-        assert output["hookSpecificOutput"]["additionalContext"] == "Run validation?"
+        assert output["agent_message"] == "Run validation?"
 
     def test_noop_output_silent(self, capsys):
         """Noop result should produce no output."""
@@ -36,3 +36,9 @@ class TestPreCommitHookCCAdapter:
             from pre_commit_hook import main
             main()
         assert capsys.readouterr().out == ""
+
+    def test_command_at_top_level(self):
+        """Cursor beforeShellExecution has command at top level, not in tool_input."""
+        raw = json.loads(_make_stdin("git commit -m 'test'"))
+        assert raw["command"] == "git commit -m 'test'"
+        assert "tool_input" not in raw
