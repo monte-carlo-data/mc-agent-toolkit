@@ -1,12 +1,12 @@
 #!/bin/bash
 set -e
 
-echo "Running post-uninstall cleanup for Monte Carlo Safe Change plugin..."
+echo "Running post-uninstall cleanup for Monte Carlo Prevent plugin..."
 
-SKILL_PATH="$HOME/.claude/skills/safe-change"
+SKILL_PATH="$HOME/.claude/skills/prevent"
 BACKUP_PATH="$SKILL_PATH.backup"
 if [ -d "$BACKUP_PATH" ]; then
-  echo "Restoring standalone safe-change skill from backup..."
+  echo "Restoring standalone prevent skill from backup..."
   mv "$BACKUP_PATH" "$SKILL_PATH"
   echo "✓ Standalone skill restored."
 else

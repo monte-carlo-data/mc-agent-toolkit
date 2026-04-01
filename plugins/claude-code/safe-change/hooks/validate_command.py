@@ -45,7 +45,7 @@ def main():
             "hookEventName": "PreToolUse",
             "additionalContext": (
                 f"Generate validation queries for: {table_list}. "
-                f"Use the validation query workflow from the Monte Carlo safe-change skill. "
+                f"Use the validation query workflow from the Monte Carlo Prevent skill. "
                 f"Save queries to validation/<table_name>_<timestamp>.sql."
             ),
         }

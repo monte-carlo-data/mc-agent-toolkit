@@ -1,4 +1,4 @@
-# Monte Carlo Safe Change Skill
+# Monte Carlo Prevent Skill
 
 Bring Monte Carlo data observability into your editor — automatically, before you write a single line of code.
 

@@ -1,6 +1,6 @@
 # Workflow Details
 
-Detailed step-by-step instructions for each Monte Carlo safe-change workflow.
+Detailed step-by-step instructions for each Monte Carlo Prevent workflow.
 These are referenced from the main SKILL.md — consult the relevant section when
 executing a workflow.
 

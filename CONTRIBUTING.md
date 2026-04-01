@@ -9,7 +9,7 @@ Welcome! We appreciate contributions from both Monte Carlo engineers and the com
 ```
 mcd-agent-toolkit/
 ├── skills/
-│   ├── safe-change/
+│   ├── prevent/
 │   │   ├── SKILL.md
 │   │   ├── README.md
 │   │   └── references/
@@ -22,9 +22,9 @@ mcd-agent-toolkit/
 │
 ├── plugins/
 │   └── claude-code/
-│       ├── safe-change/
+│       ├── prevent/
 │       │   ├── .claude-plugin/plugin.json
-│       │   ├── skills/safe-change → symlink
+│       │   ├── skills/prevent → symlink
 │       │   └── hooks/mc_context_hook.py
 │       └── generate-validation-notebook/
 │           ├── .claude-plugin/plugin.json

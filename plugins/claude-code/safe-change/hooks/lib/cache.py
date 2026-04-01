@@ -1,6 +1,6 @@
 """Per-table session cache backed by temp files.
 
-All state lives under /tmp/mc_safe_change_*. No external dependencies.
+All state lives under /tmp/mc_prevent_*. No external dependencies.
 Cleans up naturally on reboot.
 
 Impact check gate uses three states:
@@ -16,12 +16,12 @@ import time
 CACHE_DIR = "/tmp"
 _FILE_PERMISSIONS = 0o600  # Owner read/write only
 _SESSION_ID_RE = re.compile(r"^[a-zA-Z0-9_-]+$")
-IC_PREFIX = "mc_safe_change_ic_"
-MG_PREFIX = "mc_safe_change_mg_"
-TURN_PREFIX = "mc_safe_change_turn_"
-PENDING_PREFIX = "mc_safe_change_pending_"
-DBT_CONFIG_PREFIX = "mc_safe_change_dbt_config_"
-CLEANUP_MARKER = "mc_safe_change_last_cleanup"
+IC_PREFIX = "mc_prevent_ic_"
+MG_PREFIX = "mc_prevent_mg_"
+TURN_PREFIX = "mc_prevent_turn_"
+PENDING_PREFIX = "mc_prevent_pending_"
+DBT_CONFIG_PREFIX = "mc_prevent_dbt_config_"
+CLEANUP_MARKER = "mc_prevent_last_cleanup"
 
 ALL_PREFIXES = (IC_PREFIX, MG_PREFIX, TURN_PREFIX, PENDING_PREFIX, DBT_CONFIG_PREFIX)
 STALE_THRESHOLD_SECONDS = 6 * 3600  # 6 hours — covers long sessions, cleans between days
@@ -303,7 +303,7 @@ def get_dbt_paths(file_path: str) -> dict:
 # --- Lazy cleanup ---
 
 def cleanup_stale_cache() -> None:
-    """Remove mc_safe_change_* files older than STALE_THRESHOLD_SECONDS.
+    """Remove mc_prevent_* files older than STALE_THRESHOLD_SECONDS.
 
     Runs at most once per hour (tracked via CLEANUP_MARKER file).
     Call from any hook — it short-circuits quickly if cleanup ran recently.

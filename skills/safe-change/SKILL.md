@@ -1,5 +1,5 @@
 ---
-name: monte-carlo-safe-change
+name: monte-carlo-prevent
 description: |
   Automatically activates when a dbt model, SQL file, or table is referenced.
   Surfaces Monte Carlo context — table health, active alerts, lineage, blast
@@ -11,7 +11,7 @@ description: |
 version: 1.0.0
 ---
 
-# Monte Carlo Safe Change Skill
+# Monte Carlo Prevent Skill
 
 This skill brings Monte Carlo's data observability context directly into your editor. When you're modifying a dbt model or SQL pipeline, use it to surface table health, lineage, active alerts, and to generate monitors-as-code without leaving Claude Code.
 

@@ -1,9 +1,17 @@
 # Changelog
 
-All notable changes to the Monte Carlo Safe Change plugin will be documented in this file.
+All notable changes to the Monte Carlo Prevent plugin will be documented in this file.
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [1.0.0] - 2026-04-01
+
+### Changed
+
+- Rename plugin from `mc-safe-change` to `mc-prevent`
+- Rename skill from `monte-carlo-safe-change` to `monte-carlo-prevent`
+- Reset version to 1.0.0 as a fresh identity
 
 ## [1.1.2] - 2026-03-30
 
