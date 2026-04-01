@@ -77,7 +77,7 @@ If you're using the standalone MCP server (Step 1) **without** the plugin, add t
 }
 ```
 
-The plugin handles this automatically — no manual configuration needed.
+The plugin's install script adds this permission to `~/.claude/settings.json` automatically.
 
 <details>
 <summary>Legacy: header-based auth (for MCP clients without HTTP transport)</summary>

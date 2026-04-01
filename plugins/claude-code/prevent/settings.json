@@ -1,4 +1,5 @@
 {
+    "_note": "Claude Code plugin settings.json only supports the 'agent' key today. The permissions below are NOT read by Claude Code — they are applied by install.sh instead. Kept here as documentation of intended permissions.",
     "permissions": {
         "allow": [
             "mcp__plugin_mc-prevent_monte-carlo__*",

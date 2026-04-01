@@ -5,6 +5,14 @@ All notable changes to the Monte Carlo Prevent plugin will be documented in this
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] - 2026-04-01
+
+### Fixed
+
+- MCP tool permissions in `settings.json` were silently ignored — Claude Code plugin settings only support the `agent` key today
+- `install.sh` now merges the `mcp__monte-carlo-mcp__*` wildcard permission into `~/.claude/settings.json` so standalone server tools are auto-approved
+- `uninstall.sh` removes the permission on uninstall
+
 ## [1.0.0] - 2026-04-01
 
 ### Changed
