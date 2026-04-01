@@ -28,14 +28,28 @@ def _scan_transcript_for_markers(transcript_path: str, table_name: str) -> dict:
     ic_pattern = re.compile(rf"MC_IMPACT_CHECK_COMPLETE: {re.escape(table_name)}\b")
     mg_pattern = re.compile(rf"MC_MONITOR_GAP: {re.escape(table_name)}\b")
     found = {"impact_check": False, "monitor_gap": False}
+
+    debug_log = os.environ.get("MC_PREVENT_DEBUG")
+    if debug_log:
+        print(f"[DEBUG] Scanning {transcript_path} for table={table_name}", file=sys.stderr)
+        print(f"[DEBUG] ic_pattern={ic_pattern.pattern}", file=sys.stderr)
+
     try:
         with open(transcript_path, "r", encoding="utf-8") as f:
+            line_num = 0
             for line in f:
+                line_num += 1
                 if ic_pattern.search(line):
                     found["impact_check"] = True
+                    if debug_log:
+                        print(f"[DEBUG] Found impact_check marker at line {line_num}", file=sys.stderr)
                 if mg_pattern.search(line):
                     found["monitor_gap"] = True
-    except (OSError, UnicodeDecodeError):
+                    if debug_log:
+                        print(f"[DEBUG] Found monitor_gap marker at line {line_num}", file=sys.stderr)
+    except (OSError, UnicodeDecodeError) as e:
+        if debug_log:
+            print(f"[DEBUG] Error reading transcript: {e}", file=sys.stderr)
         pass
     return found
 
@@ -59,13 +73,22 @@ def main():
     table_name = extract_table_name(file_path)
     state = get_impact_check_state(session_id, table_name)
 
+    # DEBUG: Log state for troubleshooting
+    debug_log = os.environ.get("MC_PREVENT_DEBUG")
+    if debug_log:
+        print(f"[DEBUG] session={session_id}, table={table_name}, state={state}, file={file_path}", file=sys.stderr)
+
     if state == "verified":
         return
 
     if state == "injected":
         # Always check transcript for completion marker before allowing edit
         transcript_path = input_data.get("transcript_path", "")
+        if debug_log:
+            print(f"[DEBUG] transcript_path={transcript_path}", file=sys.stderr)
         markers = _scan_transcript_for_markers(transcript_path, table_name)
+        if debug_log:
+            print(f"[DEBUG] markers={markers}", file=sys.stderr)
         if markers["monitor_gap"] and not has_monitor_gap(session_id, table_name):
             mark_monitor_gap(session_id, table_name)
         if markers["impact_check"]:
