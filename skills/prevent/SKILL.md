@@ -16,6 +16,7 @@ version: 1.0.0
 This skill brings Monte Carlo's data observability context directly into your editor. When you're modifying a dbt model or SQL pipeline, use it to surface table health, lineage, active alerts, and to generate monitors-as-code without leaving Claude Code.
 
 Reference files live next to this skill file. **Use the Read tool** (not MCP resources) to access them:
+
 - Full workflow step-by-step instructions: `references/workflows.md` (relative to this file)
 - MCP parameter details: `references/parameters.md` (relative to this file)
 - Troubleshooting: `references/TROUBLESHOOTING.md` (relative to this file)
@@ -217,9 +218,11 @@ on its own line when the condition is met.
 ### Impact check complete
 
 After the engineer confirms (High/Medium) or after presenting the synthesis (Low),
-output one marker per assessed table:
+output one marker per assessed table. **IMPORTANT: use only the table/model name, not the full MCON:**
 
 <!-- MC_IMPACT_CHECK_COMPLETE: <table_name> -->
+
+(Use the model filename without .sql extension — NOT "acme.analytics.orders" or "prod.public.client_hub")
 
 How many markers to emit depends on how the assessment was triggered:
 
@@ -242,6 +245,7 @@ When Workflow 4 finds zero custom monitors on a table's affected columns, output
 
 <!-- MC_MONITOR_GAP: <table_name> -->
 
-This allows the plugin's hooks to remind the engineer about monitor coverage at
-commit time. Only output this marker when the gap is specifically about the
-columns or logic being changed — not for general table-level monitor absence.
+Use only the table/model name (NOT the full MCON). This allows the plugin's hooks
+to remind the engineer about monitor coverage at commit time. Only output this
+marker when the gap is specifically about the columns or logic being changed —
+not for general table-level monitor absence.
