@@ -3,27 +3,27 @@
     "hooks": {
         "preToolUse": [
             {
-                "command": "python3 hooks/pre_edit_hook.py",
+                "command": "python3 ${CURSOR_PLUGIN_ROOT}/hooks/pre_edit_hook.py",
                 "matcher": "Write",
                 "timeout": 5
             }
         ],
         "afterFileEdit": [
             {
-                "command": "python3 hooks/post_edit_hook.py",
+                "command": "python3 ${CURSOR_PLUGIN_ROOT}/hooks/post_edit_hook.py",
                 "timeout": 3
             }
         ],
         "beforeShellExecution": [
             {
-                "command": "python3 hooks/pre_commit_hook.py",
+                "command": "python3 ${CURSOR_PLUGIN_ROOT}/hooks/pre_commit_hook.py",
                 "matcher": "git commit",
                 "timeout": 5
             }
         ],
         "stop": [
             {
-                "command": "python3 hooks/turn_end_hook.py"
+                "command": "python3 ${CURSOR_PLUGIN_ROOT}/hooks/turn_end_hook.py"
             }
         ]
     }
