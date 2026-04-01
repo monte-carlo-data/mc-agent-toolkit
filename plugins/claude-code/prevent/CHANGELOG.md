@@ -13,6 +13,10 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Rename skill from `monte-carlo-safe-change` to `monte-carlo-prevent`
 - Reset version to 1.0.0 as a fresh identity
 
+---
+
+*Entries below predate the rename from `mc-safe-change` to `mc-prevent`.*
+
 ## [1.1.2] - 2026-03-30
 
 ### Changed
