@@ -24,6 +24,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from typing import Any
 
+from dateutil.parser import isoparse
 from pycarlo.core import Client, Session
 from pycarlo.features.ingestion import IngestionService
 from pycarlo.features.ingestion.models import QueryLogEntry
@@ -58,12 +59,15 @@ def _build_query_log_entries(entry_dicts: list[dict[str, Any]]) -> list[QueryLog
         if d.get("elapsed_time_us") is not None:
             extra["elapsed_time_us"] = d["elapsed_time_us"]
 
+        start_time = d.get("start_time")
+        end_time = d.get("end_time")
+
         entries.append(
             QueryLogEntry(
                 query_id=d.get("query_id"),
                 query_text=query_text,
-                start_time=d.get("start_time"),
-                end_time=d.get("end_time"),
+                start_time=isoparse(start_time) if start_time else None,
+                end_time=isoparse(end_time) if end_time else None,
                 user=d.get("user"),
                 extra=extra or None,
             )
@@ -115,7 +119,6 @@ def push(
 
     def _push_batch(batch: list, batch_num: int) -> str | None:
         """Push a single batch using a dedicated Session (thread-safe)."""
-        log.info("Pushing batch %d/%d (%d entries) ...", batch_num, total_batches, len(batch))
         client = Client(session=Session(mcd_id=key_id, mcd_token=key_token, scope="Ingestion"))
         service = IngestionService(mc_client=client)
         result = service.send_query_logs(
@@ -124,8 +127,7 @@ def push(
             events=batch,
         )
         invocation_id = service.extract_invocation_id(result)
-        if invocation_id:
-            log.info("Batch %d: invocation_id=%s", batch_num, invocation_id)
+        log.info("Pushed batch %d/%d (%d entries) — invocation_id=%s", batch_num, total_batches, len(batch), invocation_id)
         return invocation_id
 
     # Push batches in parallel (each thread gets its own pycarlo Session)

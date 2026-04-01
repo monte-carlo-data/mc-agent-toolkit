@@ -118,7 +118,6 @@ def push(
 
     def _push_batch(batch: list, batch_num: int) -> str | None:
         """Push a single batch using a dedicated Session (thread-safe)."""
-        print(f"  Pushing batch {batch_num}/{total_batches} ({len(batch)} assets) ...")
         client = Client(session=Session(mcd_id=key_id, mcd_token=key_token, scope="Ingestion"))
         service = IngestionService(mc_client=client)
         result = service.send_metadata(
@@ -127,8 +126,7 @@ def push(
             events=batch,
         )
         invocation_id = service.extract_invocation_id(result)
-        if invocation_id:
-            print(f"    Batch {batch_num}: invocation_id={invocation_id}")
+        print(f"  Pushed batch {batch_num}/{total_batches} ({len(batch)} assets) — invocation_id={invocation_id}")
         return invocation_id
 
     # Push batches in parallel (each thread gets its own pycarlo Session)
