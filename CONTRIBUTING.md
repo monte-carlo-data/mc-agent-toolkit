@@ -86,7 +86,11 @@ Plugins reference skills via symlinks so that skills are authored once and share
 
 ## Adding support for a new editor
 
-1. Create a new directory under `plugins/` (e.g., `plugins/cursor/`).
-2. Inside it, create per-skill directories that follow the target editor's convention (e.g., `.cursor/rules/` for Cursor).
+1. Create a new directory under `plugins/` (e.g., `plugins/cursor/`, `plugins/opencode/`).
+2. Inside it, create per-skill directories that follow the target editor's convention (e.g., `.cursor/rules/` for Cursor, `.opencode/plugins/` for OpenCode).
 3. Reference or inline content from `skills/` — the shared skill directory remains the source of truth.
 4. Document the installation steps in the plugin's own README and in the repo's main README.
+
+### OpenCode plugins
+
+OpenCode plugins are TypeScript packages using `@opencode-ai/plugin`. They register hooks via events (`tool.execute.before`, `tool.execute.after`, `session.idle`). See `plugins/opencode/prevent/` for a complete example. Install locally by copying to `.opencode/plugins/` and running `bun install`.
