@@ -326,10 +326,13 @@ def cleanup_stale_cache() -> None:
     except OSError:
         return
 
-    # Scan /tmp for our files and remove stale ones
+    # Scan /tmp for our files and remove stale ones.
+    # Also sweep orphaned mc_safe_change_* files left from the pre-rename plugin.
+    _LEGACY_PREFIX = "mc_safe_change_"
     try:
         for filename in os.listdir(CACHE_DIR):
-            if not any(filename.startswith(prefix) for prefix in ALL_PREFIXES):
+            if not (any(filename.startswith(prefix) for prefix in ALL_PREFIXES)
+                    or filename.startswith(_LEGACY_PREFIX)):
                 continue
             filepath = os.path.join(CACHE_DIR, filename)
             try:
