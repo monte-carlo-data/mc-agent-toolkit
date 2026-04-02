@@ -1,0 +1,19 @@
+{
+    "name": "mcd-agent-toolkit",
+    "interface": {
+        "displayName": "Monte Carlo Plugins"
+    },
+    "plugins": [
+        {
+            "name": "mc-prevent",
+            "source": {
+                "source": "local",
+                "path": "./plugins/codex/prevent"
+            },
+            "policy": {
+                "installation": "AVAILABLE"
+            },
+            "category": "Data Observability"
+        }
+    ]
+}

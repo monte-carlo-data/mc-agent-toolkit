@@ -1,0 +1,14 @@
+{
+    "name": "mc-prevent",
+    "version": "1.0.0",
+    "description": "Monte Carlo Prevent — detect and prevent breaking schema changes using Monte Carlo lineage and monitoring data.",
+    "author": {
+        "name": "Monte Carlo",
+        "url": "https://www.montecarlodata.com"
+    },
+    "repository": "https://github.com/monte-carlo-data/mcd-agent-toolkit",
+    "license": "Apache-2.0",
+    "keywords": ["monte-carlo", "data-observability", "prevent", "dbt", "schema"],
+    "skills": "./skills/",
+    "mcpServers": "./.mcp.json"
+}
