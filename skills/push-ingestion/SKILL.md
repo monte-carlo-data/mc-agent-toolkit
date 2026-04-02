@@ -136,9 +136,10 @@ generate a ready-to-run Python script that:
 - Builds the correct pycarlo `RelationalAsset`, `LineageEvent`, or `QueryLogEntry` objects
 - Pushes to Monte Carlo and saves an output manifest with the `invocation_id` for tracing
 
-Templates are available for common warehouses (Snowflake, BigQuery, Databricks, Redshift,
-Hive). For any other platform, Claude will derive the appropriate collection queries from
-the warehouse's system catalog or metadata APIs and generate an equivalent script.
+Templates are available for common warehouses (Snowflake, BigQuery, BigQuery Iceberg,
+Databricks, Redshift, Hive). For any other platform, Claude will derive the appropriate
+collection queries from the warehouse's system catalog or metadata APIs and generate an
+equivalent script.
 
 ### Ready-to-run examples
 
@@ -200,7 +201,7 @@ Ask Claude to build the script for your warehouse:
 
 > "Build me a metadata collection script for Snowflake. My MC resource UUID is `abc-123`."
 
-The script templates in `**/push-ingestion/scripts/templates/` (Snowflake, BigQuery, Databricks, Redshift, Hive)
+The script templates in `**/push-ingestion/scripts/templates/` (Snowflake, BigQuery, BigQuery Iceberg, Databricks, Redshift, Hive)
 are the **mandatory starting point** for script generation — they contain the correct pycarlo
 imports, model constructors, and SDK calls. **They are not an exhaustive list.** If the
 customer's warehouse is not listed, use the templates as a guide and determine the appropriate
