@@ -67,26 +67,39 @@ mkdir -p "$COMMAND_DEST"
 cp "$SCRIPT_DIR/commands/mc-validate.md" "$COMMAND_DEST/"
 echo "  ✓ Command copied to .opencode/commands/mc-validate.md"
 
-# --- 4. MCP server config ---
+# --- 4. opencode.json (plugin registration + MCP server config) ---
 
 OPENCODE_JSON="$TARGET_DIR/opencode.json"
 
 if [ -f "$OPENCODE_JSON" ]; then
-  # Check if monte-carlo MCP is already configured
+  NEEDS_GUIDANCE=false
+
+  # Check plugin registration
+  if grep -q '"\.opencode/plugins/mc-prevent"' "$OPENCODE_JSON" 2>/dev/null; then
+    echo "  ✓ Plugin already registered in opencode.json"
+  else
+    echo "  ⚠ opencode.json exists but mc-prevent plugin is not registered."
+    echo "    Add to your opencode.json:"
+    echo '    "plugin": [".opencode/plugins/mc-prevent"]'
+    NEEDS_GUIDANCE=true
+  fi
+
+  # Check MCP config
   if grep -q '"monte-carlo"' "$OPENCODE_JSON" 2>/dev/null; then
     echo "  ✓ MCP server already configured in opencode.json"
   else
-    echo "  ⚠ opencode.json exists but monte-carlo MCP is not configured."
-    echo "    Add this to your opencode.json under \"mcp\":"
+    echo "  ⚠ monte-carlo MCP is not configured."
+    echo '    Add under "mcp": { "monte-carlo": { "type": "remote", "url": "https://integrations.getmontecarlo.com/mcp" } }'
+    NEEDS_GUIDANCE=true
+  fi
+
+  if [ "$NEEDS_GUIDANCE" = true ]; then
     echo ""
-    echo '    "monte-carlo": {'
-    echo '      "type": "remote",'
-    echo '      "url": "https://integrations.getmontecarlo.com/mcp"'
-    echo '    }'
+    echo "  Tip: delete opencode.json and re-run this script to get a fresh config."
   fi
 else
   cp "$SCRIPT_DIR/opencode.json" "$OPENCODE_JSON"
-  echo "  ✓ Created opencode.json with MCP server config"
+  echo "  ✓ Created opencode.json with plugin registration and MCP server config"
 fi
 
 # --- Done ---

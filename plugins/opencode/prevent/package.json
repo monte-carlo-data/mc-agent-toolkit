@@ -4,6 +4,10 @@
   "description": "Monte Carlo Prevent — detect and prevent breaking schema changes using Monte Carlo lineage and monitoring data.",
   "type": "module",
   "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./server": "./src/index.ts"
+  },
   "author": {
     "name": "Monte Carlo",
     "url": "https://www.montecarlodata.com"

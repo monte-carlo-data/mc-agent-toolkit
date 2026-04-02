@@ -194,7 +194,8 @@ export function addEditedTable(
 ): void {
   const existing = getEditedTables(sessionId);
   if (existing.includes(tableName)) return;
-  appendSecure(turnPath(sessionId), tableName + "\n");
+  existing.push(tableName);
+  writeSecure(turnPath(sessionId), existing.join("\n") + "\n");
 }
 
 export function clearEditedTables(sessionId: string): void {
