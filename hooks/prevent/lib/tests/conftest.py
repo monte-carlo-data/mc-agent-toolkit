@@ -3,8 +3,8 @@ import os
 import glob
 import pytest
 
-# Add the shared lib to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+# Add hooks/prevent to path so `from lib.<module>` resolves from any working directory
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 
 @pytest.fixture(autouse=True)
