@@ -142,3 +142,7 @@ See [skills/prevent/references/TROUBLESHOOTING.md](../../../skills/prevent/refer
 1. Run `opencode mcp auth monte-carlo` to authenticate
 2. Check that `opencode.json` has the `mcp.monte-carlo` configuration
 3. Verify connectivity: the `testConnection` tool should succeed
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for release history.
