@@ -14,34 +14,55 @@ When you edit a dbt model, the plugin:
 ## Prerequisites
 
 - [OpenCode](https://opencode.ai) installed
+- [Bun](https://bun.sh) installed
 - A Monte Carlo account with API access
 
 ## Installation
 
-### Option 1: Project plugin (recommended)
+### Quick install (recommended)
 
-Copy the plugin into your project's `.opencode/plugins/` directory:
+From the repo root, run the install script targeting your dbt project:
 
 ```bash
-mkdir -p .opencode/plugins
-cp -r plugins/opencode/prevent .opencode/plugins/mc-prevent
+./plugins/opencode/prevent/install.sh /path/to/your/dbt-project
+```
+
+This installs all three components and creates the MCP server config:
+- **Plugin** → `.opencode/plugins/mc-prevent/` (hooks that gate edits)
+- **Skill** → `.opencode/skills/prevent/` (workflow instructions for the LLM)
+- **Command** → `.opencode/commands/mc-validate.md` (slash command)
+- **Config** → `opencode.json` with Monte Carlo MCP server
+
+Then authenticate:
+
+```bash
+opencode mcp auth monte-carlo
+```
+
+### Manual install
+
+If you prefer to install components individually:
+
+**1. Plugin** (hooks that gate edits and track changes):
+```bash
+mkdir -p .opencode/plugins/mc-prevent
+cp -r plugins/opencode/prevent/{src,package.json,tsconfig.json} .opencode/plugins/mc-prevent/
 cd .opencode/plugins/mc-prevent && bun install
 ```
 
-### Option 2: Global plugin
-
-Install globally for all projects:
-
+**2. Skill** (workflow instructions — required for impact assessments):
 ```bash
-mkdir -p ~/.config/opencode/plugins
-cp -r plugins/opencode/prevent ~/.config/opencode/plugins/mc-prevent
-cd ~/.config/opencode/plugins/mc-prevent && bun install
+mkdir -p .opencode/skills
+cp -r skills/prevent .opencode/skills/prevent
 ```
 
-### Configure the MCP server
+**3. Command** (slash command for validation queries):
+```bash
+mkdir -p .opencode/commands
+cp plugins/opencode/prevent/commands/mc-validate.md .opencode/commands/
+```
 
-Merge the MCP server configuration into your project's `opencode.json`:
-
+**4. MCP server config** (add to your `opencode.json`):
 ```json
 {
   "mcp": {
@@ -53,23 +74,17 @@ Merge the MCP server configuration into your project's `opencode.json`:
 }
 ```
 
-### Authenticate
-
-Run OpenCode and authenticate with Monte Carlo:
-
+**5. Authenticate:**
 ```bash
 opencode mcp auth monte-carlo
 ```
 
-### Install the skill (optional)
+### Updating
 
-OpenCode reads `.claude/skills/` natively. If your project already has the MC Prevent skill installed for Claude Code, it will be picked up automatically.
-
-To install explicitly for OpenCode:
+Re-run the install script to update all components. It will overwrite existing files and re-install dependencies.
 
 ```bash
-mkdir -p .opencode/skills
-cp -r skills/prevent .opencode/skills/prevent
+./plugins/opencode/prevent/install.sh /path/to/your/dbt-project
 ```
 
 ## Usage
@@ -90,8 +105,8 @@ The plugin registers three OpenCode hook events:
 
 | Hook | Event | Behavior |
 |---|---|---|
-| Pre-edit gate | `tool.execute.before` (edit/write/patch) | Blocks dbt model edits until impact assessment verified |
-| Edit tracker | `tool.execute.after` (edit/write/patch) | Silently accumulates edited table names |
+| Pre-edit gate | `tool.execute.before` (edit/write/apply_patch/multiedit) | Blocks dbt model edits until impact assessment verified |
+| Edit tracker | `tool.execute.after` (edit/write/apply_patch/multiedit) | Silently accumulates edited table names |
 | Pre-commit gate | `tool.execute.before` (bash with `git commit`) | Prompts for validation on staged dbt files |
 | Turn-end prompt | `session.idle` event | Reminds about validation queries and monitor coverage |
 
