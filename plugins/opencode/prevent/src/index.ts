@@ -29,7 +29,7 @@ import {
 const GRACE_PERIOD_SECONDS = 120;
 
 /** Tools that modify files — the names OpenCode uses for its built-in tools. */
-const EDIT_TOOLS = new Set(["edit", "write", "patch", "multi_edit"]);
+const EDIT_TOOLS = new Set(["edit", "write", "apply_patch", "multiedit"]);
 
 type OpencodeClient = ReturnType<typeof import("@opencode-ai/sdk").createOpencodeClient>;
 
@@ -76,6 +76,34 @@ function getFilePath(args: any): string {
 }
 
 /**
+ * Extract all file paths from apply_patch patchText.
+ * Parses markers like `*** Update File: path/to/file.sql`
+ */
+function getFilePathsFromPatch(args: any): string[] {
+  const patchText: string = args?.patchText ?? "";
+  if (!patchText) return [];
+  const paths: string[] = [];
+  const pattern = /^\*\*\*\s+(?:Update|Add|Delete)\s+File:\s*(.+)$/gm;
+  let match;
+  while ((match = pattern.exec(patchText)) !== null) {
+    const p = match[1].trim();
+    if (p) paths.push(p);
+  }
+  return paths;
+}
+
+/**
+ * Get all file paths from tool args, handling both regular tools and apply_patch.
+ */
+function getAllFilePaths(tool: string, args: any): string[] {
+  if (tool === "apply_patch") {
+    return getFilePathsFromPatch(args);
+  }
+  const fp = getFilePath(args);
+  return fp ? [fp] : [];
+}
+
+/**
  * Extract command from bash tool args.
  */
 function getCommand(args: any): string {
@@ -92,80 +120,83 @@ export const McPrevent: Plugin = async ({ client, directory, worktree }) => {
         if (EDIT_TOOLS.has(tool)) {
           cleanupStaleCache();
 
-          const filePath = getFilePath(output.args);
-          if (!filePath || !isDbtModel(filePath)) return;
+          const filePaths = getAllFilePaths(tool, output.args);
+          // Check each file in the tool call (apply_patch may touch multiple)
+          for (const filePath of filePaths) {
+            if (!isDbtModel(filePath)) continue;
 
-          // New models have no blast radius — let SKILL.md handle Workflow 1
-          if (!existsSync(filePath)) return;
+            // New models have no blast radius — let SKILL.md handle Workflow 1
+            if (!existsSync(filePath)) continue;
 
-          const tableName = extractTableName(filePath);
-          const state = getImpactCheckState(sessionID, tableName);
+            const tableName = extractTableName(filePath);
+            const state = getImpactCheckState(sessionID, tableName);
 
-          if (state === "verified") return;
+            if (state === "verified") continue;
 
-          if (state === "injected") {
-            // Check messages for completion marker
-            const markers = await scanMessagesForMarkers(
-              client,
-              sessionID,
-              tableName
-            );
-            if (markers.monitorGap && !hasMonitorGap(sessionID, tableName)) {
-              markMonitorGap(sessionID, tableName);
+            if (state === "injected") {
+              // Check messages for completion marker
+              const markers = await scanMessagesForMarkers(
+                client,
+                sessionID,
+                tableName
+              );
+              if (markers.monitorGap && !hasMonitorGap(sessionID, tableName)) {
+                markMonitorGap(sessionID, tableName);
+              }
+              if (markers.impactCheck) {
+                markImpactCheckVerified(sessionID, tableName);
+                continue;
+              }
+              // Not completed — block without re-injecting if within grace period
+              const age = getImpactCheckAgeSeconds(sessionID, tableName);
+              if (age < GRACE_PERIOD_SECONDS) {
+                throw new Error(
+                  `Monte Carlo Prevent: the impact assessment for ${tableName} ` +
+                    `has not completed yet. Complete the assessment before editing this file.`
+                );
+              }
+              // Grace period expired — re-inject below
+            } else if (state === null) {
+              // Check if skill was invoked voluntarily before any edit
+              const markers = await scanMessagesForMarkers(
+                client,
+                sessionID,
+                tableName
+              );
+              if (markers.monitorGap && !hasMonitorGap(sessionID, tableName)) {
+                markMonitorGap(sessionID, tableName);
+              }
+              if (markers.impactCheck) {
+                markImpactCheckVerified(sessionID, tableName);
+                continue;
+              }
             }
-            if (markers.impactCheck) {
-              markImpactCheckVerified(sessionID, tableName);
-              return;
-            }
-            // Not completed — block without re-injecting if within grace period
-            const age = getImpactCheckAgeSeconds(sessionID, tableName);
-            if (age < GRACE_PERIOD_SECONDS) {
+
+            // Block the edit until impact assessment runs
+            markImpactCheckInjected(sessionID, tableName);
+
+            const hookTriggeredNote =
+              "This assessment is hook-triggered — only emit MC_IMPACT_CHECK_COMPLETE " +
+              "markers for tables whose lineage and monitor coverage were fetched " +
+              "directly via Monte Carlo tools.";
+
+            if (tableName.startsWith("macro:")) {
+              const macroName = tableName.slice("macro:".length);
               throw new Error(
-                `Monte Carlo Prevent: the impact assessment for ${tableName} ` +
-                  `has not completed yet. Complete the assessment before editing this file.`
+                `Monte Carlo Prevent: this macro (${macroName}) is inlined into ` +
+                  `models at compile time — changes here affect every model that calls it. ` +
+                  `Identify which models use this macro, then run the change impact ` +
+                  `assessment for the affected models before editing this file. ` +
+                  hookTriggeredNote
+              );
+            } else {
+              throw new Error(
+                `Monte Carlo Prevent: run the change impact assessment ` +
+                  `for ${tableName} before editing this file. Present the full ` +
+                  `impact report and synthesis step, then retry the edit. ` +
+                  hookTriggeredNote
               );
             }
-            // Grace period expired — re-inject below
-          } else if (state === null) {
-            // Check if skill was invoked voluntarily before any edit
-            const markers = await scanMessagesForMarkers(
-              client,
-              sessionID,
-              tableName
-            );
-            if (markers.monitorGap && !hasMonitorGap(sessionID, tableName)) {
-              markMonitorGap(sessionID, tableName);
-            }
-            if (markers.impactCheck) {
-              markImpactCheckVerified(sessionID, tableName);
-              return;
-            }
-          }
-
-          // Block the edit until impact assessment runs
-          markImpactCheckInjected(sessionID, tableName);
-
-          const hookTriggeredNote =
-            "This assessment is hook-triggered — only emit MC_IMPACT_CHECK_COMPLETE " +
-            "markers for tables whose lineage and monitor coverage were fetched " +
-            "directly via Monte Carlo tools.";
-
-          if (tableName.startsWith("macro:")) {
-            const macroName = tableName.slice("macro:".length);
-            throw new Error(
-              `Monte Carlo Prevent: this macro (${macroName}) is inlined into ` +
-                `models at compile time — changes here affect every model that calls it. ` +
-                `Identify which models use this macro, then run the change impact ` +
-                `assessment for the affected models before editing this file. ` +
-                hookTriggeredNote
-            );
-          } else {
-            throw new Error(
-              `Monte Carlo Prevent: run the change impact assessment ` +
-                `for ${tableName} before editing this file. Present the full ` +
-                `impact report and synthesis step, then retry the edit. ` +
-                hookTriggeredNote
-            );
           }
         }
 
@@ -216,12 +247,12 @@ export const McPrevent: Plugin = async ({ client, directory, worktree }) => {
         const { tool, sessionID, args } = input;
         if (!EDIT_TOOLS.has(tool)) return;
 
-        const filePath = getFilePath(args);
-        if (!filePath) return;
-        if (!isDbtModel(filePath) && !isDbtSchemaFile(filePath)) return;
-
-        const tableName = extractTableName(filePath);
-        addEditedTable(sessionID, tableName);
+        const filePaths = getAllFilePaths(tool, args);
+        for (const filePath of filePaths) {
+          if (!isDbtModel(filePath) && !isDbtSchemaFile(filePath)) continue;
+          const tableName = extractTableName(filePath);
+          addEditedTable(sessionID, tableName);
+        }
       } catch {
         // Never block on error
       }

@@ -223,13 +223,13 @@ describe("PreEditGate (tool.execute.before on edit tools)", () => {
     expect(getImpactCheckState("s1", "orders")).toBe("verified");
   });
 
-  it("works with write, patch, and multi_edit tools", async () => {
+  it("works with write and multiedit tools", async () => {
     const { hooks } = await getHooks();
     const { projectDir } = createDbtProject(tmpDir, {
       models: { "orders.sql": "SELECT * FROM {{ ref('raw') }}" },
     });
 
-    for (const tool of ["write", "patch", "multi_edit"]) {
+    for (const tool of ["write", "multiedit"]) {
       cleanCache();
       await expect(
         hooks["tool.execute.before"]!(
@@ -238,6 +238,37 @@ describe("PreEditGate (tool.execute.before on edit tools)", () => {
         )
       ).rejects.toThrow("impact assessment");
     }
+  });
+
+  it("blocks apply_patch with dbt model in patchText", async () => {
+    const { hooks } = await getHooks();
+    const { projectDir } = createDbtProject(tmpDir, {
+      models: { "orders.sql": "SELECT * FROM {{ ref('raw') }}" },
+    });
+
+    await expect(
+      hooks["tool.execute.before"]!(
+        { tool: "apply_patch", sessionID: "s1", callID: "c1" },
+        {
+          args: {
+            patchText: `*** Update File: ${join(projectDir, "models/orders.sql")}\n--- old\n+++ new\n@@ -1 +1 @@\n-SELECT *\n+SELECT id`,
+          },
+        }
+      )
+    ).rejects.toThrow("impact assessment");
+  });
+
+  it("passes apply_patch with no dbt files in patchText", async () => {
+    const { hooks } = await getHooks();
+
+    await hooks["tool.execute.before"]!(
+      { tool: "apply_patch", sessionID: "s1", callID: "c1" },
+      {
+        args: {
+          patchText: `*** Update File: /project/readme.md\n--- old\n+++ new\n@@ -1 +1 @@\n-old\n+new`,
+        },
+      }
+    );
   });
 });
 
