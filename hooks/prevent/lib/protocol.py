@@ -172,6 +172,13 @@ def evaluate_pre_edit(inp: HookInput) -> HookOutput:
         "directly via Monte Carlo tools."
     )
 
+    no_bypass_note = (
+        "IMPORTANT: Do NOT bypass this check by using shell commands, git apply, "
+        "or any other workaround. If Monte Carlo MCP tools are not available in "
+        "this session, ask the user to authenticate the Monte Carlo MCP server "
+        "in their editor settings before proceeding."
+    )
+
     if table_name.startswith("macro:"):
         macro_name = table_name.removeprefix("macro:")
         reason = (
@@ -179,14 +186,14 @@ def evaluate_pre_edit(inp: HookInput) -> HookOutput:
             f"models at compile time — changes here affect every model that calls it. "
             f"Identify which models use this macro, then run the change impact "
             f"assessment for the affected models before editing this file. "
-            f"{hook_triggered_note}"
+            f"{hook_triggered_note} {no_bypass_note}"
         )
     else:
         reason = (
             f"Monte Carlo Prevent: run the change impact assessment "
             f"for {table_name} before editing this file. Present the full "
-            f"impact report and synthesis step, then retry the edit. "
-            f"{hook_triggered_note}"
+            f"impact report and synthesis step, then ask the user whether to proceed before retrying the edit. "
+            f"{hook_triggered_note} {no_bypass_note}"
         )
 
     return HookOutput(action="deny", reason=reason)
