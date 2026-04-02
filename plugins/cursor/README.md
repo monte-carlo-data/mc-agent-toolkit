@@ -10,13 +10,32 @@ Monte Carlo plugins for the Cursor editor.
 
 ## Installation
 
-Install via GitHub:
+### One-line install (macOS / Linux)
 
-```
-/add-plugin monte-carlo-data/mcd-agent-toolkit
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/monte-carlo-data/mcd-agent-toolkit/main/plugins/cursor/prevent/scripts/install.sh)
 ```
 
-Then authenticate with Monte Carlo by configuring the MCP server in Cursor settings.
+### Manual install
+
+1. Clone the repository:
+
+   ```bash
+   git clone https://github.com/monte-carlo-data/mcd-agent-toolkit.git
+   cd mcd-agent-toolkit
+   ```
+
+2. Run the install script:
+
+   ```bash
+   bash plugins/cursor/prevent/scripts/install.sh
+   ```
+
+   This copies the plugin (with symlinks resolved) to `~/.cursor/plugins/local/mc-prevent`.
+
+3. Restart Cursor or run **Developer: Reload Window** from the Command Palette (`Cmd+Shift+P`).
+
+4. The Monte Carlo MCP server will prompt for OAuth authentication on first use.
 
 ## Architecture
 
