@@ -3,6 +3,9 @@
 .mcp.json
 !plugins/**/.mcp.json
 node_modules/
+package-lock.json
+bun.lockb
+bun.lock
 .DS_Store
 .venv/
 target/

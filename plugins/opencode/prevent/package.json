@@ -1,0 +1,38 @@
+{
+  "name": "@montecarlo/opencode-prevent",
+  "version": "1.0.0",
+  "description": "Monte Carlo Prevent — detect and prevent breaking schema changes using Monte Carlo lineage and monitoring data.",
+  "type": "module",
+  "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./server": "./src/index.ts"
+  },
+  "author": {
+    "name": "Monte Carlo",
+    "url": "https://www.montecarlodata.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/monte-carlo-data/mcd-agent-toolkit"
+  },
+  "license": "Apache-2.0",
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "opencode",
+    "monte-carlo",
+    "data-observability",
+    "prevent",
+    "dbt",
+    "schema"
+  ],
+  "dependencies": {
+    "@opencode-ai/plugin": "^1.3.13"
+  },
+  "devDependencies": {
+    "bun-types": "^1.3.11"
+  }
+}
