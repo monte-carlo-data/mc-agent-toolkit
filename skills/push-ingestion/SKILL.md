@@ -140,6 +140,17 @@ Templates are available for common warehouses (Snowflake, BigQuery, Databricks, 
 Hive). For any other platform, Claude will derive the appropriate collection queries from
 the warehouse's system catalog or metadata APIs and generate an equivalent script.
 
+### Ready-to-run examples
+
+Production-ready example scripts built from these templates are published in the
+[mcd-public-resources](https://github.com/monte-carlo-data/mcd-public-resources) repo:
+
+- **[BigQuery Iceberg (BigLake) tables](https://github.com/monte-carlo-data/mcd-public-resources/tree/main/examples/push-ingestion/bigquery/push-iceberg-tables)** —
+  metadata and query log collection for BigQuery Iceberg tables that are invisible to Monte
+  Carlo's standard pull collector (which uses `__TABLES__`). Includes a `--only-freshness-and-volume`
+  flag for fast periodic pushes that skip the schema/fields query — useful for hourly cron jobs
+  after the initial full metadata push.
+
 ## Reference docs — when to load
 
 | Reference file | Load when… |
