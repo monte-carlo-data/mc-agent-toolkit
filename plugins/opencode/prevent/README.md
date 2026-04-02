@@ -6,10 +6,13 @@ Detect and prevent breaking schema changes in dbt projects using Monte Carlo lin
 
 When you edit a dbt model, the plugin:
 
-1. **Blocks the edit** until a change impact assessment (Workflow 4) is completed via Monte Carlo tools
+1. **Blocks the edit** until a change impact assessment is completed via Monte Carlo tools
 2. **Tracks edited tables** throughout your session
-3. **Prompts for validation queries** before committing changes to dbt models
-4. **Reminds about monitor coverage gaps** when custom monitors are missing on changed columns
+3. **Generates validation queries** to verify changes behaved as intended
+4. **Generates monitors-as-code** (validation, metric, comparison, or custom SQL monitors) for new or changed logic
+5. **Prompts for validation and monitor coverage** before committing changes
+
+For detailed workflow descriptions, activation rules, and synthesis guidelines, see the [MC Prevent skill](../../../skills/prevent/SKILL.md).
 
 ## Prerequisites
 
