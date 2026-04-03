@@ -37,6 +37,10 @@ bash <(curl -fsSL https://raw.githubusercontent.com/monte-carlo-data/mcd-agent-t
 
 4. The Monte Carlo MCP server will prompt for OAuth authentication on first use.
 
+## Known Issues
+
+- **Hook denials may not be enforced.** Cursor's `beforeReadFile` (and potentially other `before*` hooks) may fail to block the operation even when the hook exits with a deny response. This means Prevent hooks can detect and warn about breaking changes but cannot guarantee the edit is stopped. See [Cursor forum discussion](https://forum.cursor.com/t/hook-beforereadfile-does-not-work-in-the-agent/150520) for details.
+
 ## Architecture
 
 Each Cursor plugin is a thin adapter wrapping shared skills and hook logic:
