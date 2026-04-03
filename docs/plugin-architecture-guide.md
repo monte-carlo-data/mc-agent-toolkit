@@ -65,9 +65,11 @@ Each skill maintains strict isolation within the toolkit plugin:
 
 ### Directory Structure
 
+This is the **target state**. Cursor and OpenCode are being migrated from per-skill directories to this unified model.
+
 ```
 mcd-agent-toolkit/
-├── skills/                          # Shared skill definitions (platform-agnostic)
+├── skills/                              # Shared skill definitions (platform-agnostic)
 │   ├── prevent/
 │   │   ├── SKILL.md
 │   │   └── references/
@@ -75,30 +77,63 @@ mcd-agent-toolkit/
 │       ├── SKILL.md
 │       └── references/
 │
-├── hooks/                           # Shared hook logic (platform-agnostic)
+├── hooks/                               # Shared hook logic (platform-agnostic)
 │   ├── prevent/lib/
-│   │   ├── protocol.py              # Business logic (evaluate_pre_edit, etc.)
-│   │   ├── cache.py                 # State management (mc_prevent_* prefixed)
-│   │   ├── detect.py                # dbt file detection
-│   │   └── safe_run.py              # Error safety decorator
+│   │   ├── protocol.py                  # Business logic (evaluate_pre_edit, etc.)
+│   │   ├── cache.py                     # State management (mc_prevent_* prefixed)
+│   │   ├── detect.py                    # dbt file detection
+│   │   └── safe_run.py                  # Error safety decorator
 │   └── <future-skill>/lib/
-│       ├── protocol.py              # Separate business logic
-│       └── cache.py                 # Separate cache (mc_<skill>_* prefixed)
+│       ├── protocol.py                  # Separate business logic
+│       └── cache.py                     # Separate cache (mc_<skill>_* prefixed)
 │
 ├── plugins/
-│   ├── claude-code/                 # Claude Code adapters
-│   │   └── prevent/
-│   │       ├── hooks/               # Thin adapters calling hooks/prevent/lib/
-│   │       └── skills/prevent → symlink
-│   ├── cursor/                      # Cursor adapters
-│   │   └── prevent/
-│   ├── opencode/                    # OpenCode adapters (TypeScript port)
-│   │   └── prevent/src/
-│   └── vscode/                      # VS Code extension
-│       └── src/
-│           ├── prevent/             # Feature module
-│           └── <future-skill>/      # Feature module
+│   │
+│   │  # --- Claude Code: per-skill plugins (marketplace exception) ---
+│   ├── claude-code/
+│   │   ├── prevent/                     # mc-prevent plugin
+│   │   │   ├── .claude-plugin/plugin.json
+│   │   │   ├── hooks/                   # Thin adapters → hooks/prevent/lib/
+│   │   │   └── skills/prevent → symlink
+│   │   └── <future-skill>/              # Separate plugin per skill
+│   │       ├── .claude-plugin/plugin.json
+│   │       └── skills/<future-skill> → symlink
+│   │
+│   │  # --- All other editors: ONE mcd-agent-toolkit plugin each ---
+│   ├── cursor/                          # mcd-agent-toolkit plugin for Cursor
+│   │   ├── .cursor-plugin/plugin.json
+│   │   ├── hooks/
+│   │   │   ├── prevent/                 # MC Prevent hook adapters
+│   │   │   └── <future-skill>/          # Future feature hook adapters
+│   │   ├── skills/
+│   │   │   ├── prevent → symlink
+│   │   │   └── <future-skill> → symlink
+│   │   └── mcp.json
+│   │
+│   ├── opencode/                        # mcd-agent-toolkit plugin for OpenCode
+│   │   ├── src/
+│   │   │   ├── prevent/                 # MC Prevent feature module
+│   │   │   └── <future-skill>/          # Future feature module
+│   │   ├── package.json
+│   │   └── opencode.json
+│   │
+│   ├── vscode/                          # mcd-agent-toolkit plugin for VS Code
+│   │   ├── hooks/
+│   │   │   ├── prevent/                 # MC Prevent hook adapters
+│   │   │   └── <future-skill>/          # Future feature hook adapters
+│   │   ├── skills/
+│   │   │   ├── prevent → symlink
+│   │   │   └── <future-skill> → symlink
+│   │   └── mcp.json
+│   │
+│   └── codex/                           # mcd-agent-toolkit plugin for Codex
+│       ├── skills/
+│       │   ├── prevent → symlink
+│       │   └── <future-skill> → symlink
+│       └── install.sh
 ```
+
+**Key distinction:** Under `claude-code/`, each skill is its own plugin with its own `plugin.json`. Under every other editor, the editor directory itself is the plugin, and skills are feature modules within it.
 
 ### Isolation Guarantees
 
@@ -151,6 +186,6 @@ A skill needs a plugin when it requires **enforcement** — gating edits, blocki
 For skills that need hooks, follow the existing two-layer pattern:
 
 1. **Shared logic** (`hooks/<skill>/lib/`): Platform-agnostic Python. Contains all decision-making. No editor-specific I/O.
-2. **Editor adapters** (`plugins/<editor>/<skill>/hooks/`): Thin scripts that read editor-specific JSON input, call shared logic, and format editor-specific output.
+2. **Editor adapters** (`plugins/<editor>/hooks/<skill>/`): Thin scripts that read editor-specific JSON input, call shared logic, and format editor-specific output. For Claude Code, the path is `plugins/claude-code/<skill>/hooks/` due to the per-skill plugin structure.
 
 This ensures business logic is written and tested once, with only I/O adapters varying per editor. OpenCode is an exception — it ports the logic to TypeScript since the plugin SDK requires it.
