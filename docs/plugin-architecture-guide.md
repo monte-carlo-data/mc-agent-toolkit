@@ -56,7 +56,7 @@ All other editors (VS Code, Cursor, OpenCode, Codex) follow the unified toolkit 
 | **Claude Code** | `.claude-plugin/plugin.json` + marketplace | `skills/` dir in plugin | `hooks.json` → Python scripts | `.mcp.json` |
 | **Cursor** | `.cursor-plugin/plugin.json` | Symlinked from `skills/` | `hooks.json` → Python scripts | `mcp.json` |
 | **OpenCode** | `@opencode-ai/plugin` SDK (TypeScript) | Copied to `.opencode/skills/` | Event handlers in `index.ts` | `opencode.json` |
-| **VS Code** | VS Code extension (`package.json`) | Bundled in extension | Extension API events | `.vscode/mcp.json` |
+| **VS Code** | `.github/hooks/*.json` + install script | Copied to project | `hooks.json` → Python scripts | `.vscode/mcp.json` |
 | **Codex** | `AGENTS.md` + config files | Copied to project | N/A (instruction-only) | Config file |
 
 ## Separation of Concerns

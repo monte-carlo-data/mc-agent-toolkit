@@ -59,6 +59,26 @@ bash plugins/cursor/scripts/install.sh
 
 Then restart Cursor (or run **Developer: Reload Window** from the Command Palette). The Monte Carlo MCP server will prompt for OAuth authentication on first use.
 
+### VS Code (GitHub Copilot)
+
+Run the install script targeting your dbt project:
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/monte-carlo-data/mcd-agent-toolkit/main/plugins/vscode/scripts/install.sh)
+```
+
+Or install manually:
+
+```bash
+git clone https://github.com/monte-carlo-data/mcd-agent-toolkit.git
+cd mcd-agent-toolkit
+./plugins/vscode/scripts/install.sh /path/to/your/dbt-project
+```
+
+Then open the project in VS Code and start a Copilot Agent Mode session. The Monte Carlo MCP server will prompt for OAuth authentication on first use.
+
+> **Note:** VS Code Copilot hooks are currently in Preview. Ensure you have the latest GitHub Copilot extension.
+
 ## Available plugins
 
 Non-Claude-Code editors use a single **`mc-agent-toolkit`** plugin that bundles all features. Claude Code maintains per-skill marketplace entries.
