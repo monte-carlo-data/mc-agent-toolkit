@@ -1,52 +1,27 @@
+"""CC adapter tests for validate_command — tests JSON format only."""
 import json
 import pytest
 from unittest.mock import patch
 from io import StringIO
 
-import lib.cache as cache
+from lib.protocol import HookOutput
 
 
-def _make_stdin(session_id="test_session"):
+def _make_stdin():
     return json.dumps({
-        "session_id": session_id,
-        "transcript_path": "/tmp/test_transcript.jsonl",
-        "cwd": "/project",
-        "hook_event_name": "PreToolUse",
-        "tool_name": "Bash",
-        "tool_input": {"command": "/mc-validate"},
-        "tool_use_id": "toolu_test123",
+        "session_id": "test_session",
     })
 
 
-class TestValidateCommand:
-    def test_no_tables_shows_message(self, capsys):
-        from validate_command import main
-        with patch("sys.stdin", StringIO(_make_stdin())):
+class TestValidateCommandCCAdapter:
+    def test_context_output_format(self, capsys):
+        """Context result should produce CC additionalContext format."""
+        ctx_result = HookOutput(action="context", context="Generate queries for: orders.")
+        with patch("validate_command.evaluate_validate_command", return_value=ctx_result), \
+             patch("sys.stdin", StringIO(_make_stdin())):
+            from validate_command import main
             main()
-        output = capsys.readouterr().out
-        parsed = json.loads(output)
-        assert "No dbt model changes" in parsed["hookSpecificOutput"]["additionalContext"]
 
-    def test_pending_tables_with_w4_generates_instruction(self, capsys):
-        cache.add_edited_table("test_session", "orders")
-        cache.move_to_pending_validation("test_session")
-        cache.mark_impact_check_injected("test_session", "orders")
-        cache.mark_impact_check_verified("test_session", "orders")
-
-        from validate_command import main
-        with patch("sys.stdin", StringIO(_make_stdin())):
-            main()
-        output = capsys.readouterr().out
-        parsed = json.loads(output)
-        assert "orders" in parsed["hookSpecificOutput"]["additionalContext"]
-        assert "validation query workflow" in parsed["hookSpecificOutput"]["additionalContext"]
-
-    def test_current_turn_tables_used_as_fallback(self, capsys):
-        cache.add_edited_table("test_session", "customers")
-
-        from validate_command import main
-        with patch("sys.stdin", StringIO(_make_stdin())):
-            main()
-        output = capsys.readouterr().out
-        parsed = json.loads(output)
-        assert "customers" in parsed["hookSpecificOutput"]["additionalContext"]
+        output = json.loads(capsys.readouterr().out)
+        assert output["hookSpecificOutput"]["hookEventName"] == "PreToolUse"
+        assert "orders" in output["hookSpecificOutput"]["additionalContext"]

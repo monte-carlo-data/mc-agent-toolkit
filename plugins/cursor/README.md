@@ -1,7 +1,51 @@
-# Cursor Plugin (Planned)
+# Cursor Plugins
 
-This directory is reserved for future Cursor editor support.
+Monte Carlo plugins for the Cursor editor.
 
-Cursor uses `.cursor/rules/` files rather than a plugin marketplace. The adapter here will reference or inline content from the shared `skills/` directory at the repo root.
+## Available Plugins
 
-See `plugins/claude-code/` for an example of how editor-specific plugins wrap the shared skills.
+| Plugin | Description |
+|---|---|
+| `mc-prevent` | Detect and prevent breaking schema changes using Monte Carlo lineage and monitoring data. |
+
+## Installation
+
+### One-line install (macOS / Linux)
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/monte-carlo-data/mcd-agent-toolkit/main/plugins/cursor/prevent/scripts/install.sh)
+```
+
+### Manual install
+
+1. Clone the repository:
+
+   ```bash
+   git clone https://github.com/monte-carlo-data/mcd-agent-toolkit.git
+   cd mcd-agent-toolkit
+   ```
+
+2. Run the install script:
+
+   ```bash
+   bash plugins/cursor/prevent/scripts/install.sh
+   ```
+
+   This copies the plugin (with symlinks resolved) to `~/.cursor/plugins/local/mc-prevent`.
+
+3. Restart Cursor or run **Developer: Reload Window** from the Command Palette (`Cmd+Shift+P`).
+
+4. The Monte Carlo MCP server will prompt for OAuth authentication on first use.
+
+## Known Issues
+
+- **Hook denials may not be enforced.** Cursor's `beforeReadFile` (and potentially other `before*` hooks) may fail to block the operation even when the hook exits with a deny response. This means Prevent hooks can detect and warn about breaking changes but cannot guarantee the edit is stopped. See [Cursor forum discussion](https://forum.cursor.com/t/hook-beforereadfile-does-not-work-in-the-agent/150520) for details.
+
+## Architecture
+
+Each Cursor plugin is a thin adapter wrapping shared skills and hook logic:
+
+- **Skills** — symlinked from `skills/` at the repo root (shared with Claude Code)
+- **Hook lib** — symlinked from `hooks/prevent/lib/` (shared decision logic)
+- **Adapter hooks** — Cursor-specific JSON parsing and output formatting
+- **MCP config** — Monte Carlo MCP server connection

@@ -1,7 +1,7 @@
-"""CC adapter tests for pre_edit_hook — tests JSON format only, not business logic."""
+"""Cursor adapter tests for pre_edit_hook — tests JSON format only."""
 import json
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from io import StringIO
 
 from lib.protocol import HookOutput
@@ -9,19 +9,18 @@ from lib.protocol import HookOutput
 
 def _make_stdin(file_path):
     return json.dumps({
-        "session_id": "test_session",
+        "conversation_id": "test_conv",
         "transcript_path": "/tmp/test_transcript.jsonl",
         "cwd": "/project",
-        "hook_event_name": "PreToolUse",
-        "tool_name": "Edit",
+        "hook_event_name": "preToolUse",
+        "tool_name": "Write",
         "tool_input": {"file_path": file_path},
-        "tool_use_id": "toolu_test123",
     })
 
 
-class TestPreEditHookCCAdapter:
+class TestPreEditHookCursorAdapter:
     def test_deny_output_format(self, capsys):
-        """Deny result should produce CC-formatted JSON."""
+        """Deny result should produce Cursor-formatted JSON."""
         deny_result = HookOutput(action="deny", reason="blocked for testing")
         with patch("pre_edit_hook.evaluate_pre_edit", return_value=deny_result), \
              patch("sys.stdin", StringIO(_make_stdin("/project/models/orders.sql"))):
@@ -29,9 +28,8 @@ class TestPreEditHookCCAdapter:
             main()
 
         output = json.loads(capsys.readouterr().out)
-        assert output["hookSpecificOutput"]["hookEventName"] == "PreToolUse"
-        assert output["hookSpecificOutput"]["permissionDecision"] == "deny"
-        assert output["hookSpecificOutput"]["permissionDecisionReason"] == "blocked for testing"
+        assert output["permission"] == "deny"
+        assert output["user_message"] == "blocked for testing"
 
     def test_noop_output_silent(self, capsys):
         """Noop result should produce no output."""
@@ -43,12 +41,8 @@ class TestPreEditHookCCAdapter:
 
         assert capsys.readouterr().out == ""
 
-    def test_session_id_extracted(self):
-        """Adapter should extract session_id from CC JSON."""
+    def test_conversation_id_used_as_session(self):
+        """Cursor adapter should map conversation_id to session_id."""
         raw = json.loads(_make_stdin("/project/models/orders.sql"))
-        assert raw["session_id"] == "test_session"
-
-    def test_file_path_extracted(self):
-        """Adapter should extract file_path from tool_input."""
-        raw = json.loads(_make_stdin("/project/models/orders.sql"))
-        assert raw["tool_input"]["file_path"] == "/project/models/orders.sql"
+        assert raw["conversation_id"] == "test_conv"
+        assert "session_id" not in raw

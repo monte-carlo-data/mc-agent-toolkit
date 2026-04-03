@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""PreToolUse/Bash hook (Claude Code adapter): validation checkpoint before git commit."""
+"""beforeShellExecution hook (Cursor adapter): validation checkpoint before git commit."""
 import json
 import sys
 import os
@@ -14,17 +14,14 @@ from lib.protocol import HookInput, evaluate_pre_commit
 def main():
     raw = json.load(sys.stdin)
     inp = HookInput(
-        session_id=raw.get("session_id", "unknown"),
-        command=raw.get("tool_input", {}).get("command", ""),
+        session_id=raw.get("conversation_id", "unknown"),
+        command=raw.get("command", ""),
         cwd=raw.get("cwd", "."),
     )
     result = evaluate_pre_commit(inp)
     if result.action == "context":
         print(json.dumps({
-            "hookSpecificOutput": {
-                "hookEventName": "PreToolUse",
-                "additionalContext": result.context,
-            }
+            "agent_message": result.context,
         }))
 
 

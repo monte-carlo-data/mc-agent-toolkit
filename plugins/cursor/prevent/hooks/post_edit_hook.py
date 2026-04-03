@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""PostToolUse hook (Claude Code adapter): silently accumulates edited dbt model files."""
+"""afterFileEdit hook (Cursor adapter): silently accumulates edited dbt model files."""
 import json
 import sys
 import os
@@ -14,8 +14,8 @@ from lib.protocol import HookInput, evaluate_post_edit
 def main():
     raw = json.load(sys.stdin)
     inp = HookInput(
-        session_id=raw.get("session_id", "unknown"),
-        file_path=raw.get("tool_input", {}).get("file_path", ""),
+        session_id=raw.get("conversation_id", "unknown"),
+        file_path=raw.get("file_path", ""),
     )
     evaluate_post_edit(inp)
 

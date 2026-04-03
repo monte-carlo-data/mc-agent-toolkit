@@ -41,6 +41,24 @@ Monte Carlo's official toolkit for AI coding agents. Contains skills and plugins
    ```
 3. Updates — `claude plugin update` pulls in the latest skill and hook changes.
 
+### Cursor
+
+Run the install script (clones the repo and copies the plugin to `~/.cursor/plugins/local/mc-prevent`):
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/monte-carlo-data/mcd-agent-toolkit/main/plugins/cursor/prevent/scripts/install.sh)
+```
+
+Or install manually:
+
+```bash
+git clone https://github.com/monte-carlo-data/mcd-agent-toolkit.git
+cd mcd-agent-toolkit
+bash plugins/cursor/prevent/scripts/install.sh
+```
+
+Then restart Cursor (or run **Developer: Reload Window** from the Command Palette). The Monte Carlo MCP server will prompt for OAuth authentication on first use.
+
 ## Available plugins
 
 | Plugin | Description |

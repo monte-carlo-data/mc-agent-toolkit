@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Stop hook (Claude Code adapter): prompts for validation once per turn if dbt models were edited."""
+"""stop hook (Cursor adapter): prompts for validation once per turn if dbt models were edited."""
 import json
 import sys
 import os
@@ -14,12 +14,12 @@ from lib.protocol import HookInput, evaluate_turn_end
 def main():
     raw = json.load(sys.stdin)
     inp = HookInput(
-        session_id=raw.get("session_id", "unknown"),
+        session_id=raw.get("conversation_id", "unknown"),
         stop_hook_active=raw.get("stop_hook_active", False),
     )
     result = evaluate_turn_end(inp)
     if result.action == "block":
-        print(json.dumps({"decision": "block", "reason": result.reason}))
+        print(json.dumps({"followup_message": result.reason}))
 
 
 if __name__ == "__main__":
