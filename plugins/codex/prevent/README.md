@@ -4,25 +4,26 @@ Detects and prevents breaking schema changes to dbt models using Monte Carlo lin
 
 ## Installation
 
-This plugin is available via the Codex marketplace. Add it to your repo by including `.agents/plugins/marketplace.json` at the repo root (already present in this repo).
-
-### MCP Server
-
-The plugin bundles MCP configuration in `.mcp.json`. If Codex doesn't auto-discover it, register manually:
+Run the install script from your target repo:
 
 ```bash
-codex mcp add monte-carlo --url https://integrations.getmontecarlo.com/mcp
+bash <(curl -fsSL https://raw.githubusercontent.com/monte-carlo-data/mcd-agent-toolkit/main/plugins/codex/prevent/scripts/install.sh)
 ```
 
-### Hooks
+Or specify a target repo path:
 
-Ensure hooks are enabled in your Codex config:
-
-```toml
-# ~/.codex/config.toml
-[features]
-codex_hooks = true
+```bash
+bash install.sh /path/to/your/repo
 ```
+
+The script handles everything:
+1. Copies the plugin into `<repo>/plugins/mc-prevent/`
+2. Creates `.agents/plugins/marketplace.json` for Codex plugin discovery
+3. Adds the Monte Carlo MCP server to `~/.codex/config.toml` with the required `User-Agent` header (workaround for [codex#12859](https://github.com/openai/codex/issues/12859))
+4. Enables `codex_hooks` in your config
+5. Opens a browser for OAuth login with your Monte Carlo account
+
+After installation, restart Codex in your project. You should see "Installed mc-prevent plugin" on startup.
 
 ## How It Works
 
