@@ -22,38 +22,30 @@ For detailed workflow descriptions, activation rules, and synthesis guidelines, 
 
 ## Installation
 
-### Quick install (recommended)
+### From Git URL
 
-```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/monte-carlo-data/mcd-agent-toolkit/main/plugins/vscode/scripts/install.sh)
-```
+1. Open VS Code
+2. Run **Chat: Install Plugin From Source** from the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`)
+3. Paste the repository URL: `https://github.com/monte-carlo-data/mcd-agent-toolkit`
 
 ### From a local clone
 
-```bash
-git clone https://github.com/monte-carlo-data/mcd-agent-toolkit.git
-cd mcd-agent-toolkit
-./plugins/vscode/scripts/install.sh /path/to/your/dbt-project
-```
-
-### What gets installed
-
-The install script copies the following into your project:
-
-| Destination | Contents |
-|---|---|
-| `.github/hooks/hooks.json` | Hook registration for Copilot |
-| `.github/hooks/prevent/` | MC Prevent hook adapters (Python) |
-| `.github/hooks/lib/` | Shared hook logic (protocol, cache, detection) |
-| `.github/skills/prevent/` | MC Prevent skill definition |
-| `.github/commands/mc-validate.md` | Validation query slash command |
-| `.vscode/mcp.json` | Monte Carlo MCP server configuration |
+1. Clone the repo:
+   ```bash
+   git clone https://github.com/monte-carlo-data/mcd-agent-toolkit.git
+   ```
+2. In VS Code, add the plugin path to your settings:
+   ```json
+   "chat.pluginLocations": {
+       "/path/to/mcd-agent-toolkit/plugins/vscode": true
+   }
+   ```
 
 ### Post-install
 
-1. Open the project in VS Code
-2. Start a Copilot Agent Mode session (`Ctrl+Shift+I` / `Cmd+Shift+I`)
-3. The Monte Carlo MCP server will prompt for OAuth authentication on first use
+1. Start a Copilot Agent Mode session (`Ctrl+Shift+I` / `Cmd+Shift+I`)
+2. The Monte Carlo MCP server will prompt for authentication on first use
+3. The MC Prevent skill appears in the **Configure Skills** menu
 
 ## How it works
 
@@ -66,32 +58,51 @@ The plugin uses VS Code Copilot's hook system to intercept tool calls at key lif
 | `PostToolUse` | `editFiles`, `createFile` | Silently tracks which models were modified |
 | `Stop` | — | Prompts for validation and monitor coverage at turn end |
 
+## Plugin structure
+
+```
+plugins/vscode/
+├── plugin.json          # Plugin manifest
+├── hooks.json           # Hook registration (Copilot format)
+├── .mcp.json            # Monte Carlo MCP server config
+├── hooks/
+│   └── prevent/         # MC Prevent hook adapters (Python)
+├── skills/
+│   └── prevent/         # MC Prevent skill definition
+```
+
 ## Differences from other editor plugins
 
 | Aspect | VS Code | Claude Code | Cursor |
 |---|---|---|---|
+| Plugin format | Copilot agent plugin | Claude Code marketplace | Cursor plugin |
+| Hook config | `hooks.json` at plugin root | `hooks/hooks.json` | `hooks/hooks.json` |
 | Hook language | Python | Python | Python |
-| Hook config | `.github/hooks/hooks.json` | `hooks/hooks.json` in plugin | `hooks/hooks.json` in plugin |
-| Output format | `hookSpecificOutput` (same as Claude Code) | `hookSpecificOutput` | Cursor-specific (`permission`/`agent_message`) |
-| Input field names | camelCase (`sessionId`, `filePath`) | snake_case (`session_id`, `file_path`) | mixed (`conversation_id`, `file_path`) |
+| Output format | `hookSpecificOutput` (same as Claude Code) | `hookSpecificOutput` | Cursor-specific |
+| Input field names | camelCase (`sessionId`, `filePath`) | snake_case (`session_id`, `file_path`) | mixed |
 | Tool names | `editFiles`, `createFile`, `runTerminalCommand` | `Write`, `Edit`, `Bash` | `Write`, `Edit` |
-| Installation | Project-level (`.github/hooks/`) | Marketplace plugin cache | `~/.cursor/plugins/local/` |
+| MCP config | `.mcp.json` in plugin | `.mcp.json` in plugin | `mcp.json` in plugin |
+| Installation | Git URL or marketplace | Marketplace | Install script |
 
 ## Known Issues
 
 - **Hooks are in VS Code Preview.** The hook configuration format and behavior may change in future VS Code releases.
 - **Matchers may be ignored.** VS Code currently parses but does not enforce matchers — all hooks for a given event type run regardless of matcher. The hook scripts check the tool name internally as a safeguard.
+- **Plugin system is in Preview.** Agent plugins require `chat.plugins.enabled` to be true.
 
 ## Troubleshooting
 
+**Plugin not appearing:**
+- Ensure `chat.plugins.enabled` is true in VS Code settings
+- Check that the plugin path is correct in `chat.pluginLocations`
+
 **Hooks not firing:**
 - Ensure you have the latest GitHub Copilot extension
-- Check that `.github/hooks/hooks.json` exists in your project root
 - Verify Python 3 is available: `python3 --version`
 
 **MCP tools not appearing:**
-- Check `.vscode/mcp.json` exists with the `monte-carlo` server entry
-- Run the MCP auth flow: open Copilot and try calling a Monte Carlo tool
+- Check that `.mcp.json` exists in the plugin directory
+- The MCP server should auto-start when the plugin is enabled
 
 **Permission errors on hook scripts:**
-- Run `chmod +x .github/hooks/prevent/*.py`
+- Run `chmod +x plugins/vscode/hooks/prevent/*.py`

@@ -56,7 +56,7 @@ All other editors (VS Code, Cursor, OpenCode, Codex) follow the unified toolkit 
 | **Claude Code** | `.claude-plugin/plugin.json` + marketplace | `skills/` dir in plugin | `hooks.json` → Python scripts | `.mcp.json` |
 | **Cursor** | `.cursor-plugin/plugin.json` | Symlinked from `skills/` | `hooks.json` → Python scripts | `mcp.json` |
 | **OpenCode** | `@opencode-ai/plugin` SDK (TypeScript) | Copied to `.opencode/skills/` | Event handlers in `index.ts` | `opencode.json` |
-| **VS Code** | `.github/hooks/*.json` + install script | Copied to project | `hooks.json` → Python scripts | `.vscode/mcp.json` |
+| **VS Code** | Copilot agent plugin (`plugin.json` + `hooks.json` at root) | `skills/` dir in plugin | `hooks.json` → Python scripts | `.mcp.json` |
 | **Codex** | `AGENTS.md` + config files | Copied to project | N/A (instruction-only) | Config file |
 
 ## Separation of Concerns
@@ -121,13 +121,16 @@ mcd-agent-toolkit/
 │   │   └── opencode.json
 │   │
 │   ├── vscode/                          # mcd-agent-toolkit plugin for VS Code
+│   │   ├── plugin.json                  # Copilot agent plugin manifest
+│   │   ├── hooks.json                   # Hook registration (Copilot format: at root)
+│   │   ├── .mcp.json                    # MCP server config
 │   │   ├── hooks/
+│   │   │   ├── lib → symlink            # Shared hook logic
 │   │   │   ├── prevent/                 # MC Prevent hook adapters
 │   │   │   └── <future-skill>/          # Future feature hook adapters
-│   │   ├── skills/
-│   │   │   ├── prevent → symlink
-│   │   │   └── <future-skill> → symlink
-│   │   └── mcp.json
+│   │   └── skills/
+│   │       ├── prevent → symlink
+│   │       └── <future-skill> → symlink
 │   │
 │   └── codex/                           # mcd-agent-toolkit plugin for Codex
 │       ├── skills/

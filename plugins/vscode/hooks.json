@@ -3,13 +3,13 @@
         "PreToolUse": [
             {
                 "type": "command",
-                "command": "python3 hooks/prevent/pre_edit_hook.py",
+                "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/prevent/pre_edit_hook.py",
                 "matcher": "editFiles|createFile",
                 "timeout": 5
             },
             {
                 "type": "command",
-                "command": "python3 hooks/prevent/pre_commit_hook.py",
+                "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/prevent/pre_commit_hook.py",
                 "matcher": "runTerminalCommand",
                 "timeout": 5
             }
@@ -17,7 +17,7 @@
         "PostToolUse": [
             {
                 "type": "command",
-                "command": "python3 hooks/prevent/post_edit_hook.py",
+                "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/prevent/post_edit_hook.py",
                 "matcher": "editFiles|createFile",
                 "timeout": 3
             }
@@ -25,7 +25,7 @@
         "Stop": [
             {
                 "type": "command",
-                "command": "python3 hooks/prevent/turn_end_hook.py"
+                "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/prevent/turn_end_hook.py"
             }
         ]
     }

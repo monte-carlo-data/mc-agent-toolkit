@@ -61,23 +61,14 @@ Then restart Cursor (or run **Developer: Reload Window** from the Command Palett
 
 ### VS Code (GitHub Copilot)
 
-Run the install script targeting your dbt project:
+Install the plugin from the Command Palette:
 
-```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/monte-carlo-data/mcd-agent-toolkit/main/plugins/vscode/scripts/install.sh)
-```
+1. Run **Chat: Install Plugin From Source** (`Ctrl+Shift+P` / `Cmd+Shift+P`)
+2. Paste: `https://github.com/monte-carlo-data/mcd-agent-toolkit`
 
-Or install manually:
+Then start a Copilot Agent Mode session. The Monte Carlo MCP server will prompt for authentication on first use.
 
-```bash
-git clone https://github.com/monte-carlo-data/mcd-agent-toolkit.git
-cd mcd-agent-toolkit
-./plugins/vscode/scripts/install.sh /path/to/your/dbt-project
-```
-
-Then open the project in VS Code and start a Copilot Agent Mode session. The Monte Carlo MCP server will prompt for OAuth authentication on first use.
-
-> **Note:** VS Code Copilot hooks are currently in Preview. Ensure you have the latest GitHub Copilot extension.
+> **Note:** VS Code Copilot agent plugins and hooks are currently in Preview. Ensure you have the latest GitHub Copilot extension.
 
 ## Available plugins
 

@@ -1,5 +1,5 @@
 {
-    "servers": {
+    "mcpServers": {
         "monte-carlo": {
             "type": "http",
             "url": "https://integrations.getmontecarlo.com/mcp"
