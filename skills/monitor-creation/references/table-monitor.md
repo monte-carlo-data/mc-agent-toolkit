@@ -122,6 +122,7 @@ Alert conditions define which metrics the table monitor tracks. The operator is 
 ### Notes
 
 - **All operators are AUTO (anomaly detection).** Table monitors do not support custom thresholds like GT, LT, or explicit operators. If the user needs custom thresholds, use a metric monitor instead.
+- **No `schedule` field.** Table monitors do not support the `schedule` field in MaC YAML. Adding it will cause a validation error on `montecarlo monitors apply`. Table monitor scheduling is managed automatically by Monte Carlo. Do NOT add a schedule block to the generated YAML.
 - The default set (`last_updated_on`, `schema`, `total_row_count`, `total_row_count_last_changed_on`) provides broad coverage and is appropriate for most use cases. Only override the defaults when the user specifically requests a subset.
 - `schema` is a superset of `schema_fields_added`, `schema_fields_removed`, and `schema_fields_type_change`. If using `schema`, there is no need to also include the granular schema metrics.
 

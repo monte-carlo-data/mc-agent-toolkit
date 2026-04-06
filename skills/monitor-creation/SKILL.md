@@ -136,7 +136,9 @@ Based on the monitor type, read the detailed reference for parameter guidance:
 
 #### Step 5: Ask about scheduling
 
-The creation tools default to a fixed schedule running every 60 minutes. Present these options:
+**Skip this step for table monitors.** Table monitors do not support the `schedule` field in MaC YAML — adding it will cause a validation error on `montecarlo monitors apply`. Table monitor scheduling is managed automatically by Monte Carlo.
+
+For all other monitor types, the creation tools default to a fixed schedule running every 60 minutes. Present these options:
 
 1. **Fixed interval** -- any integer for `interval_minutes` (30, 60, 90, 120, 360, 720, 1440, etc.)
 2. **Dynamic** -- MC auto-determines when to run based on table update patterns.
