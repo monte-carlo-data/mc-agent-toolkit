@@ -11,7 +11,7 @@ import {
   isDbtSchemaFile,
   isMacroFile,
   extractTableName,
-} from "../src/detect";
+} from "../../src/prevent/detect";
 
 let tmpDir: string;
 

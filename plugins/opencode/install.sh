@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-# Monte Carlo Prevent — OpenCode Plugin Installer
+# Monte Carlo Agent Toolkit — OpenCode Plugin Installer
 #
 # Installs the plugin, skill, and command into a target dbt project.
 # Also merges the MCP server config into opencode.json.
@@ -15,7 +15,7 @@ TARGET_DIR="${1:-.}"
 TARGET_DIR="$(cd "$TARGET_DIR" && pwd)"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 SKILL_SRC="$REPO_ROOT/skills/prevent"
 
 # --- Preflight checks ---
@@ -35,11 +35,11 @@ if [ ! -f "$SKILL_SRC/SKILL.md" ]; then
   exit 1
 fi
 
-echo "Installing MC Prevent for OpenCode into: $TARGET_DIR"
+echo "Installing MC Agent Toolkit for OpenCode into: $TARGET_DIR"
 
 # --- 1. Plugin ---
 
-PLUGIN_DEST="$TARGET_DIR/.opencode/plugins/mc-prevent"
+PLUGIN_DEST="$TARGET_DIR/.opencode/plugins/mc-agent-toolkit"
 mkdir -p "$PLUGIN_DEST"
 
 # Copy plugin files (exclude node_modules, tests, symlinks)
@@ -47,7 +47,7 @@ for item in src package.json tsconfig.json; do
   cp -r "$SCRIPT_DIR/$item" "$PLUGIN_DEST/"
 done
 
-echo "  ✓ Plugin copied to .opencode/plugins/mc-prevent/"
+echo "  ✓ Plugin copied to .opencode/plugins/mc-agent-toolkit/"
 
 # Install dependencies
 (cd "$PLUGIN_DEST" && bun install --silent)
@@ -75,12 +75,12 @@ if [ -f "$OPENCODE_JSON" ]; then
   NEEDS_GUIDANCE=false
 
   # Check plugin registration
-  if grep -q '"\.opencode/plugins/mc-prevent"' "$OPENCODE_JSON" 2>/dev/null; then
+  if grep -q '"\.opencode/plugins/mc-agent-toolkit"' "$OPENCODE_JSON" 2>/dev/null; then
     echo "  ✓ Plugin already registered in opencode.json"
   else
-    echo "  ⚠ opencode.json exists but mc-prevent plugin is not registered."
+    echo "  ⚠ opencode.json exists but mc-agent-toolkit plugin is not registered."
     echo "    Add to your opencode.json:"
-    echo '    "plugin": [".opencode/plugins/mc-prevent"]'
+    echo '    "plugin": [".opencode/plugins/mc-agent-toolkit"]'
     NEEDS_GUIDANCE=true
   fi
 

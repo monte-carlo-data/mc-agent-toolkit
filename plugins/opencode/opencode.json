@@ -1,6 +1,6 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": [".opencode/plugins/mc-prevent"],
+  "plugin": [".opencode/plugins/mc-agent-toolkit"],
   "mcp": {
     "monte-carlo": {
       "type": "remote",

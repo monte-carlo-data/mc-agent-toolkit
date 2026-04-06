@@ -20,7 +20,7 @@ import {
   moveToPendingValidation,
   getPendingValidationTables,
   getDbtPaths,
-} from "../src/cache";
+} from "../../src/prevent/cache";
 
 beforeEach(() => cleanCache());
 afterEach(() => cleanCache());

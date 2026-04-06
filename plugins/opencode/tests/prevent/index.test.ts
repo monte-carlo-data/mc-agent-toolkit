@@ -17,8 +17,8 @@ import {
   getPendingValidationTables,
   moveToPendingValidation,
   markMonitorGap,
-} from "../src/cache";
-import { McPrevent } from "../src/index";
+} from "../../src/prevent/cache";
+import { McPrevent } from "../../src/prevent/index";
 
 let tmpDir: string;
 
