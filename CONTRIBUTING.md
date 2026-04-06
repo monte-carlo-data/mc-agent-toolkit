@@ -2,42 +2,50 @@
 
 Welcome! We appreciate contributions from both Monte Carlo engineers and the community.
 
-**Repo layout:** `skills/` is the single source of truth for skill content. `plugins/claude-code/` contains editor-specific plugin wrappers that reference skills via symlinks.
+**Repo layout:** `skills/` is the single source of truth for skill content. `plugins/shared/` contains platform-agnostic hook logic. Each editor under `plugins/<editor>/` is a single `mc-agent-toolkit` plugin (except Claude Code, which maintains per-skill marketplace entries).
 
 ## Repository structure
 
 ```
 mcd-agent-toolkit/
-├── skills/
+├── skills/                              # Shared skill definitions (platform-agnostic)
 │   ├── prevent/
 │   │   ├── SKILL.md
-│   │   ├── README.md
 │   │   └── references/
-│   │       └── TROUBLESHOOTING.md
-│   └── generate-validation-notebook/
-│       ├── SKILL.md
-│       └── scripts/
-│           ├── generate_notebook_url.py
-│           └── resolve_dbt_schema.py
+│   ├── generate-validation-notebook/
+│   └── push-ingestion/
 │
 ├── plugins/
-│   └── claude-code/
-│       ├── prevent/
-│       │   ├── .claude-plugin/plugin.json
-│       │   ├── skills/prevent → symlink
-│       │   └── hooks/mc_context_hook.py
-│       └── generate-validation-notebook/
-│           ├── .claude-plugin/plugin.json
-│           └── skills/generate-validation-notebook → symlink
+│   ├── shared/                          # Platform-agnostic hook logic
+│   │   └── prevent/lib/                 # Business logic (symlinked by editor plugins)
+│   │
+│   ├── claude-code/                     # Per-skill plugins (marketplace exception)
+│   │   ├── prevent/
+│   │   ├── generate-validation-notebook/
+│   │   └── push-ingestion/
+│   │
+│   ├── cursor/                          # Unified mc-agent-toolkit plugin
+│   │   ├── .cursor-plugin/plugin.json
+│   │   ├── hooks/prevent/              # Hook adapters (thin, call shared lib)
+│   │   ├── skills/prevent → symlink
+│   │   └── mcp.json
+│   │
+│   ├── opencode/                        # Unified mc-agent-toolkit plugin
+│   │   ├── src/prevent/                # TypeScript feature module
+│   │   ├── skills/prevent → symlink
+│   │   └── opencode.json
+│   │
+│   └── codex/                           # Unified mc-agent-toolkit plugin
+│       └── skills/prevent → symlink
 │
-├── .claude-plugin/
-│   └── marketplace.json
+├── .claude-plugin/marketplace.json
+├── .cursor-plugin/marketplace.json
 ├── README.md
 ├── LICENSE
 └── SECURITY.md
 ```
 
-Plugins reference skills via symlinks so that skills are authored once and shared across the corresponding plugins. When a user installs a plugin, Claude Code resolves the symlinks and copies the real files into its plugin cache.
+Plugins reference skills via symlinks so that skills are authored once and shared across all editor plugins. Shared hook logic in `plugins/shared/<skill>/lib/` is also symlinked into editor-specific adapter directories.
 
 ## Adding a new skill
 
@@ -86,11 +94,16 @@ Plugins reference skills via symlinks so that skills are authored once and share
 
 ## Adding support for a new editor
 
-1. Create a new directory under `plugins/` (e.g., `plugins/cursor/`, `plugins/opencode/`).
-2. Inside it, create per-skill directories that follow the target editor's convention (e.g., `.cursor/rules/` for Cursor, `.opencode/plugins/` for OpenCode).
-3. Reference or inline content from `skills/` — the shared skill directory remains the source of truth.
+1. Create a single `mc-agent-toolkit` plugin directory under `plugins/<editor>/`.
+2. Add skill symlinks under `plugins/<editor>/skills/` pointing to `skills/<skill-name>`.
+3. If the skill needs hooks, create shared logic in `plugins/shared/<skill>/lib/` and thin editor-specific adapters in `plugins/<editor>/hooks/<skill>/`.
 4. Document the installation steps in the plugin's own README and in the repo's main README.
 
-### OpenCode plugins
+### Hook implementation pattern
 
-OpenCode plugins are TypeScript packages using `@opencode-ai/plugin`. They register hooks via events (`tool.execute.before`, `tool.execute.after`, `session.idle`). See `plugins/opencode/prevent/` for a complete example. Install locally by copying to `.opencode/plugins/` and running `bun install`.
+For skills that need hooks, follow the two-layer pattern:
+
+1. **Shared logic** (`plugins/shared/<skill>/lib/`): Platform-agnostic Python. All decision-making. No editor-specific I/O.
+2. **Editor adapters** (`plugins/<editor>/hooks/<skill>/`): Thin scripts that read editor-specific JSON, call shared logic, and format output.
+
+OpenCode is an exception — it ports hook logic to TypeScript since the `@opencode-ai/plugin` SDK requires it. See `plugins/opencode/src/prevent/` for a complete example.
