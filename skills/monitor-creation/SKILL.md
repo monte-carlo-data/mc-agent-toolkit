@@ -191,7 +191,7 @@ For example, a metric monitor would look like:
 
 ```yaml
 montecarlo:
-  field_health:
+  metric:
     - <yaml returned by createMetricMonitorMac>
 ```
 

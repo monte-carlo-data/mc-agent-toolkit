@@ -52,36 +52,11 @@ Before creating a table monitor, resolve the warehouse name or UUID. The `wareho
 
 ## Asset Selection
 
-The `asset_selection` object defines which tables the monitor covers. It must include a `databases` list and can optionally include `filters` and `exclusions`.
+The `asset_selection` object defines which tables the monitor covers. It must include a `databases` list.
 
-### Structure
+**Use database and schema scoping to select which tables to monitor.** This is the reliable approach and covers most use cases.
 
-```json
-{
-  "databases": [
-    {
-      "name": "my_database",
-      "schemas": ["public", "analytics"]
-    }
-  ],
-  "filters": [
-    {
-      "tableName": {
-        "nameExpression": ".*_fact$",
-        "nameExpressionType": "REGEX"
-      }
-    }
-  ],
-  "exclusions": [
-    {
-      "tableName": {
-        "nameExpression": "tmp_*",
-        "nameExpressionType": "WILDCARD"
-      }
-    }
-  ]
-}
-```
+> **Known limitation:** The MCP tool supports `filters` and `exclusions` parameters, but the tool's schema describes the wrong format for them. Until this is fixed ([K2-269](https://linear.app/montecarlodata/issue/K2-269)), **do not pass `filters` or `exclusions`** — they will cause errors. Use database/schema scoping instead to narrow the set of monitored tables. If the user needs regex or pattern-based filtering, explain this limitation and suggest either (a) using schema-level scoping to get close, or (b) creating individual metric monitors for specific tables.
 
 ### Database-Level Selection
 
@@ -114,73 +89,19 @@ To monitor all tables in specific schemas, include the `schemas` list:
 
 This monitors every table in the `core` and `staging` schemas within `analytics`, but not tables in other schemas.
 
-### Filtered Selection
+### Multiple Databases
 
-Use `filters` to include only tables matching a pattern. Supported expression types are `REGEX` and `WILDCARD`.
-
-```json
-{
-  "databases": [{"name": "analytics"}],
-  "filters": [
-    {
-      "tableName": {
-        "nameExpression": ".*_fact$",
-        "nameExpressionType": "REGEX"
-      }
-    }
-  ]
-}
-```
-
-This monitors only tables whose names end with `_fact` in the `analytics` database.
-
-### Exclusions
-
-Use `exclusions` to skip tables matching a pattern. Exclusions are applied after filters.
+You can monitor tables across multiple databases in a single monitor:
 
 ```json
 {
-  "databases": [{"name": "analytics"}],
-  "exclusions": [
-    {
-      "tableName": {
-        "nameExpression": "tmp_*",
-        "nameExpressionType": "WILDCARD"
-      }
-    }
+  "databases": [
+    {"name": "analytics", "schemas": ["core"]},
+    {"name": "raw_data"},
+    {"name": "reporting", "schemas": ["public", "internal"]}
   ]
 }
 ```
-
-This monitors all tables in `analytics` except those whose names start with `tmp_`.
-
-### Combining Filters and Exclusions
-
-Filters and exclusions can be used together. Filters narrow the set of included tables, then exclusions remove specific tables from the filtered set.
-
-```json
-{
-  "databases": [{"name": "analytics"}],
-  "filters": [
-    {
-      "tableName": {
-        "nameExpression": ".*_(fact|dim)$",
-        "nameExpressionType": "REGEX"
-      }
-    }
-  ],
-  "exclusions": [
-    {
-      "tableName": {
-        "nameExpression": "deprecated_*",
-        "nameExpressionType": "WILDCARD"
-      }
-    }
-  ]
-}
-```
-
-This monitors only fact and dimension tables, excluding any that start with `deprecated_`.
 
 ---
 
@@ -245,61 +166,29 @@ Uses the default alert conditions (`last_updated_on`, `schema`, `total_row_count
 
 Monitors every table in the `core` and `reporting` schemas, leaving other schemas unmonitored.
 
-### Monitor only fact tables using regex filter
+### Monitor multiple schemas across databases
 
 ```json
 {
-  "name": "fact_tables_monitor",
-  "description": "Monitor all fact tables in the analytics database",
+  "name": "prod_tables_monitor",
+  "description": "Monitor production tables across analytics and raw_data databases",
   "warehouse": "production_warehouse",
   "asset_selection": {
     "databases": [
-      {"name": "analytics"}
-    ],
-    "filters": [
       {
-        "tableName": {
-          "nameExpression": ".*_fact$",
-          "nameExpressionType": "REGEX"
-        }
-      }
-    ]
-  }
-}
-```
-
-Only tables whose names end with `_fact` are monitored.
-
-### Monitor with exclusions (skip tmp/staging tables)
-
-```json
-{
-  "name": "analytics_no_tmp_monitor",
-  "description": "Monitor all analytics tables except temporary and staging tables",
-  "warehouse": "production_warehouse",
-  "asset_selection": {
-    "databases": [
-      {"name": "analytics"}
-    ],
-    "exclusions": [
-      {
-        "tableName": {
-          "nameExpression": "tmp_*",
-          "nameExpressionType": "WILDCARD"
-        }
+        "name": "analytics",
+        "schemas": ["core", "reporting"]
       },
       {
-        "tableName": {
-          "nameExpression": "stg_*",
-          "nameExpressionType": "WILDCARD"
-        }
+        "name": "raw_data",
+        "schemas": ["ingestion"]
       }
     ]
   }
 }
 ```
 
-Monitors all tables in `analytics` except those starting with `tmp_` or `stg_`.
+Monitors tables in specific production schemas, leaving development and staging schemas unmonitored.
 
 ### Schema change monitoring only
 
