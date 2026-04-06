@@ -1,7 +1,7 @@
 {
-    "name": "mc-prevent",
+    "name": "mc-agent-toolkit",
     "version": "1.0.0",
-    "description": "Monte Carlo Prevent — detect and prevent breaking schema changes using Monte Carlo lineage and monitoring data.",
+    "description": "Monte Carlo Agent Toolkit — data observability skills and enforcement hooks for AI coding agents.",
     "author": {
         "name": "Monte Carlo",
         "url": "https://www.montecarlodata.com"
@@ -11,6 +11,7 @@
     "keywords": [
         "monte-carlo",
         "data-observability",
+        "agent-toolkit",
         "prevent",
         "dbt",
         "schema"

@@ -1,13 +1,13 @@
 #!/bin/bash
 set -e
 
-# Monte Carlo Prevent — Cursor plugin installer
+# Monte Carlo Agent Toolkit — Cursor plugin installer
 # Clones the repo (or uses an existing clone) and copies the plugin
-# into ~/.cursor/plugins/local/mc-prevent with symlinks resolved.
+# into ~/.cursor/plugins/local/mc-agent-toolkit with symlinks resolved.
 
-PLUGIN_NAME="mc-prevent"
+PLUGIN_NAME="mc-agent-toolkit"
 REPO_URL="https://github.com/monte-carlo-data/mcd-agent-toolkit.git"
-PLUGIN_SRC="plugins/cursor/prevent"
+PLUGIN_SRC="plugins/cursor"
 
 # --- Determine target directory (macOS/Linux vs Windows Git Bash) ---
 if [ -n "$USERPROFILE" ]; then
@@ -47,7 +47,7 @@ mkdir -p "$CURSOR_PLUGINS"
 cp -rL "$CLONE_DIR/$PLUGIN_SRC" "$TARGET"
 
 # --- Remove test files and dev artifacts from installation ---
-rm -rf "$TARGET/tests" "$TARGET/scripts" "$TARGET/hooks/lib/tests" \
+rm -rf "$TARGET/tests" "$TARGET/scripts" "$TARGET/hooks/prevent/lib/tests" \
        "$TARGET/__pycache__" "$TARGET/.DS_Store" "$TARGET/.git"
 find "$TARGET" -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
 find "$TARGET" -name "*.pyc" -delete 2>/dev/null || true
