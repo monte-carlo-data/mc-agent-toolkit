@@ -11,7 +11,7 @@ Monte Carlo's official toolkit for AI coding agents. Contains skills and plugins
   ```
   Then authenticate: run `/mcp` in Claude Code, select `monte-carlo-mcp`, and complete the OAuth flow in your browser.
 
-  > **Note:** The `mc-prevent` plugin bundles its own MCP server, so if you install the plugin you can skip this step.
+  > **Note:** The `mc-core` and `mc-prevent` plugins bundle their own MCP server, so if you install either plugin you can skip this step.
 
   See [official docs](https://docs.getmontecarlo.com/docs/mcp-server#option-1-oauth-21-recommended-for-mcp-clients-that-support-http-transport) for other MCP clients and advanced options.
 
@@ -33,8 +33,9 @@ Monte Carlo's official toolkit for AI coding agents. Contains skills and plugins
    ```
    /plugin marketplace add monte-carlo-data/mcd-agent-toolkit
    ```
-2. Install a plugin:
+2. Install plugins (start with `mc-core` — recommended for all users):
    ```
+   /plugin install mc-core@mcd-agent-toolkit
    /plugin install mc-prevent@mcd-agent-toolkit
    /plugin install mc-generate-validation-notebook@mcd-agent-toolkit
    /plugin install mc-push-ingestion@mcd-agent-toolkit
@@ -63,6 +64,7 @@ Then restart Cursor (or run **Developer: Reload Window** from the Command Palett
 
 | Plugin | Description |
 |---|---|
+| `mc-core` | **Recommended first install.** Guides AI agents through creating monitors correctly — validates tables, fields, and parameters before generating monitors-as-code YAML. |
 | `mc-prevent` | Analyzes schema changes using MC lineage, monitoring, alerts, queries, and table metadata. Generates Monte Carlo monitors and validation queries to prevent data incidents. |
 | `mc-generate-validation-notebook` | Generates executable validation queries from a pull request and packages them into Monte Carlo notebooks for direct testing. |
 | `mc-push-ingestion` | Generates warehouse-specific collection scripts and guides customers through pushing metadata, lineage, and query logs to Monte Carlo. |
@@ -89,6 +91,7 @@ cp -r skills/prevent ~/.claude/skills/prevent
 
 | Skill | Description |
 |---|---|
+| `monitor-creation` | Guides AI agents through creating monitors correctly — validates tables, fields, and parameters before generating monitors-as-code YAML. |
 | `prevent` | Analyzes schema changes using MC lineage, monitoring, alerts, queries, and table metadata. Generates monitors and validation queries to prevent data incidents. |
 | `generate-validation-notebook` | Generates executable validation queries from a pull request and packages them into Monte Carlo notebooks for direct testing. |
 | `push-ingestion` | Generates warehouse-specific collection scripts and guides customers through pushing metadata, lineage, and query logs to Monte Carlo. |

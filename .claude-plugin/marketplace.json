@@ -7,6 +7,11 @@
     },
     "plugins": [
         {
+            "name": "mc-core",
+            "source": "./plugins/claude-code/core",
+            "description": "Core Monte Carlo skill — guides AI agents through creating monitors correctly with validation and monitors-as-code YAML generation."
+        },
+        {
             "name": "mc-prevent",
             "source": "./plugins/claude-code/prevent",
             "description": "Detect and prevent breaking schema changes using MC lineage and monitoring."
