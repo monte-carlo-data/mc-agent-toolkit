@@ -1,18 +1,20 @@
 # Plugins
 
-This directory contains the **mc-agent-toolkit** plugin for each supported AI code editor. Each editor plugin bundles skills, hooks, MCP server configuration, and editor-specific adapters into a single installable package.
+This directory contains the **mc-agent-toolkit** plugin for each supported AI coding agent. Each plugin bundles skills, hooks, MCP server configuration, and agent-specific adapters into a single installable package.
 
 For the user-facing feature list and installation instructions, see the [main README](../README.md).
 
-## Editor Support
+## Coding Agent Support
 
-| Editor | Status | Hooks | Skills | MCP | Details |
-|---|---|---|---|---|---|
-| **Claude Code** | Full | Pre-edit gate, post-edit tracking, pre-commit gate, turn-end prompt | All 3 skills | OAuth | [README](claude-code/README.md) |
-| **Cursor** | Full | Pre-edit gate, post-edit tracking, pre-commit gate, turn-end prompt | MC Prevent | OAuth | [README](cursor/README.md) |
-| **OpenCode** | Full | Pre-edit gate, post-edit tracking, pre-commit gate, turn-end prompt | MC Prevent | Remote | [README](opencode/README.md) |
-| **Copilot CLI** | Preliminary | Pre-edit gate, post-edit tracking, pre-commit gate (hooks installed separately) | MC Prevent | HTTP | [README](copilot/README.md) |
-| **Codex** | Preliminary | None (instruction-only) | MC Prevent | N/A | [README](codex/README.md) |
+| Agent | Status | Skills | MCP |
+|---|---|---|---|
+| **[Claude Code](claude-code/README.md)** | Full | All 3 | OAuth |
+| **[Cursor](cursor/README.md)** | Full | All 3 | OAuth |
+| **[OpenCode](opencode/README.md)** | Full | All 3 | OAuth |
+| **[Copilot CLI](copilot/README.md)** | Preliminary | All 3 | OAuth |
+| **[Codex](codex/README.md)** | Preliminary | All 3 | OAuth |
+
+Currently, only the **Prevent** skill leverages hooks for enforcement (pre-edit gate, post-edit tracking, pre-commit gate, turn-end prompt). The other skills are instruction-only. See each agent's README for hook details specific to that platform.
 
 ## Architecture
 
