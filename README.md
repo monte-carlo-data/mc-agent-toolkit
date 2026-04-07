@@ -33,11 +33,9 @@ Monte Carlo's official toolkit for AI coding agents. Contains skills and plugins
    ```
    /plugin marketplace add monte-carlo-data/mcd-agent-toolkit
    ```
-2. Install a plugin:
+2. Install the plugin:
    ```
-   /plugin install mc-prevent@mcd-agent-toolkit
-   /plugin install mc-generate-validation-notebook@mcd-agent-toolkit
-   /plugin install mc-push-ingestion@mcd-agent-toolkit
+   /plugin install mc-agent-toolkit@mcd-agent-toolkit
    ```
 3. Updates — `claude plugin update` pulls in the latest skill and hook changes.
 
