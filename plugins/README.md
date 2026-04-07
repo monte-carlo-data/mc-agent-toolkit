@@ -6,15 +6,17 @@ For the user-facing feature list and installation instructions, see the [main RE
 
 ## Coding Agent Support
 
-| Agent | Status | Skills | MCP |
-|---|---|---|---|
-| **[Claude Code](claude-code/README.md)** | Full | All 3 | OAuth |
-| **[Cursor](cursor/README.md)** | Full | All 3 | OAuth |
-| **[OpenCode](opencode/README.md)** | Full | All 3 | OAuth |
-| **[Copilot CLI](copilot/README.md)** | Preliminary | All 3 | OAuth |
-| **[Codex](codex/README.md)** | Preliminary | All 3 | OAuth |
+| Agent | Status | Skills | MCP | Installation |
+|---|---|---|---|---|
+| **Claude Code** | Full | All 3 | OAuth | [Setup guide](claude-code/README.md) |
+| **Cursor** | Full | All 3 | OAuth | [Setup guide](cursor/README.md) |
+| **OpenCode** | Full | All 3 | OAuth | [Setup guide](opencode/README.md) |
+| **Copilot CLI** | Preliminary | All 3 | OAuth | [Setup guide](copilot/README.md) |
+| **Codex** | Preliminary | All 3 | OAuth | [Setup guide](codex/README.md) |
 
 Currently, only the **Prevent** skill leverages hooks for enforcement (pre-edit gate, post-edit tracking, pre-commit gate, turn-end prompt). The other skills are instruction-only. See each agent's README for hook details specific to that platform.
+
+**Editor compatibility:** Most agents run inside popular editors. **VS Code** users can use Copilot CLI or Claude Code. **JetBrains** users can use Copilot CLI. **Cursor** is a standalone editor with its own plugin. Claude Code, Copilot CLI, and OpenCode also run in any **terminal**. Codex runs on **GitHub**.
 
 ## Architecture
 
