@@ -4,11 +4,11 @@ Skills are platform-agnostic instruction sets that tell an AI coding agent what 
 
 ## Available Skills
 
-| Skill | Description | Details |
-|---|---|---|
-| **[MC Prevent](prevent/)** | Surfaces Monte Carlo context (lineage, alerts, blast radius) before code changes, generates monitors-as-code, and produces targeted validation queries. | [README](prevent/README.md) |
-| **[Generate Validation Notebook](generate-validation-notebook/)** | Generates SQL validation notebooks for dbt model changes, with targeted queries comparing baseline and development data. | [README](generate-validation-notebook/README.md) |
-| **[Push Ingestion](push-ingestion/)** | Generates warehouse-specific collection scripts for pushing metadata, lineage, and query logs to Monte Carlo. | [README](push-ingestion/README.md) |
+| Skill | Description |
+|---|---|
+| **[Prevent](prevent/)** | Surfaces Monte Carlo context (lineage, alerts, blast radius) before code changes, generates monitors-as-code, and produces targeted validation queries. |
+| **[Generate Validation Notebook](generate-validation-notebook/)** | Generates SQL validation notebooks for dbt model changes, with targeted queries comparing baseline and development data. |
+| **[Push Ingestion](push-ingestion/)** | Generates warehouse-specific collection scripts for pushing metadata, lineage, and query logs to Monte Carlo. |
 
 ## Standalone Installation
 
