@@ -63,13 +63,13 @@ Then restart Cursor. See the [Cursor plugin README](plugins/cursor/README.md) fo
 ### GitHub Copilot CLI
 
 ```bash
-git clone https://github.com/monte-carlo-data/mcd-agent-toolkit.git
+git clone https://github.com/monte-carlo-data/mc-agent-toolkit.git
 
 # Install hooks into your dbt project
-./mcd-agent-toolkit/plugins/copilot/scripts/install.sh /path/to/your/dbt-project
+./mc-agent-toolkit/plugins/copilot/scripts/install.sh /path/to/your/dbt-project
 
 # Install the plugin (skills + MCP)
-copilot plugin install ./mcd-agent-toolkit/plugins/copilot
+copilot plugin install ./mc-agent-toolkit/plugins/copilot
 ```
 
 See the [Copilot CLI plugin README](plugins/copilot/README.md) for details.

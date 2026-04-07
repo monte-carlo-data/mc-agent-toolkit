@@ -15,7 +15,7 @@ Skills are platform-agnostic instruction sets that tell an AI coding agent what 
 Skills can be installed without the plugin via skill registries:
 
 ```bash
-npx skills add monte-carlo-data/mcd-agent-toolkit --skill prevent
+npx skills add monte-carlo-data/mc-agent-toolkit --skill prevent
 ```
 
 Or by copying directly:

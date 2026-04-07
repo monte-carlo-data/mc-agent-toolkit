@@ -27,8 +27,8 @@ Installation has two steps: the **plugin** (for skills + MCP) and the **hooks** 
 ### Step 1: Install hooks into your project
 
 ```bash
-git clone https://github.com/monte-carlo-data/mcd-agent-toolkit.git
-./mcd-agent-toolkit/plugins/copilot/scripts/install.sh /path/to/your/dbt-project
+git clone https://github.com/monte-carlo-data/mc-agent-toolkit.git
+./mc-agent-toolkit/plugins/copilot/scripts/install.sh /path/to/your/dbt-project
 ```
 
 This copies hook scripts and registration to `.github/hooks/` in your project.
@@ -36,7 +36,7 @@ This copies hook scripts and registration to `.github/hooks/` in your project.
 ### Step 2: Install the plugin (skills + MCP)
 
 ```bash
-copilot plugin install ./mcd-agent-toolkit/plugins/copilot
+copilot plugin install ./mc-agent-toolkit/plugins/copilot
 ```
 
 Verify:

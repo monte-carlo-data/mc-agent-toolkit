@@ -1,12 +1,12 @@
 # Plugin Architecture Guide
 
-This document explains how skills and plugins are structured in `mcd-agent-toolkit`, the reasoning behind the architecture, and how to extend it for new skills and editors.
+This document explains how skills and plugins are structured in `mc-agent-toolkit`, the reasoning behind the architecture, and how to extend it for new skills and editors.
 
 For step-by-step contribution instructions, see [CONTRIBUTING.md](../CONTRIBUTING.md).
 
 ## Overview
 
-`mcd-agent-toolkit` distributes Monte Carlo capabilities into AI code editors through two layers:
+`mc-agent-toolkit` distributes Monte Carlo capabilities into AI code editors through two layers:
 
 1. **Skills** — platform-agnostic instruction sets that tell an AI agent what to do (e.g., run impact assessments, generate validation queries). Skills live in `skills/` and are the single source of truth.
 2. **Plugins** — editor-specific wrappers that install skills, configure MCP servers, and add hooks/gates that enforce workflows. Plugins live in `plugins/<editor>/`.
@@ -24,9 +24,9 @@ As more skills are added, a per-skill-per-editor plugin model creates `skills ×
 **Option A — Toolkit as invisible plumbing.** A single plugin per editor handles distribution (MCP, auth, updates), but the plugin identity is hidden from users. All user-facing surfaces show individual skill names only (e.g., "MC Prevent").
 
 - *Pro:* Individual skills get standalone brand recognition.
-- *Con:* Users see a plugin name (`mcd-agent-toolkit`) in their editor's plugin list that doesn't match what they interact with. No natural place for enable/disable configuration. Hard to make truly invisible across all editors.
+- *Con:* Users see a plugin name (`mc-agent-toolkit`) in their editor's plugin list that doesn't match what they interact with. No natural place for enable/disable configuration. Hard to make truly invisible across all editors.
 
-**Option B — Unified toolkit with namespaced features (chosen).** One plugin per editor named `mcd-agent-toolkit`. Each skill is a named feature within it. Users understand they installed "Monte Carlo's toolkit" and interact with features like "MC Prevent" inside it.
+**Option B — Unified toolkit with namespaced features (chosen).** One plugin per editor named `mc-agent-toolkit`. Each skill is a named feature within it. Users understand they installed "Monte Carlo's toolkit" and interact with features like "MC Prevent" inside it.
 
 - *Pro:* Consistent identity across all editors. Natural enable/disable model. New skills appear as new features in a product users already know. MCP and auth configured once. Single install, single update path.
 - *Con:* Users get all features, not just the ones they want (mitigated by enable/disable config). A bug in one feature's hooks could theoretically affect the plugin — mitigated by feature isolation (see below).
@@ -38,7 +38,7 @@ As more skills are added, a per-skill-per-editor plugin model creates `skills ×
 
 ### Why Option B
 
-1. **Cross-editor consistency.** Every editor surfaces plugin names — in marketplace listings, extension panels, config files. One name (`mcd-agent-toolkit`) everywhere is clearer than hiding it.
+1. **Cross-editor consistency.** Every editor surfaces plugin names — in marketplace listings, extension panels, config files. One name (`mc-agent-toolkit`) everywhere is clearer than hiding it.
 2. **Shared infrastructure.** MCP server configuration, OAuth, and base permissions are identical across skills. Configure once, not per-skill.
 3. **Scalable UX.** New skills showing up as features in an existing toolkit is expected. New standalone plugins appearing unexpectedly is confusing.
 4. **Enable/disable is natural.** A toolkit has features you can toggle. A hidden plumbing layer doesn't.
@@ -64,7 +64,7 @@ Each skill maintains strict isolation within the toolkit plugin:
 This reflects the **current repository structure**.
 
 ```
-mcd-agent-toolkit/
+mc-agent-toolkit/
 ├── skills/                              # Shared skill definitions (platform-agnostic)
 │   ├── prevent/
 │   │   ├── SKILL.md
@@ -175,7 +175,7 @@ Skills and plugins are distributed through independent channels:
 | **Claude Code marketplace** | Per-plugin | One plugin per editor |
 | **Editor plugin installs** | Per-toolkit | Yes — one install gets all features |
 
-The `--skill` flag in `npx skills add monte-carlo-data/mcd-agent-toolkit --skill monte-carlo-prevent` addresses individual skills by directory name. This is independent of plugin organization. **Moving to a unified toolkit plugin does not affect individual skill publishability.**
+The `--skill` flag in `npx skills add monte-carlo-data/mc-agent-toolkit --skill monte-carlo-prevent` addresses individual skills by directory name. This is independent of plugin organization. **Moving to a unified toolkit plugin does not affect individual skill publishability.**
 
 ## For Contributors
 
