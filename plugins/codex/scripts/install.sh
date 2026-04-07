@@ -3,7 +3,7 @@ set -e
 
 # Monte Carlo Agent Toolkit — Codex plugin installer
 # 1. Clones the repo and copies the plugin into the target repo
-# 2. Registers the prevent skill in .agents/skills/
+# 2. Registers skills (prevent, generate-validation-notebook, push-ingestion) in .agents/skills/
 # 3. Writes hooks to <repo>/.codex/hooks.json (project-level)
 # 4. Creates .agents/plugins/marketplace.json
 # 5. Adds Monte Carlo MCP server to ~/.codex/config.toml
@@ -14,7 +14,7 @@ PLUGIN_NAME="mc-agent-toolkit"
 REPO_URL="https://github.com/monte-carlo-data/mcd-agent-toolkit.git"
 PLUGIN_SRC="plugins/codex"
 SHARED_LIB="plugins/shared/prevent/lib"
-SHARED_SKILL="skills/prevent"
+SHARED_SKILLS=("skills/prevent" "skills/generate-validation-notebook" "skills/push-ingestion")
 
 CONFIG_DIR="$HOME/.codex"
 CONFIG_FILE="$CONFIG_DIR/config.toml"
@@ -92,7 +92,10 @@ find . -not -type l -not -path './__pycache__/*' -not -path './.pytest_cache/*' 
 # --- Copy symlink targets as real directories ---
 cp -R "$REPO_ROOT/$SHARED_LIB" "$TARGET/hooks/prevent/lib"
 mkdir -p "$TARGET/skills"
-cp -R "$REPO_ROOT/$SHARED_SKILL" "$TARGET/skills/prevent"
+for skill in "${SHARED_SKILLS[@]}"; do
+  skill_name="$(basename "$skill")"
+  cp -R "$REPO_ROOT/$skill" "$TARGET/skills/$skill_name"
+done
 
 # --- Clean up dev artifacts ---
 find "$TARGET" -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
@@ -105,19 +108,23 @@ echo "  Plugin files installed."
 # STEP 2: Register skill in .agents/skills/
 # ============================================================
 
-echo "[2/7] Registering prevent skill..."
+echo "[2/7] Registering skills..."
 SKILLS_DIR="$TARGET_REPO/.agents/skills"
-SKILL_TARGET="$SKILLS_DIR/prevent"
 
 mkdir -p "$SKILLS_DIR"
 
-if [ -d "$SKILL_TARGET" ]; then
-  echo "  Removing previous skill installation..."
-  rm -rf "$SKILL_TARGET"
-fi
+for skill in "${SHARED_SKILLS[@]}"; do
+  skill_name="$(basename "$skill")"
+  skill_target="$SKILLS_DIR/$skill_name"
 
-cp -R "$TARGET/skills/prevent" "$SKILL_TARGET"
-echo "  Skill registered at .agents/skills/prevent/"
+  if [ -d "$skill_target" ]; then
+    echo "  Removing previous $skill_name installation..."
+    rm -rf "$skill_target"
+  fi
+
+  cp -R "$TARGET/skills/$skill_name" "$skill_target"
+  echo "  Skill registered at .agents/skills/$skill_name/"
+done
 
 # ============================================================
 # STEP 3: Merge hooks into ~/.codex/hooks.json
@@ -248,4 +255,4 @@ echo ""
 echo "Next steps:"
 echo "  1. Restart Codex in $TARGET_REPO"
 echo "  2. You should see 'Installed mc-agent-toolkit plugin' on startup"
-echo "  3. The prevent skill is available — Codex will activate it when you work with dbt models"
+echo "  3. Skills available: prevent, generate-validation-notebook, push-ingestion"
