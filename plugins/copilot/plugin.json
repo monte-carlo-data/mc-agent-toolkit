@@ -16,5 +16,6 @@
         "schema"
     ],
     "skills": "./skills/",
+    "hooks": "hooks.json",
     "mcpServers": "./.mcp.json"
 }

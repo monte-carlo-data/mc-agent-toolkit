@@ -56,7 +56,7 @@ All other editors (VS Code, Cursor, OpenCode, Codex) follow the unified toolkit 
 | **Claude Code** | `.claude-plugin/plugin.json` + marketplace | `skills/` dir in plugin | `hooks.json` → Python scripts | `.mcp.json` |
 | **Cursor** | `.cursor-plugin/plugin.json` | Symlinked from `skills/` | `hooks.json` → Python scripts | `mcp.json` |
 | **OpenCode** | `@opencode-ai/plugin` SDK (TypeScript) | Copied to `.opencode/skills/` | Event handlers in `index.ts` | `opencode.json` |
-| **VS Code** | Copilot agent plugin (`plugin.json` + `hooks.json` at root) | `skills/` dir in plugin | `hooks.json` → Python scripts | `.mcp.json` |
+| **Copilot CLI** | `plugin.json` + `hooks.json` (version 1) | `skills/` dir in plugin | `hooks.json` → Python scripts | `.mcp.json` |
 | **Codex** | `AGENTS.md` + config files | Copied to project | N/A (instruction-only) | Config file |
 
 ## Separation of Concerns
@@ -120,9 +120,9 @@ mcd-agent-toolkit/
 │   │   ├── package.json
 │   │   └── opencode.json
 │   │
-│   ├── vscode/                          # mcd-agent-toolkit plugin for VS Code
-│   │   ├── plugin.json                  # Copilot agent plugin manifest
-│   │   ├── hooks.json                   # Hook registration (Copilot format: at root)
+│   ├── copilot/                         # mcd-agent-toolkit plugin for Copilot CLI
+│   │   ├── plugin.json                  # Plugin manifest
+│   │   ├── hooks.json                   # Hook registration (version 1 format)
 │   │   ├── .mcp.json                    # MCP server config
 │   │   ├── hooks/
 │   │   │   ├── lib → symlink            # Shared hook logic

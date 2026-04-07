@@ -59,16 +59,16 @@ bash plugins/cursor/scripts/install.sh
 
 Then restart Cursor (or run **Developer: Reload Window** from the Command Palette). The Monte Carlo MCP server will prompt for OAuth authentication on first use.
 
-### VS Code (GitHub Copilot)
+### GitHub Copilot CLI
 
-Install the plugin from the Command Palette:
+Install from a local clone:
 
-1. Run **Chat: Install Plugin From Source** (`Ctrl+Shift+P` / `Cmd+Shift+P`)
-2. Paste: `https://github.com/monte-carlo-data/mcd-agent-toolkit`
+```bash
+git clone https://github.com/monte-carlo-data/mcd-agent-toolkit.git
+copilot plugin install ./mcd-agent-toolkit/plugins/copilot
+```
 
-Then start a Copilot Agent Mode session. The Monte Carlo MCP server will prompt for authentication on first use.
-
-> **Note:** VS Code Copilot agent plugins and hooks are currently in Preview. Ensure you have the latest GitHub Copilot extension.
+Verify with `copilot plugin list`, then start a Copilot session. The Monte Carlo MCP server will prompt for authentication on first use.
 
 ## Available plugins
 

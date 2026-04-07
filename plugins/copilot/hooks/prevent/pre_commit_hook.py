@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""PreToolUse hook (VS Code adapter): validation checkpoint before git commit."""
+"""preToolUse hook (Copilot CLI adapter): validation checkpoint before git commit."""
 import json
 import sys
 import os
@@ -13,18 +13,21 @@ from lib.protocol import HookInput, evaluate_pre_commit
 @safe_run
 def main():
     raw = json.load(sys.stdin)
+    tool_name = raw.get("toolName", "")
+    if tool_name != "bash":
+        sys.exit(0)
+    tool_args = json.loads(raw.get("toolArgs", "{}"))
+    command = tool_args.get("command", "")
     inp = HookInput(
-        session_id=raw.get("sessionId", "unknown"),
-        command=raw.get("tool_input", {}).get("command", ""),
+        session_id=str(os.getpid()),
+        command=command,
         cwd=raw.get("cwd", "."),
     )
     result = evaluate_pre_commit(inp)
     if result.action == "context":
         print(json.dumps({
-            "hookSpecificOutput": {
-                "hookEventName": "PreToolUse",
-                "additionalContext": result.context,
-            }
+            "permissionDecision": "deny",
+            "permissionDecisionReason": result.context,
         }))
 
 

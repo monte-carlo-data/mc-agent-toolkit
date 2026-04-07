@@ -22,7 +22,7 @@ def clean_cache():
 
 @pytest.fixture(autouse=True)
 def isolate_hook_modules():
-    """Ensure VS Code hook modules are loaded from VS Code's hooks dir."""
+    """Ensure Copilot hook modules are loaded from Copilot's hooks dir."""
     hook_modules = [
         "pre_edit_hook", "post_edit_hook", "pre_commit_hook",
         "turn_end_hook",
