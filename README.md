@@ -11,7 +11,7 @@ Monte Carlo's official toolkit for AI coding agents. Contains skills and plugins
   ```
   Then authenticate: run `/mcp` in Claude Code, select `monte-carlo-mcp`, and complete the OAuth flow in your browser.
 
-  > **Note:** The `mc-prevent` plugin bundles its own MCP server, so if you install the plugin you can skip this step.
+  > **Note:** The `mc-agent-toolkit` plugin bundles its own MCP server, so if you install the plugin you can skip this step.
 
   See [official docs](https://docs.getmontecarlo.com/docs/mcp-server#option-1-oauth-21-recommended-for-mcp-clients-that-support-http-transport) for other MCP clients and advanced options.
 
@@ -43,10 +43,10 @@ Monte Carlo's official toolkit for AI coding agents. Contains skills and plugins
 
 ### Cursor
 
-Run the install script (clones the repo and copies the plugin to `~/.cursor/plugins/local/mc-prevent`):
+Run the install script (clones the repo and copies the `mc-agent-toolkit` plugin to `~/.cursor/plugins/local/mc-agent-toolkit`):
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/monte-carlo-data/mcd-agent-toolkit/main/plugins/cursor/prevent/scripts/install.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/monte-carlo-data/mcd-agent-toolkit/main/plugins/cursor/scripts/install.sh)
 ```
 
 Or install manually:
@@ -54,14 +54,16 @@ Or install manually:
 ```bash
 git clone https://github.com/monte-carlo-data/mcd-agent-toolkit.git
 cd mcd-agent-toolkit
-bash plugins/cursor/prevent/scripts/install.sh
+bash plugins/cursor/scripts/install.sh
 ```
 
 Then restart Cursor (or run **Developer: Reload Window** from the Command Palette). The Monte Carlo MCP server will prompt for OAuth authentication on first use.
 
 ## Available plugins
 
-| Plugin | Description |
+Non-Claude-Code editors use a single **`mc-agent-toolkit`** plugin that bundles all features. Claude Code maintains per-skill marketplace entries.
+
+| Plugin / Feature | Description |
 |---|---|
 | `mc-prevent` | Analyzes schema changes using MC lineage, monitoring, alerts, queries, and table metadata. Generates Monte Carlo monitors and validation queries to prevent data incidents. |
 | `mc-generate-validation-notebook` | Generates executable validation queries from a pull request and packages them into Monte Carlo notebooks for direct testing. |
