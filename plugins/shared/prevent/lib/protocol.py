@@ -31,7 +31,7 @@ class HookInput:
     """Platform-agnostic hook input."""
 
     __slots__ = ("session_id", "file_path", "command", "transcript_path",
-                 "cwd", "tool_name", "stop_hook_active")
+                 "cwd", "tool_name", "stop_hook_active", "validate_command")
 
     def __init__(
         self,
@@ -42,6 +42,7 @@ class HookInput:
         cwd: str | None = None,
         tool_name: str | None = None,
         stop_hook_active: bool = False,
+        validate_command: str = "/mc-validate",
     ):
         self.session_id = session_id
         self.file_path = file_path
@@ -50,6 +51,7 @@ class HookInput:
         self.cwd = cwd
         self.tool_name = tool_name
         self.stop_hook_active = stop_hook_active
+        self.validate_command = validate_command
 
 
 class HookOutput:
@@ -75,8 +77,11 @@ GRACE_PERIOD_SECONDS = 120
 
 def scan_transcript_for_markers(transcript_path: str, table_name: str) -> dict:
     """Scan transcript for MC_IMPACT_CHECK_COMPLETE and MC_MONITOR_GAP markers."""
-    ic_pattern = re.compile(rf"MC_IMPACT_CHECK_COMPLETE: {re.escape(table_name)}\b")
-    mg_pattern = re.compile(rf"MC_MONITOR_GAP: {re.escape(table_name)}\b")
+    # Match the table name with an optional MCON-style prefix (e.g. "analytics:prod.client_hub")
+    # so markers work even if the model emits a fully qualified name instead of just "client_hub"
+    esc = re.escape(table_name)
+    ic_pattern = re.compile(rf"MC_IMPACT_CHECK_COMPLETE:\s+(?:\S+\.)?{esc}\b")
+    mg_pattern = re.compile(rf"MC_MONITOR_GAP:\s+(?:\S+\.)?{esc}\b")
     found = {"impact_check": False, "monitor_gap": False}
     try:
         with open(transcript_path, "r", encoding="utf-8") as f:
@@ -169,7 +174,8 @@ def evaluate_pre_edit(inp: HookInput) -> HookOutput:
     hook_triggered_note = (
         "This assessment is hook-triggered — only emit MC_IMPACT_CHECK_COMPLETE "
         "markers for tables whose lineage and monitor coverage were fetched "
-        "directly via Monte Carlo tools."
+        "directly via Monte Carlo tools. When complete, emit exactly this marker "
+        f"on its own line: MC_IMPACT_CHECK_COMPLETE: {table_name}"
     )
 
     no_bypass_note = (
@@ -272,7 +278,7 @@ def evaluate_turn_end(inp: HookInput) -> HookOutput:
         f"verify these changes behaved as intended. Present these options and "
         f"WAIT for the user to respond — do NOT answer on their behalf:\n\n"
         f"→ Yes: I'll generate and run queries for all changed models\n"
-        f"→ No: You can use /mc-validate anytime to validate changes"
+        f"→ No: You can use {inp.validate_command} anytime to validate changes"
     )
     if gap_tables:
         gap_list = ", ".join(gap_tables)
@@ -299,7 +305,7 @@ def evaluate_validate_command(inp: HookInput) -> HookOutput:
     if not tables:
         return HookOutput(
             action="context",
-            context="No dbt model changes detected in this session. Edit a dbt model first, then run /mc-validate.",
+            context=f"No dbt model changes detected in this session. Edit a dbt model first, then run {inp.validate_command}.",
         )
 
     w4_tables = [t for t in tables

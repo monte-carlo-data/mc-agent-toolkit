@@ -16,6 +16,7 @@ def main():
     inp = HookInput(
         session_id=raw.get("conversation_id", "unknown"),
         stop_hook_active=raw.get("stop_hook_active", False),
+        validate_command="/mc-agent-toolkit:mc-validate",
     )
     result = evaluate_turn_end(inp)
     if result.action == "block":
