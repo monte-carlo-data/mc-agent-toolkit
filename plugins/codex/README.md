@@ -1,13 +1,13 @@
-# Monte Carlo Prevent — Codex Plugin
+# Monte Carlo Agent Toolkit — Codex Plugin
 
-Detects and prevents breaking schema changes to dbt models using Monte Carlo lineage and monitoring data.
+Data observability skills and enforcement hooks for AI coding agents, powered by Monte Carlo.
 
 ## Installation
 
 Run the install script from your target repo:
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/monte-carlo-data/mcd-agent-toolkit/main/plugins/codex/prevent/scripts/install.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/monte-carlo-data/mcd-agent-toolkit/main/plugins/codex/scripts/install.sh)
 ```
 
 Or specify a target repo path:
@@ -17,13 +17,13 @@ bash install.sh /path/to/your/repo
 ```
 
 The script handles everything:
-1. Copies the plugin into `<repo>/plugins/mc-prevent/`
+1. Copies the plugin into `<repo>/plugins/mc-agent-toolkit/`
 2. Creates `.agents/plugins/marketplace.json` for Codex plugin discovery
 3. Adds the Monte Carlo MCP server to `~/.codex/config.toml` with the required `User-Agent` header (workaround for [codex#12859](https://github.com/openai/codex/issues/12859))
 4. Enables `codex_hooks` in your config
 5. Opens a browser for OAuth login with your Monte Carlo account
 
-After installation, restart Codex in your project. You should see "Installed mc-prevent plugin" on startup.
+After installation, restart Codex in your project. You should see "Installed mc-agent-toolkit plugin" on startup.
 
 ## How It Works
 

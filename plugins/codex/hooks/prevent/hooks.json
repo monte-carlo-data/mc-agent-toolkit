@@ -6,7 +6,7 @@
                 "hooks": [
                     {
                         "type": "command",
-                        "command": "python3 ${CODEX_PLUGIN_ROOT}/hooks/pre_edit_hook.py"
+                        "command": "python3 ${CODEX_PLUGIN_ROOT}/hooks/prevent/pre_edit_hook.py"
                     }
                 ]
             },
@@ -15,7 +15,7 @@
                 "hooks": [
                     {
                         "type": "command",
-                        "command": "python3 ${CODEX_PLUGIN_ROOT}/hooks/pre_commit_hook.py"
+                        "command": "python3 ${CODEX_PLUGIN_ROOT}/hooks/prevent/pre_commit_hook.py"
                     }
                 ]
             }
@@ -26,7 +26,7 @@
                 "hooks": [
                     {
                         "type": "command",
-                        "command": "python3 ${CODEX_PLUGIN_ROOT}/hooks/post_edit_hook.py"
+                        "command": "python3 ${CODEX_PLUGIN_ROOT}/hooks/prevent/post_edit_hook.py"
                     }
                 ]
             }
@@ -36,7 +36,7 @@
                 "hooks": [
                     {
                         "type": "command",
-                        "command": "python3 ${CODEX_PLUGIN_ROOT}/hooks/turn_end_hook.py"
+                        "command": "python3 ${CODEX_PLUGIN_ROOT}/hooks/prevent/turn_end_hook.py"
                     }
                 ]
             }

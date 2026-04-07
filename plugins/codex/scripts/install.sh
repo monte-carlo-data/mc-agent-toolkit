@@ -1,22 +1,22 @@
 #!/bin/bash
 set -e
 
-# Monte Carlo Prevent — Codex plugin installer
+# Monte Carlo Agent Toolkit — Codex plugin installer
 # 1. Clones the repo and copies the plugin into the target repo
 # 2. Creates .agents/plugins/marketplace.json
 # 3. Adds Monte Carlo MCP server to ~/.codex/config.toml
 # 4. Enables codex_hooks
 # 5. Triggers OAuth login
 
-PLUGIN_NAME="mc-prevent"
+PLUGIN_NAME="mc-agent-toolkit"
 REPO_URL="https://github.com/monte-carlo-data/mcd-agent-toolkit.git"
-PLUGIN_SRC="plugins/codex/prevent"
-SHARED_LIB="hooks/prevent/lib"
+PLUGIN_SRC="plugins/codex"
+SHARED_LIB="plugins/shared/prevent/lib"
 SHARED_SKILL="skills/prevent"
 
 CONFIG_DIR="$HOME/.codex"
 CONFIG_FILE="$CONFIG_DIR/config.toml"
-SERVER_NAME="monte-carlo"
+SERVER_NAME="monte-carlo-mcp"
 SERVER_URL="https://integrations.getmontecarlo.com/mcp"
 
 # --- Parse arguments ---
@@ -86,14 +86,14 @@ find . -not -type l -not -path './__pycache__/*' -not -path './.pytest_cache/*' 
        -not -path './tests/*' -not -name '*.pyc' | cpio -pdm "$TARGET" 2>/dev/null
 
 # --- Copy symlink targets as real directories ---
-cp -R "$REPO_ROOT/$SHARED_LIB" "$TARGET/hooks/lib"
+cp -R "$REPO_ROOT/$SHARED_LIB" "$TARGET/hooks/prevent/lib"
 mkdir -p "$TARGET/skills"
 cp -R "$REPO_ROOT/$SHARED_SKILL" "$TARGET/skills/prevent"
 
 # --- Clean up dev artifacts ---
 find "$TARGET" -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
 find "$TARGET" -name "*.pyc" -delete 2>/dev/null || true
-rm -rf "$TARGET/hooks/lib/tests"
+rm -rf "$TARGET/hooks/prevent/lib/tests"
 
 echo "  Plugin files installed."
 
@@ -115,10 +115,10 @@ else
     "name": "local-plugins",
     "plugins": [
         {
-            "name": "mc-prevent",
+            "name": "mc-agent-toolkit",
             "source": {
                 "source": "local",
-                "path": "./plugins/mc-prevent"
+                "path": "./plugins/mc-agent-toolkit"
             },
             "policy": {
                 "installation": "AVAILABLE"
@@ -184,4 +184,4 @@ echo "Done! $PLUGIN_NAME installed to $TARGET"
 echo ""
 echo "Next steps:"
 echo "  1. Restart Codex in $TARGET_REPO"
-echo "  2. You should see 'Installed mc-prevent plugin' on startup"
+echo "  2. You should see 'Installed mc-agent-toolkit plugin' on startup"

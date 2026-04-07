@@ -1,4 +1,4 @@
-# Changelog — mc-prevent (Codex)
+# Changelog — mc-agent-toolkit (Codex)
 
 ## v1.0.0 (2026-04-02)
 
