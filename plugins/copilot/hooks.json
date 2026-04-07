@@ -1,0 +1,30 @@
+{
+    "version": 1,
+    "hooks": {
+        "preToolUse": [
+            {
+                "type": "command",
+                "bash": "python3 hooks/prevent/pre_edit_hook.py",
+                "timeoutSec": 5
+            },
+            {
+                "type": "command",
+                "bash": "python3 hooks/prevent/pre_commit_hook.py",
+                "timeoutSec": 5
+            }
+        ],
+        "postToolUse": [
+            {
+                "type": "command",
+                "bash": "python3 hooks/prevent/post_edit_hook.py",
+                "timeoutSec": 3
+            }
+        ],
+        "agentStop": [
+            {
+                "type": "command",
+                "bash": "python3 hooks/prevent/turn_end_hook.py"
+            }
+        ]
+    }
+}
