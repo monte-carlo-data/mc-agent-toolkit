@@ -105,3 +105,7 @@ plugins/copilot/
 **MCP tools not appearing:**
 - Check that `.mcp.json` exists in the plugin directory
 - Run `/skills list` to verify the prevent skill is loaded
+
+## Architecture
+
+See the [plugins README](../README.md) for the overall plugin architecture and editor support comparison.

@@ -1,6 +1,16 @@
 # mc-agent-toolkit
 
-Monte Carlo's official toolkit for AI coding agents. Contains skills and plugins that integrate Monte Carlo's data observability platform — lineage, monitoring, validation and alerting — into your development workflow.
+Monte Carlo's official toolkit for AI coding agents. Integrates Monte Carlo's data observability platform — lineage, monitoring, validation, and alerting — directly into your development workflow.
+
+## Features
+
+The toolkit bundles the following capabilities as a single **mc-agent-toolkit** plugin. Each feature is a [skill](skills/) that can also be used standalone.
+
+| Feature | Description | Details |
+|---|---|---|
+| **MC Prevent** | Surfaces lineage, alerts, and blast radius before code changes. Generates monitors-as-code and targeted validation queries to prevent data incidents. | [README](skills/prevent/README.md) |
+| **MC Generate Validation Notebook** | Generates SQL validation notebooks for dbt model changes, with targeted queries comparing baseline and development data. | [README](skills/generate-validation-notebook/README.md) |
+| **MC Push Ingestion** | Generates warehouse-specific collection scripts for pushing metadata, lineage, and query logs to Monte Carlo. | [README](skills/push-ingestion/README.md) |
 
 ## Prerequisites
 
@@ -22,10 +32,9 @@ Monte Carlo's official toolkit for AI coding agents. Contains skills and plugins
 
   </details>
 
+## Installing the plugin (recommended)
 
-## Installing plugins (recommended)
-
-**Monte Carlo recommends installing skills via their corresponding plugins.** Plugins bundle the skill together with hooks, configuration and additional capabilities that provide a richer experience (e.g., automatic context enrichment from MC lineage data, executing validation queries and synthesizing results in your coding sessions).
+**Monte Carlo recommends installing the mc-agent-toolkit plugin.** It bundles skills together with hooks, MCP server configuration, and editor-specific capabilities for a richer experience. See the [plugins README](plugins/README.md) for editor support details.
 
 ### Claude Code
 
@@ -39,27 +48,19 @@ Monte Carlo's official toolkit for AI coding agents. Contains skills and plugins
    ```
 3. Updates — `claude plugin update` pulls in the latest skill and hook changes.
 
+See the [Claude Code plugin README](plugins/claude-code/README.md) for detailed setup and usage.
+
 ### Cursor
 
-Run the install script (clones the repo and copies the `mc-agent-toolkit` plugin to `~/.cursor/plugins/local/mc-agent-toolkit`):
+Run the install script:
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/monte-carlo-data/mc-agent-toolkit/main/plugins/cursor/scripts/install.sh)
 ```
 
-Or install manually:
-
-```bash
-git clone https://github.com/monte-carlo-data/mc-agent-toolkit.git
-cd mc-agent-toolkit
-bash plugins/cursor/scripts/install.sh
-```
-
-Then restart Cursor (or run **Developer: Reload Window** from the Command Palette). The Monte Carlo MCP server will prompt for OAuth authentication on first use.
+Then restart Cursor. See the [Cursor plugin README](plugins/cursor/README.md) for details.
 
 ### GitHub Copilot CLI
-
-Install from a local clone:
 
 ```bash
 git clone https://github.com/monte-carlo-data/mcd-agent-toolkit.git
@@ -71,43 +72,23 @@ git clone https://github.com/monte-carlo-data/mcd-agent-toolkit.git
 copilot plugin install ./mcd-agent-toolkit/plugins/copilot
 ```
 
-Verify with `copilot plugin list`, then start a Copilot session. The Monte Carlo MCP server will prompt for authentication on first use.
-
-## Available plugins
-
-All editors use a single **`mc-agent-toolkit`** plugin that bundles the following features:
-
-| Feature | Description |
-|---|---|
-| **MC Prevent** | Analyzes schema changes using MC lineage, monitoring, alerts, queries, and table metadata. Generates Monte Carlo monitors and validation queries to prevent data incidents. |
-| **MC Generate Validation Notebook** | Generates executable validation queries from a pull request and packages them into Monte Carlo notebooks for direct testing. |
-| **MC Push Ingestion** | Generates warehouse-specific collection scripts and guides customers through pushing metadata, lineage, and query logs to Monte Carlo. |
+See the [Copilot CLI plugin README](plugins/copilot/README.md) for details.
 
 ## Using skills directly (advanced)
 
-Skills can also be used standalone without the plugin wrapper. This section is for users who want to submit skills to registries or use them with non-Claude-Code agents. Monte Carlo recommends the plugin approach above for the best experience.
-
-### skills.sh (Vercel CLI)
+Skills can also be used standalone without the plugin. This is for users who want to install individual skills via registries or use them with editors not listed above.
 
 ```bash
 npx skills add monte-carlo-data/mc-agent-toolkit --skill prevent
 ```
 
-### Manual installation
-
-Copy to `~/.claude/skills/` or `.agents/skills/`:
+Or copy directly:
 
 ```bash
 cp -r skills/prevent ~/.claude/skills/prevent
 ```
 
-## Available skills
-
-| Skill | Description |
-|---|---|
-| `prevent` | Analyzes schema changes using MC lineage, monitoring, alerts, queries, and table metadata. Generates monitors and validation queries to prevent data incidents. |
-| `generate-validation-notebook` | Generates executable validation queries from a pull request and packages them into Monte Carlo notebooks for direct testing. |
-| `push-ingestion` | Generates warehouse-specific collection scripts and guides customers through pushing metadata, lineage, and query logs to Monte Carlo. |
+See the [skills directory](skills/) for the full list and individual READMEs.
 
 ## Contributing
 

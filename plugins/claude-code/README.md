@@ -131,6 +131,10 @@ claude plugin remove mc-agent-toolkit
 
 The uninstall script restores standalone skill backups if they exist.
 
+## Architecture
+
+See the [plugins README](../README.md) for the overall plugin architecture, editor support comparison, and hook format details.
+
 ## Changelog
 
 See [CHANGELOG.md](CHANGELOG.md).

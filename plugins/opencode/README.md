@@ -153,6 +153,10 @@ See [skills/prevent/references/TROUBLESHOOTING.md](../../../skills/prevent/refer
 2. Check that `opencode.json` has the `mcp.monte-carlo` configuration
 3. Verify connectivity: the `testConnection` tool should succeed
 
+## Architecture
+
+See the [plugins README](../README.md) for the overall plugin architecture and editor support comparison.
+
 ## Changelog
 
 See [CHANGELOG.md](CHANGELOG.md) for release history.
