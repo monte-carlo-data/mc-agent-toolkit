@@ -1,7 +1,7 @@
 {
-    "mcpServers": {
-        "monte-carlo": {
-            "url": "https://integrations.getmontecarlo.com/mcp"
-        }
+  "mcpServers": {
+    "monte-carlo-mcp": {
+      "url": "https://integrations.getmontecarlo.com/mcp"
     }
+  }
 }
