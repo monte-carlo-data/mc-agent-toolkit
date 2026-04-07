@@ -85,11 +85,11 @@ if [ -f "$OPENCODE_JSON" ]; then
   fi
 
   # Check MCP config
-  if grep -q '"monte-carlo"' "$OPENCODE_JSON" 2>/dev/null; then
+  if grep -q '"monte-carlo-mcp"' "$OPENCODE_JSON" 2>/dev/null; then
     echo "  ✓ MCP server already configured in opencode.json"
   else
-    echo "  ⚠ monte-carlo MCP is not configured."
-    echo '    Add under "mcp": { "monte-carlo": { "type": "remote", "url": "https://integrations.getmontecarlo.com/mcp" } }'
+    echo "  ⚠ monte-carlo-mcp MCP is not configured."
+    echo '    Add under "mcp": { "monte-carlo-mcp": { "type": "remote", "url": "https://integrations.getmontecarlo.com/mcp" } }'
     NEEDS_GUIDANCE=true
   fi
 

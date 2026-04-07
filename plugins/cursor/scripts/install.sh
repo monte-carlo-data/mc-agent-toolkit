@@ -6,7 +6,7 @@ set -e
 # into ~/.cursor/plugins/local/mc-agent-toolkit with symlinks resolved.
 
 PLUGIN_NAME="mc-agent-toolkit"
-REPO_URL="https://github.com/monte-carlo-data/mcd-agent-toolkit.git"
+REPO_URL="https://github.com/monte-carlo-data/mc-agent-toolkit.git"
 PLUGIN_SRC="plugins/cursor"
 
 # --- Determine target directory (macOS/Linux vs Windows Git Bash) ---
@@ -30,7 +30,7 @@ if [ -f "$REPO_ROOT/$PLUGIN_SRC/.cursor-plugin/plugin.json" ]; then
   cleanup() { :; }
 else
   TMPDIR_ROOT="${TMPDIR:-/tmp}"
-  CLONE_DIR="$TMPDIR_ROOT/mcd-agent-toolkit-$$"
+  CLONE_DIR="$TMPDIR_ROOT/mc-agent-toolkit-$$"
   cleanup() { rm -rf "$CLONE_DIR"; }
   echo "  Cloning repository..."
   git clone --depth 1 --quiet "$REPO_URL" "$CLONE_DIR"

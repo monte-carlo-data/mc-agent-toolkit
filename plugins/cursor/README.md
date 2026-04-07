@@ -13,7 +13,7 @@ Monte Carlo's unified agent toolkit plugin for the Cursor editor. Delivers data 
 ### One-line install (macOS / Linux)
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/monte-carlo-data/mcd-agent-toolkit/main/plugins/cursor/scripts/install.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/monte-carlo-data/mc-agent-toolkit/main/plugins/cursor/scripts/install.sh)
 ```
 
 ### Manual install
@@ -21,8 +21,8 @@ bash <(curl -fsSL https://raw.githubusercontent.com/monte-carlo-data/mcd-agent-t
 1. Clone the repository:
 
    ```bash
-   git clone https://github.com/monte-carlo-data/mcd-agent-toolkit.git
-   cd mcd-agent-toolkit
+   git clone https://github.com/monte-carlo-data/mc-agent-toolkit.git
+   cd mc-agent-toolkit
    ```
 
 2. Run the install script:

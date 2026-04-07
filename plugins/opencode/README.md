@@ -74,7 +74,7 @@ cp plugins/opencode/commands/mc-validate.md .opencode/commands/
 ```json
 {
   "mcp": {
-    "monte-carlo": {
+    "monte-carlo-mcp": {
       "type": "remote",
       "url": "https://integrations.getmontecarlo.com/mcp"
     }
@@ -85,7 +85,7 @@ cp plugins/opencode/commands/mc-validate.md .opencode/commands/
 **5. Authenticate:**
 
 ```bash
-opencode mcp auth monte-carlo
+opencode mcp auth monte-carlo-mcp
 ```
 
 ### Updating

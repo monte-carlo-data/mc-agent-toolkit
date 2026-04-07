@@ -1,32 +1,45 @@
 # Changelog
 
-All notable changes to the Monte Carlo Prevent plugin will be documented in this file.
+All notable changes to the Monte Carlo Agent Toolkit plugin for Claude Code will be documented in this file.
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.0] - 2026-04-01
+## [1.0.0] - 2026-04-07
+
+### Changed
+
+- Restructure from three separate plugins (`mc-prevent`, `mc-generate-validation-notebook`, `mc-push-ingestion`) to unified `mc-agent-toolkit` plugin
+- All skills, commands, hooks, and config merged into a single plugin directory
+- Hooks namespaced under `hooks/prevent/` for multi-skill support
+- Commands namespaced under `commands/<skill>/`
+- MCP server and permissions configured once at plugin root
+
+### Upgrade instructions
+
+Claude Code treats this as a new plugin. Existing users must uninstall old plugins and install the new one:
+
+```bash
+# 1. Uninstall old plugins
+claude plugin remove mc-prevent
+claude plugin remove mc-generate-validation-notebook
+claude plugin remove mc-push-ingestion
+
+# 2. Install the unified plugin
+/plugin install mc-agent-toolkit@mc-marketplace
+```
+
+---
+
+_History prior to the unified toolkit restructure (mc-prevent plugin only):_
+
+## [1.0.0-prevent] - 2026-04-01
 
 ### Changed
 
 - Rename plugin from `mc-safe-change` to `mc-prevent`
 - Rename skill from `monte-carlo-safe-change` to `monte-carlo-prevent`
 - Reset version to 1.0.0 as a fresh identity
-
-### Upgrade instructions
-
-Claude Code treats this as a new plugin. Existing users must uninstall the old
-plugin and install the new one:
-
-```bash
-# 1. Uninstall the old plugin
-claude plugin remove mc-safe-change
-
-# 2. Install the new plugin (see README for instructions)
-```
-
-The install script automatically cleans up leftover `safe-change` skill and
-cache files.
 
 ---
 
@@ -62,6 +75,6 @@ _Entries below predate the rename from `mc-safe-change` to `mc-prevent`._
 - Shared lib: dbt model detection, session cache, fail-open decorator
 - Monte Carlo MCP server wiring
 
-## [1.0.0] - 2026-03-22
+## [1.0.0-initial] - 2026-03-22
 
 - Initial plugin shell with skill file and manifest

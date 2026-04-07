@@ -1,7 +1,7 @@
 {
   "_comment": "Legacy fallback for MCP clients without HTTP transport. Preferred method: claude mcp add --transport http monte-carlo-mcp https://integrations.getmontecarlo.com/mcp (see https://docs.getmontecarlo.com/docs/mcp-server).",
   "mcpServers": {
-    "monte-carlo": {
+    "monte-carlo-mcp": {
       "command": "npx",
       "args": [
         "-y",

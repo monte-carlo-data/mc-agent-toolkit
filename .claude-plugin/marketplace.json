@@ -1,25 +1,15 @@
 {
     "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
-    "name": "mcd-agent-toolkit",
+    "name": "mc-marketplace",
     "owner": {
         "name": "Monte Carlo",
         "email": "support@montecarlodata.com"
     },
     "plugins": [
         {
-            "name": "mc-prevent",
-            "source": "./plugins/claude-code/prevent",
-            "description": "Detect and prevent breaking schema changes using MC lineage and monitoring."
-        },
-        {
-            "name": "mc-generate-validation-notebook",
-            "source": "./plugins/claude-code/generate-validation-notebook",
-            "description": "Generate Monte Carlo validation notebooks."
-        },
-        {
-            "name": "mc-push-ingestion",
-            "source": "./plugins/claude-code/push-ingestion",
-            "description": "Generates warehouse-specific collection scripts and guides customers through pushing metadata, lineage, and query logs to Monte Carlo."
+            "name": "mc-agent-toolkit",
+            "source": "./plugins/claude-code",
+            "description": "Monte Carlo Agent Toolkit — data observability skills and enforcement hooks for AI coding agents."
         }
     ]
 }
