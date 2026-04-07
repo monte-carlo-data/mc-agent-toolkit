@@ -100,6 +100,17 @@ If you send `freshness`, each push must carry a **changed** `last_update_time` t
 a new data point for the anomaly detector (repeated identical timestamps don't advance the
 training clock).
 
+## Freshness + volume only mode (skip schema)
+
+For periodic pushes (e.g. hourly cron), you often don't need to re-collect the full schema
+on every run — field definitions rarely change. Collection scripts can support a
+`--only-freshness-and-volume` flag that skips the `COLUMNS` / `INFORMATION_SCHEMA` query
+and omits `fields` from the manifest. This is significantly faster on warehouses with many
+tables. Use the full collection (with fields) on the first push and on a daily schedule,
+and the freshness+volume only mode for hourly pushes in between. See the
+[BigQuery Iceberg example](https://github.com/monte-carlo-data/mcd-public-resources/tree/main/examples/push-ingestion/bigquery/push-iceberg-tables)
+for a working implementation of this pattern.
+
 ## Batch multiple tables
 
 `events` accepts a list. Push all tables in a single call or in batches:
