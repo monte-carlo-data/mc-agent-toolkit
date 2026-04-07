@@ -43,11 +43,7 @@ As more skills are added, a per-skill-per-editor plugin model creates `skills ×
 3. **Scalable UX.** New skills showing up as features in an existing toolkit is expected. New standalone plugins appearing unexpectedly is confusing.
 4. **Enable/disable is natural.** A toolkit has features you can toggle. A hidden plumbing layer doesn't.
 
-### Claude Code Marketplace Exception
-
-Claude Code's marketplace uniquely supports listing multiple plugins from a single repo (e.g., `/plugin install mc-prevent@mcd-agent-toolkit`). The current per-skill marketplace entries will be maintained for now. This decision is being evaluated separately and may align with Option B in the future.
-
-All other editors (VS Code, Cursor, OpenCode, Codex) follow the unified toolkit plugin model.
+All editors (Claude Code, Cursor, OpenCode, Copilot CLI, Codex) follow the unified toolkit plugin model.
 
 ## How It Works Per Editor
 
@@ -65,9 +61,7 @@ Each skill maintains strict isolation within the toolkit plugin:
 
 ### Directory Structure
 
-This is the **target state**. The current codebase has two pending migrations:
-1. Cursor and OpenCode are being migrated from per-skill directories to the unified model.
-2. `hooks/` (currently at repo root) will be moved into `plugins/shared/`, since hook logic is an implementation detail of the plugin system — not independently publishable like skills.
+This reflects the **current repository structure**.
 
 ```
 mcd-agent-toolkit/
@@ -75,9 +69,10 @@ mcd-agent-toolkit/
 │   ├── prevent/
 │   │   ├── SKILL.md
 │   │   └── references/
-│   └── <future-skill>/
-│       ├── SKILL.md
-│       └── references/
+│   ├── generate-validation-notebook/
+│   │   └── SKILL.md
+│   └── push-ingestion/
+│       └── SKILL.md
 │
 ├── plugins/
 │   │
@@ -92,57 +87,60 @@ mcd-agent-toolkit/
 │   │       ├── protocol.py              # Separate business logic
 │   │       └── cache.py                 # Separate cache (mc_<skill>_* prefixed)
 │   │
-│   │  # --- Claude Code: per-skill plugins (marketplace exception) ---
-│   ├── claude-code/
-│   │   ├── prevent/                     # mc-prevent plugin
-│   │   │   ├── .claude-plugin/plugin.json
-│   │   │   ├── hooks/                   # Thin adapters → plugins/shared/prevent/lib/
-│   │   │   └── skills/prevent → symlink
-│   │   └── <future-skill>/              # Separate plugin per skill
-│   │       ├── .claude-plugin/plugin.json
-│   │       └── skills/<future-skill> → symlink
-│   │
-│   │  # --- All other editors: ONE mcd-agent-toolkit plugin each ---
-│   ├── cursor/                          # mcd-agent-toolkit plugin for Cursor
-│   │   ├── .cursor-plugin/plugin.json
+│   │  # --- Each editor: ONE mc-agent-toolkit plugin ---
+│   ├── claude-code/                     # mc-agent-toolkit plugin for Claude Code
+│   │   ├── .claude-plugin/plugin.json
+│   │   ├── .mcp.json
 │   │   ├── hooks/
-│   │   │   ├── prevent/                 # MC Prevent hook adapters
-│   │   │   └── <future-skill>/          # Future feature hook adapters
+│   │   │   └── prevent/                 # Thin adapters → plugins/shared/prevent/lib/
 │   │   ├── skills/
 │   │   │   ├── prevent → symlink
-│   │   │   └── <future-skill> → symlink
+│   │   │   ├── generate-validation-notebook → symlink
+│   │   │   └── push-ingestion → symlink
+│   │   └── commands/
+│   │       ├── prevent/
+│   │       └── push-ingestion/
+│   │
+│   ├── cursor/                          # mc-agent-toolkit plugin for Cursor
+│   │   ├── .cursor-plugin/plugin.json
+│   │   ├── hooks/
+│   │   │   └── prevent/                 # MC Prevent hook adapters
+│   │   ├── skills/
+│   │   │   └── prevent → symlink
 │   │   └── mcp.json
 │   │
-│   ├── opencode/                        # mcd-agent-toolkit plugin for OpenCode
+│   ├── opencode/                        # mc-agent-toolkit plugin for OpenCode
 │   │   ├── src/
-│   │   │   ├── prevent/                 # MC Prevent feature module
-│   │   │   └── <future-skill>/          # Future feature module
+│   │   │   └── prevent/                 # TypeScript feature module (ported from Python)
 │   │   ├── package.json
 │   │   └── opencode.json
 │   │
-│   ├── copilot/                         # mcd-agent-toolkit plugin for Copilot CLI
+│   ├── copilot/                         # mc-agent-toolkit plugin for Copilot CLI
 │   │   ├── plugin.json                  # Plugin manifest
 │   │   ├── hooks.json                   # Hook registration (version 1 format)
 │   │   ├── .mcp.json                    # MCP server config
 │   │   ├── hooks/
-│   │   │   ├── lib → symlink            # Shared hook logic
-│   │   │   ├── prevent/                 # MC Prevent hook adapters
-│   │   │   └── <future-skill>/          # Future feature hook adapters
-│   │   └── skills/
-│   │       ├── prevent → symlink
-│   │       └── <future-skill> → symlink
+│   │   │   └── prevent/                 # MC Prevent hook adapters
+│   │   │       ├── lib → symlink        # Shared hook logic (sibling of scripts)
+│   │   │       ├── pre_edit_hook.py
+│   │   │       └── ...
+│   │   ├── skills/
+│   │   │   └── prevent → symlink
+│   │   └── scripts/
+│   │       ├── install.sh               # Installs hooks to .github/hooks/
+│   │       └── mc-prevent.json          # Hook registration template for target project
 │   │
-│   └── codex/                           # mcd-agent-toolkit plugin for Codex
-│       ├── skills/
-│       │   ├── prevent → symlink
-│       │   └── <future-skill> → symlink
-│       └── install.sh
+│   └── codex/                           # mc-agent-toolkit plugin for Codex
+│       └── skills/
+│           └── prevent → symlink
 ```
 
 **Key distinctions:**
 - `skills/` stays at repo root — skills are independently publishable to registries.
 - `plugins/shared/` contains platform-agnostic hook logic — it exists only to serve plugins.
-- Under `claude-code/`, each skill is its own plugin with its own `plugin.json`. Under every other editor, the editor directory itself is the plugin, and skills are feature modules within it.
+- Each editor directory is a unified `mc-agent-toolkit` plugin with skills as features within it.
+
+**Copilot CLI note:** Copilot CLI does not load hooks from plugins — only skills and MCP. Hooks must be installed to `.github/hooks/` in the target project via `scripts/install.sh`. The `hooks.json` in the plugin root is kept for compatibility but is not used at runtime by Copilot CLI.
 
 ### Isolation Guarantees
 
@@ -174,7 +172,7 @@ Skills and plugins are distributed through independent channels:
 |---------|-------------|-------------------------------|
 | **skills.sh** (`npx skills add ... --skill <name>`) | Per-skill | No — discovers skills by scanning `skills/` directory |
 | **skillsmp.com** | Per-skill | No — auto-indexes from repo, reads `skills/` |
-| **Claude Code marketplace** | Per-plugin | Maintained separately (see exception above) |
+| **Claude Code marketplace** | Per-plugin | One plugin per editor |
 | **Editor plugin installs** | Per-toolkit | Yes — one install gets all features |
 
 The `--skill` flag in `npx skills add monte-carlo-data/mcd-agent-toolkit --skill monte-carlo-prevent` addresses individual skills by directory name. This is independent of plugin organization. **Moving to a unified toolkit plugin does not affect individual skill publishability.**
@@ -195,6 +193,6 @@ A skill needs a plugin when it requires **enforcement** — gating edits, blocki
 For skills that need hooks, follow the existing two-layer pattern:
 
 1. **Shared logic** (`plugins/shared/<skill>/lib/`): Platform-agnostic Python. Contains all decision-making. No editor-specific I/O.
-2. **Editor adapters** (`plugins/<editor>/hooks/<skill>/`): Thin scripts that read editor-specific JSON input, call shared logic, and format editor-specific output. For Claude Code, the path is `plugins/claude-code/<skill>/hooks/` due to the per-skill plugin structure.
+2. **Editor adapters** (`plugins/<editor>/hooks/<skill>/`): Thin scripts that read editor-specific JSON input, call shared logic, and format editor-specific output.
 
 This ensures business logic is written and tested once, with only I/O adapters varying per editor. OpenCode is an exception — it ports the logic to TypeScript since the plugin SDK requires it.
