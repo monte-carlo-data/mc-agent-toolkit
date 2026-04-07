@@ -20,15 +20,22 @@ TARGET="$CURSOR_PLUGINS/$PLUGIN_NAME"
 echo "Installing $PLUGIN_NAME Cursor plugin..."
 echo "  Target: $TARGET"
 
-# --- Clone or update repo in a temp directory ---
-TMPDIR_ROOT="${TMPDIR:-/tmp}"
-CLONE_DIR="$TMPDIR_ROOT/mcd-agent-toolkit-$$"
+# --- Locate repo: use local checkout if available, otherwise clone ---
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 
-cleanup() { rm -rf "$CLONE_DIR"; }
+if [ -f "$REPO_ROOT/$PLUGIN_SRC/.cursor-plugin/plugin.json" ]; then
+  echo "  Using local repo at $REPO_ROOT"
+  CLONE_DIR="$REPO_ROOT"
+  cleanup() { :; }
+else
+  TMPDIR_ROOT="${TMPDIR:-/tmp}"
+  CLONE_DIR="$TMPDIR_ROOT/mcd-agent-toolkit-$$"
+  cleanup() { rm -rf "$CLONE_DIR"; }
+  echo "  Cloning repository..."
+  git clone --depth 1 --quiet "$REPO_URL" "$CLONE_DIR"
+fi
 trap cleanup EXIT
-
-echo "  Cloning repository..."
-git clone --depth 1 --quiet "$REPO_URL" "$CLONE_DIR"
 
 # --- Verify plugin source exists ---
 if [ ! -f "$CLONE_DIR/$PLUGIN_SRC/.cursor-plugin/plugin.json" ]; then

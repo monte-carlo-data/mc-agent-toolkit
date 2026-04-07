@@ -27,10 +27,11 @@ For detailed workflow descriptions, activation rules, and synthesis guidelines, 
 From the repo root, run the install script targeting your dbt project:
 
 ```bash
-./plugins/opencode/prevent/install.sh /path/to/your/dbt-project
+./plugins/opencode/install.sh /path/to/your/dbt-project
 ```
 
 This installs all three components and creates the MCP server config:
+
 - **Plugin** → `.opencode/plugins/mc-prevent/` (hooks that gate edits)
 - **Skill** → `.opencode/skills/prevent/` (workflow instructions for the LLM)
 - **Command** → `.opencode/commands/mc-validate.md` (slash command)
@@ -47,25 +48,29 @@ opencode mcp auth monte-carlo
 If you prefer to install components individually:
 
 **1. Plugin** (hooks that gate edits and track changes):
+
 ```bash
 mkdir -p .opencode/plugins/mc-prevent
-cp -r plugins/opencode/prevent/{src,package.json,tsconfig.json} .opencode/plugins/mc-prevent/
+cp -r plugins/opencode/{src,package.json,tsconfig.json} .opencode/plugins/mc-prevent/
 cd .opencode/plugins/mc-prevent && bun install
 ```
 
 **2. Skill** (workflow instructions — required for impact assessments):
+
 ```bash
 mkdir -p .opencode/skills
 cp -r skills/prevent .opencode/skills/prevent
 ```
 
 **3. Command** (slash command for validation queries):
+
 ```bash
 mkdir -p .opencode/commands
-cp plugins/opencode/prevent/commands/mc-validate.md .opencode/commands/
+cp plugins/opencode/commands/mc-validate.md .opencode/commands/
 ```
 
 **4. MCP server config** (add to your `opencode.json`):
+
 ```json
 {
   "mcp": {
@@ -78,6 +83,7 @@ cp plugins/opencode/prevent/commands/mc-validate.md .opencode/commands/
 ```
 
 **5. Authenticate:**
+
 ```bash
 opencode mcp auth monte-carlo
 ```
@@ -87,7 +93,7 @@ opencode mcp auth monte-carlo
 Re-run the install script to update all components. It will overwrite existing files and re-install dependencies.
 
 ```bash
-./plugins/opencode/prevent/install.sh /path/to/your/dbt-project
+./plugins/opencode/install.sh /path/to/your/dbt-project
 ```
 
 ## Usage
@@ -106,14 +112,15 @@ Use `/mc-validate` to generate validation queries for all dbt models changed in 
 
 The plugin registers three OpenCode hook events:
 
-| Hook | Event | Behavior |
-|---|---|---|
-| Pre-edit gate | `tool.execute.before` (edit/write/apply_patch/multiedit) | Blocks dbt model edits until impact assessment verified |
-| Edit tracker | `tool.execute.after` (edit/write/apply_patch/multiedit) | Silently accumulates edited table names |
-| Pre-commit gate | `tool.execute.before` (bash with `git commit`) | Prompts for validation on staged dbt files |
-| Turn-end prompt | `session.idle` event | Reminds about validation queries and monitor coverage |
+| Hook            | Event                                                    | Behavior                                                |
+| --------------- | -------------------------------------------------------- | ------------------------------------------------------- |
+| Pre-edit gate   | `tool.execute.before` (edit/write/apply_patch/multiedit) | Blocks dbt model edits until impact assessment verified |
+| Edit tracker    | `tool.execute.after` (edit/write/apply_patch/multiedit)  | Silently accumulates edited table names                 |
+| Pre-commit gate | `tool.execute.before` (bash with `git commit`)           | Prompts for validation on staged dbt files              |
+| Turn-end prompt | `session.idle` event                                     | Reminds about validation queries and monitor coverage   |
 
 State is managed via temp files under `$TMPDIR/mc_prevent_*` with a three-state machine:
+
 - `absent` → `injected` (instruction sent, waiting for completion)
 - `injected` → `verified` (completion marker found in session messages)
 
@@ -121,14 +128,14 @@ All hooks are wrapped in error handling — failures never block the engineer.
 
 ## Differences from Claude Code plugin
 
-| Feature | Claude Code | OpenCode |
-|---|---|---|
-| Hook language | Python | TypeScript |
-| Packaging | Marketplace plugin | `.opencode/plugins/` directory |
-| Pre-edit gate | `PreToolUse` hook with deny decision | `tool.execute.before` with thrown error |
-| Transcript scanning | Reads transcript file | Uses SDK client to read session messages |
-| Turn-end prompt | `Stop` hook with block decision | `session.idle` event with SDK message |
-| Git staged files | `subprocess.run(["git", ...])` | `Bun.spawn(["git", ...])` |
+| Feature             | Claude Code                          | OpenCode                                 |
+| ------------------- | ------------------------------------ | ---------------------------------------- |
+| Hook language       | Python                               | TypeScript                               |
+| Packaging           | Marketplace plugin                   | `.opencode/plugins/` directory           |
+| Pre-edit gate       | `PreToolUse` hook with deny decision | `tool.execute.before` with thrown error  |
+| Transcript scanning | Reads transcript file                | Uses SDK client to read session messages |
+| Turn-end prompt     | `Stop` hook with block decision      | `session.idle` event with SDK message    |
+| Git staged files    | `subprocess.run(["git", ...])`       | `Bun.spawn(["git", ...])`                |
 
 ## Troubleshooting
 
