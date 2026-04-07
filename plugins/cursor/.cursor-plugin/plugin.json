@@ -15,5 +15,6 @@
         "prevent",
         "dbt",
         "schema"
-    ]
+    ],
+    "hooks": "./hooks/prevent/hooks.json"
 }
