@@ -6,11 +6,11 @@ Monte Carlo's unified agent toolkit plugin for Claude Code. Delivers data observ
 
 1. Add the marketplace:
    ```
-   /plugin marketplace add monte-carlo-data/mcd-agent-toolkit
+   /plugin marketplace add monte-carlo-data/mc-marketplace
    ```
 2. Install the plugin:
    ```
-   /plugin install mc-agent-toolkit@mcd-agent-toolkit
+   /plugin install mc-agent-toolkit@mc-marketplace
    ```
 3. Updates — `claude plugin update` pulls in the latest changes.
 

@@ -26,7 +26,7 @@ claude plugin remove mc-generate-validation-notebook
 claude plugin remove mc-push-ingestion
 
 # 2. Install the unified plugin
-/plugin install mc-agent-toolkit@mcd-agent-toolkit
+/plugin install mc-agent-toolkit@mc-marketplace
 ```
 
 ---

@@ -1,13 +1,13 @@
-# Contributing to mcd-agent-toolkit
+# Contributing to mc-agent-toolkit
 
 Welcome! We appreciate contributions from both Monte Carlo engineers and the community.
 
-**Repo layout:** `skills/` is the single source of truth for skill content. `plugins/shared/` contains platform-agnostic hook logic. Each editor under `plugins/<editor>/` is a single `mc-agent-toolkit` plugin (except Claude Code, which maintains per-skill marketplace entries).
+**Repo layout:** `skills/` is the single source of truth for skill content. `plugins/shared/` contains platform-agnostic hook logic. Each editor under `plugins/<editor>/` is a single `mc-agent-toolkit` plugin.
 
 ## Repository structure
 
 ```
-mcd-agent-toolkit/
+mc-agent-toolkit/
 ├── skills/                              # Shared skill definitions (platform-agnostic)
 │   ├── prevent/
 │   │   ├── SKILL.md
@@ -19,10 +19,11 @@ mcd-agent-toolkit/
 │   ├── shared/                          # Platform-agnostic hook logic
 │   │   └── prevent/lib/                 # Business logic (symlinked by editor plugins)
 │   │
-│   ├── claude-code/                     # Per-skill plugins (marketplace exception)
-│   │   ├── prevent/
-│   │   ├── generate-validation-notebook/
-│   │   └── push-ingestion/
+│   ├── claude-code/                     # Unified mc-agent-toolkit plugin
+│   │   ├── .claude-plugin/plugin.json
+│   │   ├── hooks/prevent/              # Hook adapters (thin, call shared lib)
+│   │   ├── skills/ (prevent, generate-validation-notebook, push-ingestion → symlinks)
+│   │   └── commands/ (prevent/, push-ingestion/)
 │   │
 │   ├── cursor/                          # Unified mc-agent-toolkit plugin
 │   │   ├── .cursor-plugin/plugin.json
@@ -54,18 +55,17 @@ Plugins reference skills via symlinks so that skills are authored once and share
 3. Optionally add supporting directories: `scripts/`, `references/`, `assets/`.
 4. Test the skill locally by copying it to `~/.claude/skills/my-new-skill/` and verifying Claude discovers and activates it correctly.
 
-## Adding a new Claude Code plugin for a skill
+## Adding a new skill to the Claude Code plugin
 
-1. Create the plugin directory: `plugins/claude-code/<skill-name>/`.
-2. Create `.claude-plugin/plugin.json` with at minimum `name`, `version`, `description`, `skills`. Use existing plugins as a template.
-3. Create `skills/` inside the plugin directory and add a symlink to the shared skill:
+1. Add a symlink in `plugins/claude-code/skills/`:
    ```bash
-   cd plugins/claude-code/<skill-name>/skills
-   ln -s ../../../../skills/<skill-name> <skill-name>
+   cd plugins/claude-code/skills
+   ln -s ../../../skills/<skill-name> <skill-name>
    ```
-4. If the plugin needs hooks, create a `hooks/` directory at the plugin root and add hook files there.
-5. Add the plugin to `.claude-plugin/marketplace.json`.
-6. Test locally with `claude --plugin-dir ./plugins/claude-code/<skill-name>`.
+2. If the skill has slash commands, create `plugins/claude-code/commands/<skill-name>/` and add `.md` command files. Update the `commands` array in `plugins/claude-code/.claude-plugin/plugin.json`.
+3. If the skill needs hooks, create adapters in `plugins/claude-code/hooks/<skill-name>/` following the two-layer pattern (see below).
+4. Bump the `version` in `plugins/claude-code/.claude-plugin/plugin.json`.
+5. Test locally with `claude --plugin-dir ./plugins/claude-code`.
 
 ## Updating an existing skill
 

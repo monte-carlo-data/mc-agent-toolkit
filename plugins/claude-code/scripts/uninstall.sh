@@ -14,5 +14,5 @@ for skill_name in prevent generate-validation-notebook push-ingestion; do
 done
 
 echo "✓ Post-uninstall cleanup complete."
-echo "  Install standalone skills from mcd-agent-toolkit/skills/ if needed."
+echo "  Install standalone skills from mc-agent-toolkit/skills/ if needed."
 echo "  Done."

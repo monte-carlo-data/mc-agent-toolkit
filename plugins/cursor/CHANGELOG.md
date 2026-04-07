@@ -19,7 +19,7 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Existing users should re-run the install script to pick up the new structure:
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/monte-carlo-data/mcd-agent-toolkit/main/plugins/cursor/scripts/install.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/monte-carlo-data/mc-agent-toolkit/main/plugins/cursor/scripts/install.sh)
 ```
 
 ---

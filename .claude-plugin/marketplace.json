@@ -1,6 +1,6 @@
 {
     "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
-    "name": "mcd-agent-toolkit",
+    "name": "mc-marketplace",
     "owner": {
         "name": "Monte Carlo",
         "email": "support@montecarlodata.com"
