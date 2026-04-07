@@ -42,6 +42,16 @@ The plugin uses two hooks to enforce the Monte Carlo Prevent workflow:
 
 The **prevent** skill is registered in `.agents/skills/prevent/` during installation. Codex activates it automatically when you work with dbt models or SQL files. You can also invoke it explicitly with `$monte-carlo-prevent`.
 
+## Known Issues
+
+Codex hook coverage is incomplete, which may cause hooks to not fire consistently:
+
+- [openai/codex#16732](https://github.com/openai/codex/issues/16732): `ApplyPatchHandler` doesn't emit PreToolUse/PostToolUse hook events — hooks only fire for the Bash tool. When Codex uses its native edit path (`• Edited`), our pre-edit gate is bypassed entirely. We work around this by parsing `apply_patch` commands within the Bash hook, but native edits remain ungated.
+- [openai/codex#14754](https://github.com/openai/codex/issues/14754): Add PreToolUse and PostToolUse hook events for code quality enforcement — tracks the broader request for non-Bash hook parity.
+- [openai/codex#16246](https://github.com/openai/codex/issues/16246): PostToolUse is missing for tools that complete via exec session / polling path — prevents reliable post-edit tracking.
+
+The skill-based impact assessment (via `SKILL.md`) works reliably regardless of these hook limitations.
+
 ## Architecture
 
 This plugin uses the shared core library at `hooks/prevent/lib/` (symlinked). All business logic lives in the shared library; the hooks in this plugin are thin adapters (~20 lines each) that translate Codex JSON to/from the platform-agnostic interface.
