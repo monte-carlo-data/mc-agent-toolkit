@@ -4,7 +4,7 @@ import json
 import sys
 import os
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from lib.safe_run import safe_run
 from lib.protocol import HookInput, evaluate_post_edit

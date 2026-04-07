@@ -65,6 +65,11 @@ Install from a local clone:
 
 ```bash
 git clone https://github.com/monte-carlo-data/mcd-agent-toolkit.git
+
+# Install hooks into your dbt project
+./mcd-agent-toolkit/plugins/copilot/scripts/install.sh /path/to/your/dbt-project
+
+# Install the plugin (skills + MCP)
 copilot plugin install ./mcd-agent-toolkit/plugins/copilot
 ```
 

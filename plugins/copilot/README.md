@@ -22,10 +22,20 @@ For detailed workflow descriptions, activation rules, and synthesis guidelines, 
 
 ## Installation
 
-Install from a local clone:
+Installation has two steps: the **plugin** (for skills + MCP) and the **hooks** (for enforcement).
+
+### Step 1: Install hooks into your project
 
 ```bash
 git clone https://github.com/monte-carlo-data/mcd-agent-toolkit.git
+./mcd-agent-toolkit/plugins/copilot/scripts/install.sh /path/to/your/dbt-project
+```
+
+This copies hook scripts and registration to `.github/hooks/` in your project.
+
+### Step 2: Install the plugin (skills + MCP)
+
+```bash
 copilot plugin install ./mcd-agent-toolkit/plugins/copilot
 ```
 
@@ -35,14 +45,7 @@ Verify:
 copilot plugin list
 ```
 
-Or in a Copilot session:
-
-```
-/plugin list
-/skills list
-```
-
-> **Note:** Copilot CLI caches plugins on install. After making changes to a local plugin, run `copilot plugin install` again to pick up updates.
+> **Note:** Hooks live in the project repo (`.github/hooks/`) because Copilot CLI loads hooks from the working directory, not from plugins. The plugin delivers skills and MCP server configuration.
 
 ## How it works
 
