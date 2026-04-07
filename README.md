@@ -57,15 +57,15 @@ bash plugins/cursor/scripts/install.sh
 
 Then restart Cursor (or run **Developer: Reload Window** from the Command Palette). The Monte Carlo MCP server will prompt for OAuth authentication on first use.
 
-## Available plugins
+## Available features
 
-All editors use a single **`mc-agent-toolkit`** plugin that bundles all features.
+All editors use a single **`mc-agent-toolkit`** plugin that bundles the following features:
 
-| Plugin / Feature | Description |
+| Feature | Description |
 |---|---|
-| `mc-prevent` | Analyzes schema changes using MC lineage, monitoring, alerts, queries, and table metadata. Generates Monte Carlo monitors and validation queries to prevent data incidents. |
-| `mc-generate-validation-notebook` | Generates executable validation queries from a pull request and packages them into Monte Carlo notebooks for direct testing. |
-| `mc-push-ingestion` | Generates warehouse-specific collection scripts and guides customers through pushing metadata, lineage, and query logs to Monte Carlo. |
+| **MC Prevent** | Analyzes schema changes using MC lineage, monitoring, alerts, queries, and table metadata. Generates Monte Carlo monitors and validation queries to prevent data incidents. |
+| **MC Generate Validation Notebook** | Generates executable validation queries from a pull request and packages them into Monte Carlo notebooks for direct testing. |
+| **MC Push Ingestion** | Generates warehouse-specific collection scripts and guides customers through pushing metadata, lineage, and query logs to Monte Carlo. |
 
 ## Using skills directly (advanced)
 
