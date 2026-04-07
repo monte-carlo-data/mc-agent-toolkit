@@ -3,10 +3,12 @@ set -e
 
 # Monte Carlo Agent Toolkit — Codex plugin installer
 # 1. Clones the repo and copies the plugin into the target repo
-# 2. Creates .agents/plugins/marketplace.json
-# 3. Adds Monte Carlo MCP server to ~/.codex/config.toml
-# 4. Enables codex_hooks
-# 5. Triggers OAuth login
+# 2. Registers the prevent skill in .agents/skills/
+# 3. Writes hooks to <repo>/.codex/hooks.json (project-level)
+# 4. Creates .agents/plugins/marketplace.json
+# 5. Adds Monte Carlo MCP server to ~/.codex/config.toml
+# 6. Enables codex_hooks
+# 7. Triggers OAuth login
 
 PLUGIN_NAME="mc-agent-toolkit"
 REPO_URL="https://github.com/monte-carlo-data/mcd-agent-toolkit.git"
@@ -16,6 +18,7 @@ SHARED_SKILL="skills/prevent"
 
 CONFIG_DIR="$HOME/.codex"
 CONFIG_FILE="$CONFIG_DIR/config.toml"
+HOOKS_FILE=""  # set after TARGET_REPO is resolved
 SERVER_NAME="monte-carlo-mcp"
 SERVER_URL="https://integrations.getmontecarlo.com/mcp"
 
@@ -40,6 +43,7 @@ done
 TARGET_REPO="${TARGET_REPO:-.}"
 TARGET_REPO="$(cd "$TARGET_REPO" && pwd)"
 TARGET="$TARGET_REPO/plugins/$PLUGIN_NAME"
+HOOKS_FILE="$TARGET_REPO/.codex/hooks.json"
 
 echo "Installing $PLUGIN_NAME Codex plugin..."
 echo "  Target repo: $TARGET_REPO"
@@ -52,7 +56,7 @@ echo ""
 
 if [ -n "$SOURCE_DIR" ]; then
   # --- Local source ---
-  echo "[1/5] Copying from local source: $SOURCE_DIR"
+  echo "[1/7] Copying from local source: $SOURCE_DIR"
   REPO_ROOT="$SOURCE_DIR"
 else
   # --- Clone from GitHub ---
@@ -62,7 +66,7 @@ else
   cleanup() { rm -rf "$CLONE_DIR"; }
   trap cleanup EXIT
 
-  echo "[1/5] Cloning repository..."
+  echo "[1/7] Cloning repository..."
   git clone --depth 1 --quiet "$REPO_URL" "$CLONE_DIR"
   REPO_ROOT="$CLONE_DIR"
 fi
@@ -98,10 +102,69 @@ rm -rf "$TARGET/hooks/prevent/lib/tests"
 echo "  Plugin files installed."
 
 # ============================================================
-# STEP 2: Create marketplace.json
+# STEP 2: Register skill in .agents/skills/
 # ============================================================
 
-echo "[2/5] Creating marketplace config..."
+echo "[2/7] Registering prevent skill..."
+SKILLS_DIR="$TARGET_REPO/.agents/skills"
+SKILL_TARGET="$SKILLS_DIR/prevent"
+
+mkdir -p "$SKILLS_DIR"
+
+if [ -d "$SKILL_TARGET" ]; then
+  echo "  Removing previous skill installation..."
+  rm -rf "$SKILL_TARGET"
+fi
+
+cp -R "$TARGET/skills/prevent" "$SKILL_TARGET"
+echo "  Skill registered at .agents/skills/prevent/"
+
+# ============================================================
+# STEP 3: Merge hooks into ~/.codex/hooks.json
+# ============================================================
+
+echo "[3/7] Registering hooks in .codex/hooks.json (project-level)..."
+
+HOOKS_DIR="$TARGET/hooks/prevent"
+
+mkdir -p "$(dirname "$HOOKS_FILE")"
+
+# Note: Codex currently only emits PreToolUse/PostToolUse for the Bash tool.
+# Edit|Write matchers are omitted until Codex expands tool coverage.
+cat > "$HOOKS_FILE" << HOOKEOF
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 $HOOKS_DIR/bash_hook.py"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 $HOOKS_DIR/turn_end_hook.py"
+          }
+        ]
+      }
+    ]
+  }
+}
+HOOKEOF
+echo "  Created $HOOKS_FILE"
+
+# ============================================================
+# STEP 4: Create marketplace.json
+# ============================================================
+
+echo "[4/7] Creating marketplace config..."
 MARKETPLACE_DIR="$TARGET_REPO/.agents/plugins"
 MARKETPLACE_FILE="$MARKETPLACE_DIR/marketplace.json"
 
@@ -132,10 +195,10 @@ EOF
 fi
 
 # ============================================================
-# STEP 3: Configure MCP server
+# STEP 5: Configure MCP server
 # ============================================================
 
-echo "[3/5] Configuring Monte Carlo MCP server..."
+echo "[5/7] Configuring Monte Carlo MCP server..."
 mkdir -p "$CONFIG_DIR"
 
 if [ -f "$CONFIG_FILE" ] && grep -q "\[mcp_servers\.${SERVER_NAME}\]" "$CONFIG_FILE" 2>/dev/null; then
@@ -153,10 +216,10 @@ EOF
 fi
 
 # ============================================================
-# STEP 4: Enable hooks
+# STEP 6: Enable hooks
 # ============================================================
 
-echo "[4/5] Enabling codex hooks..."
+echo "[6/7] Enabling codex hooks..."
 
 if [ -f "$CONFIG_FILE" ] && grep -q "codex_hooks" "$CONFIG_FILE" 2>/dev/null; then
   echo "  Hooks already enabled — skipping."
@@ -170,14 +233,14 @@ EOF
 fi
 
 # ============================================================
-# STEP 5: OAuth login
+# STEP 7: OAuth login
 # ============================================================
 
-echo "[5/5] Starting OAuth login..."
+echo "[7/7] Starting OAuth login..."
 echo "  A browser window will open — log in with your Monte Carlo account."
 echo ""
 
-codex mcp login "$SERVER_NAME" || echo "  OAuth login skipped (run 'codex mcp login monte-carlo' manually if needed)."
+codex mcp login "$SERVER_NAME" || echo "  OAuth login skipped (run 'codex mcp login $SERVER_NAME' manually if needed)."
 
 echo ""
 echo "Done! $PLUGIN_NAME installed to $TARGET"
@@ -185,3 +248,4 @@ echo ""
 echo "Next steps:"
 echo "  1. Restart Codex in $TARGET_REPO"
 echo "  2. You should see 'Installed mc-agent-toolkit plugin' on startup"
+echo "  3. The prevent skill is available — Codex will activate it when you work with dbt models"

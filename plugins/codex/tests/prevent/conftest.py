@@ -23,7 +23,7 @@ def isolate_hook_modules():
     """Ensure Codex hook modules are loaded from Codex's hooks dir."""
     hook_modules = [
         "pre_edit_hook", "post_edit_hook", "pre_commit_hook",
-        "turn_end_hook",
+        "turn_end_hook", "bash_hook",
     ]
     for mod_name in hook_modules:
         sys.modules.pop(mod_name, None)
