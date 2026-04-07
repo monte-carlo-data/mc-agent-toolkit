@@ -1,16 +1,18 @@
 #!/bin/bash
 set -e
 
-echo "Running post-install cleanup for Monte Carlo Prevent plugin..."
+echo "Running post-install cleanup for Monte Carlo Agent Toolkit plugin..."
 
-# Remove standalone prevent skill if present (superseded by plugin)
-SKILL_PATH="$HOME/.claude/skills/prevent"
-if [ -d "$SKILL_PATH" ]; then
-  echo "Backing up and removing standalone prevent skill (now bundled in plugin)..."
-  cp -r "$SKILL_PATH" "$SKILL_PATH.backup"
-  rm -rf "$SKILL_PATH"
-  echo "Backup saved to $SKILL_PATH.backup"
-fi
+# Remove standalone skills if present (superseded by plugin)
+for skill_name in prevent generate-validation-notebook push-ingestion; do
+  SKILL_PATH="$HOME/.claude/skills/$skill_name"
+  if [ -d "$SKILL_PATH" ]; then
+    echo "Backing up and removing standalone $skill_name skill (now bundled in plugin)..."
+    cp -r "$SKILL_PATH" "$SKILL_PATH.backup"
+    rm -rf "$SKILL_PATH"
+    echo "Backup saved to $SKILL_PATH.backup"
+  fi
+done
 
 # Clean up old safe-change skill left from the pre-rename plugin
 OLD_SKILL_PATH="$HOME/.claude/skills/safe-change"
