@@ -1,0 +1,35 @@
+"""Copilot CLI adapter tests for turn_end_hook — tests JSON format only."""
+import json
+from unittest.mock import patch
+from io import StringIO
+
+from lib.protocol import HookOutput
+
+
+def _make_stdin():
+    return json.dumps({
+        "timestamp": 1704614800000,
+        "cwd": "/project",
+    })
+
+
+class TestTurnEndHookCopilotAdapter:
+    def test_always_silent(self, capsys):
+        """agentStop output is ignored by Copilot CLI — hook should produce no output."""
+        block_result = HookOutput(action="block", reason="Validate changes?")
+        with patch("turn_end_hook.evaluate_turn_end", return_value=block_result), \
+             patch("sys.stdin", StringIO(_make_stdin())):
+            from turn_end_hook import main
+            main()
+
+        # Copilot CLI ignores agentStop output, so we produce nothing
+        assert capsys.readouterr().out == ""
+
+    def test_noop_output_silent(self, capsys):
+        """Noop result should also produce no output."""
+        noop_result = HookOutput(action="noop")
+        with patch("turn_end_hook.evaluate_turn_end", return_value=noop_result), \
+             patch("sys.stdin", StringIO(_make_stdin())):
+            from turn_end_hook import main
+            main()
+        assert capsys.readouterr().out == ""

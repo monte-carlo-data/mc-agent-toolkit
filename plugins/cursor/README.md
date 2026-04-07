@@ -49,3 +49,5 @@ The toolkit plugin wraps shared skills and hook logic, with each feature namespa
 - **Shared hook logic** — symlinked from `plugins/shared/prevent/lib/` (platform-agnostic business logic)
 - **Adapter hooks** — Cursor-specific JSON parsing and output formatting under `hooks/prevent/`
 - **MCP config** — Monte Carlo MCP server connection
+
+See the [plugins README](../README.md) for the overall plugin architecture and editor support comparison.

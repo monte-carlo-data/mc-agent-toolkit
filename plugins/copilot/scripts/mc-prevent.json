@@ -1,0 +1,34 @@
+{
+    "version": 1,
+    "hooks": {
+        "preToolUse": [
+            {
+                "type": "command",
+                "bash": "./scripts/pre_edit_hook.py",
+                "cwd": ".github/hooks",
+                "timeoutSec": 5
+            },
+            {
+                "type": "command",
+                "bash": "./scripts/pre_commit_hook.py",
+                "cwd": ".github/hooks",
+                "timeoutSec": 5
+            }
+        ],
+        "postToolUse": [
+            {
+                "type": "command",
+                "bash": "./scripts/post_edit_hook.py",
+                "cwd": ".github/hooks",
+                "timeoutSec": 3
+            }
+        ],
+        "agentStop": [
+            {
+                "type": "command",
+                "bash": "./scripts/turn_end_hook.py",
+                "cwd": ".github/hooks"
+            }
+        ]
+    }
+}
