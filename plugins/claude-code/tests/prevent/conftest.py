@@ -3,7 +3,7 @@ import os
 import glob
 import pytest
 
-_hooks_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "hooks"))
+_hooks_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "hooks", "prevent"))
 # Add hooks to path at collection time so test files can import lib.*
 sys.path.insert(0, _hooks_dir)
 
