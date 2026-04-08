@@ -20,7 +20,7 @@ The toolkit bundles the following capabilities as a single **mc-agent-toolkit** 
 
 1. Add the marketplace:
    ```
-   /plugin marketplace add monte-carlo-data/mc-marketplace
+   /plugin marketplace add monte-carlo-data/mc-agent-toolkit
    ```
 2. Install the plugin:
    ```
