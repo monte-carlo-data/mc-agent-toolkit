@@ -14,6 +14,15 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
+# Clean up temp files on exit (interrupted runs, errors, etc.)
+cleanup() {
+  rm -f "${TMPDIR:-/tmp}"/release-changelog.*
+  for f in "${CHANGELOG_FILES[@]:-}"; do
+    rm -f "$REPO_ROOT/${f}.tmp" 2>/dev/null
+  done
+}
+trap cleanup EXIT
+
 # ── Plugin config files (version source of truth) ──────────────────────────
 VERSION_FILES=(
   "plugins/claude-code/.claude-plugin/plugin.json"
