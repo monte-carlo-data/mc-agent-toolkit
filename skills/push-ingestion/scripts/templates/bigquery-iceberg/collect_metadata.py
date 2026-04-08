@@ -3,8 +3,8 @@ BigQuery Iceberg — Metadata Collection (collect only)
 =====================================================
 Collects table schemas, row counts, byte sizes, and freshness for BigQuery
 Iceberg (BigLake-managed) tables using INFORMATION_SCHEMA.TABLE_STORAGE and
-INFORMATION_SCHEMA.COLUMNS. Standard BigQuery collection uses __TABLES__ which
-does not include Iceberg tables — this template fills that gap.
+INFORMATION_SCHEMA.COLUMNS. Iceberg tables appear in __TABLES__ but lack
+freshness information there — this template fills that gap.
 
 Can be run standalone via CLI or imported (use the ``collect()`` function).
 
