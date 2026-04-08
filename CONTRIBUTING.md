@@ -92,6 +92,28 @@ Plugins reference skills via symlinks so that skills are authored once and share
 - **Minor** (`1.0.0` → `1.1.0`): new features, new scripts, or significant skill content changes.
 - **Major** (`1.0.0` → `2.0.0`): breaking changes to skill behavior or hook interfaces.
 
+## Releasing
+
+Use `scripts/release.sh` to cut a release. It bumps the version in all 5 plugin config files, opens your editor for a changelog entry, commits, and tags.
+
+```bash
+# Bump patch version (1.0.0 → 1.0.1), commit + tag locally
+./scripts/release.sh patch
+
+# Bump minor version and push (triggers GitHub Release via Actions)
+./scripts/release.sh minor --push
+
+# Set an explicit version
+./scripts/release.sh 2.0.0
+
+# Preview what would happen without making changes
+./scripts/release.sh patch --dry-run
+```
+
+The script requires a clean working tree and warns if you're not on `main`. Without `--push`, it commits and tags locally so you can inspect before pushing.
+
+When a `v*` tag is pushed, a GitHub Actions workflow automatically creates a GitHub Release with auto-generated release notes.
+
 ## Architecture
 
 For the reasoning behind the plugin structure, the unified toolkit model, and guidelines on how skills and plugins interact across editors, see the [Plugin Architecture Guide](docs/plugin-architecture-guide.md).
