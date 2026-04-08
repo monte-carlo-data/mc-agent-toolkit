@@ -32,7 +32,23 @@ Use a metric monitor when the user wants to:
 | `segment_fields` | array of string | none | Fields to group/segment metrics by (e.g., `["country", "status"]`). |
 | `aggregate_by` | string | `"day"` | Time interval: `"hour"`, `"day"`, `"week"`, `"month"`. |
 | `where_condition` | string | none | SQL WHERE clause (without `WHERE` keyword) to filter rows before computing metrics. |
+| `interval_minutes` | int | auto | Schedule interval in minutes. Must be compatible with `aggregate_by` (see note below). If not specified, the tool defaults to the minimum valid interval for the chosen `aggregate_by`. |
 | `domain_id` | string (uuid) | none | Domain UUID (use `getDomains` to list). |
+
+---
+
+## Schedule and Aggregation Compatibility
+
+The schedule interval must be compatible with `aggregate_by`. Daily aggregation requires an interval that is a multiple of 1440 minutes (24 hours), weekly requires a multiple of 10080, etc. If you pass `interval_minutes`, make sure it satisfies this constraint. If you omit it, the tool picks a sensible default.
+
+| `aggregate_by` | Minimum `interval_minutes` | Default if omitted |
+|---|---|---|
+| `hour` | 60 | 60 |
+| `day` | 1440 | 1440 |
+| `week` | 10080 | 10080 |
+| `month` | 43200 | 43200 |
+
+For example, to run a daily-aggregated monitor every other day, pass `aggregate_by: "day"` and `interval_minutes: 2880`.
 
 ---
 
