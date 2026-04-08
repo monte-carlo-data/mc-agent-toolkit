@@ -8,7 +8,7 @@ Claude Code plugin that brings Monte Carlo data observability into your editor. 
 
 1. Add the marketplace:
    ```
-   /plugin marketplace add monte-carlo-data/mc-marketplace
+   /plugin marketplace add monte-carlo-data/mc-agent-toolkit
    ```
 2. Install the plugin:
    ```
