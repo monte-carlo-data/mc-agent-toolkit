@@ -202,5 +202,8 @@ else
   if [[ "$DRY_RUN" == false ]]; then
     echo "Done! To publish the release, run:"
     echo "  git push origin main --tags"
+    echo ""
+    echo "Or next time, use --push to push automatically:"
+    echo "  ./scripts/release.sh $BUMP_TYPE --push"
   fi
 fi
