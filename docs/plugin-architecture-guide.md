@@ -66,6 +66,9 @@ This reflects the **current repository structure**.
 ```
 mc-agent-toolkit/
 ├── skills/                              # Shared skill definitions (platform-agnostic)
+│   ├── monitor-creation/
+│   │   ├── SKILL.md
+│   │   └── references/
 │   ├── prevent/
 │   │   ├── SKILL.md
 │   │   └── references/
@@ -94,6 +97,7 @@ mc-agent-toolkit/
 │   │   ├── hooks/
 │   │   │   └── prevent/                 # Thin adapters → plugins/shared/prevent/lib/
 │   │   ├── skills/
+│   │   │   ├── monitor-creation → symlink
 │   │   │   ├── prevent → symlink
 │   │   │   ├── generate-validation-notebook → symlink
 │   │   │   └── push-ingestion → symlink
@@ -106,6 +110,7 @@ mc-agent-toolkit/
 │   │   ├── hooks/
 │   │   │   └── prevent/                 # MC Prevent hook adapters
 │   │   ├── skills/
+│   │   │   ├── monitor-creation → symlink
 │   │   │   └── prevent → symlink
 │   │   └── mcp.json
 │   │
@@ -125,6 +130,7 @@ mc-agent-toolkit/
 │   │   │       ├── pre_edit_hook.py
 │   │   │       └── ...
 │   │   ├── skills/
+│   │   │   ├── monitor-creation → symlink
 │   │   │   └── prevent → symlink
 │   │   └── scripts/
 │   │       ├── install.sh               # Installs hooks to .github/hooks/
@@ -132,6 +138,7 @@ mc-agent-toolkit/
 │   │
 │   └── codex/                           # mc-agent-toolkit plugin for Codex
 │       └── skills/
+│           ├── monitor-creation → symlink
 │           └── prevent → symlink
 ```
 

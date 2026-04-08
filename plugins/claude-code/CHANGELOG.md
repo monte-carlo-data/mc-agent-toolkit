@@ -5,6 +5,12 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Claude Code will
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-04-08
+
+### Added
+
+- Monitor Creation skill — guides AI agents through creating Monte Carlo monitors correctly with validation, field-type compatibility checks, and monitors-as-code YAML generation. Covers metric, validation, custom SQL, comparison, and table monitors.
+
 ## [1.0.0] - 2026-04-07
 
 ### Changed

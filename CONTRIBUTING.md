@@ -9,6 +9,9 @@ Welcome! We appreciate contributions from both Monte Carlo engineers and the com
 ```
 mc-agent-toolkit/
 ├── skills/                              # Shared skill definitions (platform-agnostic)
+│   ├── monitor-creation/
+│   │   ├── SKILL.md
+│   │   └── references/
 │   ├── prevent/
 │   │   ├── SKILL.md
 │   │   └── references/
@@ -22,7 +25,7 @@ mc-agent-toolkit/
 │   ├── claude-code/                     # Unified mc-agent-toolkit plugin
 │   │   ├── .claude-plugin/plugin.json
 │   │   ├── hooks/prevent/              # Hook adapters (thin, call shared lib)
-│   │   ├── skills/ (prevent, generate-validation-notebook, push-ingestion → symlinks)
+│   │   ├── skills/ (monitor-creation, prevent, generate-validation-notebook, push-ingestion → symlinks)
 │   │   └── commands/ (prevent/, push-ingestion/)
 │   │
 │   ├── cursor/                          # Unified mc-agent-toolkit plugin
