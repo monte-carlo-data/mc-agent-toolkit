@@ -24,12 +24,12 @@ As more skills are added, a per-skill-per-editor plugin model creates `skills ×
 **Option A — Toolkit as invisible plumbing.** A single plugin per editor handles distribution (MCP, auth, updates), but the plugin identity is hidden from users. All user-facing surfaces show individual skill names only (e.g., "MC Prevent").
 
 - *Pro:* Individual skills get standalone brand recognition.
-- *Con:* Users see a plugin name (`mc-agent-toolkit`) in their editor's plugin list that doesn't match what they interact with. No natural place for enable/disable configuration. Hard to make truly invisible across all editors.
+- *Con:* Users see a plugin name (`mc-agent-toolkit`) in their editor's plugin list that doesn't match what they interact with. No natural place for enable/disable configuration. Difficult to make truly invisible across all editors.
 
 **Option B — Unified toolkit with namespaced features (chosen).** One plugin per editor named `mc-agent-toolkit`. Each skill is a named feature within it. Users understand they installed "Monte Carlo's toolkit" and interact with features like "MC Prevent" inside it.
 
 - *Pro:* Consistent identity across all editors. Natural enable/disable model. New skills appear as new features in a product users already know. MCP and auth configured once. Single install, single update path.
-- *Con:* Users get all features, not just the ones they want (mitigated by enable/disable config). A bug in one feature's hooks could theoretically affect the plugin — mitigated by feature isolation (see below).
+- *Con:* Users get all features, not just the ones they want (mitigated by enable/disable config). A bug in one feature's hooks could theoretically affect the plugin, mitigated by feature isolation (see below).
 
 **Option C — Separate plugins per skill.** Each skill that needs a plugin gets its own. Distribution is handled by install scripts, not by bundling.
 

@@ -1,6 +1,6 @@
-# mc-agent-toolkit
+# MC Agent Toolkit
 
-Monte Carlo's official toolkit for AI coding agents. Integrates Monte Carlo's data observability platform — lineage, monitoring, validation, and alerting — directly into your development workflow.
+Monte Carlo's official toolkit for AI coding agents. Brings data observability — lineage, monitoring, validation, alerting, and metadata ingestion — directly into your development workflow. The toolkit bundles multiple skills into a single plugin that works across supported editors.
 
 ## Features
 
@@ -70,7 +70,7 @@ See the [skills directory](skills/) for the full list and individual READMEs.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on adding skills, creating plugins, and submitting pull requests.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on adding skills, creating plugins, and submitting pull requests. It also covers [plugin architecture](docs/plugin-architecture-guide.md) and [releasing new versions](CONTRIBUTING.md#releasing).
 
 ## License
 
