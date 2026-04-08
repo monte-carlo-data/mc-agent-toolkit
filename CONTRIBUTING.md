@@ -96,6 +96,17 @@ Plugins reference skills via symlinks so that skills are authored once and share
 
 Use `scripts/release.sh` to cut a release. It bumps the version in all 5 plugin config files, opens your editor for a changelog entry, commits, and tags.
 
+### Prerequisites
+
+- A baseline tag must exist (e.g., `v1.0.0`). If this is the first release, create one manually:
+  ```bash
+  git tag v1.0.0
+  git push origin v1.0.0
+  ```
+- You must be on `main` with a clean working tree.
+
+### Usage
+
 ```bash
 # Bump patch version (1.0.0 → 1.0.1), commit + tag locally
 ./scripts/release.sh patch
@@ -110,9 +121,24 @@ Use `scripts/release.sh` to cut a release. It bumps the version in all 5 plugin 
 ./scripts/release.sh patch --dry-run
 ```
 
-The script requires a clean working tree and warns if you're not on `main`. Without `--push`, it commits and tags locally so you can inspect before pushing.
+### What the script does
 
-When a `v*` tag is pushed, a GitHub Actions workflow automatically creates a GitHub Release with auto-generated release notes.
+1. Reads the current version from `plugins/claude-code/.claude-plugin/plugin.json`
+2. Computes the next version based on the bump type
+3. Opens `$EDITOR` with a changelog template pre-filled with commits since the last tag
+4. Updates `"version"` in all 5 plugin config files
+5. Prepends the changelog entry to all 5 `CHANGELOG.md` files
+6. Creates a commit (`release: vX.Y.Z`) and a git tag (`vX.Y.Z`)
+
+Without `--push`, the commit and tag stay local so you can inspect before pushing. To publish:
+
+```bash
+git push origin main --tags
+```
+
+### GitHub Release
+
+When a `v*` tag is pushed, a GitHub Actions workflow (`.github/workflows/release-on-tag.yml`) automatically creates a GitHub Release with auto-generated release notes from PR titles since the previous tag.
 
 ## Architecture
 
