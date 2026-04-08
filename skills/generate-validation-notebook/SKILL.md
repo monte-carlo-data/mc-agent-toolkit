@@ -1,4 +1,5 @@
 ---
+name: generate-validation-notebook
 description: Generate SQL validation notebooks for dbt changes. Pass a GitHub PR URL or local dbt repo path.
 ---
 
