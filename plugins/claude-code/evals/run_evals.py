@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # ruff: noqa
 """
-Trigger accuracy eval for the montecarlo-push-ingestion skill.
+Trigger accuracy eval runner for mc-agent-toolkit skills.
 
 Loads the skill description from SKILL.md and runs each case from trigger-evals.json
 through the Claude API to check whether the skill would be triggered.
@@ -9,7 +9,8 @@ through the Claude API to check whether the skill would be triggered.
 Usage:
     pip install anthropic
     export ANTHROPIC_API_KEY=sk-ant-...
-    python run_evals.py [--model claude-sonnet-4-6] [--threshold 0.85]
+    python run_evals.py --skill prevent
+    python run_evals.py --skill push-ingestion [--model claude-sonnet-4-6] [--threshold 0.85]
 
 Exit codes:
     0 — pass rate meets threshold
@@ -25,7 +26,8 @@ from pathlib import Path
 import anthropic
 
 EVALS_DIR = Path(__file__).parent
-SKILL_DIR = EVALS_DIR.parent / "skills" / "push-ingestion"
+PLUGIN_DIR = EVALS_DIR.parent
+SKILLS_DIR = PLUGIN_DIR / "skills"
 
 JUDGE_SYSTEM_PROMPT = """You are evaluating whether a Claude skill should be triggered for a given user message.
 
@@ -37,8 +39,7 @@ Respond with exactly one word: TRIGGER if the skill should activate for this mes
 
 Rules:
 - Trigger if the message clearly falls within the skill's stated scope
-- Do NOT trigger for general Monte Carlo questions unrelated to the push ingestion model
-- Do NOT trigger for pull-based integrations, monitor configuration, or alerting
+- Do NOT trigger for messages outside the skill's domain
 - When in doubt, lean toward NO_TRIGGER
 """
 
@@ -61,8 +62,8 @@ def load_skill_description(skill_dir: Path) -> tuple[str, str]:
 
     fm = frontmatter.group(1)
     name_match = re.search(r"^name:\s*(.+)$", fm, re.MULTILINE)
-    # description may be multi-line (YAML block scalar with >)
-    desc_match = re.search(r"^description:\s*>\n((?:  .+\n?)+)", fm, re.MULTILINE)
+    # description may be multi-line (YAML block scalar with > or |)
+    desc_match = re.search(r"^description:\s*[>|]\n((?:  .+\n?)+)", fm, re.MULTILINE)
     if not desc_match:
         desc_match = re.search(r"^description:\s*(.+)$", fm, re.MULTILINE)
 
@@ -93,20 +94,40 @@ def judge(client: anthropic.Anthropic, model: str, skill_name: str, skill_descri
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Run trigger accuracy evals for the push-ingestion skill")
+    parser = argparse.ArgumentParser(description="Run trigger accuracy evals for an mc-agent-toolkit skill")
+    parser.add_argument("--skill", required=True, help="Skill directory name (e.g. 'prevent', 'push-ingestion')")
     parser.add_argument("--model", default="claude-sonnet-4-6", help="Claude model to use as judge")
     parser.add_argument("--threshold", type=float, default=0.85, help="Minimum pass rate to exit 0 (default: 0.85)")
-    parser.add_argument("--evals", default=str(EVALS_DIR / "trigger-evals.json"), help="Path to eval cases JSON")
+    parser.add_argument("--evals", default=None, help="Path to eval cases JSON (default: <skill>/trigger-evals.json)")
+    parser.add_argument("--dry-run", action="store_true", help="Load and validate cases without calling the API")
     args = parser.parse_args()
 
-    cases = json.loads(Path(args.evals).read_text())["cases"]
-    skill_name, skill_description = load_skill_description(SKILL_DIR)
+    skill_dir = SKILLS_DIR / args.skill
+    if not skill_dir.exists():
+        print(f"Error: Skill directory not found: {skill_dir}")
+        sys.exit(1)
+
+    evals_path = Path(args.evals) if args.evals else EVALS_DIR / args.skill / "trigger-evals.json"
+    if not evals_path.exists():
+        print(f"Error: Eval cases not found: {evals_path}")
+        sys.exit(1)
+
+    cases = json.loads(evals_path.read_text())["cases"]
+    skill_name, skill_description = load_skill_description(skill_dir)
 
     print(f"Skill:     {skill_name}")
     print(f"Model:     {args.model}")
     print(f"Cases:     {len(cases)}")
-    print(f"Threshold: {args.threshold:.0%}\n")
+    print(f"Threshold: {args.threshold:.0%}")
 
+    if args.dry_run:
+        print(f"\n[dry-run] Loaded {len(cases)} cases for {skill_name}")
+        print(f"[dry-run] Skill description: {skill_description[:120]}...")
+        for case in cases:
+            print(f"  [{case['id']}] ({case['expected']}) {case['prompt'][:75]}{'…' if len(case['prompt']) > 75 else ''}")
+        sys.exit(0)
+
+    print()
     client = anthropic.Anthropic()
 
     results = []
