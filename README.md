@@ -8,6 +8,7 @@ The toolkit bundles the following capabilities as a single **mc-agent-toolkit** 
 
 | Feature | Description | Details |
 |---|---|---|
+| **Asset Health** | Checks the health of a data table — surfaces last activity, alerts, monitoring coverage, importance, and upstream dependency health. | [README](skills/asset-health/README.md) |
 | **Monitor Creation** | Guides AI agents through creating monitors correctly — validates tables, fields, and parameters before generating monitors-as-code YAML. | [README](skills/monitor-creation/README.md) |
 | **Prevent** | Surfaces lineage, alerts, and blast radius before code changes. Generates monitors-as-code and targeted validation queries to prevent data incidents. | [README](skills/prevent/README.md) |
 | **Generate Validation Notebook** | Generates SQL validation notebooks for dbt model changes, with targeted queries comparing baseline and development data. | [README](skills/generate-validation-notebook/README.md) |
