@@ -11,13 +11,7 @@ version: 1.0.0
 
 This skill helps you analyze a user's data estate, discover critical use cases, identify coverage gaps, and suggest or create monitors to protect what matters most. It is the interactive counterpart to Monte Carlo's coverage analysis — walking the user through warehouse discovery, use-case exploration, and monitor creation.
 
-Reference files for monitor creation parameters live in the **monitor-creation** skill. **Use the Read tool** (not MCP resources) to access them:
-
-- Metric monitor details: `../monitor-creation/references/metric-monitor.md` (relative to this file)
-- Validation monitor details: `../monitor-creation/references/validation-monitor.md` (relative to this file)
-- Custom SQL monitor details: `../monitor-creation/references/custom-sql-monitor.md` (relative to this file)
-- Comparison monitor details: `../monitor-creation/references/comparison-monitor.md` (relative to this file)
-- Table monitor details: `../monitor-creation/references/table-monitor.md` (relative to this file)
+When the user is ready to create monitors, **hand off to the monitor-creation skill** (`../monitor-creation/SKILL.md`). It contains the full validation, parameter guidance, and creation workflow. This skill focuses on the coverage analysis that leads up to monitor creation.
 
 ## When to activate this skill
 
@@ -159,37 +153,21 @@ If no database MCP is available, skip this step entirely. Do not ask the user to
 
 ## Monitor creation
 
-When the user is ready to create monitors, follow this procedure.
+When the user is ready to create monitors, **read and follow the monitor-creation skill** (`../monitor-creation/SKILL.md`). It handles monitor type selection, table/column validation, domain assignment, scheduling, confirmation, and YAML generation.
 
-### Pre-creation steps
+This section covers only the guidance specific to coverage-driven monitor creation.
+
+### Pre-creation context
+
+Before handing off to the monitor-creation workflow:
 
 1. Call `getAudiences` to list available notification audiences. Ask the user which audience they want notifications sent to.
 2. Ask whether the monitor should be created as a **DRAFT** or active.
-3. Default to **dry-run** (YAML preview). Ask whether the user wants to see the YAML first or create directly.
-4. Ask if the user wants to add **notes** or a **priority** to the monitor.
+3. When passing `audiences` or `failure_audiences`, use the audience **name/label** (not UUID).
 
-### Choose monitor type
+### Use-case tag monitors
 
-| Type | Tool | When to Use |
-| --- | --- | --- |
-| **Table** | `createTableMonitorMac` | Monitor groups of tables for freshness, schema changes, and volume. Best for use-case tag-based monitoring. |
-| **Metric** | `createMetricMonitorMac` | Track statistical metrics on fields (null rates, unique counts, numeric stats) or row count changes. Requires a timestamp field. |
-| **Validation** | `createValidationMonitorMac` | Row-level data quality checks with conditions (e.g. "field X is never null"). |
-| **Custom SQL** | `createCustomSqlMonitorMac` | Arbitrary SQL returning a single number. Most flexible. |
-| **Comparison** | `createComparisonMonitorMac` | Compare metrics between two tables (e.g. source vs. target). |
-
-For **use-case tag monitors** (the most common output of coverage analysis), use `createTableMonitorMac` with the appropriate `asset_selection`.
-
-For detailed parameter guidance on each monitor type, **read the reference files** in the monitor-creation skill:
-- `../monitor-creation/references/metric-monitor.md`
-- `../monitor-creation/references/validation-monitor.md`
-- `../monitor-creation/references/custom-sql-monitor.md`
-- `../monitor-creation/references/comparison-monitor.md`
-- `../monitor-creation/references/table-monitor.md`
-
-### Building asset_selection for use-case tag monitors
-
-The `asset_selection` parameter for `createTableMonitorMac` uses this structure:
+The most common output of coverage analysis is a **table monitor scoped by use-case tags** via `createTableMonitorMac`. The `asset_selection` parameter uses this structure:
 
 ```json
 {
@@ -221,35 +199,6 @@ Write a clear, meaningful `description` that explains what the monitor covers an
 - **Good:** `"Monitor HIGH criticality tables in the Revenue Reporting use case to catch issues before they affect dashboards and financial reports."`
 
 The description should mention the criticality scope, the use case name, and a brief reason why this monitoring matters.
-
-### Confirm before creating
-
-Before calling any creation tool, present the monitor configuration in plain language:
-- Monitor type
-- Target tables or use-case scope
-- What it checks / what triggers an alert
-- Notification audience
-- Draft vs. active status
-
-Ask: "Does this look correct? I'll generate the monitor configuration."
-
-**NEVER call a creation tool without user confirmation.**
-
-### Present results
-
-1. Always include the YAML in your response — the user needs copy-pasteable YAML.
-2. Wrap the YAML in the standard MaC structure:
-
-```yaml
-montecarlo:
-  <monitor_type>:
-    - <returned yaml>
-```
-
-3. Tell the user:
-   - Save the YAML to a `.yml` file (e.g. `monitors/<use_case_name>.yml`)
-   - Apply via the Monte Carlo CLI: `montecarlo monitors apply --namespace <namespace>`
-   - Or integrate into CI/CD for automatic deployment on merge
 
 ---
 
