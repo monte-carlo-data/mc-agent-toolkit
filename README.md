@@ -35,6 +35,7 @@ Monte Carlo's official toolkit for AI coding agents. Contains skills and plugins
    ```
 2. Install a plugin:
    ```
+   /plugin install mc-agent-monitoring@mcd-agent-toolkit
    /plugin install mc-prevent@mcd-agent-toolkit
    /plugin install mc-generate-validation-notebook@mcd-agent-toolkit
    /plugin install mc-push-ingestion@mcd-agent-toolkit
@@ -63,6 +64,7 @@ Then restart Cursor (or run **Developer: Reload Window** from the Command Palett
 
 | Plugin | Description |
 |---|---|
+| `mc-agent-monitoring` | Creates observability monitors for AI agents — metric, evaluation, trajectory, and validation monitors for tracking latency, quality, execution patterns, and business rules. |
 | `mc-prevent` | Analyzes schema changes using MC lineage, monitoring, alerts, queries, and table metadata. Generates Monte Carlo monitors and validation queries to prevent data incidents. |
 | `mc-generate-validation-notebook` | Generates executable validation queries from a pull request and packages them into Monte Carlo notebooks for direct testing. |
 | `mc-push-ingestion` | Generates warehouse-specific collection scripts and guides customers through pushing metadata, lineage, and query logs to Monte Carlo. |
@@ -89,6 +91,7 @@ cp -r skills/prevent ~/.claude/skills/prevent
 
 | Skill | Description |
 |---|---|
+| `agent-monitoring` | Creates observability monitors for AI agents — metric, evaluation, trajectory, and validation monitors for tracking latency, quality, execution patterns, and business rules. |
 | `prevent` | Analyzes schema changes using MC lineage, monitoring, alerts, queries, and table metadata. Generates monitors and validation queries to prevent data incidents. |
 | `generate-validation-notebook` | Generates executable validation queries from a pull request and packages them into Monte Carlo notebooks for direct testing. |
 | `push-ingestion` | Generates warehouse-specific collection scripts and guides customers through pushing metadata, lineage, and query logs to Monte Carlo. |

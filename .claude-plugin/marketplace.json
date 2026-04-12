@@ -7,6 +7,11 @@
     },
     "plugins": [
         {
+            "name": "mc-agent-monitoring",
+            "source": "./plugins/claude-code/agent-monitoring",
+            "description": "Create observability monitors for AI agents — metric, evaluation, trajectory, and validation monitors."
+        },
+        {
             "name": "mc-prevent",
             "source": "./plugins/claude-code/prevent",
             "description": "Detect and prevent breaking schema changes using MC lineage and monitoring."
