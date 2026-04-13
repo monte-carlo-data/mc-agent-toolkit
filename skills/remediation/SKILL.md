@@ -104,6 +104,8 @@ This returns `triage_confidence` (HIGH/MEDIUM/LOW), `alert_impact` (HIGH/MEDIUM/
 
 #### Step 3: Root cause analysis (TSA)
 
+**Always use async mode.** TSA analysis takes 4–8 minutes — sync mode will time out.
+
 ```
 runTroubleshootingAgent(
   incident_id="<alert_uuid>",
@@ -111,7 +113,8 @@ runTroubleshootingAgent(
 )
 ```
 
-Then poll for results (wait 30s initially, then 60s intervals):
+**While TSA runs, proceed with Steps 4–6 in parallel** — gather lineage, table context, and query data while waiting. Then poll for TSA results:
+
 ```
 getTroubleshootingAgentResults(
   incident_id="<alert_uuid>"
@@ -120,11 +123,11 @@ getTroubleshootingAgentResults(
 
 Status values:
 - `not_found` → TSA hasn't been triggered yet
-- `running` → still analyzing (keep polling)
-- `success` → read the `tldr` for the root cause summary, `full_response` for details
+- `running` → still analyzing (wait 30s initially, then 60s intervals)
+- `success` → results available
 - `failed` → check `full_response` for error; proceed with manual investigation
 
-**The TSA `tldr` is your primary input for choosing a remediation action.** Read it carefully.
+**When TSA succeeds, read both the `tldr` and the verifications section.** The `tldr` summarizes the root cause — this is your primary input for choosing a remediation action. The `full_response` includes a "verifications to confirm the root cause" section with specific checks (queries to run, things to compare, upstream systems to inspect). These verifications are often actionable remediation steps themselves — use them to guide what to do next or present them to the user as concrete next steps.
 
 #### Step 4: Assess blast radius
 
