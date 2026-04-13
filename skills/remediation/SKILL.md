@@ -68,14 +68,15 @@ All tools are available via the `monte-carlo` MCP server.
 
 ### External tools (remediation execution)
 
-These are **not** Monte Carlo tools. They come from external MCP servers the user may have configured. Their availability varies — see Workflow 2 (Capability Discovery) for how to detect them at runtime.
+These are **not** Monte Carlo tools. They may be available as MCP servers, CLI tools, or APIs. Their availability varies — see Workflow 2 (Capability Discovery) for how to detect them at runtime.
 
-| Capability | Example MCP Servers | Example Tools |
-| ---------- | ------------------- | ------------- |
-| Pipeline orchestration | Airflow, Dagster, Prefect | `trigger_dag_run`, `get_task_status`, `retry_task` |
-| dbt operations | dbt Cloud | `trigger_run`, `get_run`, `list_jobs` |
-| Code changes | GitHub, GitLab | `create_pull_request`, `create_issue`, `create_branch` |
-| Data warehouse | Snowflake, BigQuery, Databricks | `execute_query`, `get_table_info` |
+| Capability | MCP Servers | CLI Tools | What they enable |
+| ---------- | ----------- | --------- | ---------------- |
+| Pipeline orchestration | Airflow, Dagster, Prefect | `airflow`, `dagster`, `prefect` | Trigger runs, retry tasks, check status |
+| dbt operations | dbt Cloud | `dbt` | Trigger job runs, rebuild models, run tests |
+| Code changes | GitHub, GitLab | `gh`, `git` | Create PRs, branches, issues |
+| Data warehouse | Snowflake, BigQuery, Databricks | `snowsql`, `bq`, `databricks` | Execute queries, inspect tables |
+| Any HTTP API | — | `curl` | Call any service REST API directly |
 
 ---
 
@@ -219,47 +220,34 @@ Present this summary to the user before proceeding to remediation.
 
 **Goal:** Determine what remediation actions are possible given the tools you have available.
 
-Before attempting any remediation action, you must know what tools you can use. You cannot assume any external MCP server is connected.
+Before attempting any remediation action, you must know what tools you can use. You have three categories to check:
 
-#### How tool discovery works
+1. **MCP servers** — scan your tool list for `mcp__*__*` patterns (e.g., `mcp__airflow__trigger_dag_run`)
+2. **CLI tools** — you have shell access; check for tools like `gh`, `dbt`, `airflow`, `curl` via `which <tool>`
+3. **APIs** — any service with a REST API is reachable via `curl` if you have the right credentials
 
-Your available tools are listed in your system prompt or tool inventory. External MCP tools follow the naming convention `mcp__<server_name>__<tool_name>`.
+Don't assume any particular tool is available. But also don't assume MCP is the only option — a `gh pr create` via the CLI works just as well as a GitHub MCP tool.
 
-Scan your available tools and look for these patterns:
-
-| Pattern | Capability | What you can do |
-| ------- | ---------- | --------------- |
-| `mcp__*airflow*__*` | Pipeline orchestration (Airflow) | Trigger DAG runs, retry failed tasks, check task status |
-| `mcp__*dagster*__*` | Pipeline orchestration (Dagster) | Trigger pipeline runs, check run status |
-| `mcp__*prefect*__*` | Pipeline orchestration (Prefect) | Trigger flow runs, check run status |
-| `mcp__*dbt*__*` | dbt operations | Trigger dbt job runs, check run status, list jobs |
-| `mcp__*github*__*` | Code changes | Create PRs, open issues, create branches |
-| `mcp__*gitlab*__*` | Code changes | Create merge requests, open issues |
-| `mcp__*snowflake*__*`, `mcp__*bigquery*__*`, `mcp__*databricks*__*` | Data warehouse | Run queries, inspect tables directly |
-
-**If a capability is not found:** That's fine. Not every remediation requires every tool. The skill degrades gracefully — see "Graceful degradation" below.
+For detailed guidance on discovery across all three categories, read `references/tool-discovery.md`.
 
 #### Capability assessment
 
-After scanning, summarize what's available:
+After checking, summarize what's available:
 
-> "Based on your connected MCP servers, I can:
-> - ✅ Investigate via Monte Carlo (always available)
-> - ✅/❌ Restart pipelines (Airflow/Dagster/Prefect)
-> - ✅/❌ Rerun dbt jobs (dbt Cloud)
-> - ✅/❌ Create code changes (GitHub/GitLab)
-> - ✅/❌ Query the warehouse directly"
-
-For detailed guidance on tool discovery, read `references/tool-discovery.md`.
+> "For this remediation, I can:
+> - ✅ Investigate via Monte Carlo (MCP connected)
+> - ✅ Restart the Airflow DAG (Airflow MCP connected)
+> - ✅ Create a code fix (`gh` CLI available)
+> - ❌ Rerun the dbt job (no dbt Cloud MCP or `dbt` CLI found)"
 
 #### Graceful degradation
 
-When the needed execution tool is NOT available:
+When no tool (MCP, CLI, or API) is available for a needed action:
 
 1. **Always produce the remediation plan** — describe exactly what needs to happen, step by step
-2. **Provide runnable commands** — if the fix is "restart this Airflow DAG", give the user the `airflow dags trigger <dag_id>` command they can run manually
-3. **Present findings and ask for next steps** — tell the user what you found, what you recommend, and ask how they'd like to proceed. They may choose to run commands manually, notify their team via Slack, page on-call, or take a different approach entirely.
-4. **Document on the alert** — use `createOrUpdateAlertComment` to record the diagnosis and recommended fix, even if you can't execute it
+2. **Provide runnable commands** — give the user the exact commands they can run manually (e.g., `airflow dags trigger <dag_id>`, `dbt run --select <model>`)
+3. **Present findings and ask for next steps** — tell the user what you found, what you recommend, and ask how they'd like to proceed
+4. **Document on the alert** — use `createOrUpdateAlertComment` to record the diagnosis and recommended fix
 
 ---
 
