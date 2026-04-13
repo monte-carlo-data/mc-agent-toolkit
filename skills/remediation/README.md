@@ -11,7 +11,7 @@ When you have a data quality alert (freshness, volume, schema change, etc.), thi
 3. **Remediate** — proposes a fix with clear reasoning, confirms with the user, executes via available tools, and verifies the result
 4. **Close out** — updates alert status, documents what was done, and suggests prevention measures
 
-The skill works with whatever tools you have connected. If an Airflow MCP is available, it can restart pipelines. If only Slack is connected, it escalates with full context. If no external MCPs are connected, it produces a detailed remediation plan you can execute manually.
+The skill works with whatever tools you have connected. If an Airflow MCP is available, it can restart pipelines. If no external MCPs are connected, it produces a detailed remediation plan with manual commands and asks you how to proceed.
 
 ## Design: single document, not playbooks
 
@@ -33,8 +33,7 @@ The skill works with any AI editor that supports MCP and the Agent Skills format
 | Airflow / Dagster / Prefect | ✅ Full (with MCP) | Can restart pipelines automatically |
 | dbt Cloud | ✅ Full (with MCP) | Can rerun dbt jobs automatically |
 | GitHub / GitLab | ✅ Full (with MCP) | Can create PRs for code fixes |
-| Slack / PagerDuty | ✅ Full (with MCP) | Can escalate and notify |
-| No external MCPs | 🟡 Investigation only | Produces remediation plan for manual execution |
+| No external MCPs | 🟡 Investigation only | Produces remediation plan with manual commands, asks user for next steps |
 
 ## Prerequisites
 
@@ -76,8 +75,6 @@ The remediation skill can use any MCP server you have configured. Here are commo
 | **Airflow** | Restart DAGs, retry failed tasks | [Airflow MCP](https://github.com/apache/airflow-mcp) |
 | **dbt Cloud** | Rerun dbt jobs | [dbt Cloud MCP](https://github.com/dbt-labs/dbt-cloud-mcp) |
 | **GitHub** | Create PRs for code fixes | [GitHub MCP](https://github.com/github/github-mcp-server) |
-| **Slack** | Notify teams, escalate issues | [Slack MCP](https://github.com/modelcontextprotocol/servers/tree/main/src/slack) |
-| **PagerDuty** | Page on-call for critical incidents | [PagerDuty MCP](https://github.com/PagerDuty/mcp-server-pagerduty) |
 
 ## How to use it
 
@@ -103,7 +100,7 @@ The skill has built-in safety rails:
 
 - **Always explains** what it's about to do and why before executing
 - **Always confirms** destructive operations (pipeline triggers, data modifications, code changes)
-- **Escalates** when uncertain rather than guessing at a fix
+- **Asks the user** when uncertain rather than guessing at a fix
 - **Documents** all findings and actions on the alert
 - **Never chains** multiple actions without verifying each one
 - **Never modifies data** without explicit confirmation and a rollback plan

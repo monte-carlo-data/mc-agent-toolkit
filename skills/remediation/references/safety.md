@@ -82,9 +82,9 @@ For these, provide the exact commands and let the user execute them.
 
 ## Escalation criteria
 
-### When to escalate instead of remediating
+### When to stop and ask the user for direction
 
-Escalate to a human when ANY of these conditions are true:
+Present your findings and ask the user how to proceed when ANY of these conditions are true:
 
 1. **No clear root cause:** TSA failed or returned ambiguous results, and your manual investigation didn't identify a clear cause.
 
@@ -92,7 +92,7 @@ Escalate to a human when ANY of these conditions are true:
 
 3. **High blast radius + uncertain fix:** The affected table has >10 downstream consumers AND you're not confident the fix will work.
 
-4. **Data loss detected:** Any sign that data has been permanently deleted or corrupted. Do not attempt to fix data loss — escalate immediately.
+4. **Data loss detected:** Any sign that data has been permanently deleted or corrupted. Do not attempt to fix data loss — stop and tell the user immediately.
 
 5. **Permission or access issues:** The root cause involves permissions, credentials, or access controls. These require human intervention.
 
@@ -102,34 +102,28 @@ Escalate to a human when ANY of these conditions are true:
 
 8. **Production safety concern:** Any situation where the proposed fix could make things worse, even with a rollback plan.
 
-### How to escalate
+### How to hand off to the user
 
-1. **Document everything on the alert:**
+1. **Present your findings clearly:** Summarize what you investigated, what you found, and why you're not confident in an automated fix.
+
+2. **Document on the alert:**
    ```
    createOrUpdateAlertComment(
      alert_id="<alert_uuid>",
-     comment="## Escalation\n\n**Reason:** [why automated remediation is not appropriate]\n**Investigation findings:** [full summary]\n**Attempted actions:** [what was tried, if anything]\n**Recommended next steps for human responder:**\n1. [specific step]\n2. [specific step]"
+     comment="## Investigation Summary\n\n**Findings:** [full summary]\n**Why automated remediation was not attempted:** [reason]\n**Recommended next steps:**\n1. [specific step]\n2. [specific step]"
    )
    ```
 
-2. **Set status to WORK_IN_PROGRESS:**
+3. **Set status to WORK_IN_PROGRESS:**
    ```
    updateAlert(alert_id="<alert_uuid>", status="WORK_IN_PROGRESS")
    ```
 
-3. **Assign an owner if possible:**
-   ```
-   setAlertOwner(alert_id="<alert_uuid>", owner="<appropriate_person_email>")
-   ```
-
-4. **Notify via available channels** (Slack, PagerDuty, etc.)
-
-5. **Report to the user:**
-   > "I've escalated this incident because [reason]. Here's what I found and what I recommend the team investigate next: [summary]"
+4. **Ask the user for next steps:** They may want to notify their team, page on-call, investigate further, or take a manual action you can assist with.
 
 ## What "uncertain" means in practice
 
-You should consider yourself "uncertain" and escalate when:
+You should consider yourself "uncertain" and ask the user for direction when:
 
 - You can identify multiple plausible root causes and can't narrow it down
 - The TSA summary says one thing but your manual investigation suggests something different
@@ -140,7 +134,7 @@ You should consider yourself "uncertain" and escalate when:
 
 **When in doubt, state your confidence level:**
 
-> "I'm moderately confident (60-70%) that the root cause is [X], based on [evidence]. However, [alternative explanation] is also possible. I'd recommend [safer action] first, and if that doesn't resolve it, escalate to the data platform team for [deeper investigation]."
+> "I'm moderately confident (60-70%) that the root cause is [X], based on [evidence]. However, [alternative explanation] is also possible. I'd recommend [safer action] first. If that doesn't resolve it, the data platform team may need to investigate further. How would you like to proceed?"
 
 ## Rollback planning
 

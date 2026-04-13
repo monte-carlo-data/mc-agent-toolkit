@@ -75,7 +75,6 @@ These are **not** Monte Carlo tools. They come from external MCP servers the use
 | Pipeline orchestration | Airflow, Dagster, Prefect | `trigger_dag_run`, `get_task_status`, `retry_task` |
 | dbt operations | dbt Cloud | `trigger_run`, `get_run`, `list_jobs` |
 | Code changes | GitHub, GitLab | `create_pull_request`, `create_issue`, `create_branch` |
-| Notifications | Slack, PagerDuty, Teams | `send_message`, `create_incident`, `post_message` |
 | Data warehouse | Snowflake, BigQuery, Databricks | `execute_query`, `get_table_info` |
 
 ---
@@ -236,8 +235,6 @@ Scan your available tools and look for these patterns:
 | `mcp__*dbt*__*` | dbt operations | Trigger dbt job runs, check run status, list jobs |
 | `mcp__*github*__*` | Code changes | Create PRs, open issues, create branches |
 | `mcp__*gitlab*__*` | Code changes | Create merge requests, open issues |
-| `mcp__*slack*__*` | Notifications | Send messages, post to channels |
-| `mcp__*pagerduty*__*` | Incident management | Create/escalate incidents, notify on-call |
 | `mcp__*snowflake*__*`, `mcp__*bigquery*__*`, `mcp__*databricks*__*` | Data warehouse | Run queries, inspect tables directly |
 
 **If a capability is not found:** That's fine. Not every remediation requires every tool. The skill degrades gracefully — see "Graceful degradation" below.
@@ -251,7 +248,6 @@ After scanning, summarize what's available:
 > - ✅/❌ Restart pipelines (Airflow/Dagster/Prefect)
 > - ✅/❌ Rerun dbt jobs (dbt Cloud)
 > - ✅/❌ Create code changes (GitHub/GitLab)
-> - ✅/❌ Send notifications (Slack/PagerDuty)
 > - ✅/❌ Query the warehouse directly"
 
 For detailed guidance on tool discovery, read `references/tool-discovery.md`.
@@ -262,7 +258,7 @@ When the needed execution tool is NOT available:
 
 1. **Always produce the remediation plan** — describe exactly what needs to happen, step by step
 2. **Provide runnable commands** — if the fix is "restart this Airflow DAG", give the user the `airflow dags trigger <dag_id>` command they can run manually
-3. **Escalate via available channels** — if Slack is connected but Airflow isn't, post the remediation plan to the appropriate channel
+3. **Present findings and ask for next steps** — tell the user what you found, what you recommend, and ask how they'd like to proceed. They may choose to run commands manually, notify their team via Slack, page on-call, or take a different approach entirely.
 4. **Document on the alert** — use `createOrUpdateAlertComment` to record the diagnosis and recommended fix, even if you can't execute it
 
 ---
@@ -284,13 +280,13 @@ Based on the TSA root cause and available tools, determine the action:
 | Schema change (upstream) | Assess impact, update downstream models or revert | Code changes |
 | Volume anomaly (missing data) | Check upstream pipeline, trigger backfill | Pipeline orchestration + warehouse |
 | Volume anomaly (duplicate data) | Identify and remove duplicates, fix pipeline | Warehouse + code changes |
-| Permission/access error | Escalate to data platform team | Notifications |
-| Infrastructure issue | Escalate to platform/ops team | Notifications |
-| Unknown or complex root cause | Escalate with full context | Notifications |
+| Permission/access error | Present findings, recommend user escalates to data platform team | None (user decides) |
+| Infrastructure issue | Present findings, recommend user escalates to platform/ops team | None (user decides) |
+| Unknown or complex root cause | Present full context and ask user for next steps | None (user decides) |
 
 **If the root cause maps to multiple possible actions**, present the options to the user with tradeoffs and let them choose.
 
-**If the root cause doesn't clearly map to any pattern**, read `references/patterns.md` for the "Unknown / complex" pattern, which focuses on packaging context for escalation.
+**If the root cause doesn't clearly map to any pattern**, read `references/patterns.md` for the "Unknown / complex" pattern, which focuses on presenting full context to the user and asking for direction.
 
 #### Step 2: Present the remediation plan
 
@@ -314,7 +310,7 @@ Read `references/safety.md` for detailed safety protocols.
 
 2. **Confirm destructive operations.** Any action that modifies data, restarts a pipeline, triggers a job, or changes configuration requires explicit user confirmation. Ask and wait for "yes", "go ahead", "proceed", or similar.
 
-3. **Escalate when uncertain.** If you're not confident the action will fix the issue without side effects, say so. Present what you know, what you're unsure about, and recommend the user verify before proceeding.
+3. **Ask the user when uncertain.** If you're not confident the action will fix the issue without side effects, say so. Present what you know, what you're unsure about, and ask the user how they'd like to proceed.
 
 4. **One action at a time.** Don't chain multiple remediation actions. Execute one, verify the result, then decide on the next step.
 
@@ -373,17 +369,7 @@ createOrUpdateAlertComment(
 )
 ```
 
-#### Step 3: Assign ownership (if escalated)
-
-If the issue was escalated or needs follow-up:
-```
-setAlertOwner(
-  alert_id="<alert_uuid>",
-  owner="<owner_email>"
-)
-```
-
-#### Step 4: Consider prevention
+#### Step 3: Consider prevention
 
 After remediating, briefly assess whether this issue is likely to recur:
 
@@ -398,7 +384,7 @@ Do not automatically create monitors or tickets — suggest them and let the use
 
 - **NEVER execute a remediation action without presenting the plan first.** The user must understand what you're about to do.
 - **NEVER skip the investigation phase.** A wrong diagnosis leads to a wrong fix — or worse, a fix that causes new problems.
-- **NEVER assume external MCP tools are available.** Always check first. A missing tool is not an error — it just means you escalate instead of execute.
+- **NEVER assume external MCP tools are available.** Always check first. A missing tool is not an error — present findings to the user and ask for next steps.
 - **NEVER chain multiple remediation actions without verifying each one.** One action at a time.
 - **NEVER modify data directly** (DELETE, UPDATE, DROP) without explicit user confirmation AND a clearly stated rollback plan.
 - **NEVER mark an alert as FIXED before verifying the fix.** Check that the underlying condition has actually improved.

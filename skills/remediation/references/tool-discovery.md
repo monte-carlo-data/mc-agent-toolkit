@@ -38,9 +38,6 @@ Use this mapping table to understand what each server enables:
 | `*dbt*` | dbt operations | Trigger job runs, get run status, list jobs, cancel runs |
 | `*github*` | Code changes | Create branches, create/update PRs, create issues, read file contents |
 | `*gitlab*` | Code changes | Create merge requests, create issues, read file contents |
-| `*slack*` | Notifications | Send messages to channels, post thread replies, search messages |
-| `*pagerduty*` | Incident management | Create incidents, escalate, acknowledge, resolve |
-| `*teams*` | Notifications | Send messages, create cards |
 | `*jira*` | Issue tracking | Create issues, update status, add comments |
 | `*snowflake*` | Warehouse access | Execute queries, get table info |
 | `*bigquery*` | Warehouse access | Execute queries, get table info |
@@ -52,8 +49,7 @@ Use this mapping table to understand what each server enables:
 For the current remediation task, determine:
 
 1. **Can I investigate?** — Monte Carlo MCP is always needed. If it's not connected, you cannot proceed.
-2. **Can I execute the fix?** — Check if the needed orchestration/code/notification tool is available.
-3. **Can I notify the right people?** — Check for Slack, PagerDuty, or similar.
+2. **Can I execute the fix?** — Check if the needed orchestration/code tool is available.
 
 ### Step 4: Report capabilities
 
@@ -62,8 +58,7 @@ Present what you found to the user before proceeding:
 > "I've checked your connected MCP servers. For this remediation, I can:
 > - ✅ Investigate the issue (Monte Carlo)
 > - ✅ Restart the Airflow DAG (Airflow MCP connected)
-> - ❌ Create a code fix (no GitHub/GitLab MCP)
-> - ✅ Notify the team (Slack MCP connected)"
+> - ❌ Create a code fix (no GitHub/GitLab MCP)"
 
 ## Graceful degradation
 
@@ -89,25 +84,9 @@ Or via CLI: dbt run --select stg_orders+"
   `user_id` to `customer_id`. Create a branch and PR with this change."
 ```
 
-### Priority 2: Escalate via available notification channels
+### Priority 2: Present findings and ask for next steps
 
-If Slack or PagerDuty is available, send the remediation plan:
-
-```
-Slack message format:
-"🔧 Remediation needed — [table_name]
-
-Alert: [type] ([severity])
-Root cause: [TSA summary]
-
-Required action: [specific fix]
-Manual steps:
-1. [step 1]
-2. [step 2]
-
-I couldn't execute this automatically because [reason].
-Alert link: [MC alert URL]"
-```
+Tell the user what you found, what the fix is, and ask how they'd like to proceed. They may run the commands themselves, notify their team, page on-call, or take a different approach.
 
 ### Priority 3: Document on the alert
 
@@ -152,20 +131,3 @@ Common tools you might find:
 
 **Best practice:** For code fixes, create a branch → make the change → open a PR. Don't push directly to main.
 
-### Slack MCP
-
-Common tools you might find:
-- `send_message` / `post_message` — send to a channel (needs `channel` and `text`)
-- `search_channels` — find the right channel
-- `send_message_draft` — create a draft for review before sending
-
-**Tip:** If you don't know which channel to post to, ask the user. Don't guess — posting to the wrong channel is noisy.
-
-### PagerDuty MCP
-
-Common tools you might find:
-- `create_incident` — create a new incident (needs `service_id`, `title`, `urgency`)
-- `acknowledge_incident` — acknowledge an existing incident
-- `resolve_incident` — mark incident as resolved
-
-**Use PagerDuty for HIGH severity alerts only.** Don't page people for low-severity issues that can wait.

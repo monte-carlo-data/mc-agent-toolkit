@@ -49,7 +49,7 @@ Stale data usually means the pipeline that feeds this table has either failed or
 **If no execution tool is available:**
 - Document which pipeline is responsible (from query analysis)
 - Provide the manual commands: `airflow dags trigger <dag_id>` or `dbt run --select <model>`
-- Post to Slack or escalate via PagerDuty if available
+- Present the diagnosis and recommended fix to the user and ask for next steps
 - Comment on the alert with the diagnosis and recommended fix
 
 ### Verification
@@ -157,7 +157,7 @@ Schema changes can be intentional (upstream team made a planned change) or accid
 **If the change is accidental and should be reverted:**
 - If GitHub is available: create a PR reverting the upstream change
 - If the change was a direct DDL (not code-managed): provide the ALTER statement to revert
-- Escalate to the upstream table owner with context
+- Present findings to the user and recommend they contact the upstream table owner
 
 **If no execution tool is available:**
 - Document all affected downstream tables and the specific column changes
@@ -214,7 +214,7 @@ Volume anomalies can indicate: data loss (rows missing), data duplication (rows 
 **For missing data (row count drop):**
 - If pipeline orchestrator is available: trigger a backfill for the affected time range
 - If the drop is from a bad deployment: revert via GitHub, then rerun the pipeline
-- If upstream source stopped: escalate to the source system owner
+- If upstream source stopped: present findings to the user and recommend they contact the source system owner
 
 **For duplicate data:**
 - If warehouse access is available: run a deduplication query (with user confirmation!)
@@ -250,11 +250,11 @@ Volume anomalies can indicate: data loss (rows missing), data duplication (rows 
 
 ### Reasoning
 
-Not every issue has a clear, automatable fix. When the root cause is unclear or complex, the best remediation is comprehensive escalation with full context — not guessing at a fix.
+Not every issue has a clear, automatable fix. When the root cause is unclear or complex, the best approach is to present full context to the user and ask for direction — not guess at a fix.
 
-### Escalation package
+### Context package
 
-Compile a complete context package for the human responder:
+Compile a complete summary for the user:
 
 1. **Alert details:** type, severity, when it fired, affected tables
 2. **TSA findings:** whatever root cause analysis was available (even if partial)
@@ -264,48 +264,24 @@ Compile a complete context package for the human responder:
 6. **Monitoring coverage:** what monitors exist, any gaps
 7. **Your assessment:** what you think might be wrong and why, with confidence level
 
-### Remediation by available tools
+### What to do
 
-**If Slack is available:**
-```
-Post to the appropriate channel:
-"🔔 Data quality alert requires manual investigation
+Present the context package to the user and ask how they'd like to proceed. They may want to:
+- Notify their team via Slack or PagerDuty
+- Investigate further with specific queries
+- Assign the alert to a specific person
+- Take a manual remediation action you can help with
 
-Alert: [type] on [table]
-Severity: [level]
-TSA summary: [tldr or 'TSA inconclusive']
-
-Investigation findings:
-- [key finding 1]
-- [key finding 2]
-- [key finding 3]
-
-Recommended next steps:
-1. [specific action]
-2. [specific action]
-
-Full alert: [MC alert URL]"
-```
-
-**If PagerDuty is available:**
-- Create an incident with the escalation package
-- Set appropriate severity based on blast radius and impact
-
-**Always (regardless of tools):**
+**Document on the alert regardless:**
 ```
 createOrUpdateAlertComment(
   alert_id="<alert_uuid>",
-  comment="## Investigation Summary\n\n[full context package]\n\n**Escalation reason:** [why automated remediation was not attempted]\n**Recommended next steps:** [specific actions for the human responder]"
+  comment="## Investigation Summary\n\n[full context package]\n\n**Why automated remediation was not attempted:** [reason]\n**Recommended next steps:** [specific actions]"
 )
 
 updateAlert(
   alert_id="<alert_uuid>",
   status="WORK_IN_PROGRESS"
-)
-
-setAlertOwner(
-  alert_id="<alert_uuid>",
-  owner="<data_team_lead_email>"
 )
 ```
 
