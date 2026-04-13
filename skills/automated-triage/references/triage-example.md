@@ -14,7 +14,7 @@ Run in recommendation mode first. Once the classifications and recommendations m
 1. Asks whether to run in recommendation or action mode
 2. Fetches all alerts from the last 3 hours
 3. Scores every alert by confidence and impact (in parallel)
-4. Runs deep troubleshooting on high-signal alerts, classifying each as it completes
+4. Fires deep troubleshooting on all high-signal alerts simultaneously, classifying each as results arrive
 5. In **action mode**: posts a triage comment on every alert and updates statuses
    In **recommendation mode**: outputs what it would comment and what status it would set — no writes
 
@@ -40,11 +40,11 @@ Call `alert_assessment` in parallel for every alert from step 2, in batches of u
 
 ### Step 4: Troubleshoot and classify high-signal alerts
 
-For each alert where BOTH `alert_confidence` AND `alert_impact` are MEDIUM or HIGH, call `run_tsa` with at most 2 running in parallel — each TSA call can spawn dozens of sub-agents, so more than 2 concurrent calls can cause degraded performance.
+For each alert where BOTH `alert_confidence` AND `alert_impact` are MEDIUM or HIGH, call `run_troubleshooting_agent` (default `async_mode=True`). Fire all eligible alerts simultaneously — each call returns immediately with a `thread_id` and `run_id`.
 
-Skip any alert where either value is LOW — `run_tsa` is expensive and not warranted for low-signal alerts.
+Skip any alert where either value is LOW — troubleshooting is expensive and not warranted for low-signal alerts.
 
-After each call, classify that alert before moving on to the next.
+Poll each in-flight job with `get_troubleshooting_agent_results` every ~30 seconds. Classify each alert as its result arrives (`success`), before moving on. If a job returns `failed`, note it and continue.
 
 **Classifications:**
 
@@ -57,7 +57,7 @@ After each call, classify that alert before moving on to the next.
 | **Verified ongoing incident** | A clear incident that has not resolved, where troubleshooting identified the root cause (e.g. query change or infrastructure failure) |
 | **Other**                     | Does not fit the above                                                                                                |
 
-Alerts that did not go through `run_tsa` are left unclassified.
+Alerts that did not go through troubleshooting are left unclassified.
 
 ### Step 5: Comments and status updates
 
@@ -65,7 +65,7 @@ Alerts that did not go through `run_tsa` are left unclassified.
 
 Call `create_or_update_alert_comment` for each alert:
 - **Untroubleshot alerts**: one sentence describing the anomaly and the confidence/impact scores. Do not explain why it wasn't troubleshot. No recommendations.
-- **Troubleshot alerts**: 2–4 sentences covering classification, reasoning from the `run_tsa` output, any action taken, and a recommendation.
+- **Troubleshot alerts**: 2–4 sentences covering classification, reasoning from the troubleshooting output, any action taken, and a recommendation.
 
 Then call `update_alert` for each classified alert:
 

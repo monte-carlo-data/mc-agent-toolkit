@@ -59,21 +59,21 @@ Start with the defaults and tune `user_instructions` once you've seen real outpu
 
 ## Stage 3: Deep troubleshooting
 
-**Tool:** `run_tsa` *(extended toolset required)*
+**Tools:** `run_troubleshooting_agent`, `get_troubleshooting_agent_results`
 
-`run_tsa` runs the Monte Carlo Troubleshooting Agent on a single alert. This is substantially more expensive than `alert_assessment` — it tracks the issue upstream through lineage, analyses all queries involved, examines relevant PRs, and samples affected tables to identify root cause.
+`run_troubleshooting_agent` runs the Monte Carlo Troubleshooting Agent on a single alert. This is substantially more expensive than `alert_assessment` — it tracks the issue upstream through lineage, analyses all queries involved, examines relevant PRs, and samples affected tables to identify root cause.
 
-**Only run `run_tsa` on alerts that warrant it.** A common filter: run troubleshooting only when BOTH `alert_confidence` AND `alert_impact` are MEDIUM or HIGH. Skip any alert where either is LOW.
+**Only run `run_troubleshooting_agent` on alerts that warrant it.** A common filter: run troubleshooting only when BOTH `alert_confidence` AND `alert_impact` are MEDIUM or HIGH. Skip any alert where either is LOW.
 
 You can adjust this threshold based on your environment — for example, also running troubleshooting when either score is HIGH (even if the other is LOW), while still requiring MEDIUM/MEDIUM as the baseline.
 
-**Run at most 2 `run_tsa` calls in parallel.** Each TSA call can spawn dozens of sub-agents, so running more than 2 concurrently can cause degraded performance.
+**Use async mode for parallelism.** `run_troubleshooting_agent` defaults to `async_mode=True`, returning immediately with a `thread_id` and `run_id`. Fire all eligible alerts simultaneously, then poll each with `get_troubleshooting_agent_results` (check every ~30 seconds) until it returns `success` or `failed`. Classify each alert as its result arrives. This avoids the timeout issues of synchronous calls and removes the need to limit concurrency.
 
 ---
 
 ## Stage 4: Classification
 
-Classify each alert immediately after its `run_tsa` call completes. Use the troubleshooting output to determine which category fits best.
+Classify each alert immediately after its troubleshooting result arrives. Use the troubleshooting output to determine which category fits best.
 
 | Classification              | Description                                                                                                                    |
 | --------------------------- |--------------------------------------------------------------------------------------------------------------------------------|

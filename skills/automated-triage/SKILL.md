@@ -42,9 +42,9 @@ Do not activate when the user is:
 
 ## Prerequisites
 
-**Steps 2 and 3 of any triage workflow (alert scoring and troubleshooting) require the extended MCP toolset.** The `alert_assessment` and `run_tsa` tools are only available when the Monte Carlo MCP server is configured with `toolset: extended`.
+**Alert scoring (`alert_assessment`) requires the extended MCP toolset.** Deep troubleshooting (`run_troubleshooting_agent`, `get_troubleshooting_agent_results`) is available in the default toolset.
 
-To enable the extended toolset, update your MCP server configuration:
+To enable the extended toolset for alert scoring, update your MCP server configuration:
 
 **Claude Code** (`.claude/settings.json` or `~/.claude/settings.json`):
 ```json
@@ -75,7 +75,7 @@ To enable the extended toolset, update your MCP server configuration:
 }
 ```
 
-Without `toolset: extended`, alert scoring and troubleshooting will fail.
+Without `toolset: extended`, alert scoring (`alert_assessment`) will fail.
 
 ---
 
@@ -85,12 +85,13 @@ All tools are available via the `monte-carlo` MCP server.
 
 | Tool                             | Toolset  | Purpose                                                         |
 | -------------------------------- | -------- | --------------------------------------------------------------- |
-| `get_alerts`                     | default  | Fetch recent alerts for a time window                           |
-| `alert_assessment`               | extended | Score an alert by confidence and impact (HIGH/MEDIUM/LOW each)  |
-| `run_tsa`                        | extended | Run deep troubleshooting on a single alert                      |
-| `update_alert`                   | default  | Update an alert's status and/or declare an incident by setting severity |
-| `set_alert_owner`                | default  | Assign an owner to an alert by email                            |
-| `create_or_update_alert_comment` | default  | Post or update a triage comment on an alert                     |
+| `get_alerts`                          | default  | Fetch recent alerts for a time window                                                                             |
+| `alert_assessment`                    | extended | Score an alert by confidence and impact (HIGH/MEDIUM/LOW each)                                                    |
+| `run_troubleshooting_agent`           | default  | Run the Monte Carlo Troubleshooting Agent on a single alert; use `async_mode=True` (default) to get a `thread_id`/`run_id` for polling |
+| `get_troubleshooting_agent_results`   | default  | Poll an async troubleshooting run by `thread_id`/`run_id`; returns status (`running`/`success`/`failed`) and results when complete |
+| `update_alert`                        | default  | Update an alert's status and/or declare an incident by setting severity                                           |
+| `set_alert_owner`                     | default  | Assign an owner to an alert by email                                                                              |
+| `create_or_update_alert_comment`      | default  | Post or update a triage comment on an alert                                                                       |
 
 ---
 
@@ -100,7 +101,7 @@ Read `references/triage-stages.md` for a full description of each stage and how 
 
 1. **Fetch alerts** — decide which alerts to triage and over what time window
 2. **Initial investigation** — score every alert by confidence and impact using `alert_assessment`
-3. **Deep troubleshooting** — run `run_tsa` on high-signal alerts to get root cause analysis
+3. **Deep troubleshooting** — run `run_troubleshooting_agent` on high-signal alerts to get root cause analysis
 4. **Classify** — use the troubleshooting output to classify each alert
 5. **Take actions** — post comments, update statuses, message Slack, create tickets
 
@@ -114,7 +115,7 @@ When this skill is activated, follow this sequence in order.
 
 ### Step 1: Check MCP tools
 
-Verify that `get_alerts`, `alert_assessment`, and `run_tsa` are accessible. If `alert_assessment` or `run_tsa` are missing, show the extended toolset configuration from the Prerequisites section and stop — the user needs to fix this before continuing.
+Verify that `get_alerts`, `alert_assessment`, and `run_troubleshooting_agent` are accessible. If `alert_assessment` is missing, show the extended toolset configuration from the Prerequisites section and stop — the user needs to fix this before continuing.
 
 ### Step 2: Orient the user to their workflow file
 
