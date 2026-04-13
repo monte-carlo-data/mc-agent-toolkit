@@ -47,6 +47,7 @@ All skills are registered in `.agents/skills/` during installation.
 | **Prevent** | Gates dbt model edits with impact assessments, generates monitors-as-code, and produces targeted validation queries. | [Skill README](../../skills/prevent/README.md) |
 | **Generate Validation Notebook** | Generates SQL validation notebooks for dbt model changes from a PR or local repo. | [Skill README](../../skills/generate-validation-notebook/README.md) |
 | **Push Ingestion** | Generates warehouse-specific collection scripts for pushing metadata, lineage, and query logs to Monte Carlo. | [Skill README](../../skills/push-ingestion/README.md) |
+| **Automated Triage** | Guides you through automated alert triage — scoring, deep troubleshooting, classification, and actions. Requires extended MCP toolset. | [SKILL](../../skills/automated-triage/SKILL.md) |
 
 Codex activates skills automatically when you work with dbt models or SQL files. You can also invoke prevent explicitly with `$monte-carlo-prevent`.
 
