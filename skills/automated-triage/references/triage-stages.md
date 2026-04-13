@@ -67,7 +67,12 @@ Start with the defaults and tune `user_instructions` once you've seen real outpu
 
 You can adjust this threshold based on your environment — for example, also running troubleshooting when either score is HIGH (even if the other is LOW), while still requiring MEDIUM/MEDIUM as the baseline.
 
-**Use async mode for parallelism.** `run_troubleshooting_agent` defaults to `async_mode=True`, returning immediately with a `thread_id` and `run_id`. Fire all eligible alerts simultaneously, then poll each with `get_troubleshooting_agent_results` (check every ~30 seconds) until it returns `success` or `failed`. Classify each alert as its result arrives. This avoids the timeout issues of synchronous calls and removes the need to limit concurrency.
+**Use async mode for parallelism.** `run_troubleshooting_agent` defaults to `async_mode=True`, returning immediately with one of three statuses:
+- `success` — a previous analysis already completed; results are available immediately, no polling needed
+- `queued` — the job was accepted but hasn't started yet; wait ~30 seconds then start polling
+- `running` — the job is in progress; poll with increasing intervals (30s, 60s, 60s…)
+
+Fire all eligible alerts simultaneously, then poll each with `get_troubleshooting_agent_results(incident_id=...)` until it returns `success` or `failed`. Classify each alert as its result arrives. This avoids the timeout issues of synchronous calls and removes the need to limit concurrency.
 
 ---
 

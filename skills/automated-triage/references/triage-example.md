@@ -40,11 +40,11 @@ Call `alert_assessment` in parallel for every alert from step 2, in batches of u
 
 ### Step 4: Troubleshoot and classify high-signal alerts
 
-For each alert where BOTH `alert_confidence` AND `alert_impact` are MEDIUM or HIGH, call `run_troubleshooting_agent` (default `async_mode=True`). Fire all eligible alerts simultaneously — each call returns immediately with a `thread_id` and `run_id`.
+For each alert where BOTH `alert_confidence` AND `alert_impact` are MEDIUM or HIGH, call `run_troubleshooting_agent` (default `async_mode=True`). Fire all eligible alerts simultaneously — each call returns immediately with one of: `success` (previous results available immediately), `queued` (accepted, not started yet), or `running` (in progress).
 
 Skip any alert where either value is LOW — troubleshooting is expensive and not warranted for low-signal alerts.
 
-Poll each in-flight job with `get_troubleshooting_agent_results` every ~30 seconds. Classify each alert as its result arrives (`success`), before moving on. If a job returns `failed`, note it and continue.
+For each job that returned `queued` or `running`, poll with `get_troubleshooting_agent_results(incident_id=...)` — start at ~30 seconds, then increase to 60s intervals. Classify each alert as its result arrives (`success`), before moving on. If a job returns `failed`, note it and continue.
 
 **Classifications:**
 

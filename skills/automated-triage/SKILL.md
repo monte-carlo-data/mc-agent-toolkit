@@ -87,8 +87,8 @@ All tools are available via the `monte-carlo` MCP server.
 | -------------------------------- | -------- | --------------------------------------------------------------- |
 | `get_alerts`                          | default  | Fetch recent alerts for a time window                                                                             |
 | `alert_assessment`                    | extended | Score an alert by confidence and impact (HIGH/MEDIUM/LOW each)                                                    |
-| `run_troubleshooting_agent`           | default  | Run the Monte Carlo Troubleshooting Agent on a single alert; use `async_mode=True` (default) to get a `thread_id`/`run_id` for polling |
-| `get_troubleshooting_agent_results`   | default  | Poll an async troubleshooting run by `thread_id`/`run_id`; returns status (`running`/`success`/`failed`) and results when complete |
+| `run_troubleshooting_agent`           | default  | Run the Monte Carlo Troubleshooting Agent on a single alert; async by default — returns immediately, reuses existing results when available |
+| `get_troubleshooting_agent_results`   | default  | Poll an async troubleshooting run by `incident_id`; returns status (`not_found`/`running`/`success`/`failed`) and results when complete |
 | `update_alert`                        | default  | Update an alert's status and/or declare an incident by setting severity                                           |
 | `set_alert_owner`                     | default  | Assign an owner to an alert by email                                                                              |
 | `create_or_update_alert_comment`      | default  | Post or update a triage comment on an alert                                                                       |
