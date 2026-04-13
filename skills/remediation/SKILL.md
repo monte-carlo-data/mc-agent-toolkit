@@ -282,17 +282,13 @@ Before executing, read `references/safety.md` for the full safety protocol. The 
 
 #### Step 1: Update the alert
 
-```
-updateAlert(
-  alert_id="<alert_uuid>",
-  status="FIXED"
-)
-```
+Ask the user what status to set:
 
-Use the appropriate status:
 - `FIXED` — the root cause was identified and remediated
 - `EXPECTED` — the alert fired on expected behavior (e.g., planned maintenance)
 - `NO_ACTION_NEEDED` — the issue resolved itself or is not actionable
+
+Then call `updateAlert(alert_id="<alert_uuid>", status="<chosen_status>")`.
 
 #### Step 2: Document the remediation
 
