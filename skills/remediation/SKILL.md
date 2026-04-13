@@ -44,39 +44,15 @@ Do not activate when the user is:
 
 ---
 
-## Available MCP tools
+## Available tools
 
-### Monte Carlo tools (investigation + post-remediation)
+### Monte Carlo MCP server (investigation + post-remediation)
 
-All tools are available via the `monte-carlo` MCP server.
-
-| Tool | Purpose |
-| ---- | ------- |
-| `getAlerts` | Fetch alert details — type, severity, affected tables, timestamps |
-| `alertAssessment` | Triage confidence + impact score — use as a gate before running TSA |
-| `runTroubleshootingAgent` | Launch TSA root cause analysis (async — returns immediately) |
-| `getTroubleshootingAgentResults` | Poll for TSA results — contains root cause `tldr` and detailed findings |
-| `getAssetLineage` | Upstream producers and downstream consumers — blast radius assessment |
-| `getTable` | Table schema, stats, freshness, volume, capabilities, monitoring status |
-| `getMonitors` | Existing monitoring coverage on affected tables |
-| `getQueriesForTable` | Recent query patterns — helps distinguish pipeline issues from ad-hoc problems |
-| `search` | Find assets by name when you don't have the MCON |
-| `updateAlert` | Update alert status (ACKNOWLEDGED, FIXED, EXPECTED, etc.) and severity |
-| `setAlertOwner` | Assign alert ownership to a specific user |
-| `createOrUpdateAlertComment` | Document findings and remediation actions on the alert |
-| `getCurrentTime` | ISO timestamp for API calls that need date ranges |
+The Monte Carlo MCP server (`monte-carlo`) provides the investigation tools used in the workflows below. The workflows reference key tools by name (e.g., `getAlerts`, `runTroubleshootingAgent`, `getAssetLineage`), but **use any Monte Carlo tool that helps** — the server has additional tools beyond what the workflows explicitly call out. Explore what's available.
 
 ### External tools (remediation execution)
 
-These are **not** Monte Carlo tools. They may be available as MCP servers, CLI tools, or APIs. Their availability varies — see Workflow 2 (Capability Discovery) for how to detect them at runtime.
-
-| Capability | MCP Servers | CLI Tools | What they enable |
-| ---------- | ----------- | --------- | ---------------- |
-| Pipeline orchestration | Airflow, Dagster, Prefect | `airflow`, `dagster`, `prefect` | Trigger runs, retry tasks, check status |
-| dbt operations | dbt Cloud | `dbt` | Trigger job runs, rebuild models, run tests |
-| Code changes | GitHub, GitLab | `gh`, `git` | Create PRs, branches, issues |
-| Data warehouse | Snowflake, BigQuery, Databricks | `snowsql`, `bq`, `databricks` | Execute queries, inspect tables |
-| Any HTTP API | — | `curl` | Call any service REST API directly |
+Remediation actions are executed via whatever tools are available — MCP servers, CLI tools, or APIs. See Workflow 2 (Capability Discovery) and `references/tool-discovery.md` for how to detect and use them. Use whatever works; don't limit yourself to a prescribed list.
 
 ---
 
