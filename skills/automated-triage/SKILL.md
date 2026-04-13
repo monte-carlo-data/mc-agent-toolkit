@@ -123,22 +123,25 @@ Ask whether the user has an existing triage workflow file, or is starting fresh.
 
 **Starting fresh:**
 
-1. Read `references/triage-example.md` (relative to this skill file) and display its full contents to the user — not a summary, the actual content. This is their starting point and they need to see exactly what will run.
-2. Offer to save a copy to their project (e.g. `triage.md` or `.claude/triage.md`) so they have a file they own and can edit.
-3. Once a copy is saved (or they decline and want to use the example as-is), ask: **"Want to edit this before running, or run it as-is for your first test?"**
+1. Read `references/triage-example.md` (relative to this skill file). Give a brief description: it fetches alerts from the last 3 hours, scores every alert, runs deep troubleshooting on high-signal ones, and shows what actions it would take — no writes on a first run.
+2. Run in recommendation mode, step by step (see Step 3). No need to ask.
 
 **Has an existing file:**
 
 1. Read it and confirm the key settings: time window, filter threshold, and whether it includes a mode-selection step.
-2. Summarise what it will do, then ask the same question: **"Want to edit anything, or run it as-is?"**
+2. Summarise what it will do, then ask: **"Run straight through, or step through each stage one at a time? And recommendation or action mode?"**
 
 ### Step 3: Run the workflow
 
-Before executing, ask: **"Run all stages straight through, or step through each stage one at a time — pausing to show results before continuing?"**
-
-In **step-by-step mode**: after each stage completes, summarise what it produced, discuss options and wait for confirmation before moving to the next.
-
 Execute the workflow from the file, following its instructions exactly. Do not improvise steps or add actions not described in the file.
+
+**For first runs (starting fresh):** always run step by step — after each stage completes, summarise what it produced, proactively suggest alternatives or adjustments, and wait for confirmation before continuing.
+
+**For existing-file runs:** use whichever mode the user chose in Step 2.
+
+### Step 4: Offer to save a copy
+
+After the workflow completes, ask: **"Want me to save a copy of this workflow to your project (e.g. `triage.md`) so you can customise it?"** If yes, write the current workflow to the path they choose.
 
 ---
 

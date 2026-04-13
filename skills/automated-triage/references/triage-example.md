@@ -28,7 +28,7 @@ Ask: "Run in **recommendation mode** (no writes — I'll show you what actions w
 
 Also ask: "Run all stages **straight through**, or **step by step** — pausing after each stage to show results before continuing?"
 
-Wait for both answers before proceeding. In step-by-step mode, after each stage completes, summarise what it produced and wait for confirmation before moving to the next.
+Wait for both answers before proceeding. In step-by-step mode, after each stage completes, summarise what it produced, proactively suggest alternatives or adjustments based on what you observed, and wait for confirmation before moving to the next.
 
 ### Step 2: Fetch alerts
 
