@@ -108,6 +108,35 @@ The triage process is not fixed. Read the stages reference to understand the opt
 
 ---
 
+## Activation flow
+
+When this skill is activated, follow this sequence in order.
+
+### Step 1: Check MCP tools
+
+Verify that `get_alerts`, `alert_assessment`, and `run_tsa` are accessible. If `alert_assessment` or `run_tsa` are missing, show the extended toolset configuration from the Prerequisites section and stop — the user needs to fix this before continuing.
+
+### Step 2: Orient the user to their workflow file
+
+Ask whether the user has an existing triage workflow file, or is starting fresh.
+
+**Starting fresh:**
+
+1. Read `references/triage-example.md` (relative to this skill file) and display its full contents to the user — not a summary, the actual content. This is their starting point and they need to see exactly what will run.
+2. Offer to save a copy to their project (e.g. `triage.md` or `.claude/triage.md`) so they have a file they own and can edit.
+3. Once a copy is saved (or they decline and want to use the example as-is), ask: **"Want to edit this before running, or run it as-is for your first test?"**
+
+**Has an existing file:**
+
+1. Read it and confirm the key settings: time window, filter threshold, and whether it includes a mode-selection step.
+2. Summarise what it will do, then ask the same question: **"Want to edit anything, or run it as-is?"**
+
+### Step 3: Run the workflow
+
+Execute the workflow from the file, following its instructions exactly. Do not improvise steps or add actions not described in the file.
+
+---
+
 ## Getting started
 
 Build up your triage automation in three stages:
