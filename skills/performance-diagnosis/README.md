@@ -25,7 +25,6 @@ Connect to Monte Carlo's MCP server (`integrations.getmontecarlo.com/mcp`). The 
 | `get_query_latency_distribution` | Diagnosis | Latency trend over time |
 | `get_asset_lineage` | Diagnosis | Trace upstream/downstream impact |
 | `get_warehouses` | Supporting | List available warehouses |
-| `get_alerts` | Supporting | Fetch incident details |
 
 ## Example prompts
 

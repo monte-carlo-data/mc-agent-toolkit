@@ -58,7 +58,6 @@ The following MCP tools must be available (connect to Monte Carlo's MCP server):
 
 **Supporting tools:**
 - `get_warehouses` -- list available warehouses
-- `get_alerts` -- fetch incident details
 
 ## Workflow
 
@@ -84,6 +83,8 @@ If you don't have specific MCONs to investigate, start with discovery:
    - Look for: queries with high total runtime or high individual execution time
 
 Present the top findings to the user before drilling deeper. A typical investigation needs only 3-7 tool calls.
+
+**If both discovery tools return no results:** Tell the user no performance issues were found in the current time window. Suggest broadening the scope (different warehouse, longer time range, or a different platform filter).
 
 ### Step 3: Bridge -- Job to Tables
 
@@ -115,7 +116,7 @@ Now drill into root causes using the MCONs from discovery or the bridge:
    - Compare p50 vs p95 -- if p95 >> p50 (>5x), the problem is outlier queries
    - Look for step-changes in latency (sudden increase = regression)
 
-5. **Trace impact**: Call `get_asset_lineage` with `direction=DOWNSTREAM` to see what's affected by a slow table, or `direction=UPSTREAM` to find what feeds it.
+5. **Trace impact**: Call `get_asset_lineage` with `direction="DOWNSTREAM"` to see what's affected by a slow table, or `direction="UPSTREAM"` to find what feeds it.
 
 ### Step 5: Present findings
 
@@ -129,7 +130,7 @@ Structure your response as:
 ### Important rules
 
 - **Quote tool numbers exactly.** If a tool returns "1282 runs, avg 22.5s", say exactly that. Never round, estimate, or fabricate numbers.
-- **Always compare to baselines.** Use 7-day trend data (`runDurationTrend7d`) to distinguish regressions from normal variance. Flag if trend data has fewer than 0.1 confidence.
+- **Always compare to baselines.** Use 7-day trend data (`runDurationTrend7d`) to distinguish regressions from normal variance. Flag if trend data has less than 0.1 confidence.
 - **Stop when you have a root cause.** 3-7 tool calls is typical. More than 10 means you're over-investigating.
 - **Read vs write queries**: When the user asks about "reads" or "read queries", filter with `query_type="read"`. When they ask about "writes", use `query_type="write"`. Do NOT mix them.
 - **Never expose MCONs, UUIDs, or internal identifiers** to the user. Use human-readable names.

@@ -100,5 +100,5 @@ Trace upstream/downstream impact.
 **When to use:** Understanding what's affected by a slow table.
 
 **Key parameters:**
-- `direction=DOWNSTREAM`: What depends on this table?
-- `direction=UPSTREAM`: What feeds this table?
+- `direction="DOWNSTREAM"`: What depends on this table?
+- `direction="UPSTREAM"`: What feeds this table?
