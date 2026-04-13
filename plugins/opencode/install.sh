@@ -89,7 +89,7 @@ if [ -f "$OPENCODE_JSON" ]; then
     echo "  ✓ MCP server already configured in opencode.json"
   else
     echo "  ⚠ monte-carlo-mcp MCP is not configured."
-    echo '    Add under "mcp": { "monte-carlo-mcp": { "type": "remote", "url": "https://integrations.getmontecarlo.com/mcp" } }'
+    echo '    Add under "mcp": { "monte-carlo-mcp": { "type": "remote", "url": "https://mcp.getmontecarlo.com/mcp" } }'
     NEEDS_GUIDANCE=true
   fi
 
