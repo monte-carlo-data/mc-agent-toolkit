@@ -134,6 +134,10 @@ Ask whether the user has an existing triage workflow file, or is starting fresh.
 
 ### Step 3: Run the workflow
 
+Before executing, ask: **"Run all stages straight through, or step through each stage one at a time — pausing to show results before continuing?"**
+
+In **step-by-step mode**: after each stage completes, summarise what it produced, discuss options and wait for confirmation before moving to the next.
+
 Execute the workflow from the file, following its instructions exactly. Do not improvise steps or add actions not described in the file.
 
 ---

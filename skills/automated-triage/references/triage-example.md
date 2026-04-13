@@ -26,7 +26,9 @@ Run in recommendation mode first. Once the classifications and recommendations m
 
 Ask: "Run in **recommendation mode** (no writes — I'll show you what actions would be taken) or **action mode** (comments and status updates applied for real)?"
 
-Wait for the answer before proceeding.
+Also ask: "Run all stages **straight through**, or **step by step** — pausing after each stage to show results before continuing?"
+
+Wait for both answers before proceeding. In step-by-step mode, after each stage completes, summarise what it produced and wait for confirmation before moving to the next.
 
 ### Step 2: Fetch alerts
 
@@ -107,3 +109,4 @@ Common adjustments:
 - **Adjust the troubleshooting filter** in step 4
 - **Add Slack or ticket creation** in step 5 for confirmed incidents
 - **Customise `alert_assessment` scoring** via `user_instructions` to tune emphasis for your environment (see `triage-stages.md`)
+- **Run step-by-step when tuning** — a useful pattern is to run the full workflow straight through first to see end-to-end behaviour, then re-run in step-by-step mode to inspect each stage's output and make decisions before proceeding
