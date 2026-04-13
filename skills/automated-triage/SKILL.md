@@ -1,0 +1,121 @@
+---
+name: monte-carlo-automated-triage
+description: |
+  Guides users through setting up and running automated alert triage for
+  their Monte Carlo environment. Activates when a user asks to triage alerts,
+  set up automated triage, run agentic triage, or investigate recent alert
+  activity. Covers MCP setup, the stages of a triage workflow, and how to
+  customise each stage to match how their team responds to alerts manually.
+version: 1.0.0
+---
+
+# Monte Carlo Automated Triage
+
+This skill helps you design, test, and deploy an automated triage agent for Monte Carlo alerts. Rather than a fixed workflow, it gives you the building blocks — a set of MCP tools, a description of each triage stage, and a working example — so you can build a process that matches how your team actually responds to alerts.
+
+Read the reference files before proceeding:
+
+- Triage stages and customisation: `references/triage-stages.md` (relative to this file)
+- Working example workflow: `references/triage-example.md` (relative to this file)
+
+---
+
+## When to activate this skill
+
+Activate when the user:
+
+- Wants to set up automated triage for Monte Carlo alerts
+- Asks to run agentic triage or investigate recent alert activity
+- Wants to understand what triage tools are available and how to use them
+- Is building or refining a triage prompt for their environment
+- Wants to move from manual alert review to automated or semi-automated triage
+
+## When NOT to activate this skill
+
+Do not activate when the user is:
+
+- Investigating a specific known incident (help them directly)
+- Creating or configuring monitors (use the monitor-creation skill)
+- Running impact analysis before a code change (use the prevent skill)
+
+---
+
+## Prerequisites
+
+**Steps 2 and 3 of any triage workflow (alert scoring and troubleshooting) require the extended MCP toolset.** The `alert_assessment` and `run_tsa` tools are only available when the Monte Carlo MCP server is configured with `toolset: extended`.
+
+To enable the extended toolset, update your MCP server configuration:
+
+**Claude Code** (`.claude/settings.json` or `~/.claude/settings.json`):
+```json
+{
+  "mcpServers": {
+    "monte-carlo": {
+      "command": "...",
+      "args": ["..."],
+      "env": {
+        "toolset": "extended"
+      }
+    }
+  }
+}
+```
+
+**Cursor** (`.cursor/mcp.json`):
+```json
+{
+  "mcpServers": {
+    "monte-carlo": {
+      "command": "...",
+      "env": {
+        "toolset": "extended"
+      }
+    }
+  }
+}
+```
+
+Without `toolset: extended`, alert scoring and troubleshooting will fail.
+
+---
+
+## Available MCP tools
+
+All tools are available via the `monte-carlo` MCP server.
+
+| Tool                             | Toolset  | Purpose                                                         |
+| -------------------------------- | -------- | --------------------------------------------------------------- |
+| `get_alerts`                     | default  | Fetch recent alerts for a time window                           |
+| `alert_assessment`               | extended | Score an alert by confidence and impact (HIGH/MEDIUM/LOW each)  |
+| `run_tsa`                        | extended | Run deep troubleshooting on a single alert                      |
+| `update_alert`                   | default  | Update an alert's status and/or declare an incident by setting severity |
+| `set_alert_owner`                | default  | Assign an owner to an alert by email                            |
+| `create_or_update_alert_comment` | default  | Post or update a triage comment on an alert                     |
+
+---
+
+## How to approach automated triage
+
+Read `references/triage-stages.md` for a full description of each stage and how to customise it. The high-level flow is:
+
+1. **Fetch alerts** — decide which alerts to triage and over what time window
+2. **Initial investigation** — score every alert by confidence and impact using `alert_assessment`
+3. **Deep troubleshooting** — run `run_tsa` on high-signal alerts to get root cause analysis
+4. **Classify** — use the troubleshooting output to classify each alert
+5. **Take actions** — post comments, update statuses, message Slack, create tickets
+
+The triage process is not fixed. Read the stages reference to understand the options and tradeoffs at each step, then design a workflow that fits your team's needs.
+
+---
+
+## Getting started
+
+Build up your triage automation in three stages:
+
+**1. Manual runs with recommendations.** Run the triage workflow manually and configure it to post comments with recommendations only — no status updates or external actions. Use this to tune your triage prompt until the classifications and recommendations match how your team would respond manually.
+
+**2. Automate with recommendations.** Once you're happy with the output, automate the process to pick up new alerts on a schedule. Keep it in recommendations-only mode and monitor the results to verify the recommended actions meet your expectations.
+
+**3. Replace recommendations with actions.** When you're confident in the automation, replace comment recommendations with real actions — status updates, Slack messages, ticket creation, or whatever fits your workflow.
+
+See `references/triage-example.md` for a complete working example you can use as a starting point.
