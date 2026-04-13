@@ -25,8 +25,8 @@ mc-agent-toolkit/
 │   ├── claude-code/                     # Unified mc-agent-toolkit plugin
 │   │   ├── .claude-plugin/plugin.json
 │   │   ├── hooks/prevent/              # Hook adapters (thin, call shared lib)
-│   │   ├── skills/ (monitor-creation, prevent, generate-validation-notebook, push-ingestion → symlinks)
-│   │   └── commands/ (prevent/, push-ingestion/)
+│   │   ├── skills/ (monitor-creation, monitoring-advisor, prevent, generate-validation-notebook, push-ingestion → symlinks)
+│   │   └── commands/ (prevent/, push-ingestion/, monitoring-advisor/)
 │   │
 │   ├── cursor/                          # Unified mc-agent-toolkit plugin
 │   │   ├── .cursor-plugin/plugin.json
@@ -65,7 +65,11 @@ Plugins reference skills via symlinks so that skills are authored once and share
    cd plugins/claude-code/skills
    ln -s ../../../skills/<skill-name> <skill-name>
    ```
-2. If the skill has slash commands, create `plugins/claude-code/commands/<skill-name>/` and add `.md` command files. Update the `commands` array in `plugins/claude-code/.claude-plugin/plugin.json`.
+2. **Register the skill as a command** (required for the skill to appear as user-invocable in the plugin):
+   - Create `plugins/claude-code/commands/<skill-name>/` with at least one `.md` command file.
+   - Add the directory to the `commands` array in `plugins/claude-code/.claude-plugin/plugin.json`.
+   - Without a commands entry, the skill will not be discoverable as `mc-agent-toolkit:<skill-name>`.
+   - If the skill has sub-commands (e.g., `/mc-validate`), add additional `.md` files in the same directory.
 3. If the skill needs hooks, create adapters in `plugins/claude-code/hooks/<skill-name>/` following the two-layer pattern (see below).
 4. Bump the `version` in `plugins/claude-code/.claude-plugin/plugin.json`.
 5. Test locally with `claude --plugin-dir ./plugins/claude-code`.

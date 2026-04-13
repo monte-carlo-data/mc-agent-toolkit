@@ -1,0 +1,156 @@
+{
+  "skill": "monte-carlo-monitoring-advisor",
+  "description": "Trigger accuracy evals for the monte-carlo-monitoring-advisor skill. Each case specifies whether the skill SHOULD or SHOULD NOT be triggered by the given prompt.",
+  "cases": [
+    {
+      "id": "should-01",
+      "prompt": "What should I monitor in my Snowflake warehouse? I'm not sure where to start.",
+      "expected": "trigger",
+      "rationale": "Broad monitoring guidance request — core skill use case"
+    },
+    {
+      "id": "should-02",
+      "prompt": "Where are my coverage gaps? I want to see which critical tables don't have monitors.",
+      "expected": "trigger",
+      "rationale": "Directly asks about coverage gaps — primary activation trigger"
+    },
+    {
+      "id": "should-03",
+      "prompt": "Show me my use cases and which ones are protected by monitors.",
+      "expected": "trigger",
+      "rationale": "Use-case analysis with coverage mapping — explicit trigger phrase"
+    },
+    {
+      "id": "should-04",
+      "prompt": "I want to understand what's monitored vs. not in our data warehouse.",
+      "expected": "trigger",
+      "rationale": "Monitored vs. unmonitored analysis — listed in activation triggers"
+    },
+    {
+      "id": "should-05",
+      "prompt": "We have tables with anomalies but no monitors. Can you help me find and prioritize them?",
+      "expected": "trigger",
+      "rationale": "Unmonitored tables with anomalies — importance-based prioritization"
+    },
+    {
+      "id": "should-06",
+      "prompt": "Can you explore our data estate and tell me what needs monitoring the most?",
+      "expected": "trigger",
+      "rationale": "Data estate exploration with monitoring recommendations"
+    },
+    {
+      "id": "should-07",
+      "prompt": "Which of our tables are most critical and least monitored?",
+      "expected": "trigger",
+      "rationale": "Criticality vs. coverage gap analysis"
+    },
+    {
+      "id": "should-08",
+      "prompt": "We just onboarded Monte Carlo. Help me figure out a monitoring strategy for our warehouse.",
+      "expected": "trigger",
+      "rationale": "New customer wanting monitoring strategy — coverage analysis use case"
+    },
+    {
+      "id": "should-09",
+      "prompt": "How's our data coverage looking? Are there any high-importance tables without monitors?",
+      "expected": "trigger",
+      "rationale": "Data coverage assessment — directly matches activation triggers"
+    },
+    {
+      "id": "should-10",
+      "prompt": "I want to do a use-case analysis to see which business processes depend on which tables and whether they're covered.",
+      "expected": "trigger",
+      "rationale": "Use-case criticality analysis — explicit trigger keyword"
+    },
+    {
+      "id": "should-11",
+      "prompt": "Can you show me a breakdown of monitored vs. unmonitored tables grouped by schema?",
+      "expected": "trigger",
+      "rationale": "Coverage breakdown by schema — warehouse discovery + gap analysis"
+    },
+    {
+      "id": "should-12",
+      "prompt": "We're getting too many alerts on low-priority tables and missing issues on critical ones. Help me reprioritize.",
+      "expected": "trigger",
+      "rationale": "Coverage mismatch — needs use-case criticality reassessment"
+    },
+    {
+      "id": "should-13",
+      "prompt": "What tables in our analytics schema have the most downstream dependencies but no monitors?",
+      "expected": "trigger",
+      "rationale": "Importance-based gap detection using lineage context"
+    },
+    {
+      "id": "should-14",
+      "prompt": "Run a monitoring coverage assessment across our BigQuery datasets.",
+      "expected": "trigger",
+      "rationale": "Explicit coverage assessment request for a specific warehouse"
+    },
+    {
+      "id": "should-15",
+      "prompt": "I want to see which use cases are at risk because of missing monitors.",
+      "expected": "trigger",
+      "rationale": "Use-case risk analysis tied to coverage gaps"
+    },
+    {
+      "id": "should-not-01",
+      "prompt": "Create a freshness monitor on the orders table with a 2-hour threshold.",
+      "expected": "no-trigger",
+      "rationale": "Specific monitor creation for a known table — use monitor-creation skill"
+    },
+    {
+      "id": "should-not-02",
+      "prompt": "We got a freshness alert on raw_events. What happened and what's downstream?",
+      "expected": "no-trigger",
+      "rationale": "Active alert triage — use prevent skill's Workflow 3"
+    },
+    {
+      "id": "should-not-03",
+      "prompt": "I'm modifying the stg_payments dbt model to change a join. What's the blast radius?",
+      "expected": "no-trigger",
+      "rationale": "Impact assessment before code change — use prevent skill"
+    },
+    {
+      "id": "should-not-04",
+      "prompt": "How do I delete the volume monitor I set up on dim_customers?",
+      "expected": "no-trigger",
+      "rationale": "Editing/deleting an existing monitor — not coverage analysis"
+    },
+    {
+      "id": "should-not-05",
+      "prompt": "Can you help me push metadata from our Databricks warehouse to Monte Carlo?",
+      "expected": "no-trigger",
+      "rationale": "Push ingestion — use push-ingestion skill"
+    },
+    {
+      "id": "should-not-06",
+      "prompt": "Help me write a Python script to parse Airflow logs.",
+      "expected": "no-trigger",
+      "rationale": "General scripting — unrelated to monitoring coverage"
+    },
+    {
+      "id": "should-not-07",
+      "prompt": "How do I configure Slack notifications for Monte Carlo incidents?",
+      "expected": "no-trigger",
+      "rationale": "Notification setup — not coverage analysis"
+    },
+    {
+      "id": "should-not-08",
+      "prompt": "Set up a custom SQL rule monitor that checks for NULL values in the revenue column of daily_metrics.",
+      "expected": "no-trigger",
+      "rationale": "Specific monitor creation — use monitor-creation skill"
+    },
+    {
+      "id": "should-not-09",
+      "prompt": "Can you update the threshold on my existing row count monitor for the users table?",
+      "expected": "no-trigger",
+      "rationale": "Modifying an existing monitor — not coverage analysis"
+    },
+    {
+      "id": "should-not-10",
+      "prompt": "I need to add a new column to the orders model in models/marts/orders.sql.",
+      "expected": "no-trigger",
+      "rationale": "dbt model edit — use prevent skill for impact assessment"
+    }
+  ]
+}
