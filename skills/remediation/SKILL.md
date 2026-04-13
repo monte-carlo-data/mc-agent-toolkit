@@ -264,21 +264,15 @@ Based on the TSA root cause and available tools, determine the action:
 > **Risk:** [what could go wrong, blast radius]
 > **Rollback:** [how to undo if the fix causes new problems]"
 
-Read `references/safety.md` for detailed safety protocols.
-
 #### Step 3: Execute (with safety rails)
 
-**Safety rules — these are non-negotiable:**
+Before executing, read `references/safety.md` for the full safety protocol. The essentials:
 
-1. **Always explain before executing.** Never run a remediation action without first telling the user what you're about to do and why.
-
-2. **Confirm destructive operations.** Any action that modifies data, restarts a pipeline, triggers a job, or changes configuration requires explicit user confirmation. Ask and wait for "yes", "go ahead", "proceed", or similar.
-
-3. **Ask the user when uncertain.** If you're not confident the action will fix the issue without side effects, say so. Present what you know, what you're unsure about, and ask the user how they'd like to proceed.
-
-4. **One action at a time.** Don't chain multiple remediation actions. Execute one, verify the result, then decide on the next step.
-
-5. **Log everything.** After each action, document what you did on the alert using `createOrUpdateAlertComment`.
+- **Explain before executing** — never take action without telling the user what and why
+- **Confirm destructive operations** — wait for explicit user approval
+- **Ask the user when uncertain** — don't guess at a fix
+- **One action at a time** — execute, verify, then decide next step
+- **Log everything** — document each action on the alert via `createOrUpdateAlertComment`
 
 #### Step 4: Verify the fix
 
