@@ -3,7 +3,7 @@
 # release.sh — Bump versions, update changelogs, and open a release PR.
 #
 # Usage:
-#   ./scripts/release.sh <patch|minor|major|X.Y.Z> [--push] [--dry-run]
+#   ./scripts/release.sh <patch|minor|major|X.Y.Z> [--push] [--dry-run] [--force]
 #
 # Examples:
 #   ./scripts/release.sh patch              # 1.0.0 → 1.0.1, branch + commit locally
@@ -46,6 +46,7 @@ CHANGELOG_FILES=(
 # ── Defaults ────────────────────────────────────────────────────────────────
 PUSH=false
 DRY_RUN=false
+FORCE=false
 BUMP_TYPE=""
 
 # ── Parse arguments ─────────────────────────────────────────────────────────
@@ -58,6 +59,7 @@ for arg in "$@"; do
   case "$arg" in
     --push)    PUSH=true ;;
     --dry-run) DRY_RUN=true ;;
+    --force)   FORCE=true ;;
     patch|minor|major) BUMP_TYPE="$arg" ;;
     [0-9]*.[0-9]*.[0-9]*)  BUMP_TYPE="explicit"; EXPLICIT_VERSION="$arg" ;;
     -h|--help) usage ;;
@@ -101,8 +103,9 @@ if [[ "$DRY_RUN" == false ]]; then
   fi
 
   CURRENT_BRANCH=$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD)
-  if [[ "$CURRENT_BRANCH" != "main" ]]; then
+  if [[ "$CURRENT_BRANCH" != "main" && "$FORCE" == false ]]; then
     echo "Error: Must be on 'main' to release (currently on '$CURRENT_BRANCH')."
+    echo "       Use --force to override."
     exit 1
   fi
 
