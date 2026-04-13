@@ -171,6 +171,15 @@ getTable(mcon="<downstream_mcon>")
 getMonitors(mcons=["<affected_table_mcon>"])
 ```
 
+For **Custom SQL** or **Validation** alerts, also fetch the monitor configuration to understand the exact rule that breached:
+```
+getMonitors(
+  monitor_ids=["<monitor_id_from_alert>"],
+  include_fields=["config"]
+)
+```
+The config contains the SQL query or validation conditions — this tells you exactly what the monitor checks, which is essential for understanding what went wrong and what the fix should be.
+
 ```
 getQueriesForTable(
   mcon="<affected_table_mcon>",
@@ -183,13 +192,16 @@ Use `query_type="destination"` to find queries that write to this table (pipelin
 
 #### Investigation summary
 
-After completing Steps 1–6, synthesize your findings into a clear summary:
+**Wait for TSA to complete before presenting findings.** Do not present partial results — the TSA root cause analysis and its verifications section are critical for choosing the right remediation action. If TSA is still running, keep polling; gather Steps 4–6 in the meantime.
+
+After all steps are complete, synthesize your findings into a clear summary:
 
 1. **What happened:** alert type, when it fired, severity
 2. **Root cause:** TSA findings (or your best assessment if TSA failed)
-3. **Blast radius:** N downstream consumers, any key assets affected
-4. **Pipeline context:** which queries/jobs write to this table, when they last ran
-5. **Monitoring:** what monitors exist, any gaps
+3. **TSA verifications:** specific checks from the TSA `full_response` that can confirm the root cause or serve as remediation steps
+4. **Blast radius:** N downstream consumers, any key assets affected
+5. **Pipeline context:** which queries/jobs write to this table, when they last ran
+6. **Monitoring:** what monitors exist, any gaps. Note recurring patterns (e.g., "16 incidents in 30 days" signals a chronic issue, not a one-off)
 
 Present this summary to the user before proceeding to remediation.
 
