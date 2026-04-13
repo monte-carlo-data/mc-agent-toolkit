@@ -271,32 +271,8 @@ Before executing, read `references/safety.md` for the full safety protocol. The 
 - **Explain before executing** — never take action without telling the user what and why
 - **Confirm destructive operations** — wait for explicit user approval
 - **Ask the user when uncertain** — don't guess at a fix
-- **One action at a time** — execute, verify, then decide next step
+- **One action at a time** — execute one action, then decide next step
 - **Log everything** — document each action on the alert via `createOrUpdateAlertComment`
-
-#### Step 4: Verify the fix
-
-After executing the remediation action, verify it worked:
-
-1. **Wait for the action to take effect** — pipeline runs take time, dbt jobs need to complete
-2. **Re-check the table:**
-   ```
-   getTable(mcon="<affected_table_mcon>")
-   ```
-   Check: has `last_activity` updated? Have row counts changed as expected?
-
-3. **Re-check the alert:**
-   ```
-   getAlerts(alert_ids=["<alert_id>"])
-   ```
-   Has the alert auto-resolved? Is the condition still firing?
-
-4. **Report to the user:**
-   > "Remediation result:
-   > - Action taken: [what was done]
-   > - Table status: [current freshness/volume/schema state]
-   > - Alert status: [resolved/still firing]
-   > - Next steps: [if any]"
 
 ---
 
