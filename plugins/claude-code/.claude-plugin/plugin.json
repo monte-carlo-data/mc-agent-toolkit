@@ -15,6 +15,7 @@
     "prevent",
     "push-ingestion",
     "validation-notebook",
+    "monitoring-advisor",
     "dbt",
     "schema"
   ],
