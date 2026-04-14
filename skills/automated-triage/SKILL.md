@@ -107,6 +107,16 @@ Read `references/triage-stages.md` for a full description of each stage and how 
 
 The triage process is not fixed. Read the stages reference to understand the options and tradeoffs at each step, then design a workflow that fits your team's needs.
 
+## The longer-term direction
+
+Most teams move through roughly the same arc, though the pace and path vary:
+
+- **Start with recommendations.** Run manually and have the agent post comments describing what it found and what it would do — no actual status changes or external actions. Use this to tune the workflow until the output matches how your team would respond manually.
+- **Automate, still in recommendation mode.** Once the output looks right, put it on a schedule. Keep it in recommendation mode while you validate it's behaving well on real traffic.
+- **Replace recommendations with actions.** When you're confident, swap the comment recommendations for real actions — status updates, Slack messages, ticket creation.
+
+Don't force this progression — it's a direction, not a checklist. The path will depend on how your environment behaves and how much trust you want to build before each step.
+
 ---
 
 ## Activation flow
@@ -146,20 +156,19 @@ At each stage, draw on the options in `references/triage-stages.md` to make conc
 
 **For existing-file runs:** use whichever mode the user chose in Step 2.
 
-### Step 4: Offer to save a copy
+### Step 4: Wrap up
 
-After the workflow completes, ask: **"Want me to save a copy of this workflow to your project (e.g. `triage.md`) so you can customise it?"** If yes, write the current workflow to the path they choose.
+After the workflow completes:
 
----
+1. Ask: **"Want me to save a copy of our workflow to your project (e.g. `triage.md`) so you can customise it?"** If yes, write it to the path they choose.
 
-## Getting started
+2. Then present next steps based on what just happened and what you were asked to do in the first place.  For example:
 
-Build up your triage automation in three stages:
+   > "What would you like to do next?
+   > - **Refine the workflow** — walk through the stages and tune what's not working (filter, scoring weights, troubleshooting threshold, action mapping)
+   > - **Test on a different alert set** — re-run on a different time window or day to see how it handles a different set of alerts
+   > - **Set up a schedule** — automate this to run on a fixed cadence using the `/schedule` skill
+   > - **Something else** — just tell me"
 
-**1. Manual runs with recommendations.** Run the triage workflow manually and configure it to post comments with recommendations only — no status updates or external actions. Use this to tune your triage prompt until the classifications and recommendations match how your team would respond manually.
+   Adapt the options to context — if the run had many LOW-scoring alerts with no troubleshooting, lean towards refinement; if results looked solid, lean towards scheduling.
 
-**2. Automate with recommendations.** Once you're happy with the output, automate the process to pick up new alerts on a schedule. Keep it in recommendations-only mode and monitor the results to verify the recommended actions meet your expectations.
-
-**3. Replace recommendations with actions.** When you're confident in the automation, replace comment recommendations with real actions — status updates, Slack messages, ticket creation, or whatever fits your workflow.
-
-See `references/triage-example.md` for a complete working example you can use as a starting point.
