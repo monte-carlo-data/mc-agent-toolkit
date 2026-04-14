@@ -135,7 +135,14 @@ Ask whether the user has an existing triage workflow file, or is starting fresh.
 
 Execute the workflow from the file, following its instructions exactly. Do not improvise steps or add actions not described in the file.
 
-**For first runs (starting fresh):** always run step by step — after each stage completes, summarise what it produced, proactively suggest alternatives or adjustments, and wait for confirmation before continuing.
+**For first runs (starting fresh):** always run step by step — after each stage completes, summarise what it produced, proactively suggest alternatives or adjustments based on what you observed, and wait for confirmation before continuing.
+
+At each stage, draw on the options in `references/triage-stages.md` to make concrete suggestions:
+
+- **After fetching alerts** — suggest filter adjustments if the set looks too broad or narrow: `NOT_ACKNOWLEDGED` to skip already-triaged alerts, domain/audience filters if alerts span multiple teams, a slightly longer time window for the initial testing if we need more examples to work with.
+- **After scoring** — Suggest whether to adjust the troubleshooting filter (e.g. run when either score is HIGH, not just both MEDIUM+) or tune `alert_assessment` via `user_instructions`.
+- **After troubleshooting** — if the TSA found a clear root cause, suggest whether to declare an incident severity, assign an owner.
+- **After actions** — note cases where the default action mapping may not fit, e.g. a verified incident that warrants a Slack message or ticket rather than just a status update.
 
 **For existing-file runs:** use whichever mode the user chose in Step 2.
 
