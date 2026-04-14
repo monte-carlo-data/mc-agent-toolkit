@@ -34,7 +34,7 @@ Take care to avoid triaging too many alerts in one batch — where required, spl
 
 ## Stage 2: Initial investigation (alert scoring)
 
-**Tool:** `alert_assessment` *(extended toolset required)*
+**Tool:** `alert_assessment`
 
 This stage replicates what a knowledgeable engineer does when scanning the alert feed — quickly assessing what's fired and how serious it looks. `alert_assessment` is lightweight enough to run on every alert.
 

@@ -40,45 +40,6 @@ Do not activate when the user is:
 
 ---
 
-## Prerequisites
-
-**Alert scoring (`alert_assessment`) requires the extended MCP toolset.** Deep troubleshooting (`run_troubleshooting_agent`, `get_troubleshooting_agent_results`) is available in the default toolset.
-
-To enable the extended toolset for alert scoring, update your MCP server configuration:
-
-**Claude Code** (`.claude/settings.json` or `~/.claude/settings.json`):
-```json
-{
-  "mcpServers": {
-    "monte-carlo": {
-      "command": "...",
-      "args": ["..."],
-      "env": {
-        "toolset": "extended"
-      }
-    }
-  }
-}
-```
-
-**Cursor** (`.cursor/mcp.json`):
-```json
-{
-  "mcpServers": {
-    "monte-carlo": {
-      "command": "...",
-      "env": {
-        "toolset": "extended"
-      }
-    }
-  }
-}
-```
-
-Without `toolset: extended`, alert scoring (`alert_assessment`) will fail.
-
----
-
 ## Available MCP tools
 
 All tools are available via the `monte-carlo` MCP server.
@@ -86,7 +47,7 @@ All tools are available via the `monte-carlo` MCP server.
 | Tool                             | Toolset  | Purpose                                                         |
 | -------------------------------- | -------- | --------------------------------------------------------------- |
 | `get_alerts`                          | default  | Fetch recent alerts for a time window                                                                             |
-| `alert_assessment`                    | extended | Score an alert by confidence and impact (HIGH/MEDIUM/LOW each)                                                    |
+| `alert_assessment`                    | default  | Score an alert by confidence and impact (HIGH/MEDIUM/LOW each)                                                    |
 | `run_troubleshooting_agent`           | default  | Run the Monte Carlo Troubleshooting Agent on a single alert; async by default — returns immediately, reuses existing results when available |
 | `get_troubleshooting_agent_results`   | default  | Poll an async troubleshooting run by `incident_id`; returns status (`not_found`/`running`/`success`/`failed`) and results when complete |
 | `update_alert`                        | default  | Update an alert's status and/or declare an incident by setting severity                                           |
@@ -125,7 +86,7 @@ When this skill is activated, follow this sequence in order.
 
 ### Step 1: Check MCP tools
 
-Verify that `get_alerts`, `alert_assessment`, and `run_troubleshooting_agent` are accessible. If `alert_assessment` is missing, show the extended toolset configuration from the Prerequisites section and stop — the user needs to fix this before continuing.
+Verify that `get_alerts`, `alert_assessment`, and `run_troubleshooting_agent` are accessible. If any are missing, check that the Monte Carlo MCP server is configured and authenticated, then stop.
 
 ### Step 2: Orient the user to their workflow
 
