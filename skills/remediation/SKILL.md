@@ -1,13 +1,6 @@
 ---
 name: monte-carlo-remediation
-description: |
-  Activates when a user asks to remediate, fix, or respond to a data quality alert
-  or incident. Investigates the alert using Monte Carlo MCP tools (alerts, TSA root
-  cause analysis, lineage, table metadata), discovers what remediation tools are
-  available via connected MCP servers, reasons about the appropriate fix, and
-  executes it — or escalates to a human with full context when uncertain. Do not
-  wait to be asked for details: once activated, run the full investigation workflow
-  before proposing any action.
+description: Investigate and remediate data quality alerts using Monte Carlo MCP tools. Runs root cause analysis, assesses blast radius, discovers available tools (MCP/CLI/API), proposes and executes fixes, or escalates with full context when uncertain.
 version: 1.0.0
 ---
 
@@ -48,7 +41,9 @@ Do not activate when the user is:
 
 ### Monte Carlo MCP server (investigation + post-remediation)
 
-The Monte Carlo MCP server (`monte-carlo`) provides the investigation tools used in the workflows below. The workflows reference key tools by name (e.g., `getAlerts`, `runTroubleshootingAgent`, `getAssetLineage`), but **use any Monte Carlo tool that helps** — the server has additional tools beyond what the workflows explicitly call out. Explore what's available.
+The Monte Carlo MCP server (`monte-carlo`) provides the investigation tools used in the workflows below. The workflows reference key tools by name (e.g., `get_alerts`, `run_troubleshooting_agent`, `get_asset_lineage`), but **use any Monte Carlo tool that helps** — the server has additional tools beyond what the workflows explicitly call out. Explore what's available.
+
+> **Note on tool call examples:** The code blocks below show key parameters to guide you. Always check the tool's own description for the complete parameter list and exact parameter names — they are authoritative.
 
 ### External tools (remediation execution)
 
@@ -69,7 +64,7 @@ Before proposing ANY remediation action, you MUST complete this investigation. D
 #### Step 1: Get alert context
 
 ```
-getAlerts(
+get_alerts(
   alert_ids=["<alert_id>"],
 )
 ```
@@ -78,7 +73,7 @@ If the user provided a table name instead of an alert ID:
 ```
 search(query="<table_name>")
 → extract MCON
-getAlerts(
+get_alerts(
   table_mcons=["<mcon>"],
   created_after="<7 days ago>",
   created_before="<now>",
@@ -92,14 +87,14 @@ Extract from the alert: `alert_type` (Freshness, Volume, Schema Changes, etc.), 
 #### Step 2: Assess triage priority
 
 ```
-alertAssessment(
+alert_assessment(
   incident_id="<alert_uuid>"
 )
 ```
 
 This returns `triage_confidence` (HIGH/MEDIUM/LOW), `alert_impact` (HIGH/MEDIUM/LOW), and a summary. Use this to decide urgency:
 
-- **HIGH impact + HIGH confidence** → proceed immediately to TSA
+- **HIGH impact + HIGH confidence** → proceed immediately to Troubleshooting Agent (TSA) analysis
 - **LOW impact or LOW confidence** → still run TSA, but note to the user that this may not warrant immediate remediation
 
 #### Step 3: Root cause analysis (TSA)
@@ -107,7 +102,7 @@ This returns `triage_confidence` (HIGH/MEDIUM/LOW), `alert_impact` (HIGH/MEDIUM/
 **Always use async mode.** TSA analysis takes 4–8 minutes — sync mode will time out.
 
 ```
-runTroubleshootingAgent(
+run_troubleshooting_agent(
   incident_id="<alert_uuid>",
   async_mode=true
 )
@@ -116,7 +111,7 @@ runTroubleshootingAgent(
 **While TSA runs, proceed with Steps 4–6 in parallel** — gather lineage, table context, and query data while waiting. Then poll for TSA results:
 
 ```
-getTroubleshootingAgentResults(
+get_troubleshooting_agent_results(
   incident_id="<alert_uuid>"
 )
 ```
@@ -132,15 +127,22 @@ Status values:
 #### Step 4: Assess blast radius
 
 ```
-getAssetLineage(
+get_asset_lineage(
   mcons=["<affected_table_mcon>"],
   direction="DOWNSTREAM"
 )
 ```
 
+For BI report coverage:
+```
+get_downstream_bi_reports(
+  mcon="<affected_table_mcon>"
+)
+```
+
 Then for upstream investigation:
 ```
-getAssetLineage(
+get_asset_lineage(
   mcons=["<affected_table_mcon>"],
   direction="UPSTREAM"
 )
@@ -151,7 +153,7 @@ Note: `has_relationships=false` means no dependencies tracked — do not assume 
 #### Step 5: Gather table context
 
 ```
-getTable(
+get_table(
   mcon="<affected_table_mcon>",
   include_fields=true,
   include_table_capabilities=true
@@ -162,18 +164,18 @@ Extract: last activity timestamps, row counts, schema, monitoring status, import
 
 For key downstream tables identified in Step 4, also fetch their details:
 ```
-getTable(mcon="<downstream_mcon>")
+get_table(mcon="<downstream_mcon>")
 ```
 
-#### Step 6: Check monitoring coverage and recent queries
+#### Step 6: Check alert context, monitoring, and recent queries
 
 ```
-getMonitors(mcons=["<affected_table_mcon>"])
+get_monitors(mcons=["<affected_table_mcon>"])
 ```
 
 For **Custom SQL** or **Validation** alerts, also fetch the monitor configuration to understand the exact rule that breached:
 ```
-getMonitors(
+get_monitors(
   monitor_ids=["<monitor_id_from_alert>"],
   include_fields=["config"]
 )
@@ -181,7 +183,7 @@ getMonitors(
 The config contains the SQL query or validation conditions — this tells you exactly what the monitor checks, which is essential for understanding what went wrong and what the fix should be.
 
 ```
-getQueriesForTable(
+get_queries_for_table(
   mcon="<affected_table_mcon>",
   query_type="destination",
   limit=10
@@ -225,6 +227,7 @@ For detailed guidance on discovery across all three categories, read `references
 
 After checking, summarize what's available:
 
+**Example:**
 > "For this remediation, I can:
 > - ✅ Investigate via Monte Carlo (MCP connected)
 > - ✅ Restart the Airflow DAG (Airflow MCP connected)
@@ -238,7 +241,7 @@ When no tool (MCP, CLI, or API) is available for a needed action:
 1. **Always produce the remediation plan** — describe exactly what needs to happen, step by step
 2. **Provide runnable commands** — give the user the exact commands they can run manually (e.g., `airflow dags trigger <dag_id>`, `dbt run --select <model>`)
 3. **Present findings and ask for next steps** — tell the user what you found, what you recommend, and ask how they'd like to proceed
-4. **Document on the alert** — use `createOrUpdateAlertComment` to record the diagnosis and recommended fix
+4. **Document on the alert** — use `create_or_update_alert_comment` to record the diagnosis and recommended fix
 
 ---
 
@@ -287,7 +290,7 @@ Before executing, read `references/safety.md` for the full safety protocol. The 
 - **Confirm destructive operations** — wait for explicit user approval
 - **Ask the user when uncertain** — don't guess at a fix
 - **One action at a time** — execute one action, then decide next step
-- **Log everything** — document each action on the alert via `createOrUpdateAlertComment`
+- **Log everything** — document each action on the alert via `create_or_update_alert_comment`
 
 ---
 
@@ -303,12 +306,12 @@ Ask the user what status to set:
 - `EXPECTED` — the alert fired on expected behavior (e.g., planned maintenance)
 - `NO_ACTION_NEEDED` — the issue resolved itself or is not actionable
 
-Then call `updateAlert(alert_id="<alert_uuid>", status="<chosen_status>")`.
+Then call `update_alert(alert_id="<alert_uuid>", status="<chosen_status>")`.
 
 #### Step 2: Document the remediation
 
 ```
-createOrUpdateAlertComment(
+create_or_update_alert_comment(
   alert_id="<alert_uuid>",
   comment="## Remediation Summary\n\n**Root cause:** [TSA findings]\n**Action taken:** [what was done]\n**Result:** [outcome]\n**Remediated by:** AI agent via remediation skill\n**Timestamp:** [ISO timestamp]"
 )
@@ -333,4 +336,4 @@ Do not automatically create monitors or tickets — suggest them and let the use
 - **NEVER chain multiple remediation actions without verifying each one.** One action at a time.
 - **NEVER modify data directly** (DELETE, UPDATE, DROP) without explicit user confirmation AND a clearly stated rollback plan.
 - **NEVER mark an alert as FIXED before verifying the fix.** Check that the underlying condition has actually improved.
-- **NEVER remediate silently.** Always document what was done via `createOrUpdateAlertComment`.
+- **NEVER remediate silently.** Always document what was done via `create_or_update_alert_comment`.

@@ -134,6 +134,7 @@ You should consider yourself "uncertain" and ask the user for direction when:
 
 **When in doubt, state your confidence level:**
 
+**Example:**
 > "I'm moderately confident (60-70%) that the root cause is [X], based on [evidence]. However, [alternative explanation] is also possible. I'd recommend [safer action] first. If that doesn't resolve it, the data platform team may need to investigate further. How would you like to proceed?"
 
 ## Rollback planning
