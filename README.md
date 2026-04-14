@@ -14,6 +14,10 @@ The toolkit bundles the following capabilities as a single **mc-agent-toolkit** 
 | **Generate Validation Notebook** | Generates SQL validation notebooks for dbt model changes, with targeted queries comparing baseline and development data. | [README](skills/generate-validation-notebook/README.md) |
 | **Push Ingestion** | Generates warehouse-specific collection scripts for pushing metadata, lineage, and query logs to Monte Carlo. | [README](skills/push-ingestion/README.md) |
 | **Automated Triage** | Guides AI agents through automated alert triage — scoring alerts, running deep troubleshooting on high-signal ones, classifying, and taking actions. | [SKILL](skills/automated-triage/SKILL.md) |
+| **Storage Cost Analysis** | Identifies storage waste patterns (unread, zombie, dead-end tables) and recommends safe cleanup with cost estimates. | [README](skills/storage-cost-analysis/README.md) |
+| **Performance Diagnosis** | Diagnoses slow pipelines and expensive queries across Airflow, dbt, and Databricks with tiered investigation. | [README](skills/performance-diagnosis/README.md) |
+| **Remediation** | Investigates and remediates data quality alerts — runs TSA root cause analysis, discovers available tools, executes fixes (or escalates), and documents the resolution. | [README](skills/remediation/README.md) |
+| **Agent Monitoring** | Investigation and monitor creation guide for AI agent observability. | [README](skills/agent-monitoring/README.md) |
 
 ## Installing the plugin (recommended)
 

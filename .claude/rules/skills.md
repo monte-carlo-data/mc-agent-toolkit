@@ -50,3 +50,12 @@ getAssetLineage(...)
 ```
 
 The actual MCP tool names follow the `mcp__<server>__<tool_name>` convention where `tool_name` is always snake_case. Using camelCase causes the agent to hallucinate tool names that don't exist.
+
+## Keep READMEs in sync when adding or renaming skills
+
+When adding a new skill or renaming an existing one, update the skill tables in **both**:
+
+1. `README.md` (root) — the Features table
+2. `skills/README.md` — the Available Skills table
+
+These are the two places users discover skills. A skill that exists but isn't listed in both READMEs is effectively invisible.
