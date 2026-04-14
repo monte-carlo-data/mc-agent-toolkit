@@ -5,6 +5,14 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Cursor will be d
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-04-14
+
+### Changed
+
+- f46cdfb Add remediation skill for investigating and fixing data quality alerts (#39)
+- c5dd6a5 feat: add agent-monitoring skill and plugin (AI-167) (#35)
+- 9884442 feat: add storage cost analysis and performance diagnosis skills (#36)
+
 ## [1.2.0] - 2026-04-13
 
 ### Changed
