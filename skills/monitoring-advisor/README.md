@@ -25,7 +25,7 @@ Install the plugin for your editor — it bundles the skill, hooks, MCP server, 
 
 1. Configure the Monte Carlo MCP server:
    ```
-   claude mcp add --transport http monte-carlo-mcp https://integrations.getmontecarlo.com/mcp
+   claude mcp add --transport http monte-carlo-mcp https://mcp.getmontecarlo.com/mcp
    ```
 
 2. Install the skill:

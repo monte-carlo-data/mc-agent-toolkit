@@ -1,18 +1,29 @@
-name: Create Release on Tag
+name: Create Release on Merge
 
 on:
-  push:
-    tags: ['v*']
+  pull_request:
+    types: [closed]
+    branches: [main]
 
 permissions:
   contents: write
 
 jobs:
   release:
+    if: github.event.pull_request.merged == true && startsWith(github.event.pull_request.head.ref, 'release/v')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Create GitHub Release
-        run: gh release create "${{ github.ref_name }}" --generate-notes --latest
+
+      - name: Extract version from branch name
+        id: version
+        run: echo "tag=${GITHUB_HEAD_REF#release/}" >> "$GITHUB_OUTPUT"
+
+      - name: Create tag and GitHub Release
+        run: |
+          git tag "$TAG" "${{ github.sha }}"
+          git push origin "$TAG"
+          gh release create "$TAG" --generate-notes --latest
         env:
+          TAG: ${{ steps.version.outputs.tag }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
