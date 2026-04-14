@@ -1,11 +1,6 @@
 ---
 name: monte-carlo-automated-triage
-description: |
-  Guides users through setting up and running automated alert triage for
-  their Monte Carlo environment. Activates when a user asks to triage alerts,
-  set up automated triage, run agentic triage, or investigate recent alert
-  activity. Covers MCP setup, the stages of a triage workflow, and how to
-  customise each stage to match how their team responds to alerts manually.
+description: Guides users through automated alert triage for Monte Carlo — scoring alerts, deep troubleshooting on high-signal ones, classifying, and taking actions. Step-by-step with proactive suggestions.
 version: 1.0.0
 ---
 
