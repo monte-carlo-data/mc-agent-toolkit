@@ -51,6 +51,20 @@ getAssetLineage(...)
 
 The actual MCP tool names follow the `mcp__<server>__<tool_name>` convention where `tool_name` is always snake_case. Using camelCase causes the agent to hallucinate tool names that don't exist.
 
+## Create symlinks in all editor plugins when adding a skill
+
+Every skill in `skills/` must have a corresponding symlink in **every** editor plugin's `skills/` directory:
+
+- `plugins/claude-code/skills/<name> → ../../../skills/<name>`
+- `plugins/cursor/skills/<name> → ../../../skills/<name>`
+- `plugins/codex/skills/<name> → ../../../skills/<name>`
+- `plugins/copilot/skills/<name> → ../../../skills/<name>`
+- `plugins/opencode/skills/<name> → ../../../skills/<name>`
+
+Without these symlinks, the skill won't be discovered by the editor plugin — even if it exists in `skills/` and is listed in the READMEs.
+
+**Verify after adding:** count the directories in `skills/` (excluding `README.md`) and confirm each editor plugin's `skills/` directory has the same count of symlinks.
+
 ## Keep READMEs in sync when adding or renaming skills
 
 When adding a new skill or renaming an existing one, update the skill tables in **both**:

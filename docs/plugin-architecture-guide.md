@@ -66,16 +66,17 @@ This reflects the **current repository structure**.
 ```
 mc-agent-toolkit/
 ├── skills/                              # Shared skill definitions (platform-agnostic)
-│   ├── monitor-creation/
-│   │   ├── SKILL.md
-│   │   └── references/
-│   ├── prevent/
-│   │   ├── SKILL.md
-│   │   └── references/
+│   ├── agent-monitoring/
+│   ├── analyze-root-cause/
+│   ├── automated-triage/
 │   ├── generate-validation-notebook/
-│   │   └── SKILL.md
-│   └── push-ingestion/
-│       └── SKILL.md
+│   ├── monitor-creation/
+│   ├── monitoring-advisor/
+│   ├── performance-diagnosis/
+│   ├── prevent/
+│   ├── push-ingestion/
+│   ├── remediation/
+│   └── storage-cost-analysis/
 │
 ├── plugins/
 │   │
@@ -91,16 +92,13 @@ mc-agent-toolkit/
 │   │       └── cache.py                 # Separate cache (mc_<skill>_* prefixed)
 │   │
 │   │  # --- Each editor: ONE mc-agent-toolkit plugin ---
+│   │  # --- Each editor's skills/ dir must symlink ALL skills from skills/ ---
 │   ├── claude-code/                     # mc-agent-toolkit plugin for Claude Code
 │   │   ├── .claude-plugin/plugin.json
 │   │   ├── .mcp.json
 │   │   ├── hooks/
 │   │   │   └── prevent/                 # Thin adapters → plugins/shared/prevent/lib/
-│   │   ├── skills/
-│   │   │   ├── monitor-creation → symlink
-│   │   │   ├── prevent → symlink
-│   │   │   ├── generate-validation-notebook → symlink
-│   │   │   └── push-ingestion → symlink
+│   │   ├── skills/                      # One symlink per skill → ../../../skills/<name>
 │   │   └── commands/
 │   │       ├── prevent/
 │   │       └── push-ingestion/
@@ -109,14 +107,13 @@ mc-agent-toolkit/
 │   │   ├── .cursor-plugin/plugin.json
 │   │   ├── hooks/
 │   │   │   └── prevent/                 # MC Prevent hook adapters
-│   │   ├── skills/
-│   │   │   ├── monitor-creation → symlink
-│   │   │   └── prevent → symlink
+│   │   ├── skills/                      # One symlink per skill → ../../../skills/<name>
 │   │   └── mcp.json
 │   │
 │   ├── opencode/                        # mc-agent-toolkit plugin for OpenCode
 │   │   ├── src/
 │   │   │   └── prevent/                 # TypeScript feature module (ported from Python)
+│   │   ├── skills/                      # One symlink per skill → ../../../skills/<name>
 │   │   ├── package.json
 │   │   └── opencode.json
 │   │
@@ -129,17 +126,13 @@ mc-agent-toolkit/
 │   │   │       ├── lib → symlink        # Shared hook logic (sibling of scripts)
 │   │   │       ├── pre_edit_hook.py
 │   │   │       └── ...
-│   │   ├── skills/
-│   │   │   ├── monitor-creation → symlink
-│   │   │   └── prevent → symlink
+│   │   ├── skills/                      # One symlink per skill → ../../../skills/<name>
 │   │   └── scripts/
 │   │       ├── install.sh               # Installs hooks to .github/hooks/
 │   │       └── mc-prevent.json          # Hook registration template for target project
 │   │
 │   └── codex/                           # mc-agent-toolkit plugin for Codex
-│       └── skills/
-│           ├── monitor-creation → symlink
-│           └── prevent → symlink
+│       └── skills/                      # One symlink per skill → ../../../skills/<name>
 ```
 
 **Key distinctions:**
