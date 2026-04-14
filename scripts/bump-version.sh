@@ -1,17 +1,18 @@
 #!/usr/bin/env bash
 #
-# release.sh — Bump versions, update changelogs, and open a release PR.
+# bump-version.sh — Bump versions and update changelogs across all plugins.
+#
+# Run this on your feature branch before committing. It updates all 5 plugin
+# config files and changelogs in one step. Commit the result as part of your PR.
 #
 # Usage:
-#   ./scripts/release.sh <patch|minor|major|X.Y.Z> [--push] [--dry-run] [--force]
+#   ./scripts/bump-version.sh <patch|minor|major|X.Y.Z> [--dry-run]
 #
 # Examples:
-#   ./scripts/release.sh patch              # 1.0.0 → 1.0.1, branch + commit locally
-#   ./scripts/release.sh minor --push       # 1.0.0 → 1.1.0, push branch + open PR
-#   ./scripts/release.sh 2.0.0 --dry-run    # Preview what would happen
-#
-# After the PR merges, a GitHub Actions workflow tags the commit and creates
-# a GitHub Release automatically.
+#   ./scripts/bump-version.sh patch          # 1.0.0 → 1.0.1
+#   ./scripts/bump-version.sh minor          # 1.0.0 → 1.1.0
+#   ./scripts/bump-version.sh 2.0.0          # Set explicit version
+#   ./scripts/bump-version.sh patch --dry-run  # Preview without changes
 #
 set -euo pipefail
 
@@ -44,22 +45,18 @@ CHANGELOG_FILES=(
 )
 
 # ── Defaults ────────────────────────────────────────────────────────────────
-PUSH=false
 DRY_RUN=false
-FORCE=false
 BUMP_TYPE=""
 
 # ── Parse arguments ─────────────────────────────────────────────────────────
 usage() {
-  echo "Usage: $0 <patch|minor|major|X.Y.Z> [--push] [--dry-run]"
+  echo "Usage: $0 <patch|minor|major|X.Y.Z> [--dry-run]"
   exit 1
 }
 
 for arg in "$@"; do
   case "$arg" in
-    --push)    PUSH=true ;;
     --dry-run) DRY_RUN=true ;;
-    --force)   FORCE=true ;;
     patch|minor|major) BUMP_TYPE="$arg" ;;
     [0-9]*.[0-9]*.[0-9]*)  BUMP_TYPE="explicit"; EXPLICIT_VERSION="$arg" ;;
     -h|--help) usage ;;
@@ -97,26 +94,8 @@ echo ""
 
 # ── Preflight checks ───────────────────────────────────────────────────────
 if [[ "$DRY_RUN" == false ]]; then
-  if [[ -n "$(git -C "$REPO_ROOT" status --porcelain)" ]]; then
-    echo "Error: Working tree is not clean. Commit or stash changes first."
-    exit 1
-  fi
-
-  CURRENT_BRANCH=$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD)
-  if [[ "$CURRENT_BRANCH" != "main" && "$FORCE" == false ]]; then
-    echo "Error: Must be on 'main' to release (currently on '$CURRENT_BRANCH')."
-    echo "       Use --force to override."
-    exit 1
-  fi
-
   if git -C "$REPO_ROOT" rev-parse "v$NEW_VERSION" >/dev/null 2>&1; then
     echo "Error: Tag v$NEW_VERSION already exists."
-    exit 1
-  fi
-
-  if git -C "$REPO_ROOT" show-ref --verify --quiet "refs/heads/release/v$NEW_VERSION" 2>/dev/null ||
-     git -C "$REPO_ROOT" ls-remote --exit-code --heads origin "release/v$NEW_VERSION" >/dev/null 2>&1; then
-    echo "Error: Branch release/v$NEW_VERSION already exists."
     exit 1
   fi
 fi
@@ -195,44 +174,9 @@ for file in "${CHANGELOG_FILES[@]}"; do
   fi
 done
 
-# ── Create release branch and commit ──────────────────────────────────────
-RELEASE_BRANCH="release/v$NEW_VERSION"
+# ── Done ──────────────────────────────────────────────────────────────────
 echo ""
-if [[ "$DRY_RUN" == true ]]; then
-  echo "[dry-run] Would create branch: $RELEASE_BRANCH"
-  echo "[dry-run] Would commit: release: v$NEW_VERSION"
-else
-  cd "$REPO_ROOT"
-  git checkout -b "$RELEASE_BRANCH"
-  git add "${VERSION_FILES[@]}" "${CHANGELOG_FILES[@]}"
-  git commit -m "release: v$NEW_VERSION"
-  echo "Created branch: $RELEASE_BRANCH"
-  echo "Committed: release: v$NEW_VERSION"
-fi
-
-# ── Push and open PR ──────────────────────────────────────────────────────
-echo ""
-if [[ "$PUSH" == true ]]; then
-  if [[ "$DRY_RUN" == true ]]; then
-    echo "[dry-run] Would push branch and open PR"
-  else
-    git -C "$REPO_ROOT" push -u origin "$RELEASE_BRANCH"
-    if command -v gh &>/dev/null; then
-      gh pr create --title "release: v$NEW_VERSION" --body "Bump version to $NEW_VERSION and update changelogs."
-      echo ""
-      echo "PR created. Merging it will automatically tag and create a GitHub Release."
-    else
-      echo "Pushed branch. Open a PR manually:"
-      echo "  gh pr create --title 'release: v$NEW_VERSION'"
-    fi
-  fi
-else
-  if [[ "$DRY_RUN" == false ]]; then
-    echo "Done! To publish the release, push the branch and open a PR:"
-    echo "  git push -u origin $RELEASE_BRANCH"
-    echo "  gh pr create --title 'release: v$NEW_VERSION'"
-    echo ""
-    echo "Or next time, use --push to do this automatically:"
-    echo "  ./scripts/release.sh $BUMP_TYPE --push"
-  fi
+if [[ "$DRY_RUN" == false ]]; then
+  echo "Version bumped to $NEW_VERSION."
+  echo "Files updated — commit them as part of your PR."
 fi

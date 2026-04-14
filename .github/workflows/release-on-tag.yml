@@ -1,27 +1,40 @@
-name: Create Release on Merge
+name: Create Release on Version Bump
 
 on:
-  pull_request:
-    types: [closed]
+  push:
     branches: [main]
+    paths:
+      - 'plugins/claude-code/.claude-plugin/plugin.json'
 
 permissions:
   contents: write
 
 jobs:
   release:
-    if: github.event.pull_request.merged == true && startsWith(github.event.pull_request.head.ref, 'release/v')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
-      - name: Extract version from branch name
+      - name: Detect version change
         id: version
-        run: echo "tag=${GITHUB_HEAD_REF#release/}" >> "$GITHUB_OUTPUT"
+        run: |
+          NEW_VERSION=$(grep -o '"version": *"[^"]*"' plugins/claude-code/.claude-plugin/plugin.json | head -1 | sed 's/.*"\([0-9][^"]*\)".*/\1/')
+          OLD_VERSION=$(git show HEAD~1:plugins/claude-code/.claude-plugin/plugin.json 2>/dev/null | grep -o '"version": *"[^"]*"' | head -1 | sed 's/.*"\([0-9][^"]*\)".*/\1/' || echo "")
+          if [[ "$NEW_VERSION" != "$OLD_VERSION" && -n "$NEW_VERSION" ]]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "tag=v$NEW_VERSION" >> "$GITHUB_OUTPUT"
+            echo "Version changed: $OLD_VERSION → $NEW_VERSION"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No version change detected"
+          fi
 
       - name: Create tag and GitHub Release
+        if: steps.version.outputs.changed == 'true'
         run: |
-          git tag "$TAG" "${{ github.sha }}"
+          git tag "$TAG"
           git push origin "$TAG"
           gh release create "$TAG" --generate-notes --latest
         env:
