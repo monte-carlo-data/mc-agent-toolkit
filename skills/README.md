@@ -13,6 +13,7 @@ Skills are platform-agnostic instruction sets that tell an AI coding agent what 
 | **[Push Ingestion](push-ingestion/)** | Generates warehouse-specific collection scripts for pushing metadata, lineage, and query logs to Monte Carlo. |
 | **[Storage Cost Analysis](storage-cost-analysis/)** | Identifies storage waste patterns (unread, zombie, dead-end tables) and recommends safe cleanup with cost estimates. |
 | **[Performance Diagnosis](performance-diagnosis/)** | Diagnoses slow pipelines and expensive queries across Airflow, dbt, and Databricks with tiered investigation. |
+| **[Remediation](remediation/)** | Investigates and remediates data quality alerts — runs TSA root cause analysis, discovers available tools, executes fixes (or escalates), and documents the resolution. |
 
 ## Standalone Installation
 

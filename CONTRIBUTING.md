@@ -16,7 +16,9 @@ mc-agent-toolkit/
 │   │   ├── SKILL.md
 │   │   └── references/
 │   ├── generate-validation-notebook/
-│   └── push-ingestion/
+│   ├── monitoring-advisor/
+│   ├── push-ingestion/
+│   └── remediation/
 │
 ├── plugins/
 │   ├── shared/                          # Platform-agnostic hook logic
@@ -25,7 +27,7 @@ mc-agent-toolkit/
 │   ├── claude-code/                     # Unified mc-agent-toolkit plugin
 │   │   ├── .claude-plugin/plugin.json
 │   │   ├── hooks/prevent/              # Hook adapters (thin, call shared lib)
-│   │   ├── skills/ (monitor-creation, monitoring-advisor, prevent, generate-validation-notebook, push-ingestion → symlinks)
+│   │   ├── skills/ (monitor-creation, monitoring-advisor, prevent, generate-validation-notebook, push-ingestion, remediation → symlinks)
 │   │   └── commands/ (prevent/, push-ingestion/, monitoring-advisor/)
 │   │
 │   ├── cursor/                          # Unified mc-agent-toolkit plugin
