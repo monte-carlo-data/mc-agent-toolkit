@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "monte-carlo-mcp": {
+      "url": "https://mcp.getmontecarlo.com/mcp"
+    }
+  }
+}

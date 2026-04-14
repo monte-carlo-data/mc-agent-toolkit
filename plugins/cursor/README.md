@@ -1,19 +1,19 @@
-# Cursor Plugins
+# Monte Carlo Agent Toolkit — Cursor Plugin
 
-Monte Carlo plugins for the Cursor editor.
+Monte Carlo's unified agent toolkit plugin for the Cursor editor. Delivers data observability skills and enforcement hooks as named features within a single plugin.
 
-## Available Plugins
+## Available Features
 
-| Plugin | Description |
+| Feature | Description |
 |---|---|
-| `mc-prevent` | Detect and prevent breaking schema changes using Monte Carlo lineage and monitoring data. |
+| **MC Prevent** | Detect and prevent breaking schema changes using Monte Carlo lineage and monitoring data. |
 
 ## Installation
 
 ### One-line install (macOS / Linux)
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/monte-carlo-data/mcd-agent-toolkit/main/plugins/cursor/prevent/scripts/install.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/monte-carlo-data/mc-agent-toolkit/main/plugins/cursor/scripts/install.sh)
 ```
 
 ### Manual install
@@ -21,17 +21,17 @@ bash <(curl -fsSL https://raw.githubusercontent.com/monte-carlo-data/mcd-agent-t
 1. Clone the repository:
 
    ```bash
-   git clone https://github.com/monte-carlo-data/mcd-agent-toolkit.git
-   cd mcd-agent-toolkit
+   git clone https://github.com/monte-carlo-data/mc-agent-toolkit.git
+   cd mc-agent-toolkit
    ```
 
 2. Run the install script:
 
    ```bash
-   bash plugins/cursor/prevent/scripts/install.sh
+   bash plugins/cursor/scripts/install.sh
    ```
 
-   This copies the plugin (with symlinks resolved) to `~/.cursor/plugins/local/mc-prevent`.
+   This copies the plugin (with symlinks resolved) to `~/.cursor/plugins/local/mc-agent-toolkit`.
 
 3. Restart Cursor or run **Developer: Reload Window** from the Command Palette (`Cmd+Shift+P`).
 
@@ -43,9 +43,11 @@ bash <(curl -fsSL https://raw.githubusercontent.com/monte-carlo-data/mcd-agent-t
 
 ## Architecture
 
-Each Cursor plugin is a thin adapter wrapping shared skills and hook logic:
+The toolkit plugin wraps shared skills and hook logic, with each feature namespaced independently:
 
-- **Skills** — symlinked from `skills/` at the repo root (shared with Claude Code)
-- **Hook lib** — symlinked from `hooks/prevent/lib/` (shared decision logic)
-- **Adapter hooks** — Cursor-specific JSON parsing and output formatting
+- **Skills** — symlinked from `skills/` at the repo root (shared across all editors)
+- **Shared hook logic** — symlinked from `plugins/shared/prevent/lib/` (platform-agnostic business logic)
+- **Adapter hooks** — Cursor-specific JSON parsing and output formatting under `hooks/prevent/`
 - **MCP config** — Monte Carlo MCP server connection
+
+See the [plugins README](../README.md) for the overall plugin architecture and editor support comparison.

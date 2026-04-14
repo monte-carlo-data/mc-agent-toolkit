@@ -1,15 +1,15 @@
 {
     "$schema": "https://cursor.com/plugins/marketplace.schema.json",
-    "name": "mcd-agent-toolkit",
+    "name": "mc-marketplace",
     "owner": {
         "name": "Monte Carlo",
         "email": "support@montecarlodata.com"
     },
     "plugins": [
         {
-            "name": "mc-prevent",
-            "source": "./plugins/cursor/prevent",
-            "description": "Detect and prevent breaking schema changes using MC lineage and monitoring."
+            "name": "mc-agent-toolkit",
+            "source": "./plugins/cursor",
+            "description": "Monte Carlo Agent Toolkit — data observability skills and enforcement hooks for AI coding agents."
         }
     ]
 }

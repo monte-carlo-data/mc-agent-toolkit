@@ -33,56 +33,30 @@ Core workflows — table health check, change impact assessment, alert triage, a
 
 ## Setup
 
-### Step 1 — Configure the Monte Carlo MCP server (recommended)
+### Via the mc-agent-toolkit plugin (recommended)
 
-```
-claude mcp add --transport http monte-carlo-mcp https://integrations.getmontecarlo.com/mcp
-```
+Install the plugin for your editor — it bundles the skill, hooks, MCP server, and permissions automatically. See the [main README](../../README.md#installing-the-plugin-recommended) for editor-specific instructions.
 
-This registers the Monte Carlo MCP server with Claude Code. See the [official docs](https://docs.getmontecarlo.com/docs/mcp-server#option-1-oauth-21-recommended-for-mcp-clients-that-support-http-transport) for other MCP clients.
+### Standalone
 
-> **Note:** This step is optional if you install the plugin (Step 2), which bundles its own MCP server. However, configuring the standalone server first is recommended — it's available across all projects and won't be removed if you uninstall the plugin.
+1. Configure the Monte Carlo MCP server:
+   ```
+   claude mcp add --transport http monte-carlo-mcp https://mcp.getmontecarlo.com/mcp
+   ```
 
-### Step 2 — Install the plugin
+2. Install the skill:
+   ```bash
+   npx skills add monte-carlo-data/mc-agent-toolkit --skill prevent
+   ```
 
-See [installation options](https://github.com/monte-carlo-data/mcd-skills#installation) in the main repository README. The plugin bundles hooks, commands, and tool permissions on top of the skill. If you configured the MCP server in Step 1, the plugin will use that alongside its own bundled server.
+3. Authenticate: run `/mcp` in your editor, select `monte-carlo-mcp`, and complete the OAuth flow.
 
-### Step 3 — Authenticate with Monte Carlo
-
-In Claude Code, run:
-
-```
-/mcp
-```
-
-Select the Monte Carlo server (`monte-carlo-mcp` if standalone, or `monte-carlo` if plugin-bundled) and follow the browser-based OAuth flow to log in with your Monte Carlo account.
-
-### Step 4 — Verify the connection
-
-In Claude Code, paste:
-
-> "Test my Monte Carlo connection"
-
-Claude will call `testConnection` and confirm your credentials are working.
-
-### Step 5 — Configure tool permissions (standalone only)
-
-If you're using the standalone MCP server (Step 1) **without** the plugin, add this to `.claude/settings.local.json` in your project:
-
-```json
-{
-  "permissions": {
-    "allow": ["mcp__monte-carlo-mcp__*"]
-  }
-}
-```
-
-The plugin handles this automatically — no manual configuration needed.
+4. Verify: ask your editor "Test my Monte Carlo connection" — it should call `testConnection` and confirm.
 
 <details>
 <summary>Legacy: header-based auth (for MCP clients without HTTP transport)</summary>
 
-If your MCP client doesn't support HTTP transport, configure the MCP server using `.mcp.json.example` with `npx mcp-remote` and header-based authentication. You'll need an MCP server key from Monte Carlo → Settings → API Keys. See the [MCP server docs](https://docs.getmontecarlo.com/docs/mcp-server) for details.
+If your MCP client doesn't support HTTP transport, use `.mcp.json.example` with `npx mcp-remote` and header-based authentication. See the [MCP server docs](https://docs.getmontecarlo.com/docs/mcp-server) for details.
 
 </details>
 

@@ -1,0 +1,26 @@
+{
+  "name": "mc-agent-toolkit",
+  "version": "1.2.0",
+  "description": "Monte Carlo Agent Toolkit — data observability skills and enforcement hooks for AI coding agents.",
+  "author": {
+    "name": "Monte Carlo",
+    "url": "https://www.montecarlodata.com"
+  },
+  "repository": "https://github.com/monte-carlo-data/mc-agent-toolkit",
+  "license": "Apache-2.0",
+  "keywords": [
+    "monte-carlo",
+    "data-observability",
+    "agent-toolkit",
+    "prevent",
+    "push-ingestion",
+    "validation-notebook",
+    "monitoring-advisor",
+    "dbt",
+    "schema"
+  ],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "commands": ["./commands/prevent/", "./commands/push-ingestion/", "./commands/monitoring-advisor/"],
+  "hooks": "./hooks/prevent/hooks.json"
+}

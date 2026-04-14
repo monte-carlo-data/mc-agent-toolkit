@@ -1,17 +1,51 @@
-# mcd-agent-toolkit
+# MC Agent Toolkit
 
-Monte Carlo's official toolkit for AI coding agents. Contains skills and plugins that integrate Monte Carlo's data observability platform — lineage, monitoring, validation and alerting — into your development workflow.
+Monte Carlo's official toolkit for AI coding agents. Brings data observability — lineage, monitoring, validation, alerting, and metadata ingestion — directly into your development workflow. The toolkit bundles multiple skills into a single plugin that works across supported editors.
 
-## Prerequisites
+## Features
+
+The toolkit bundles the following capabilities as a single **mc-agent-toolkit** plugin. Each feature is a [skill](skills/) that can also be used standalone.
+
+| Feature | Description | Details |
+|---|---|---|
+| **Monitoring Advisor** | Analyzes data coverage across warehouses and use cases, identifies monitoring gaps, and creates monitors to protect critical data. | [README](skills/monitoring-advisor/README.md) |
+| **Monitor Creation** | Guides AI agents through creating monitors correctly — validates tables, fields, and parameters before generating monitors-as-code YAML. | [README](skills/monitor-creation/README.md) |
+| **Prevent** | Surfaces lineage, alerts, and blast radius before code changes. Generates monitors-as-code and targeted validation queries to prevent data incidents. | [README](skills/prevent/README.md) |
+| **Generate Validation Notebook** | Generates SQL validation notebooks for dbt model changes, with targeted queries comparing baseline and development data. | [README](skills/generate-validation-notebook/README.md) |
+| **Push Ingestion** | Generates warehouse-specific collection scripts for pushing metadata, lineage, and query logs to Monte Carlo. | [README](skills/push-ingestion/README.md) |
+
+## Installing the plugin (recommended)
+
+**Monte Carlo recommends installing the mc-agent-toolkit plugin.** The plugin bundles all skills together with hooks, the Monte Carlo MCP server, and agent-specific capabilities — no separate MCP configuration or authentication setup needed. See the [plugins page](plugins/) for the full list of supported coding agents.
+
+### Claude Code
+
+1. Add the marketplace:
+   ```
+   /plugin marketplace add monte-carlo-data/mc-agent-toolkit
+   ```
+2. Install the plugin:
+   ```
+   /plugin install mc-agent-toolkit@mc-marketplace
+   ```
+3. Updates — `claude plugin update` pulls in the latest skill and hook changes.
+
+See the [Claude Code plugin README](plugins/claude-code/README.md) for detailed setup and usage.
+
+For other coding agents (Cursor, Copilot CLI, OpenCode, Codex), see the [plugins page](plugins/) for installation guides.
+
+## Using skills directly (advanced)
+
+Skills can also be used standalone without the plugin. This is for users who want to install individual skills via registries or use them with agents not listed above.
+
+### Prerequisites
 
 - A [Monte Carlo](https://www.montecarlodata.com) account with Editor role or above
 - Monte Carlo MCP server — configure with:
   ```
-  claude mcp add --transport http monte-carlo-mcp https://integrations.getmontecarlo.com/mcp
+  claude mcp add --transport http monte-carlo-mcp https://mcp.getmontecarlo.com/mcp
   ```
-  Then authenticate: run `/mcp` in Claude Code, select `monte-carlo-mcp`, and complete the OAuth flow in your browser.
-
-  > **Note:** The `mc-prevent` plugin bundles its own MCP server, so if you install the plugin you can skip this step.
+  Then authenticate: run `/mcp` in your editor, select `monte-carlo-mcp`, and complete the OAuth flow.
 
   See [official docs](https://docs.getmontecarlo.com/docs/mcp-server#option-1-oauth-21-recommended-for-mcp-clients-that-support-http-transport) for other MCP clients and advanced options.
 
@@ -22,83 +56,23 @@ Monte Carlo's official toolkit for AI coding agents. Contains skills and plugins
 
   </details>
 
-
-## Installing plugins (recommended)
-
-**Monte Carlo recommends installing skills via their corresponding plugins.** Plugins bundle the skill together with hooks, configuration and additional capabilities that provide a richer experience (e.g., automatic context enrichment from MC lineage data, executing validation queries and synthesizing results in your coding sessions).
-
-### Claude Code
-
-1. Add the marketplace:
-   ```
-   /plugin marketplace add monte-carlo-data/mcd-agent-toolkit
-   ```
-2. Install a plugin:
-   ```
-   /plugin install mc-agent-monitoring@mcd-agent-toolkit
-   /plugin install mc-prevent@mcd-agent-toolkit
-   /plugin install mc-generate-validation-notebook@mcd-agent-toolkit
-   /plugin install mc-push-ingestion@mcd-agent-toolkit
-   ```
-3. Updates — `claude plugin update` pulls in the latest skill and hook changes.
-
-### Cursor
-
-Run the install script (clones the repo and copies the plugin to `~/.cursor/plugins/local/mc-prevent`):
+### Installation
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/monte-carlo-data/mcd-agent-toolkit/main/plugins/cursor/prevent/scripts/install.sh)
+npx skills add monte-carlo-data/mc-agent-toolkit --skill prevent
 ```
 
-Or install manually:
-
-```bash
-git clone https://github.com/monte-carlo-data/mcd-agent-toolkit.git
-cd mcd-agent-toolkit
-bash plugins/cursor/prevent/scripts/install.sh
-```
-
-Then restart Cursor (or run **Developer: Reload Window** from the Command Palette). The Monte Carlo MCP server will prompt for OAuth authentication on first use.
-
-## Available plugins
-
-| Plugin | Description |
-|---|---|
-| `mc-agent-monitoring` | Creates observability monitors for AI agents — metric, evaluation, trajectory, and validation monitors for tracking latency, quality, execution patterns, and business rules. |
-| `mc-prevent` | Analyzes schema changes using MC lineage, monitoring, alerts, queries, and table metadata. Generates Monte Carlo monitors and validation queries to prevent data incidents. |
-| `mc-generate-validation-notebook` | Generates executable validation queries from a pull request and packages them into Monte Carlo notebooks for direct testing. |
-| `mc-push-ingestion` | Generates warehouse-specific collection scripts and guides customers through pushing metadata, lineage, and query logs to Monte Carlo. |
-
-## Using skills directly (advanced)
-
-Skills can also be used standalone without the plugin wrapper. This section is for users who want to submit skills to registries or use them with non-Claude-Code agents. Monte Carlo recommends the plugin approach above for the best experience.
-
-### skills.sh (Vercel CLI)
-
-```bash
-npx skills add monte-carlo-data/mcd-agent-toolkit --skill prevent
-```
-
-### Manual installation
-
-Copy to `~/.claude/skills/` or `.agents/skills/`:
+Or copy directly:
 
 ```bash
 cp -r skills/prevent ~/.claude/skills/prevent
 ```
 
-## Available skills
-
-| Skill | Description |
-|---|---|
-| `agent-monitoring` | Creates observability monitors for AI agents — metric, evaluation, trajectory, and validation monitors for tracking latency, quality, execution patterns, and business rules. |
-| `prevent` | Analyzes schema changes using MC lineage, monitoring, alerts, queries, and table metadata. Generates monitors and validation queries to prevent data incidents. |
-| `generate-validation-notebook` | Generates executable validation queries from a pull request and packages them into Monte Carlo notebooks for direct testing. |
-| `push-ingestion` | Generates warehouse-specific collection scripts and guides customers through pushing metadata, lineage, and query logs to Monte Carlo. |
+See the [skills directory](skills/) for the full list and individual READMEs.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on adding skills, creating plugins, and submitting pull requests.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on adding skills, creating plugins, and submitting pull requests. It also covers [plugin architecture](docs/plugin-architecture-guide.md) and [releasing new versions](CONTRIBUTING.md#releasing).
 
 ## License
 

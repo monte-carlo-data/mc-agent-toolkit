@@ -1,8 +1,0 @@
-{
-    "permissions": {
-        "allow": [
-            "mcp__plugin_mc-prevent_monte-carlo__*",
-            "mcp__monte-carlo-mcp__*"
-        ]
-    }
-}
