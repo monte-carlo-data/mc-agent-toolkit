@@ -127,19 +127,30 @@ When this skill is activated, follow this sequence in order.
 
 Verify that `get_alerts`, `alert_assessment`, and `run_troubleshooting_agent` are accessible. If `alert_assessment` is missing, show the extended toolset configuration from the Prerequisites section and stop — the user needs to fix this before continuing.
 
-### Step 2: Orient the user to their workflow file
+### Step 2: Orient the user to their workflow
 
-Ask whether the user has an existing triage workflow file, or is starting fresh.
+Ask how they'd like to get started:
 
-**Starting fresh:**
+> "How would you like to approach this?
+> - **Use the built-in example** — start from a working triage workflow ready to run as-is and adapt it as you go.
+> - **Adapt an existing workflow** — point me to a file you already have and we'll review and run it.
+> - **Build from scratch** — describe what you want your triage to do and I'll help design a workflow tailored to it."
+
+**Using the built-in example:**
 
 1. Read `references/triage-example.md` (relative to this skill file). Give a brief description: it fetches alerts from the last 3 hours, scores every alert, runs deep troubleshooting on high-signal ones, and shows what actions it would take — no writes on a first run.
 2. Run in recommendation mode, step by step (see Step 3). No need to ask.
 
-**Has an existing file:**
+**Adapting an existing file:**
 
-1. Read it and confirm the key settings: time window, filter threshold, and whether it includes a mode-selection step.
+1. Read the file and confirm the key settings: time window, filter threshold, and whether it includes a mode-selection step.
 2. Summarise what it will do, then ask: **"Run straight through, or step through each stage one at a time? And recommendation or action mode?"**
+
+**Building from scratch:**
+
+1. Ask the user to describe what they want: which alerts to triage, what actions they want to take, how much they want to automate, and any constraints (e.g. specific domains, teams, or tables).
+2. Draw on `references/triage-stages.md` to propose a workflow structure that fits their goals. Present it for review — not as a finished document, but as a proposed approach — and iterate until they're happy.
+3. Run it step by step in recommendation mode (see Step 3) so they can validate each stage before committing to the design. Expect to refine as you go.
 
 ### Step 3: Run the workflow
 
