@@ -1,14 +1,17 @@
 #!/usr/bin/env bash
 #
-# release.sh — Bump versions, update changelogs, commit, and tag a release.
+# release.sh — Bump versions, update changelogs, and open a release PR.
 #
 # Usage:
-#   ./scripts/release.sh <patch|minor|major|X.Y.Z> [--push] [--dry-run]
+#   ./scripts/release.sh <patch|minor|major|X.Y.Z> [--push] [--dry-run] [--force]
 #
 # Examples:
-#   ./scripts/release.sh patch              # 1.0.0 → 1.0.1, commit + tag locally
-#   ./scripts/release.sh minor --push       # 1.0.0 → 1.1.0, commit + tag + push
+#   ./scripts/release.sh patch              # 1.0.0 → 1.0.1, branch + commit locally
+#   ./scripts/release.sh minor --push       # 1.0.0 → 1.1.0, push branch + open PR
 #   ./scripts/release.sh 2.0.0 --dry-run    # Preview what would happen
+#
+# After the PR merges, a GitHub Actions workflow tags the commit and creates
+# a GitHub Release automatically.
 #
 set -euo pipefail
 
@@ -43,6 +46,7 @@ CHANGELOG_FILES=(
 # ── Defaults ────────────────────────────────────────────────────────────────
 PUSH=false
 DRY_RUN=false
+FORCE=false
 BUMP_TYPE=""
 
 # ── Parse arguments ─────────────────────────────────────────────────────────
@@ -55,6 +59,7 @@ for arg in "$@"; do
   case "$arg" in
     --push)    PUSH=true ;;
     --dry-run) DRY_RUN=true ;;
+    --force)   FORCE=true ;;
     patch|minor|major) BUMP_TYPE="$arg" ;;
     [0-9]*.[0-9]*.[0-9]*)  BUMP_TYPE="explicit"; EXPLICIT_VERSION="$arg" ;;
     -h|--help) usage ;;
@@ -98,14 +103,20 @@ if [[ "$DRY_RUN" == false ]]; then
   fi
 
   CURRENT_BRANCH=$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD)
-  if [[ "$CURRENT_BRANCH" != "main" ]]; then
-    echo "Warning: You are on branch '$CURRENT_BRANCH', not 'main'."
-    read -rp "Continue anyway? [y/N] " confirm
-    [[ "$confirm" =~ ^[Yy]$ ]] || exit 1
+  if [[ "$CURRENT_BRANCH" != "main" && "$FORCE" == false ]]; then
+    echo "Error: Must be on 'main' to release (currently on '$CURRENT_BRANCH')."
+    echo "       Use --force to override."
+    exit 1
   fi
 
   if git -C "$REPO_ROOT" rev-parse "v$NEW_VERSION" >/dev/null 2>&1; then
     echo "Error: Tag v$NEW_VERSION already exists."
+    exit 1
+  fi
+
+  if git -C "$REPO_ROOT" show-ref --verify --quiet "refs/heads/release/v$NEW_VERSION" 2>/dev/null ||
+     git -C "$REPO_ROOT" ls-remote --exit-code --heads origin "release/v$NEW_VERSION" >/dev/null 2>&1; then
+    echo "Error: Branch release/v$NEW_VERSION already exists."
     exit 1
   fi
 fi
@@ -170,11 +181,11 @@ for file in "${CHANGELOG_FILES[@]}"; do
   if [[ "$DRY_RUN" == true ]]; then
     echo "[dry-run] Would prepend changelog entry to $file"
   else
-    # Insert the new entry after the first blank line following the header
-    # (after the "Format follows..." preamble lines)
-    awk -v entry="$CHANGELOG_ENTRY" '
+    # Insert the new entry before the first existing version heading.
+    # Uses ENVIRON instead of -v to safely pass multiline strings.
+    CHANGELOG_ENTRY="$CHANGELOG_ENTRY" awk '
       /^## \[/ && !inserted {
-        print entry
+        print ENVIRON["CHANGELOG_ENTRY"]
         print ""
         inserted = 1
       }
@@ -184,35 +195,44 @@ for file in "${CHANGELOG_FILES[@]}"; do
   fi
 done
 
-# ── Git commit and tag ─────────────────────────────────────────────────────
+# ── Create release branch and commit ──────────────────────────────────────
+RELEASE_BRANCH="release/v$NEW_VERSION"
 echo ""
 if [[ "$DRY_RUN" == true ]]; then
+  echo "[dry-run] Would create branch: $RELEASE_BRANCH"
   echo "[dry-run] Would commit: release: v$NEW_VERSION"
-  echo "[dry-run] Would tag: v$NEW_VERSION"
 else
   cd "$REPO_ROOT"
+  git checkout -b "$RELEASE_BRANCH"
   git add "${VERSION_FILES[@]}" "${CHANGELOG_FILES[@]}"
   git commit -m "release: v$NEW_VERSION"
-  git tag "v$NEW_VERSION"
+  echo "Created branch: $RELEASE_BRANCH"
   echo "Committed: release: v$NEW_VERSION"
-  echo "Tagged: v$NEW_VERSION"
 fi
 
-# ── Push ────────────────────────────────────────────────────────────────────
+# ── Push and open PR ──────────────────────────────────────────────────────
 echo ""
 if [[ "$PUSH" == true ]]; then
   if [[ "$DRY_RUN" == true ]]; then
-    echo "[dry-run] Would push to origin with tags"
+    echo "[dry-run] Would push branch and open PR"
   else
-    git -C "$REPO_ROOT" push origin HEAD --tags
-    echo "Pushed to origin with tags"
+    git -C "$REPO_ROOT" push -u origin "$RELEASE_BRANCH"
+    if command -v gh &>/dev/null; then
+      gh pr create --title "release: v$NEW_VERSION" --body "Bump version to $NEW_VERSION and update changelogs."
+      echo ""
+      echo "PR created. Merging it will automatically tag and create a GitHub Release."
+    else
+      echo "Pushed branch. Open a PR manually:"
+      echo "  gh pr create --title 'release: v$NEW_VERSION'"
+    fi
   fi
 else
   if [[ "$DRY_RUN" == false ]]; then
-    echo "Done! To publish the release, run:"
-    echo "  git push origin main --tags"
+    echo "Done! To publish the release, push the branch and open a PR:"
+    echo "  git push -u origin $RELEASE_BRANCH"
+    echo "  gh pr create --title 'release: v$NEW_VERSION'"
     echo ""
-    echo "Or next time, use --push to push automatically:"
+    echo "Or next time, use --push to do this automatically:"
     echo "  ./scripts/release.sh $BUMP_TYPE --push"
   fi
 fi

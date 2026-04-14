@@ -118,7 +118,7 @@ Use `scripts/release.sh` to cut a release. It bumps the version in all 5 plugin 
 # Bump patch version (1.0.0 → 1.0.1), commit + tag locally
 ./scripts/release.sh patch
 
-# Bump minor version and push (triggers GitHub Release via Actions)
+# Bump minor version, push branch + tag, and open PR
 ./scripts/release.sh minor --push
 
 # Set an explicit version
@@ -135,17 +135,18 @@ Use `scripts/release.sh` to cut a release. It bumps the version in all 5 plugin 
 3. Opens `$EDITOR` with a changelog template pre-filled with commits since the last tag
 4. Updates `"version"` in all 5 plugin config files
 5. Prepends the changelog entry to all 5 `CHANGELOG.md` files
-6. Creates a commit (`release: vX.Y.Z`) and a git tag (`vX.Y.Z`)
+6. Creates a `release/vX.Y.Z` branch and commits (`release: vX.Y.Z`)
 
-Without `--push`, the commit and tag stay local so you can inspect before pushing. To publish:
+Without `--push`, the branch and commit stay local so you can inspect before pushing. To publish:
 
 ```bash
-git push origin main --tags
+git push -u origin release/vX.Y.Z
+gh pr create --title 'release: vX.Y.Z'
 ```
 
 ### GitHub Release
 
-When a `v*` tag is pushed, a GitHub Actions workflow (`.github/workflows/release-on-tag.yml`) automatically creates a GitHub Release with auto-generated release notes from PR titles since the previous tag.
+When a `release/v*` PR merges to `main`, a GitHub Actions workflow (`.github/workflows/release-on-tag.yml`) automatically tags the merge commit and creates a GitHub Release with auto-generated release notes.
 
 ## Architecture
 
