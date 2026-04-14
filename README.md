@@ -43,7 +43,7 @@ Skills can also be used standalone without the plugin. This is for users who wan
 - A [Monte Carlo](https://www.montecarlodata.com) account with Editor role or above
 - Monte Carlo MCP server — configure with:
   ```
-  claude mcp add --transport http monte-carlo-mcp https://integrations.getmontecarlo.com/mcp
+  claude mcp add --transport http monte-carlo-mcp https://mcp.getmontecarlo.com/mcp
   ```
   Then authenticate: run `/mcp` in your editor, select `monte-carlo-mcp`, and complete the OAuth flow.
 
