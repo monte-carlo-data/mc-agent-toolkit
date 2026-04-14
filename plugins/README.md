@@ -8,11 +8,11 @@ For the user-facing feature list and installation instructions, see the [main RE
 
 | Agent | Status | Skills | MCP | Installation |
 |---|---|---|---|---|
-| **Claude Code** | Full | All 3 | OAuth | [Setup guide](claude-code/README.md) |
-| **Cursor** | Full | All 3 | OAuth | [Setup guide](cursor/README.md) |
-| **OpenCode** | Full | All 3 | OAuth | [Setup guide](opencode/README.md) |
-| **Copilot CLI** | Preliminary | All 3 | OAuth | [Setup guide](copilot/README.md) |
-| **Codex** | Preliminary | All 3 | OAuth | [Setup guide](codex/README.md) |
+| **Claude Code** | Full | All 4 | OAuth | [Setup guide](claude-code/README.md) |
+| **Cursor** | Full | All 4 | OAuth | [Setup guide](cursor/README.md) |
+| **OpenCode** | Full | All 4 | OAuth | [Setup guide](opencode/README.md) |
+| **Copilot CLI** | Preliminary | All 4 | OAuth | [Setup guide](copilot/README.md) |
+| **Codex** | Preliminary | All 4 | OAuth | [Setup guide](codex/README.md) |
 
 Currently, only the **Prevent** skill leverages hooks for enforcement. The other skills are instruction-only.
 
