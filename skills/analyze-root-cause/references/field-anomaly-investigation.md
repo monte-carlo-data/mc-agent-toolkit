@@ -73,6 +73,30 @@ For the upstream table/field identified in Step 2:
 - Call `get_table_size_history` — did upstream volume change?
 - If DB connector available, profile the upstream field directly
 
+### 7. Check column correlations (if DB connector available)
+
+Identify what other columns are associated with the "bad" rows vs normal rows. This is one of the most powerful investigation techniques:
+
+```sql
+-- Compare dimension values between anomalous and normal rows
+-- Replace anomalous_field condition with the actual anomaly (e.g., IS NULL, > threshold)
+SELECT other_column,
+       COUNT(*) AS total_rows,
+       SUM(CASE WHEN anomalous_field IS NULL THEN 1 ELSE 0 END) AS bad_rows,
+       ROUND(SUM(CASE WHEN anomalous_field IS NULL THEN 1 ELSE 0 END)::FLOAT
+             / NULLIF(COUNT(*), 0), 3) AS bad_rate
+FROM database.schema.table
+WHERE timestamp_col >= 'anomaly_start_time'
+GROUP BY 1
+HAVING COUNT(*) > 10
+ORDER BY bad_rate DESC
+LIMIT 20
+```
+
+If one dimension value has a much higher "bad rate" than others, it's likely the root cause — e.g., "all rows from source_system='legacy_api' have NULL revenue, but rows from other sources are fine."
+
+Try this across multiple columns (category fields, source identifiers, date partitions) to narrow down the pattern.
+
 ## Common root causes
 
 - **Upstream data quality issue** — bad data in source propagated downstream

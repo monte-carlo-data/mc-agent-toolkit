@@ -41,7 +41,17 @@ Call `get_asset_lineage(mcons=[table_mcon], direction="UPSTREAM")` to find upstr
 - If an upstream table is also stale, the issue is propagating from there
 - Recurse upstream until you find the root source of the delay
 
-### 5. Check for query changes
+### 5. Check ETL job performance
+
+Call `get_jobs_performance` to check if the ETL job's runtime has degraded:
+- Is the job taking longer than usual? (compare `avgDuration` to 7-day trend)
+- Is the job failing more often? (check `failureRate`)
+- Is the job currently running or stuck? (check last run status)
+- A job that's running but taking 3x longer than normal may explain the freshness delay without an outright failure
+
+Also call `get_airflow_tasks` / `get_dbt_jobs` / `get_databricks_jobs` with the table MCONs to find which specific jobs write to this table, then check their issues.
+
+### 6. Check for query changes
 
 Call `get_query_changes` — did someone modify the ETL query recently?
 - New JOINs that produce empty results

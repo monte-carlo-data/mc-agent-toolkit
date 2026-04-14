@@ -31,8 +31,10 @@ Connect to Monte Carlo's MCP server (`integrations.getmontecarlo.com/mcp`). The 
 | `get_airflow_issues` | Airflow DAG/task failures |
 | `get_dbt_issues` | dbt model failures |
 | `get_databricks_issues` | Databricks job failures |
+| `get_github_prs` | Recent GitHub PRs (via MC's GitHub integration) |
+| `get_jobs_performance` | Job runtime stats, failure rates, trends |
 
-**Optional:** A database MCP server (Snowflake, BigQuery, Redshift) for direct SQL queries. A GitHub MCP server for PR search.
+**Optional:** A database MCP server (Snowflake, BigQuery, Redshift) for direct SQL queries.
 
 ## Example prompts
 

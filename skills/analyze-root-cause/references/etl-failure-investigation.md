@@ -9,7 +9,7 @@ Use this when an Airflow DAG, dbt model, or Databricks job failed.
 Based on the alert or user description, determine which platform:
 
 **Airflow:**
-- Call `get_airflow_tasks` to list tasks in the DAG
+- Call `get_airflow_tasks` with the affected table MCONs to find which DAGs/tasks write to these tables
 - Call `get_airflow_issues` with a time range — look for:
   - Task failure error messages
   - Retry counts (high retries = flaky task)
@@ -17,7 +17,7 @@ Based on the alert or user description, determine which platform:
   - Upstream task failures that blocked downstream tasks
 
 **dbt:**
-- Call `get_dbt_jobs` to list jobs and models
+- Call `get_dbt_jobs` with the affected table MCONs to find which dbt jobs write to these tables
 - Call `get_dbt_issues` — look for:
   - Compilation errors (bad SQL syntax, missing refs)
   - Test failures (data quality assertions)
@@ -25,7 +25,7 @@ Based on the alert or user description, determine which platform:
   - Dependency failures (upstream model failed)
 
 **Databricks:**
-- Call `get_databricks_jobs` to list jobs
+- Call `get_databricks_jobs` with the affected table MCONs to find which Databricks jobs write to these tables
 - Call `get_databricks_issues` — look for:
   - Notebook execution errors
   - Cluster startup failures
@@ -51,9 +51,9 @@ Call `get_query_rca` with the affected table MCONs:
 - **Futile** patterns: are queries running but producing nothing?
 - Look at error messages for clues (timeout, permission, missing object)
 
-### 5. Check job runtime trends
+### 5. Check job runtime trends and current status
 
-Call `get_jobs_performance` to see if the job's runtime has been trending up:
+Call `get_jobs_performance` to see runtime stats, failure rates, and current status:
 - Gradual slowdown → growing data volume or inefficient query
 - Sudden spike → query regression or resource contention
 

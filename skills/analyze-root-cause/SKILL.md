@@ -65,11 +65,13 @@ Do not activate when the user is:
 | `get_query_changes` | Detect SQL text modifications |
 | `get_query_rca` | Root cause analysis for failed/futile/missed queries |
 | `get_airflow_issues` | Airflow DAG/task failures |
-| `get_airflow_tasks` | Airflow task names for a DAG |
+| `get_airflow_tasks` | Airflow/dbt/Databricks jobs that write to specific tables |
 | `get_dbt_issues` | dbt model failures |
-| `get_dbt_jobs` | dbt job names |
+| `get_dbt_jobs` | dbt jobs that write to specific tables |
 | `get_databricks_issues` | Databricks job failures |
-| `get_databricks_jobs` | Databricks job names |
+| `get_databricks_jobs` | Databricks jobs that write to specific tables |
+| `get_github_prs` | Recent GitHub PRs from the account's MC GitHub integration |
+| `get_jobs_performance` | Job runtime stats, failure rates, 7-day trends |
 | `get_change_timeline` | Unified timeline: query changes + volume + ETL failures |
 | `get_current_time` | Current timestamp for relative time ranges |
 
@@ -78,7 +80,7 @@ Do not activate when the user is:
 | Tool | Purpose |
 |------|---------|
 | Database MCP (Snowflake, BigQuery, etc.) | Run SQL queries for data profiling |
-| GitHub MCP | Search for recent PRs affecting the impacted table |
+| GitHub MCP | Search for recent PRs (alternative to MC's `get_github_prs` — useful if the account has no MC GitHub integration) |
 
 ---
 
@@ -106,6 +108,8 @@ Read `references/intake-no-incident.md` for the full intake flow. In short:
 3. If the issue involves specific fields, call `get_field_lineage` to trace which upstream fields feed the affected columns.
 
 Report to the user: "This table is fed by X upstream sources and feeds Y downstream consumers. Here's what could be impacted."
+
+**Ask for direction:** Before diving deeper, ask the user what they'd like to investigate first. They may already have a hunch ("I think it's the Airflow job" or "check if someone changed the SQL"). Follow their lead — don't run all investigation paths blindly. If they have no preference, proceed with the most likely path based on the issue type.
 
 ### Step 3: Investigate based on issue type
 
@@ -143,13 +147,11 @@ If the user has a database MCP server connected (Snowflake, BigQuery, Redshift, 
 
 ### Step 6: Check for code changes
 
-**If the user has a GitHub MCP server connected:**
-Search for recent PRs that modified queries, dbt models, or pipelines affecting the impacted table.
+Call `get_github_prs` with a time range around when the issue started to find recent PRs from the account's Monte Carlo GitHub integration. Look for PRs that modified dbt models, SQL files, or pipeline configs affecting the impacted table.
 
-**If no GitHub MCP:**
-Call `get_query_changes` with the affected table MCONs and a time range around when the issue started. This detects SQL text modifications that may have caused the problem.
+If the account has no GitHub integration (tool returns empty), or the user has a local GitHub MCP server they prefer, use that instead.
 
-Also call `get_change_timeline` for a unified view of all changes (query modifications + volume shifts + ETL failures) in one call.
+Also call `get_query_changes` with the affected table MCONs to detect SQL text modifications, and `get_change_timeline` for a unified view of all changes (query modifications + volume shifts + ETL failures) in one call.
 
 ### Step 7: Synthesize and present
 
