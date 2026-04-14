@@ -64,12 +64,8 @@ Do not activate when the user is:
 | `get_queries_for_table` | Read/write query history |
 | `get_query_changes` | Detect SQL text modifications |
 | `get_query_rca` | Root cause analysis for failed/futile/missed queries |
-| `get_airflow_issues` | Airflow DAG/task failures |
-| `get_airflow_tasks` | Airflow/dbt/Databricks jobs that write to specific tables |
-| `get_dbt_issues` | dbt model failures |
-| `get_dbt_jobs` | dbt jobs that write to specific tables |
-| `get_databricks_issues` | Databricks job failures |
-| `get_databricks_jobs` | Databricks jobs that write to specific tables |
+| `get_etl_issues` | ETL pipeline issues — pass `platform` ("airflow", "dbt", or "databricks") |
+| `get_etl_jobs` | Find ETL jobs that write to specific tables — pass `platform` param |
 | `get_github_prs` | Recent GitHub PRs from the account's MC GitHub integration |
 | `get_jobs_performance` | Job runtime stats, failure rates, 7-day trends |
 | `get_change_timeline` | Unified timeline: query changes + volume + ETL failures |
@@ -131,7 +127,7 @@ Data issues often originate upstream. Walk the lineage chain:
 1. For each direct upstream table from Step 2:
    - Check freshness: `get_table_freshness` — is the upstream table also stale?
    - Check size: `get_table_size_history` — did the upstream table's volume change?
-   - Check ETL status: `get_airflow_issues` / `get_dbt_issues` / `get_databricks_issues`
+   - Check ETL status: `get_etl_issues` with the relevant `platform`
 2. Use `get_field_lineage` to trace the specific field that has bad data back to its source.
 3. Check what upstream field values correlate with the anomaly (if DB connector is available — see Step 5).
 

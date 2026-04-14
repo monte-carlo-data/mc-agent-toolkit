@@ -16,16 +16,16 @@ Call `get_table_freshness` with the table's `full_table_id` and `resource_id`. C
 The table is populated by an ETL pipeline. Check if the pipeline failed:
 
 **Airflow:**
-- Call `get_airflow_tasks` to find which DAG/tasks write to this table
-- Call `get_airflow_issues` with a time range around when freshness was expected — look for task failures, retries, or SLA misses
+- Call `get_etl_jobs` with `platform="airflow"` to find which DAGs/tasks write to this table
+- Call `get_etl_issues` with `platform="airflow"` and a time range — look for task failures, retries, or SLA misses
 
 **dbt:**
-- Call `get_dbt_jobs` to find which dbt jobs/models produce this table
-- Call `get_dbt_issues` — look for model compilation errors, test failures, or timeouts
+- Call `get_etl_jobs` with `platform="dbt"` to find which dbt jobs/models produce this table
+- Call `get_etl_issues` with `platform="dbt"` — look for compilation errors, test failures, or timeouts
 
 **Databricks:**
-- Call `get_databricks_jobs` to find relevant jobs
-- Call `get_databricks_issues` — look for notebook failures, cluster issues
+- Call `get_etl_jobs` with `platform="databricks"` to find relevant jobs
+- Call `get_etl_issues` with `platform="databricks"` — look for notebook failures, cluster issues
 
 ### 3. Check the write queries
 
@@ -49,7 +49,7 @@ Call `get_jobs_performance` to check if the ETL job's runtime has degraded:
 - Is the job currently running or stuck? (check last run status)
 - A job that's running but taking 3x longer than normal may explain the freshness delay without an outright failure
 
-Also call `get_airflow_tasks` / `get_dbt_jobs` / `get_databricks_jobs` with the table MCONs to find which specific jobs write to this table, then check their issues.
+Also call `get_etl_jobs` with the relevant `platform` and the table MCONs to find which specific jobs write to this table, then check their issues with `get_etl_issues`.
 
 ### 6. Check for query changes
 

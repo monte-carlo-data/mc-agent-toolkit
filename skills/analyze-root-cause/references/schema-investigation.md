@@ -26,8 +26,8 @@ Call `get_asset_lineage(mcons=[table_mcon], direction="DOWNSTREAM")`:
 ### 4. Check ETL pipeline
 
 Schema changes often happen during deployments:
-- Call `get_dbt_issues` — dbt model changes are the most common source
-- Call `get_airflow_issues` — pipeline deployment may have changed the schema
+- Call `get_etl_issues` with `platform="dbt"` — dbt model changes are the most common source
+- Call `get_etl_issues` with `platform="airflow"` — pipeline deployment may have changed the schema
 - Check `get_change_timeline` for a correlated view
 
 ### 5. Check for code changes

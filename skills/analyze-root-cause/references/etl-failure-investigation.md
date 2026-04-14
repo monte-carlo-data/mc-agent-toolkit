@@ -9,24 +9,24 @@ Use this when an Airflow DAG, dbt model, or Databricks job failed.
 Based on the alert or user description, determine which platform:
 
 **Airflow:**
-- Call `get_airflow_tasks` with the affected table MCONs to find which DAGs/tasks write to these tables
-- Call `get_airflow_issues` with a time range — look for:
+- Call `get_etl_jobs` with `platform="airflow"` and the affected table MCONs to find which DAGs/tasks write to these tables
+- Call `get_etl_issues` with `platform="airflow"` and a time range — look for:
   - Task failure error messages
   - Retry counts (high retries = flaky task)
   - SLA misses
   - Upstream task failures that blocked downstream tasks
 
 **dbt:**
-- Call `get_dbt_jobs` with the affected table MCONs to find which dbt jobs write to these tables
-- Call `get_dbt_issues` — look for:
+- Call `get_etl_jobs` with `platform="dbt"` and the affected table MCONs to find which dbt jobs write to these tables
+- Call `get_etl_issues` with `platform="dbt"` — look for:
   - Compilation errors (bad SQL syntax, missing refs)
   - Test failures (data quality assertions)
   - Timeout errors
   - Dependency failures (upstream model failed)
 
 **Databricks:**
-- Call `get_databricks_jobs` with the affected table MCONs to find which Databricks jobs write to these tables
-- Call `get_databricks_issues` — look for:
+- Call `get_etl_jobs` with `platform="databricks"` and the affected table MCONs to find which Databricks jobs write to these tables
+- Call `get_etl_issues` with `platform="databricks"` — look for:
   - Notebook execution errors
   - Cluster startup failures
   - Out of memory errors

@@ -28,9 +28,8 @@ Connect to Monte Carlo's MCP server (`integrations.getmontecarlo.com/mcp`). The 
 | `get_query_changes` | Detect SQL text modifications |
 | `get_query_rca` | Failed/futile/missed query analysis |
 | `get_change_timeline` | Unified change timeline |
-| `get_airflow_issues` | Airflow DAG/task failures |
-| `get_dbt_issues` | dbt model failures |
-| `get_databricks_issues` | Databricks job failures |
+| `get_etl_issues` | ETL pipeline issues (Airflow, dbt, Databricks) — pass `platform` param |
+| `get_etl_jobs` | Find ETL jobs writing to tables (Airflow, dbt, Databricks) — pass `platform` param |
 | `get_github_prs` | Recent GitHub PRs (via MC's GitHub integration) |
 | `get_jobs_performance` | Job runtime stats, failure rates, trends |
 
