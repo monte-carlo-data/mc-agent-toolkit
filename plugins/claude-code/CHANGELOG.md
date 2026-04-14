@@ -5,6 +5,14 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Claude Code will
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-04-14
+
+### Changed
+
+- c4842c4 fix: add missing skill registrations — READMEs, symlinks, and sync rules (#46)
+- 647669a feat: add automated-triage skill (#40)
+- 9477ae1 feat: add analyze-root-cause skill for incident investigation (#37)
+
 ## [1.3.0] - 2026-04-14
 
 ### Changed
