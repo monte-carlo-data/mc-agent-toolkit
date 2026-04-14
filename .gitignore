@@ -9,7 +9,7 @@ bun.lock
 .DS_Store
 .venv/
 target/
-.claude/
+.claude/settings.local.json
 temp/
 __pycache__/
 *.pyc

@@ -16,7 +16,9 @@ mc-agent-toolkit/
 │   │   ├── SKILL.md
 │   │   └── references/
 │   ├── generate-validation-notebook/
-│   └── push-ingestion/
+│   ├── monitoring-advisor/
+│   ├── push-ingestion/
+│   └── remediation/
 │
 ├── plugins/
 │   ├── shared/                          # Platform-agnostic hook logic
@@ -25,8 +27,8 @@ mc-agent-toolkit/
 │   ├── claude-code/                     # Unified mc-agent-toolkit plugin
 │   │   ├── .claude-plugin/plugin.json
 │   │   ├── hooks/prevent/              # Hook adapters (thin, call shared lib)
-│   │   ├── skills/ (monitor-creation, prevent, generate-validation-notebook, push-ingestion → symlinks)
-│   │   └── commands/ (prevent/, push-ingestion/)
+│   │   ├── skills/ (monitor-creation, monitoring-advisor, prevent, generate-validation-notebook, push-ingestion, remediation → symlinks)
+│   │   └── commands/ (prevent/, push-ingestion/, monitoring-advisor/)
 │   │
 │   ├── cursor/                          # Unified mc-agent-toolkit plugin
 │   │   ├── .cursor-plugin/plugin.json
@@ -65,7 +67,11 @@ Plugins reference skills via symlinks so that skills are authored once and share
    cd plugins/claude-code/skills
    ln -s ../../../skills/<skill-name> <skill-name>
    ```
-2. If the skill has slash commands, create `plugins/claude-code/commands/<skill-name>/` and add `.md` command files. Update the `commands` array in `plugins/claude-code/.claude-plugin/plugin.json`.
+2. **Register the skill as a command** (required for the skill to appear as user-invocable in the plugin):
+   - Create `plugins/claude-code/commands/<skill-name>/` with at least one `.md` command file.
+   - Add the directory to the `commands` array in `plugins/claude-code/.claude-plugin/plugin.json`.
+   - Without a commands entry, the skill will not be discoverable as `mc-agent-toolkit:<skill-name>`.
+   - If the skill has sub-commands (e.g., `/mc-validate`), add additional `.md` files in the same directory.
 3. If the skill needs hooks, create adapters in `plugins/claude-code/hooks/<skill-name>/` following the two-layer pattern (see below).
 4. Bump the `version` in `plugins/claude-code/.claude-plugin/plugin.json`.
 5. Test locally with `claude --plugin-dir ./plugins/claude-code`.
@@ -114,7 +120,7 @@ Use `scripts/release.sh` to cut a release. It bumps the version in all 5 plugin 
 # Bump patch version (1.0.0 → 1.0.1), commit + tag locally
 ./scripts/release.sh patch
 
-# Bump minor version and push (triggers GitHub Release via Actions)
+# Bump minor version, push branch + tag, and open PR
 ./scripts/release.sh minor --push
 
 # Set an explicit version
@@ -131,17 +137,18 @@ Use `scripts/release.sh` to cut a release. It bumps the version in all 5 plugin 
 3. Opens `$EDITOR` with a changelog template pre-filled with commits since the last tag
 4. Updates `"version"` in all 5 plugin config files
 5. Prepends the changelog entry to all 5 `CHANGELOG.md` files
-6. Creates a commit (`release: vX.Y.Z`) and a git tag (`vX.Y.Z`)
+6. Creates a `release/vX.Y.Z` branch and commits (`release: vX.Y.Z`)
 
-Without `--push`, the commit and tag stay local so you can inspect before pushing. To publish:
+Without `--push`, the branch and commit stay local so you can inspect before pushing. To publish:
 
 ```bash
-git push origin main --tags
+git push -u origin release/vX.Y.Z
+gh pr create --title 'release: vX.Y.Z'
 ```
 
 ### GitHub Release
 
-When a `v*` tag is pushed, a GitHub Actions workflow (`.github/workflows/release-on-tag.yml`) automatically creates a GitHub Release with auto-generated release notes from PR titles since the previous tag.
+When a `release/v*` PR merges to `main`, a GitHub Actions workflow (`.github/workflows/release-on-tag.yml`) automatically tags the merge commit and creates a GitHub Release with auto-generated release notes.
 
 ## Architecture
 

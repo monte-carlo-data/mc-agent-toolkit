@@ -8,11 +8,12 @@ The toolkit bundles the following capabilities as a single **mc-agent-toolkit** 
 
 | Feature | Description | Details |
 |---|---|---|
+| **Monitoring Advisor** | Analyzes data coverage across warehouses and use cases, identifies monitoring gaps, and creates monitors to protect critical data. | [README](skills/monitoring-advisor/README.md) |
 | **Monitor Creation** | Guides AI agents through creating monitors correctly — validates tables, fields, and parameters before generating monitors-as-code YAML. | [README](skills/monitor-creation/README.md) |
 | **Prevent** | Surfaces lineage, alerts, and blast radius before code changes. Generates monitors-as-code and targeted validation queries to prevent data incidents. | [README](skills/prevent/README.md) |
 | **Generate Validation Notebook** | Generates SQL validation notebooks for dbt model changes, with targeted queries comparing baseline and development data. | [README](skills/generate-validation-notebook/README.md) |
 | **Push Ingestion** | Generates warehouse-specific collection scripts for pushing metadata, lineage, and query logs to Monte Carlo. | [README](skills/push-ingestion/README.md) |
-| **Automated Triage** | Guides AI agents through automated alert triage — scoring alerts, running deep troubleshooting on high-signal ones, classifying, and taking actions. Requires extended MCP toolset. | [SKILL](skills/automated-triage/SKILL.md) |
+| **Automated Triage** | Guides AI agents through automated alert triage — scoring alerts, running deep troubleshooting on high-signal ones, classifying, and taking actions. | [SKILL](skills/automated-triage/SKILL.md) |
 
 ## Installing the plugin (recommended)
 
@@ -43,7 +44,7 @@ Skills can also be used standalone without the plugin. This is for users who wan
 - A [Monte Carlo](https://www.montecarlodata.com) account with Editor role or above
 - Monte Carlo MCP server — configure with:
   ```
-  claude mcp add --transport http monte-carlo-mcp https://integrations.getmontecarlo.com/mcp
+  claude mcp add --transport http monte-carlo-mcp https://mcp.getmontecarlo.com/mcp
   ```
   Then authenticate: run `/mcp` in your editor, select `monte-carlo-mcp`, and complete the OAuth flow.
 

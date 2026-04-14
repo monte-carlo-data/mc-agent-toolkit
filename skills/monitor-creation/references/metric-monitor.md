@@ -21,13 +21,13 @@ Use a metric monitor when the user wants to:
 | `name` | string | Unique identifier for the monitor. Use a descriptive slug (e.g., `orders_null_check`). |
 | `description` | string | Human-readable description of what the monitor checks. |
 | `table` | string | Table MCON (preferred) or `database:schema.table` format. If not MCON, also pass `warehouse`. |
-| `aggregate_time_field` | string | **MUST be a real timestamp/datetime column from the table.** NEVER guess this value. |
 | `alert_conditions` | array | List of alert condition objects (see Alert Conditions below). |
 
 ## Optional Parameters
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
+| `aggregate_time_field` | string | none | Timestamp/datetime column for time-windowed aggregation. **When provided, MUST be a real column from the table — NEVER guess this value.** When omitted, the monitor queries all rows on each run (whole-table scan). Omit for tables without a suitable timestamp column. |
 | `warehouse` | string | auto-resolved | Warehouse name or UUID. Required if `table` is not an MCON. |
 | `segment_fields` | array of string | none | Fields to group/segment metrics by (e.g., `["country", "status"]`). |
 | `aggregate_by` | string | `"day"` | Time interval: `"hour"`, `"day"`, `"week"`, `"month"`. |
@@ -54,7 +54,16 @@ For example, to run a daily-aggregated monitor every other day, pass `aggregate_
 
 ## Choosing the Timestamp Field
 
-The `aggregate_time_field` is the most critical parameter. It MUST be a real column from the table that contains timestamp or datetime values. This is the number one source of monitor creation failures.
+The `aggregate_time_field` controls whether the monitor uses time-windowed aggregation or whole-table scans. When provided, it MUST be a real column from the table — this is the number one source of monitor creation failures.
+
+### When to omit it
+
+Omit `aggregate_time_field` when:
+- The table has **no timestamp or datetime columns** at all.
+- The table uses a **truncate-and-reload** pattern (fully replaced on each pipeline run) — time-windowed aggregation is meaningless since all rows share the same load time.
+- The user wants to monitor the **entire table state** on each run (e.g., `RELATIVE_ROW_COUNT` segmented by a dimension).
+
+When omitted, the monitor queries all rows on each run. This works well for small-to-medium tables but can be expensive for very large tables.
 
 ### How to pick it
 
@@ -63,9 +72,9 @@ The `aggregate_time_field` is the most critical parameter. It MUST be a real col
 3. If the user specified one, verify it exists in the column list.
 4. If exactly one obvious candidate exists, suggest it.
 5. If multiple candidates exist, present them and ask the user.
-6. If NO obvious timestamp columns exist, suggest a custom SQL monitor instead (which does not need a timestamp field).
+6. If NO obvious timestamp columns exist, omit the field — the monitor will do a whole-table scan. For very large tables, consider whether a custom SQL monitor would be more efficient.
 
-**NEVER** proceed without confirming the timestamp field exists in the table schema.
+**NEVER** guess a timestamp field name — either confirm it exists in the schema or omit it.
 
 ### Common timestamp field mistakes
 
