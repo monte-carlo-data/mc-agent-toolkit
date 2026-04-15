@@ -1,9 +1,9 @@
 ---
 name: monte-carlo-monitoring-advisor
 description: |
-  Analyze data coverage and create monitoring for critical use cases.
+  Analyze data coverage and create monitoring for critical use cases and AI agents.
   Activates when the user asks about monitoring coverage, data coverage gaps,
-  use case analysis, or wants to understand what's monitored vs. not.
+  use case analysis, what's monitored vs. not, or monitoring AI agents.
 version: 1.0.0
 ---
 
@@ -23,6 +23,7 @@ Activate when the user:
 - Wants to explore their data estate and find what needs monitoring
 - Says things like "what should I monitor?", "where are my coverage gaps?", "show me my use cases"
 - Asks about unmonitored tables with anomalies or importance-based prioritization
+- Asks about monitoring AI agents, agent latency, agent token usage, or agent quality
 
 ## When NOT to activate this skill
 
@@ -67,6 +68,13 @@ All tools are available via the `monte-carlo` MCP server.
 | `createValidationMonitorMac` | Generate validation monitor YAML (dry-run) |
 | `createCustomSqlMonitorMac` | Generate custom SQL monitor YAML (dry-run) |
 | `createComparisonMonitorMac` | Generate comparison monitor YAML (dry-run) |
+| `get_agent_metadata` | List AI agents — returns agent names, trace table MCONs, source types |
+| `get_agent_conversation` | Retrieve recent LLM interactions/conversations for an agent |
+| `get_agent_trace` | Inspect execution traces and span trees |
+| `create_agent_metric_monitor` | Create monitors for quantitative span-level metrics |
+| `create_agent_evaluation_monitor` | Create monitors for LLM-evaluated quality metrics |
+| `create_agent_trajectory` | Create trajectory monitors for execution pattern alerts |
+| `create_agent_validation` | Create validation monitors for logical assertions |
 
 ---
 
@@ -88,7 +96,11 @@ Call `getUseCases(warehouse_id=<selected>)` to discover use cases for the chosen
 - If **use cases exist** → proceed to the **Use-case workflow** (below).
 - If **no use cases** → proceed to the **Importance-based fallback** (below).
 
-### Step 3: Check for database MCP (optional)
+### Step 3: AI agent monitoring (conditional)
+
+If the user asks about monitoring AI agents, **read and follow the agent-monitoring skill** (`../agent-monitoring/SKILL.md`). It covers agent discovery, trace investigation, and creation of all 4 agent monitor types (metric, evaluation, trajectory, validation). Call `get_agent_metadata` to list all AI agents, then follow the agent-monitoring skill's step-by-step workflow.
+
+### Step 4: Check for database MCP (optional)
 
 Check if the user has a database MCP server available by looking for tools containing `snowflake`, `bigquery`, `redshift`, or `databricks` in the tool list. If found, note it for the SQL profiling step later. If not found, skip SQL profiling gracefully.
 
@@ -199,6 +211,20 @@ Write a clear, meaningful `description` that explains what the monitor covers an
 - **Good:** `"Monitor HIGH criticality tables in the Revenue Reporting use case to catch issues before they affect dashboards and financial reports."`
 
 The description should mention the criticality scope, the use case name, and a brief reason why this monitoring matters.
+
+---
+
+## AI Agent Monitoring
+
+When the user asks about monitoring AI agents, investigating agent behavior, or creating agent monitors, **read and follow the agent-monitoring skill** (`../agent-monitoring/SKILL.md`). It contains the full discovery, investigation, and monitor creation workflow for AI agents.
+
+The agent-monitoring skill covers 4 monitor types:
+- **Agent Metric** — track latency (`duration_sec`), token usage, span volume
+- **Agent Evaluation** — LLM-evaluated quality scores with sampling and transforms
+- **Agent Trajectory** — execution pattern alerts on span sequences
+- **Agent Validation** — logical assertions on span data
+
+All agent monitors target the `traceTableMcon` returned by `get_agent_metadata` — never use a regular table MCON. The agent-monitoring skill's reference docs (`references/metric-monitor.md`, etc.) have detailed parameter guides and examples.
 
 ---
 

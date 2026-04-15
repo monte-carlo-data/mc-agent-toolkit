@@ -93,6 +93,24 @@
       "rationale": "Use-case risk analysis tied to coverage gaps"
     },
     {
+      "id": "should-16",
+      "prompt": "Help me set up monitoring for my AI agents — I want to track latency and token usage.",
+      "expected": "trigger",
+      "rationale": "AI agent monitoring request — monitoring-advisor delegates to agent-monitoring skill"
+    },
+    {
+      "id": "should-17",
+      "prompt": "Which of our AI agents have the worst latency? I want to create alerts for them.",
+      "expected": "trigger",
+      "rationale": "Agent observability with monitor creation intent — coverage analysis for agents"
+    },
+    {
+      "id": "should-18",
+      "prompt": "I want to monitor my agent's response quality and catch runaway tool call loops.",
+      "expected": "trigger",
+      "rationale": "Agent evaluation and trajectory monitoring — handled via agent-monitoring skill delegation"
+    },
+    {
       "id": "should-not-01",
       "prompt": "Create a freshness monitor on the orders table with a 2-hour threshold.",
       "expected": "no-trigger",
