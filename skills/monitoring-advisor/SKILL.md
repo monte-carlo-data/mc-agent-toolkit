@@ -224,7 +224,7 @@ The agent-monitoring skill covers 4 monitor types:
 - **Agent Trajectory** — execution pattern alerts on span sequences
 - **Agent Validation** — logical assertions on span data
 
-All agent monitors target the `traceTableMcon` returned by `get_agent_metadata` — never use a regular table MCON. The agent-monitoring skill's reference docs (`references/metric-monitor.md`, etc.) have detailed parameter guides and examples.
+All agent monitors target the `traceTableMcon` returned by `get_agent_metadata` — never use a regular table MCON.
 
 ---
 
