@@ -8,6 +8,7 @@ The toolkit bundles the following capabilities as a single **mc-agent-toolkit** 
 
 | Feature | Description | Details |
 |---|---|---|
+| **Asset Health** | Checks the health of a data table — surfaces last activity, alerts, monitoring coverage, importance, and upstream dependency health. | [README](skills/asset-health/README.md) |
 | **Monitoring Advisor** | Analyzes data coverage across warehouses and use cases, identifies monitoring gaps, and creates monitors to protect critical data. | [README](skills/monitoring-advisor/README.md) |
 | **Monitor Creation** | Guides AI agents through creating monitors correctly — validates tables, fields, and parameters before generating monitors-as-code YAML. | [README](skills/monitor-creation/README.md) |
 | **Prevent** | Surfaces lineage, alerts, and blast radius before code changes. Generates monitors-as-code and targeted validation queries to prevent data incidents. | [README](skills/prevent/README.md) |
