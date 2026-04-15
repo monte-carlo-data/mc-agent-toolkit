@@ -5,6 +5,13 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for OpenCode will be
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-04-15
+
+### Changed
+
+- Add asset-health skill (#33)
+- Add AI agent monitoring to monitoring-advisor skill (#48)
+
 ## [1.4.0] - 2026-04-14
 
 ### Changed
