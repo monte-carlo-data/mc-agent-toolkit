@@ -8,6 +8,8 @@ Monte Carlo's unified agent toolkit plugin for the Cursor editor. Delivers data 
 |---|---|
 | **MC Prevent** | Detect and prevent breaking schema changes using Monte Carlo lineage and monitoring data. |
 
+**Requires Python 3.10+.**
+
 ## Installation
 
 ### One-line install (macOS / Linux)
