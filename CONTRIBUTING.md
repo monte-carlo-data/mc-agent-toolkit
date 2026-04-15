@@ -79,12 +79,12 @@ Plugins reference skills via symlinks so that skills are authored once and share
 ## Updating an existing skill
 
 1. Edit files directly under `skills/<skill-name>/`. The corresponding plugin picks up changes automatically via the symlink — no additional steps needed.
-2. If the change is user-facing, bump the `version` in the corresponding plugin's `plugin.json`. Claude Code uses the version field to determine whether to update an installed plugin.
+2. If the change is user-facing, bump the version: `./scripts/bump-version.sh patch` (or `minor`/`major` — see [Version bumping](#version-bumping)). This updates all 5 plugin config files in sync. Claude Code uses the version field to determine whether to update an installed plugin.
 
 ## Fixing a bug
 
-1. For skill content bugs: fix in `skills/<skill-name>/` and bump the plugin version.
-2. For plugin-level bugs (hooks, plugin.json config): fix in `plugins/claude-code/<skill-name>/` and bump the plugin version.
+1. For skill content bugs: fix in `skills/<skill-name>/` and bump the version with `./scripts/bump-version.sh patch`.
+2. For plugin-level bugs (hooks, plugin.json config): fix in `plugins/claude-code/<skill-name>/` and bump the version with `./scripts/bump-version.sh patch`.
 
 ## Pull request guidelines
 
@@ -103,52 +103,45 @@ Plugins reference skills via symlinks so that skills are authored once and share
 
 ## Releasing
 
-Use `scripts/release.sh` to cut a release. It bumps the version in all 5 plugin config files, opens your editor for a changelog entry, commits, and tags.
+Version is tracked in code (the 5 plugin config files). Bump it as part of your feature PR — no separate release step needed. When the version change merges to `main`, a GitHub Actions workflow automatically creates the corresponding git tag and GitHub Release.
 
-### Prerequisites
+### Bump the version
 
-- A baseline tag must exist (e.g., `v1.0.0`). If this is the first release, create one manually:
-  ```bash
-  git tag v1.0.0
-  git push origin v1.0.0
-  ```
-- You must be on `main` with a clean working tree.
-
-### Usage
+Use the convenience script to update all 5 plugin config files and changelogs in one step:
 
 ```bash
-# Bump patch version (1.0.0 → 1.0.1), commit + tag locally
-./scripts/release.sh patch
+# Bump patch version (1.0.0 → 1.0.1)
+./scripts/bump-version.sh patch
 
-# Bump minor version, push branch + tag, and open PR
-./scripts/release.sh minor --push
+# Bump minor version (1.0.0 → 1.1.0)
+./scripts/bump-version.sh minor
 
 # Set an explicit version
-./scripts/release.sh 2.0.0
+./scripts/bump-version.sh 2.0.0
 
 # Preview what would happen without making changes
-./scripts/release.sh patch --dry-run
+./scripts/bump-version.sh patch --dry-run
 ```
 
-### What the script does
-
+The script:
 1. Reads the current version from `plugins/claude-code/.claude-plugin/plugin.json`
 2. Computes the next version based on the bump type
 3. Opens `$EDITOR` with a changelog template pre-filled with commits since the last tag
 4. Updates `"version"` in all 5 plugin config files
 5. Prepends the changelog entry to all 5 `CHANGELOG.md` files
-6. Creates a `release/vX.Y.Z` branch and commits (`release: vX.Y.Z`)
 
-Without `--push`, the branch and commit stay local so you can inspect before pushing. To publish:
+Commit the resulting changes as part of your PR.
 
-```bash
-git push -u origin release/vX.Y.Z
-gh pr create --title 'release: vX.Y.Z'
-```
+### Automated checks
+
+Two automated checks help catch missing version bumps:
+
+- **`/ship`** — before opening a PR, checks whether the diff touches shipped content (`skills/`, `plugins/`) without a version bump, and prompts you to run the script.
+- **`/code-review`** — the `versioning` reviewer agent runs on every PR and flags missing or inconsistent version bumps as an ISSUE-level finding, with a suggested bump level.
 
 ### GitHub Release
 
-When a `release/v*` PR merges to `main`, a GitHub Actions workflow (`.github/workflows/release-on-tag.yml`) automatically tags the merge commit and creates a GitHub Release with auto-generated release notes.
+When a version bump merges to `main`, the GitHub Actions workflow (`.github/workflows/release-on-tag.yml`) automatically creates a git tag and GitHub Release with auto-generated release notes from PR titles.
 
 ## Architecture
 
