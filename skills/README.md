@@ -6,6 +6,7 @@ Skills are platform-agnostic instruction sets that tell an AI coding agent what 
 
 | Skill | Description |
 |---|---|
+| **[Asset Health](asset-health/)** | Checks the health of a data table — surfaces last activity, alerts, monitoring coverage, importance, and upstream dependency health from Monte Carlo. |
 | **[Monitoring Advisor](monitoring-advisor/)** | Analyzes data coverage across warehouses and use cases, identifies monitoring gaps, and creates monitors to protect critical data. |
 | **[Monitor Creation](monitor-creation/)** | Guides AI agents through creating monitors correctly — validates tables, fields, and parameters before generating monitors-as-code YAML. |
 | **[Prevent](prevent/)** | Surfaces Monte Carlo context (lineage, alerts, blast radius) before code changes, generates monitors-as-code, and produces targeted validation queries. |
