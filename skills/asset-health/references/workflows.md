@@ -41,21 +41,21 @@ Every row must include the Warehouse column.
 Run all 4 calls in a single turn:
 
 ```
-getTable(mcon="<mcon>")
+get_table(mcon="<mcon>")
 → last updated, row count, importance score, is_important (key asset flag)
 
-getAlerts(created_after="<7 days ago>", created_before="<now>", table_mcons=["<mcon>"], statuses=["ACKNOWLEDGED", "WORK_IN_PROGRESS", null])
+get_alerts(created_after="<7 days ago>", created_before="<now>", table_mcons=["<mcon>"], statuses=["NOT_ACKNOWLEDGED", "ACKNOWLEDGED", "WORK_IN_PROGRESS"])
 → active alerts on this asset
 
-getMonitors(mcons=["<mcon>"])
+get_monitors(mcons=["<mcon>"])
 → monitor configs — check status field for paused vs active
 
-getAssetLineage(mcon="<mcon>", direction="upstream")
+get_asset_lineage(mcon="<mcon>", direction="upstream")
 → 1-hop upstream parent assets
 ```
 
-Use `getCurrentTime()` in Phase 1 or Phase 2 if you need the current timestamp
-for `getAlerts`. Or compute it from system time if available.
+Use `get_current_time()` in Phase 1 or Phase 2 if you need the current timestamp
+for `get_alerts`. Or compute it from system time if available.
 
 ### Phase 3 — Check upstream health (ALL parents in parallel)
 
@@ -65,15 +65,15 @@ Check at most **10** upstream parents. If there are more than 10, check the firs
 For each upstream parent, run both calls in parallel:
 
 ```
-getTable(mcon="<parent_mcon>")
+get_table(mcon="<parent_mcon>")
 → freshness, importance
 
-getAlerts(created_after="<7 days ago>", created_before="<now>", table_mcons=["<parent_mcon>"], statuses=["ACKNOWLEDGED", "WORK_IN_PROGRESS", null])
+get_alerts(created_after="<7 days ago>", created_before="<now>", table_mcons=["<parent_mcon>"], statuses=["NOT_ACKNOWLEDGED", "ACKNOWLEDGED", "WORK_IN_PROGRESS"])
 → active alerts on this parent
 ```
 
-All parents are checked in parallel with each other. Each parent's `getTable` and
-`getAlerts` are also parallel (no dependency between them).
+All parents are checked in parallel with each other. Each parent's `get_table` and
+`get_alerts` are also parallel (no dependency between them).
 
 ### Phase 4 — Synthesize the health report
 
@@ -81,7 +81,7 @@ Assemble findings into the report format defined in SKILL.md:
 
 1. **Tags** — from `search` properties. Omit line if none.
 2. **Status** — determine from alerts and monitoring:
-   - 🔴 if any alerts returned (the statuses filter already limits to non-resolved)
+   - 🔴 if any alerts returned (the statuses filter already limits to active alerts)
    - 🟡 if no alerts but 0 active monitors on a high-importance asset
    - 🟢 otherwise
 4. **Metrics table** — freshness, volume, alerts, monitoring, importance, upstream
@@ -94,7 +94,7 @@ Assemble findings into the report format defined in SKILL.md:
 
 ### Monitoring assessment
 
-When evaluating monitors from `getMonitors`:
+When evaluating monitors from `get_monitors`:
 
 - Count only **active** (non-paused) monitors
 - A paused monitor does NOT count as active coverage
@@ -110,7 +110,7 @@ When the user requests deeper upstream investigation for a specific parent:
 ### Phase 1 — Get upstream of the specified parent
 
 ```
-getAssetLineage(mcon="<parent_mcon>", direction="upstream")
+get_asset_lineage(mcon="<parent_mcon>", direction="upstream")
 → 1-hop upstream of the parent (grandparents of the original asset)
 ```
 
@@ -119,8 +119,8 @@ getAssetLineage(mcon="<parent_mcon>", direction="upstream")
 For each grandparent:
 
 ```
-getTable(mcon="<grandparent_mcon>")
-getAlerts(created_after="<7 days ago>", created_before="<now>", table_mcons=["<grandparent_mcon>"], statuses=["ACKNOWLEDGED", "WORK_IN_PROGRESS", null])
+get_table(mcon="<grandparent_mcon>")
+get_alerts(created_after="<7 days ago>", created_before="<now>", table_mcons=["<grandparent_mcon>"], statuses=["NOT_ACKNOWLEDGED", "ACKNOWLEDGED", "WORK_IN_PROGRESS"])
 ```
 
 ### Phase 3 — Report

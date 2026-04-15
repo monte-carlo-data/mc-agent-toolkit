@@ -1,11 +1,6 @@
 ---
 name: monte-carlo-asset-health
-description: |
-  Check the health of a data table/asset using Monte Carlo. Use when the user
-  asks "how is table X", "check health of X", "is X healthy", "status of X",
-  "check on X table", or any question about the health, status, or reliability
-  of a data asset. This is NOT the explore-table skill — use this skill for
-  health checks, not profiling.
+description: Check the health of a data table/asset using Monte Carlo. Activates on "how is table X", "check health of X", "is X healthy", "status of X", "check on X table", or any health/status question about a data asset.
 version: 1.0.0
 ---
 
@@ -118,6 +113,19 @@ No monitors configured for this table.
 If there are no upstream dependencies, show:
 No upstream dependencies found.
 
+### Diagnosis
+
+1-2 sentences summarizing what is causing the table to be unhealthy, or
+confirming it is healthy. This should naturally lead into the recommendations.
+
+Example (unhealthy):
+Upstream table raw_orders has not been updated in 8 hours, which is likely
+causing staleness in this table. There are also 2 unacknowledged alerts.
+
+Example (healthy):
+Table is healthy — no active alerts, monitored, and all upstream sources
+are in good shape.
+
 ### Recommendations
 - Investigate upstream raw_orders freshness — likely root cause of this table's staleness
 - Acknowledge or investigate the 2 active alerts
@@ -134,23 +142,23 @@ embellish values beyond what the tool returns.
 
 | Metric | Data source | What to show | Signal |
 |--------|------------|-------------|--------|
-| **Last Activity** | `getTable` → `last_activity` | Date of last activity (e.g., "Apr 6, 2025") | 🟢 Recent (within 7 days) / 🟡 Stale (older than 7 days) |
-| **Alerts** | `getAlerts` → count | "N active" or "No active alerts" | 🔴 Has alerts / 🟢 No alerts |
-| **Monitoring** | `getMonitors` → count where `is_paused` is false | "N active monitors" or "0 active monitors (M paused)". Include relevant details from monitor fields (incident counts, error counts, types). | 🟢 Monitored (≥1 active) / 🔴 Unmonitored (0 active) |
-| **Upstream** | `getAssetLineage` (upstream) + Phase 3 checks | "N/M sources unhealthy" or "All N sources healthy" | 🔴 Issues (any unhealthy) / 🟢 Healthy (all healthy) |
+| **Last Activity** | `get_table` → `last_activity` | Date of last activity (e.g., "Apr 6, 2025") | 🟢 Recent (within 7 days) / 🟡 Stale (older than 7 days) |
+| **Alerts** | `get_alerts` → count | "N active" or "No active alerts" | 🔴 Has alerts / 🟢 No alerts |
+| **Monitoring** | `get_monitors` → count where `is_paused` is false | "N active monitors" or "0 active monitors (M paused)". Include relevant details from monitor fields (incident counts, error counts, types). | 🟢 Monitored (≥1 active) / 🔴 Unmonitored (0 active) |
+| **Upstream** | `get_asset_lineage` (upstream) + Phase 3 checks | "N/M sources unhealthy" or "All N sources healthy" | 🔴 Issues (any unhealthy) / 🟢 Healthy (all healthy) |
 
 **Importance** is shown next to the Status line (not in the metrics table). Source:
-`getTable` → `importance_score` + `is_important`. Show "X.XX (key asset ⭐️)" if
+`get_table` → `importance_score` + `is_important`. Show "X.XX (key asset ⭐️)" if
 key asset or importance > 0.8, otherwise just "X.XX".
 
 **Avg Reads/Day** and **Avg Writes/Day** are shown below the Status line. Source:
-`getTable` → `table_stats.avg_reads_per_active_day` and `table_stats.avg_writes_per_active_day`.
+`get_table` → `table_stats.avg_reads_per_active_day` and `table_stats.avg_writes_per_active_day`.
 
 **Do NOT include downstream data.** This skill only queries upstream lineage.
 
 ### Status determination
 
-- **🔴 Unhealthy:** Any non-resolved alerts on the asset (from `getAlerts` with statuses `[null, "ACKNOWLEDGED", "WORK_IN_PROGRESS"]` — see `parameters.md`)
+- **🔴 Unhealthy:** Any active alerts on the asset (from `get_alerts` with statuses `["NOT_ACKNOWLEDGED", "ACKNOWLEDGED", "WORK_IN_PROGRESS"]` — see `parameters.md`)
 - **🟡 Degraded:** No active alerts, but 0 active monitors on a high-importance
   asset (importance > 0.8 or key asset)
 - **🟢 Healthy:** No active alerts and has at least 1 active monitor

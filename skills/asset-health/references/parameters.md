@@ -5,7 +5,7 @@ the tools relevant to this skill's workflows.
 
 ---
 
-## `getAlerts` — use snake_case parameters
+## `get_alerts` — use snake_case parameters
 
 ```
 created_after
@@ -16,14 +16,13 @@ statuses
 ```
 
 Always provide `created_after` and `created_before`. Max window is 60 days.
-Use `getCurrentTime()` to get the current ISO timestamp when needed.
+Use `get_current_time()` to get the current ISO timestamp when needed.
 
-Filter to non-resolved alerts for health checks:
+When requesting active alerts, pass these three statuses:
+
 ```
-statuses: ["ACKNOWLEDGED", "WORK_IN_PROGRESS", null]
+statuses: ["NOT_ACKNOWLEDGED", "ACKNOWLEDGED", "WORK_IN_PROGRESS"]
 ```
-**Important:** `null` represents unacknowledged alerts. Do NOT pass
-`"NOT_ACKNOWLEDGED"` as a string — it is not a valid API value. Use `null`.
 
 Response field mapping for the alert table:
 - **Date** → `createdTime`
@@ -38,8 +37,8 @@ Response field mapping for the alert table:
 ## `search` — finding the right table identifier
 
 MC uses MCONs (Monte Carlo Object Names) as table identifiers. Always use
-`search` first to resolve a table name to its MCON before calling `getTable`,
-`getAssetLineage`, or `getAlerts`.
+`search` first to resolve a table name to its MCON before calling `get_table`,
+`get_asset_lineage`, or `get_alerts`.
 
 ```
 search(query="orders_status") → returns mcon, full_table_id, warehouse, properties
@@ -49,7 +48,7 @@ The `properties` field contains tags (key-value pairs) associated with the asset
 
 ---
 
-## `getTable` — table metadata and stats
+## `get_table` — table metadata and stats
 
 Pass the MCON as: `mcon="<mcon>"` (single string, not an array).
 
@@ -62,7 +61,7 @@ Key response fields used by this skill:
 
 ---
 
-## `getMonitors` — checking if monitors are paused
+## `get_monitors` — checking if monitors are paused
 
 When filtering by table, pass MCONs via the `mcons` parameter (not `table_mcons`).
 Check the `is_paused` field (boolean) on each monitor. Only count monitors where
@@ -92,14 +91,14 @@ Monte Carlo links — never hardcode the base URL:
 
 ---
 
-## `getCurrentTime` — get current timestamp
+## `get_current_time` — get current timestamp
 
 Takes no arguments. Returns an ISO 8601 timestamp. Use this to compute
-`created_after` and `created_before` for `getAlerts`.
+`created_after` and `created_before` for `get_alerts`.
 
 ---
 
-## `getAssetLineage` — direction and edge interpretation
+## `get_asset_lineage` — direction and edge interpretation
 
 Pass `direction` as `"UPSTREAM"` or `"DOWNSTREAM"` (uppercase).
 Pass `mcons` as an array even for a single asset: `mcons=["<mcon>"]`.
