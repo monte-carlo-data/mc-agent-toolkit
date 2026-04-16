@@ -1,5 +1,5 @@
 ---
-name: ctp-config
+name: connection-auth-rules
 description: "Build a Connection Auth Rules for a Monte Carlo connection type. Fetches live connector schemas and transform steps from the apollo-agent repo."
 version: 1.0.0
 ---

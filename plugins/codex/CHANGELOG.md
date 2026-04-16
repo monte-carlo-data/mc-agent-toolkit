@@ -9,7 +9,7 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- Add ctp-config skill for building Connection Auth Rules configs
+- Add connection-auth-rules skill for building Connection Auth Rules configs
 
 
 ## [1.6.0] - 2026-04-16
