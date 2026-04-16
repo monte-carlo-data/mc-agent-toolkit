@@ -35,7 +35,7 @@ Do not activate when the user is:
 
 - Investigating data quality issues (use the prevent skill)
 - Looking at storage costs (use the storage-cost-analysis skill)
-- Creating monitors (use the monitor-creation skill)
+- Creating monitors (use the monitoring-advisor skill)
 - Just querying data or exploring table contents
 
 ## Prerequisites

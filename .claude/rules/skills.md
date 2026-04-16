@@ -65,6 +65,16 @@ Without these symlinks, the skill won't be discovered by the editor plugin — e
 
 **Verify after adding:** count the directories in `skills/` (excluding `README.md`) and confirm each editor plugin's `skills/` directory has the same count of symlinks.
 
+## Use the 3-tier instruction style for skill content
+
+Skill content follows a 3-tier voice/style convention. Each tier serves a different purpose and reads differently:
+
+- **Tier 1 — SKILL.md (router/workflow):** Procedural and workflow-heavy. Guides the LLM through decision-making ("what kind of request is this?") and high-level flows. Softer recommendations, focus on routing and sequencing. No per-parameter DO/DON'T rules here.
+- **Tier 2 — creation procedure references (e.g. `data-monitor-creation.md`):** Procedural but domain-specific. Keeps the investigation/creation flow (steps, phases) in a readable sequence. Does NOT embed per-type constraints — those live in Tier 3.
+- **Tier 3 — per-type references (e.g. `data-metric-monitor.md`):** Constraint-heavy with `NEVER`, `CRITICAL`, and `IMPORTANT` callouts. "Common mistakes" sections. All logical DO/DON'T rules live here because one wrong parameter means a broken monitor. Being explicit about what NOT to do matters most at this level.
+
+When adding new reference content, place constraints at the right tier. A rule about "never guess column names" belongs in a Tier 3 per-type file, not in the Tier 1 router.
+
 ## Keep READMEs in sync when adding or renaming skills
 
 When adding a new skill or renaming an existing one, update the skill tables in **both**:

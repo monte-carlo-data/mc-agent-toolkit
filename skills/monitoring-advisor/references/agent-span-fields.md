@@ -1,5 +1,8 @@
 # Known Span Field Names (PARSED_SPANS Layer)
 
+> **CRITICAL:** Do NOT run `SHOW COLUMNS` or `SELECT *` on the trace table to discover
+> field names — the raw table has different columns. Use the field names listed below.
+
 Monte Carlo maintains a **PARSED_SPANS** transformation view on top of each
 agent's raw trace table. This view extracts structured fields from the raw
 OTLP JSON. **You cannot query PARSED_SPANS directly via SQL** — it is not

@@ -1,6 +1,13 @@
 # Metric Monitor Reference
 
-Detailed reference for building `createMetricMonitorMac` tool calls.
+Detailed reference for building `create_metric_monitor_mac` tool calls.
+
+## Critical Constraints
+
+- **NEVER guess column names.** Always get them from `get_table`. This is the most common source of monitor creation failures.
+- **`aggregate_time_field` MUST be a real timestamp column** from the table schema. Never assume or guess this value -- verify it exists in the `get_table` output.
+
+---
 
 ## When to Use
 
@@ -33,7 +40,7 @@ Use a metric monitor when the user wants to:
 | `aggregate_by` | string | `"day"` | Time interval: `"hour"`, `"day"`, `"week"`, `"month"`. |
 | `where_condition` | string | none | SQL WHERE clause (without `WHERE` keyword) to filter rows before computing metrics. |
 | `interval_minutes` | int | auto | Schedule interval in minutes. Must be compatible with `aggregate_by` (see note below). If not specified, the tool defaults to the minimum valid interval for the chosen `aggregate_by`. |
-| `domain_id` | string (uuid) | none | Domain UUID (use `getDomains` to list). |
+| `domain_id` | string (uuid) | none | Domain UUID (use `get_domains` to list). |
 
 ---
 
@@ -67,7 +74,7 @@ When omitted, the monitor queries all rows on each run. This works well for smal
 
 ### How to pick it
 
-1. You should already have the column names from `getTable` with `include_fields: true` (done in Step 2 of the main skill).
+1. You should already have the column names from `get_table` with `include_fields: true` (done in Step 2 of the main skill).
 2. Look for columns whose names suggest a timestamp: `created_at`, `updated_at`, `modified_at`, `timestamp`, `event_timestamp`, or columns with `_ts`, `_dt`, `_time` suffixes, or `date`, `datetime`.
 3. If the user specified one, verify it exists in the column list.
 4. If exactly one obvious candidate exists, suggest it.
@@ -79,14 +86,14 @@ When omitted, the monitor queries all rows on each run. This works well for smal
 ### Common timestamp field mistakes
 
 - **Using a DATE column (not TIMESTAMP):** This may work, but aggregation granularity is limited. For example, `aggregate_by: "hour"` is meaningless on a DATE column because the time component is always midnight. Warn the user and default to `aggregate_by: "day"` or coarser.
-- **Using a field that contains many nulls:** If the timestamp column has significant null values, rows with null timestamps are excluded from aggregation windows, producing unreliable or misleading results. Check the column's null rate from `getTable` field stats if available, and warn the user if it is high.
-- **Guessing a field name that does not exist:** Always verify the column name against the `getTable` output. A typo or assumed name (e.g., `created_date` when the actual column is `created_at`) causes the monitor creation to fail silently or error.
+- **Using a field that contains many nulls:** If the timestamp column has significant null values, rows with null timestamps are excluded from aggregation windows, producing unreliable or misleading results. Check the column's null rate from `get_table` field stats if available, and warn the user if it is high.
+- **Guessing a field name that does not exist:** Always verify the column name against the `get_table` output. A typo or assumed name (e.g., `created_date` when the actual column is `created_at`) causes the monitor creation to fail silently or error.
 
 ---
 
 ## Field-Type-to-Metric Compatibility Matrix
 
-**Before selecting a metric, check the column's data type from `getTable` results.** Passing a metric incompatible with the column type is the most common source of creation failures after timestamp issues.
+**Before selecting a metric, check the column's data type from `get_table` results.** Passing a metric incompatible with the column type is the most common source of creation failures after timestamp issues.
 
 | Column Type | Compatible Metrics |
 |-------------|-------------------|

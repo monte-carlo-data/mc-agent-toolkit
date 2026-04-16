@@ -35,7 +35,7 @@ Activate when the user:
 Do not activate when the user is:
 
 - Investigating a specific known incident (help them directly)
-- Creating or configuring monitors (use the monitor-creation skill)
+- Creating or configuring monitors (use the monitoring-advisor skill)
 - Running impact analysis before a code change (use the prevent skill)
 
 ---
