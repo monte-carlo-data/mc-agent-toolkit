@@ -194,17 +194,6 @@ Always pass the existing `uuid` to update rather than create.
 3. **Check the returned UUID** — if it differs from the one you passed, tell the user the old
    monitor was replaced with a new one.
 
-### Limitations with custom SQL monitors
-`create_metric_monitor` only supports standard built-in metrics (ROW_COUNT_CHANGE, NULL_COUNT,
-NUMERIC_MEAN, etc.) in its `alert_conditions`. It does **not** support custom SQL expressions as
-the metric definition. If the monitor uses `custom_metric` with `sql_expression` in its config,
-you cannot safely update it via this tool — you would clobber the SQL conditions.
-
-In that case, tell the user:
-> This monitor uses custom SQL metrics that can't be updated through the API tool. Please update
-> the threshold directly in the UI: go to the monitor, edit the alert condition, and change the
-> threshold value.
-
 ---
 
 ## Guidelines
