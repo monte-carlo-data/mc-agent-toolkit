@@ -28,35 +28,43 @@ Do not activate when the user is:
 
 ---
 
-## Step 1 — Fetch available connection types (Connection Auth Rules)
+## Step 1 — List available connection types
 
-Use `WebFetch` to load the directory listing from the apollo-agent GitHub API:
+Locate the companion script with Bash:
 
+```bash
+find -L ~/.claude . -name fetch_schema.py -path "*/connection-auth-rules/*" 2>/dev/null | head -1
 ```
-https://api.github.com/repos/monte-carlo-data/apollo-agent/contents/apollo/integrations/ctp/defaults
+
+Then run it:
+
+```bash
+python3 <script_path> --list
 ```
 
-Parse the response. Each entry with `"type": "file"` and a `.py` extension is a connector. Extract the `name` (filename) and `download_url` for each.
+The script outputs JSON. Parse `result.connectors` — each entry has a `name` field. Present the names to the user and ask which connection type they want to build a config for.
 
-**If this fetch fails:** Tell the user the fetch failed and show the error. Offer to retry. Do not proceed until you have the connector list.
-
-Present the list of available connection types (strip the `.py` extension and `__init__` entry). Ask the user which connection type they want to build a config for.
+**If the script fails:** Show the error output and offer to retry. Do not proceed until you have the connector list.
 
 ---
 
 ## Step 2 — Fetch the connector schema
 
-Once the user selects a connection type, fetch the raw Python source for that connector using its `download_url` from Step 1.
+Once the user selects a connection type, run the script with that connector name:
 
-Parse the file to extract:
+```bash
+python3 <script_path> --connector <name>
+```
 
-1. **`TypedDict` output shape** — the class that defines the output keys. These are the keys the mapper will produce (the `connect_args` fields the driver expects).
-2. **`MapperConfig` `field_map`** — the existing default mapping. This shows which credential fields map to which output keys and what Jinja2 template expressions are used.
-3. **`CtpConfig` `steps`** — any default transform steps already configured.
+The script outputs JSON. Parse `result.schema`:
+
+- **`output_keys`** — the driver-level `connect_args` keys the mapper must produce (from the connector's `TypedDict`)
+- **`default_field_map`** — the existing default mapping (credential field → Jinja2 template)
+- **`default_steps`** — any default transform steps already configured
 
 Present a summary to the user:
 
-- The output keys (from the TypedDict)
+- The output keys
 - The default mapper field_map entries
 - Any existing steps with their types
 
@@ -64,22 +72,21 @@ Present a summary to the user:
 
 ## Step 3 — Optionally fetch available transform steps
 
-If the connector's default config (from Step 2) already includes steps, or if the user indicates they need custom transform steps, fetch the transforms directory listing:
+If the connector's default config (from Step 2) already includes steps, or if the user indicates they need custom transform steps, run:
 
+```bash
+python3 <script_path> --connector <name> --transforms
 ```
-https://api.github.com/repos/monte-carlo-data/apollo-agent/contents/apollo/integrations/ctp/transforms
-```
 
-For each `.py` file (excluding `__init__`), fetch the raw source using its `download_url`.
-
-Parse each transform file's docstring for:
-- `Step input:` — fields the step reads from the pipeline state
-- `Step output:` — derived fields the step writes, which can then be referenced as `{{ derived.<key> }}` in the mapper
-- `Step field_map:` — typical mapper entry to wire the step's output into `connect_args` (e.g. `{"private_key": "{{ derived.private_key_der }}"}`)
+Parse `result.transforms` — each entry has:
+- `name` — the step type string used in `"type"`
+- `step_input` — fields the step reads from the pipeline state
+- `step_output` — derived fields the step writes, referenceable as `{{ derived.<key> }}` in the mapper
+- `step_field_map` — typical mapper entry to wire the step's output into `connect_args`
 
 Present the available steps with their full contracts (input, output, and field_map hint).
 
-**If this fetch fails:** Tell the user and offer to retry. You can continue without step data — just describe steps as unknown and ask the user to specify them manually.
+**If the script fails:** Tell the user and offer to retry. You can continue without step data — just describe steps as unknown and ask the user to specify them manually.
 
 ---
 
