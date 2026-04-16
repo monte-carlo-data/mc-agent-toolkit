@@ -1,6 +1,13 @@
 # Validation Monitor Reference
 
-Detailed reference for building `createValidationMonitorMac` tool calls.
+Detailed reference for building `create_validation_monitor_mac` tool calls.
+
+## Critical Constraints
+
+- **NEVER guess column names.** Always get them from `get_table`. Every field referenced in a validation condition must exist in the table schema exactly as spelled.
+- **IMPORTANT: Conditions match INVALID data, not valid data.** The monitor alerts when it finds rows matching the condition, so the condition must describe the BAD rows. Getting this backwards is the number one mistake with validation monitors.
+
+---
 
 ## When to Use
 
@@ -35,7 +42,7 @@ Think of it this way: the monitor scans rows and fires an alert when it finds ro
 
 Before constructing the `alert_condition`, verify that every field name you plan to reference exists in the table's column list. This is the number two source of validation monitor failures -- referencing columns that do not exist or are misspelled.
 
-1. You should already have the column list from `getTable` with `include_fields: true` (done in Step 2 of the main skill).
+1. You should already have the column list from `get_table` with `include_fields: true` (done in Step 2 of the main skill).
 2. For every field name in your planned conditions, confirm it appears in the column list exactly as spelled (field names are case-sensitive on most warehouses).
 3. If a field does not exist, stop and ask the user to clarify the correct column name. Do not guess.
 
@@ -55,7 +62,7 @@ Before constructing the `alert_condition`, verify that every field name you plan
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `warehouse` | string | Warehouse name or UUID. Required if `table` is not an MCON. |
-| `domain_id` | string (uuid) | Domain UUID (use `getDomains` to list). |
+| `domain_id` | string (uuid) | Domain UUID (use `get_domains` to list). |
 
 ---
 
@@ -150,7 +157,7 @@ Value descriptors appear in the `value`, `left`, and `right` arrays of UNARY and
 
 ## Predicates Reference
 
-Before building conditions, call `getValidationPredicates` to get the full list of supported predicates for the connected warehouse. The list below covers common predicates but may not be exhaustive.
+Before building conditions, call `get_validation_predicates` to get the full list of supported predicates for the connected warehouse. The list below covers common predicates but may not be exhaustive.
 
 ### Unary Predicates
 
@@ -191,7 +198,7 @@ Any predicate can be inverted by setting `"negated": true` in the predicate obje
 
 ### Alert when id is null
 
-Verify that `id` exists in the table schema from `getTable` before proceeding.
+Verify that `id` exists in the table schema from `get_table` before proceeding.
 
 ```json
 {
@@ -216,7 +223,7 @@ The condition matches rows where `id` IS NULL -- these are the invalid rows we w
 
 ### Alert when status is not in allowed set
 
-Verify that `status` exists in the table schema from `getTable` before proceeding.
+Verify that `status` exists in the table schema from `get_table` before proceeding.
 
 ```json
 {
@@ -246,7 +253,7 @@ Note `negated: true` -- the predicate is `in_set`, but we want to alert when the
 
 ### Alert when amount is negative
 
-Verify that `amount` exists in the table schema from `getTable` before proceeding.
+Verify that `amount` exists in the table schema from `get_table` before proceeding.
 
 ```json
 {
@@ -271,7 +278,7 @@ The condition matches rows where `amount` is negative -- these are the invalid r
 
 ### Combined conditions: null OR negative
 
-Verify that both `amount` and `quantity` exist in the table schema from `getTable` before proceeding.
+Verify that both `amount` and `quantity` exist in the table schema from `get_table` before proceeding.
 
 ```json
 {
@@ -301,7 +308,7 @@ The OR operator means an alert fires if either condition matches -- the row has 
 
 ### Between check with nested AND/OR
 
-Verify that `score` and `status` exist in the table schema from `getTable` before proceeding.
+Verify that `score` and `status` exist in the table schema from `get_table` before proceeding.
 
 ```json
 {
@@ -336,7 +343,7 @@ This uses `between` with `negated: true` to alert when score is outside the 0-10
 
 ### Referential integrity with SQL subquery
 
-Verify that `customer_id` exists in the table schema from `getTable` before proceeding.
+Verify that `customer_id` exists in the table schema from `get_table` before proceeding.
 
 ```json
 {
@@ -360,7 +367,7 @@ The SQL condition type is useful for referential integrity checks that require s
 
 ### Contains and starts_with checks
 
-Verify that `email` and `phone` exist in the table schema from `getTable` before proceeding.
+Verify that `email` and `phone` exist in the table schema from `get_table` before proceeding.
 
 ```json
 {
@@ -392,7 +399,7 @@ Verify that `email` and `phone` exist in the table schema from `getTable` before
 
 ## Fallback: Custom SQL Monitor
 
-If `createValidationMonitorMac` fails -- for example because a referenced column does not exist yet in the live table, or the warehouse does not support a particular predicate -- fall back to `createCustomSqlMonitorMac` with an explicit SQL query instead.
+If `create_validation_monitor_mac` fails -- for example because a referenced column does not exist yet in the live table, or the warehouse does not support a particular predicate -- fall back to `create_custom_sql_monitor_mac` with an explicit SQL query instead.
 
 A custom SQL monitor lets you express any validation logic as a SQL query that returns rows or a count. This is always available as a backup when the structured validation condition tree cannot express what you need or encounters an API error.
 
@@ -400,5 +407,5 @@ When falling back:
 
 1. Translate the intended validation logic into a SQL query.
 2. The SQL should select rows that violate the rule (matching the same "conditions match INVALID data" principle).
-3. Use `createCustomSqlMonitorMac` with the translated query.
+3. Use `create_custom_sql_monitor_mac` with the translated query.
 4. Inform the user that you used a custom SQL monitor as a fallback and explain why.

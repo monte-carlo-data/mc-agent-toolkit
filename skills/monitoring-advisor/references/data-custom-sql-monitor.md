@@ -1,6 +1,12 @@
 # Custom SQL Monitor Reference
 
-Detailed reference for building `createCustomSqlMonitorMac` tool calls.
+Detailed reference for building `create_custom_sql_monitor_mac` tool calls.
+
+## Critical Constraints
+
+- **NEVER guess column names.** Always verify column names from `get_table` before referencing them in SQL queries. A typo or assumed column name causes the monitor to fail on every scheduled run.
+
+---
 
 ## When to Use
 
@@ -41,7 +47,7 @@ If you find yourself contorting another monitor type to fit the user's intent, s
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `domain_id` | string (uuid) | Domain UUID (use `getDomains` to list). Only one domain can be assigned per monitor. |
+| `domain_id` | string (uuid) | Domain UUID (use `get_domains` to list). Only one domain can be assigned per monitor. |
 
 ---
 
