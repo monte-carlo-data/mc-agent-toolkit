@@ -66,12 +66,10 @@ This reflects the **current repository structure**.
 ```
 mc-agent-toolkit/
 ├── skills/                              # Shared skill definitions (platform-agnostic)
-│   ├── agent-monitoring/
 │   ├── analyze-root-cause/
 │   ├── automated-triage/
 │   ├── generate-validation-notebook/
-│   ├── monitor-creation/
-│   ├── monitoring-advisor/
+│   ├── monitoring-advisor/              # Unified: coverage + data monitors + agent monitors
 │   ├── performance-diagnosis/
 │   ├── prevent/
 │   ├── push-ingestion/

@@ -9,8 +9,7 @@ The toolkit bundles the following capabilities as a single **mc-agent-toolkit** 
 | Feature | Description | Details |
 |---|---|---|
 | **Asset Health** | Checks the health of a data table — surfaces last activity, alerts, monitoring coverage, importance, and upstream dependency health. | [README](skills/asset-health/README.md) |
-| **Monitoring Advisor** | Analyzes data coverage across warehouses and use cases, identifies monitoring gaps, and creates monitors to protect critical data. | [README](skills/monitoring-advisor/README.md) |
-| **Monitor Creation** | Guides AI agents through creating monitors correctly — validates tables, fields, and parameters before generating monitors-as-code YAML. | [README](skills/monitor-creation/README.md) |
+| **Monitoring Advisor** | Analyzes data coverage, creates monitors for warehouse tables and AI agents — covers coverage gaps, use-case analysis, data monitor creation, and agent observability. | [README](skills/monitoring-advisor/README.md) |
 | **Prevent** | Surfaces lineage, alerts, and blast radius before code changes. Generates monitors-as-code and targeted validation queries to prevent data incidents. | [README](skills/prevent/README.md) |
 | **Generate Validation Notebook** | Generates SQL validation notebooks for dbt model changes, with targeted queries comparing baseline and development data. | [README](skills/generate-validation-notebook/README.md) |
 | **Push Ingestion** | Generates warehouse-specific collection scripts for pushing metadata, lineage, and query logs to Monte Carlo. | [README](skills/push-ingestion/README.md) |
@@ -18,7 +17,6 @@ The toolkit bundles the following capabilities as a single **mc-agent-toolkit** 
 | **Storage Cost Analysis** | Identifies storage waste patterns (unread, zombie, dead-end tables) and recommends safe cleanup with cost estimates. | [README](skills/storage-cost-analysis/README.md) |
 | **Performance Diagnosis** | Diagnoses slow pipelines and expensive queries across Airflow, dbt, and Databricks with tiered investigation. | [README](skills/performance-diagnosis/README.md) |
 | **Remediation** | Investigates and remediates data quality alerts — runs TSA root cause analysis, discovers available tools, executes fixes (or escalates), and documents the resolution. | [README](skills/remediation/README.md) |
-| **Agent Monitoring** | Investigation and monitor creation guide for AI agent observability. | [README](skills/agent-monitoring/README.md) |
 
 ## Installing the plugin (recommended)
 

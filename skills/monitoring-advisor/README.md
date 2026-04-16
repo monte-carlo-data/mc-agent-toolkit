@@ -1,6 +1,6 @@
 # Monte Carlo Monitoring Advisor Skill
 
-Analyze data coverage across warehouses and use cases, identify monitoring gaps, and create monitors to protect critical data. Walks users through warehouse discovery, use-case exploration, coverage gap analysis, and monitor creation — all through natural conversation.
+Analyze data coverage, create monitors for warehouse tables and AI agents. Walks users through warehouse discovery, use-case exploration, coverage gap analysis, data monitor creation, and agent observability — all through natural conversation. This single skill handles all monitoring needs: coverage analysis, data quality monitors (metric, validation, custom SQL, comparison, table), and AI agent monitors (metric, evaluation, trajectory, validation).
 
 ## Editor & Stack Compatibility
 
@@ -13,7 +13,7 @@ All warehouses supported by Monte Carlo work with the monitoring advisor. The sk
 - Claude Code, Cursor, VS Code or any editor with MCP support
 - Monte Carlo account with Editor role or above
 - [MC CLI](https://docs.getmontecarlo.com/docs/using-the-cli) installed for monitor deployment (`pip install montecarlodata`)
-- **Recommended:** Install alongside the **monitor-creation** skill — the monitoring advisor cross-references its parameter docs
+- All monitor creation capabilities are built in — no additional skills needed
 
 ## Setup
 
@@ -56,14 +56,19 @@ Ask your AI editor about your monitoring coverage — describe what you want to 
 - "Analyze monitoring coverage for my warehouse"
 - "Find unmonitored tables with recent anomalies"
 - "Help me set up monitoring for my critical use cases"
+- "Create a freshness monitor on the orders table"
+- "Set up a null check on the email column"
+- "Monitor my AI agent's latency and token usage"
+- "Track my agent's response quality"
 
 ### What it does
 
-1. **Discovers** your warehouses and use cases
+1. **Discovers** your warehouses, use cases, and AI agents
 2. **Analyzes** coverage — which tables are monitored, which aren't, and which have active anomalies
 3. **Prioritizes** gaps by criticality, importance score, and anomaly activity
-4. **Suggests** monitors tailored to your use cases and data patterns
-5. **Generates** monitors-as-code YAML ready for deployment
+4. **Creates** data quality monitors (metric, validation, custom SQL, comparison, table) with full parameter validation
+5. **Creates** AI agent monitors (metric, evaluation, trajectory, validation) for agent observability
+6. **Generates** monitors-as-code YAML ready for deployment
 
 ### Deploying generated monitors
 
