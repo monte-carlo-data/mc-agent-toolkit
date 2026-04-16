@@ -64,7 +64,7 @@ Present a summary to the user:
 
 ## Step 3 — Optionally fetch available transform steps
 
-If the user indicates they need custom transform steps (or asks what steps are available), fetch the transforms directory listing:
+If the connector's default config (from Step 2) already includes steps, or if the user indicates they need custom transform steps, fetch the transforms directory listing:
 
 ```
 https://api.github.com/repos/monte-carlo-data/apollo-agent/contents/apollo/integrations/ctp/transforms
@@ -72,9 +72,12 @@ https://api.github.com/repos/monte-carlo-data/apollo-agent/contents/apollo/integ
 
 For each `.py` file (excluding `__init__`), fetch the raw source using its `download_url`.
 
-Parse each transform file's docstring or comments for the `Step input:` / `Step output:` contract — these document what fields the step reads from `derived` context and what it adds.
+Parse each transform file's docstring for:
+- `Step input:` — fields the step reads from the pipeline state
+- `Step output:` — derived fields the step writes, which can then be referenced as `{{ derived.<key> }}` in the mapper
+- `Step field_map:` — typical mapper entry to wire the step's output into `connect_args` (e.g. `{"private_key": "{{ derived.private_key_der }}"}`)
 
-Present the available steps and their input/output contracts.
+Present the available steps with their full contracts (input, output, and field_map hint).
 
 **If this fetch fails:** Tell the user and offer to retry. You can continue without step data — just describe steps as unknown and ask the user to specify them manually.
 
@@ -106,11 +109,17 @@ When the user doesn't know their credential field names, remind them these come 
 
 ## Step 5 — Configure transform steps (optional)
 
-If the connector needs steps (e.g. decoding a PEM certificate, constructing a derived field), help the user configure each step:
+If the connector needs steps (e.g. decoding a PEM certificate, constructing a derived field), help the user configure each step. A step dict has these fields:
 
-1. Ask which step type they need (from the transforms listing, or let them specify a type name).
-2. Ask for the step's parameters (each step type has its own param set — refer to the parsed source or docstring).
-3. Build the step dict.
+| Field | Required | Description |
+|-------|----------|-------------|
+| `type` | yes | Step type name (e.g. `"load_private_key"`) |
+| `input` | yes | Dict of template strings the step reads (e.g. `{"pem": "{{ raw.private_key_pem }}"}`) |
+| `output` | yes | Dict mapping the step's logical output names to derived key names (e.g. `{"private_key": "private_key_der"}`) |
+| `when` | no | Jinja2 boolean expression — step only runs if this evaluates to true (e.g. `"raw.ssl_ca_pem is defined"`) |
+| `field_map` | no | Mapper entries contributed only when this step runs — useful for conditional fields |
+
+Walk the user through `type`, `input`, and `output` for each step. Ask about `when` if the step should only run under certain credential conditions (e.g. when an optional SSL cert is present).
 
 Steps run in order before the mapper. The mapper can reference step outputs via `{{ derived.<key> }}`.
 
@@ -126,15 +135,21 @@ Produce the complete `ctp_config` as a Python dict (ready to serialize to JSON f
         # each step as a dict, e.g.:
         {
             "type": "load_private_key",
-            "params": {
-                "source_field": "private_key",
-                "target_field": "private_key_pem"
+            "input": {
+                "pem": "{{ raw.private_key_pem }}"
+            },
+            "output": {
+                "private_key": "private_key_der"
             }
+            # optional: "when": "raw.private_key_pem is defined"
         }
     ],
-    "field_map": {
-        "output_key": "{{ raw.credential_field }}",
-        # ...
+    "mapper": {
+        "field_map": {
+            "output_key": "{{ raw.credential_field }}",
+            # step output referenced as: "private_key": "{{ derived.private_key_der }}"
+            # ...
+        }
     }
 }
 ```
