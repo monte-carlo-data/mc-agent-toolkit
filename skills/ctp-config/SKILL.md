@@ -1,22 +1,22 @@
 ---
 name: ctp-config
-description: "Build a CTP (Credential Transform Pipeline) config for a Monte Carlo connection type. Fetches live connector schemas and transform steps from the apollo-agent repo."
+description: "Build a Connection Auth Rules configuration for a Monte Carlo connection type. Fetches live connector schemas and transform steps from the apollo-agent repo."
 version: 1.0.0
 ---
 
-# CTP Config Builder
+# Connection Auth Rules Builder
 
-Use this skill when the user wants to build a `ctp_config` dict for a Monte Carlo connection. The config is stored on the `Connection` object in the monolith and tells the Apollo agent how to transform flat credentials into the driver-specific `connect_args` format.
+Use this skill when the user wants to build a Connection Auth Rules configuration (stored as `ctp_config`) for a Monte Carlo connection. The config is stored on the `Connection` object in the monolith and tells the Apollo agent how to transform flat credentials into the driver-specific `connect_args` format.
 
 ## When to activate this skill
 
 Activate when the user:
 
-- Asks to create, build, or generate a `ctp_config`
-- Asks what fields are needed for a connection type's CTP config
+- Asks to create, build, or generate a Connection Auth Rules configuration
+- Asks what fields are needed for a connection type's Connection Auth Rules config
 - Wants to customize credential transformation for a connection
 - Asks about `MapperConfig`, `TransformStep`, or `CtpConfig`
-- Says things like "help me write a CTP config", "what's the ctp_config format for X"
+- Says things like "help me write a Connection Auth Rules config", "what's the connection auth rules format for X", or uses the older term "CTP config"
 
 ## When NOT to activate this skill
 
@@ -28,7 +28,7 @@ Do not activate when the user is:
 
 ---
 
-## Step 1 — Fetch available connection types
+## Step 1 — Fetch available connection types (Connection Auth Rules)
 
 Use `WebFetch` to load the directory listing from the apollo-agent GitHub API:
 
@@ -127,7 +127,7 @@ Steps run in order before the mapper. The mapper can reference step outputs via 
 
 ## Step 6 — Output the final config
 
-Produce the complete `ctp_config` as a Python dict (ready to serialize to JSON for storage):
+Produce the complete Connection Auth Rules configuration as a Python dict (ready to serialize to JSON for storage). This is stored as `ctp_config` on the `Connection` model:
 
 ```python
 {
@@ -154,15 +154,16 @@ Produce the complete `ctp_config` as a Python dict (ready to serialize to JSON f
 }
 ```
 
-Also show the equivalent JSON, since this is what gets stored in the monolith's `Connection.ctp_config` field.
+Also show the equivalent JSON, since this is what gets stored in the monolith's `Connection.ctp_config` field and entered in the "Connection auth rules configuration" field in the UI.
 
-Remind the user that validation happens server-side via `validateConnectionCtpConfig` — they should test the config through that mutation after saving it.
+Remind the user that validation happens server-side via `validateConnectionCtpConfig` — they should test the config through that mutation (or the Validate button in the UI) after saving it.
 
 ---
 
 ## Notes
 
-- **No in-skill validation.** The skill helps construct the config but does not execute or validate it. The user validates via the monolith's `validateConnectionCtpConfig` GraphQL mutation.
+- **No in-skill validation.** The skill helps construct the config but does not execute or validate it. The user validates via the monolith's `validateConnectionCtpConfig` GraphQL mutation or the Validate button in the "Connection auth rules" UI section.
 - **`is not None` pattern.** An empty `field_map` (`{}`) is valid — do not treat it as missing. The monolith checks `ctp_config is not None`, not truthiness.
 - **Steps are optional.** Most simple connectors use `steps: []`. Only add steps when the user needs credential transformation (e.g. PEM decoding, composite field construction).
 - **Fetch failures are recoverable.** If the GitHub API fetch fails, tell the user exactly what failed and offer to retry. Do not silently fall back to guessed schemas.
+- **Naming:** The user-facing name for this feature is "Connection auth rules". The underlying field and backend model remain `ctp_config` / `CtpConfig`.
