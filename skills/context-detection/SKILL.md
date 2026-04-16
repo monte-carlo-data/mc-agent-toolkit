@@ -1,6 +1,6 @@
 ---
 name: monte-carlo-context-detection
-description: Detect user context and route to the right Monte Carlo skill or workflow. Inspects workspace signals, conversation intent, and scoped API data to suggest or auto-activate the best skill.
+description: Route data-related requests to the right Monte Carlo skill or workflow. USE WHEN alerts, incidents, data broken, stale, coverage gaps, data quality, or any ambiguous data observability request.
 version: 1.0.0
 ---
 
@@ -103,6 +103,6 @@ Based on the combined signals from Steps 1-3:
 
 ### Prevent guardrail
 
-If the user is editing a dbt model file and the `prevent` skill's hooks are active, do NOT route to any other skill. Instead respond:
+If the user is **actively editing** a dbt model file (making code changes, not just viewing or asking about it) and the `prevent` skill's hooks are active, do NOT route to any other skill. Instead respond:
 
 > "The prevent skill will automatically handle impact assessment for dbt model changes via its pre-edit hooks. No additional routing needed."

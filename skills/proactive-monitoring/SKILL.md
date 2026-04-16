@@ -1,6 +1,6 @@
 ---
 name: monte-carlo-proactive-monitoring
-description: Guide users from coverage analysis to monitor creation. Sequences asset-health assessment, gap identification via monitoring-advisor, and monitor creation into a guided workflow.
+description: Guide users from coverage analysis to monitor creation. USE WHEN user asks what should I monitor, where are my gaps, improve coverage, or wants a systematic approach to monitoring across their data estate.
 version: 1.0.0
 ---
 

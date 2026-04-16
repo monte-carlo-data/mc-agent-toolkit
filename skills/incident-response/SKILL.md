@@ -1,6 +1,6 @@
 ---
 name: monte-carlo-incident-response
-description: Orchestrate incident response — triage alerts, investigate root causes, remediate issues, and add monitoring to prevent recurrence. Sequences existing skills into a guided workflow.
+description: Orchestrate incident response — triage, root cause, remediate, prevent recurrence. USE WHEN active alerts, data broken, stale, pipeline failure, or investigate and fix a data incident.
 version: 1.0.0
 ---
 
