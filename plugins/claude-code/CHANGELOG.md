@@ -5,6 +5,13 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Claude Code will
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.1] - 2026-04-15
+
+### Changed
+
+- Add ctp-config skill for building CTP (Credential Transform Pipeline) configs
+
+
 ## [1.5.0] - 2026-04-15
 
 ### Changed

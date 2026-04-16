@@ -19,6 +19,7 @@ The toolkit bundles the following capabilities as a single **mc-agent-toolkit** 
 | **Performance Diagnosis** | Diagnoses slow pipelines and expensive queries across Airflow, dbt, and Databricks with tiered investigation. | [README](skills/performance-diagnosis/README.md) |
 | **Remediation** | Investigates and remediates data quality alerts — runs TSA root cause analysis, discovers available tools, executes fixes (or escalates), and documents the resolution. | [README](skills/remediation/README.md) |
 | **Agent Monitoring** | Investigation and monitor creation guide for AI agent observability. | [README](skills/agent-monitoring/README.md) |
+| **CTP Config** | Build a CTP (Credential Transform Pipeline) config for a Monte Carlo connection type. Fetches live connector schemas and transform steps from the apollo-agent repo. | [SKILL](skills/ctp-config/SKILL.md) |
 
 ## Installing the plugin (recommended)
 
