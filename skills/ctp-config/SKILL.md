@@ -16,7 +16,7 @@ Activate when the user:
 - Asks what fields are needed for a connection type's Connection Auth Rules config
 - Wants to customize credential transformation for a connection
 - Asks about `MapperConfig`, `TransformStep`, or `CtpConfig`
-- Says things like "help me write a Connection Auth Rules config", "what's the connection auth rules format for X", or uses the older term "CTP config"
+- Says things like "help me write a Connection Auth Rules config", "what's the connection auth rules format for X"
 
 ## When NOT to activate this skill
 
