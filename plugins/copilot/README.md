@@ -17,7 +17,7 @@ For detailed workflow descriptions, activation rules, and synthesis guidelines, 
 ## Prerequisites
 
 - [GitHub Copilot CLI](https://docs.github.com/en/copilot/how-tos/copilot-cli) installed
-- Python 3 installed
+- Python 3.10+ installed
 - A Monte Carlo account with API access
 
 ## Installation

@@ -2,6 +2,8 @@
 
 Data observability skills and enforcement hooks for AI coding agents, powered by Monte Carlo.
 
+**Requires Python 3.10+.**
+
 ## Installation
 
 Run the install script from your target repo:
