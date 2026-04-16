@@ -1,0 +1,66 @@
+cases:
+  - id: live-01-warehouse-discovery
+    turns:
+      - prompt: "What warehouses do I have access to?"
+        criteria:
+          must_call: [get_warehouses]
+          must_not_call: [create_table_monitor_mac, create_metric_monitor_mac]
+          output_must_not_contain: ["MCON++"]
+    criteria:
+      judge_rubric: |
+        The agent should call get_warehouses and present warehouse names
+        in a human-readable format without exposing UUIDs or MCONs.
+
+  - id: live-02-use-case-exploration
+    turns:
+      - prompt: "Show me use cases for the MC-Snowflake-test warehouse and tell me which ones are most critical."
+        criteria:
+          must_call: [get_warehouses, get_use_cases]
+    criteria:
+      judge_rubric: |
+        The agent should discover warehouses, find MC-Snowflake-test,
+        then call get_use_cases for that warehouse.
+        Present use cases sorted by criticality with descriptions.
+
+  - id: live-03-unmonitored-anomalies
+    turns:
+      - prompt: "Find tables in MC-Snowflake-test that have anomalies but no monitors. What should I prioritize?"
+        criteria:
+          must_call: [get_unmonitored_tables_with_anomalies]
+    criteria:
+      judge_rubric: |
+        The agent should call get_unmonitored_tables_with_anomalies and
+        present results ranked by importance with clear prioritization.
+        If no results, the agent should clearly state that and suggest
+        alternative approaches.
+
+  - id: live-04-no-uuid-leak
+    turns:
+      - prompt: "What warehouses do I have and what use cases are defined in MC-Snowflake-test?"
+        criteria:
+          must_call: [get_warehouses, get_use_cases]
+          output_must_not_contain: ["MCON++", "mcon://"]
+    criteria:
+      judge_rubric: |
+        Verify no internal IDs (UUIDs, MCONs) are exposed in the output.
+        All references should use human-readable names only.
+
+  - id: live-05-full-coverage-flow
+    turns:
+      - prompt: "I just onboarded Monte Carlo. Help me understand what needs monitoring. Use the MC-Snowflake-test warehouse."
+        criteria:
+          must_call: [get_warehouses]
+      - prompt: "Now show me the use cases and which ones are most critical."
+        criteria:
+          must_call: [get_use_cases]
+      - prompt: "Are there tables with anomalies but no monitors? What should I prioritize first?"
+        criteria:
+          must_call: [get_unmonitored_tables_with_anomalies]
+    criteria:
+      output_must_not_contain: ["MCON++", "mcon://"]
+      judge_rubric: |
+        The agent should follow the first-turn protocol end-to-end:
+        1. Discover warehouses and select MC-Snowflake-test
+        2. Discover use cases, present by criticality
+        3. Identify unmonitored tables with anomalies, prioritize
+        No internal IDs should leak. Recommendations should be actionable.
