@@ -5,6 +5,16 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for OpenCode will be
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-04-16
+
+### Changed
+
+- Consolidate `monitor-creation`, `agent-monitoring`, and `monitoring-advisor` into a single `monitoring-advisor` skill
+- Add `data-monitor-creation.md` and `agent-monitor-creation.md` mid-level creation procedures
+- Move per-type references with `data-`/`agent-` prefixes and distribute constraints
+- Fix MCP tool names to snake_case across all skill docs
+- Update trigger evals: direct monitor creation and agent monitoring now trigger this skill
+
 ## [1.5.0] - 2026-04-15
 
 ### Changed

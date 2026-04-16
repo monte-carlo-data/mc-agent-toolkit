@@ -1,6 +1,12 @@
 # Comparison Monitor Reference
 
-Detailed reference for building `createComparisonMonitorMac` tool calls.
+Detailed reference for building `create_comparison_monitor_mac` tool calls.
+
+## Critical Constraints
+
+- **NEVER guess column names.** Always get them from `get_table` for both the source and target tables. Verify that `sourceField` exists in the source table and `targetField` exists in the target table before building alert conditions.
+
+---
 
 ## When to Use
 
@@ -18,7 +24,7 @@ Use a comparison monitor when the user wants to:
 Before constructing alert conditions, you MUST verify that both tables exist and that any referenced fields are real columns. This is the most common source of comparison monitor failures.
 
 1. **Resolve both MCONs.** Use `search` to find the source and target tables. If the user provided `database:schema.table` format, search for each to get the MCON.
-2. **Get full schemas.** Call `getTable` with `include_fields: true` on BOTH the source table and the target table. You need the column lists from both.
+2. **Get full schemas.** Call `get_table` with `include_fields: true` on BOTH the source table and the target table. You need the column lists from both.
 3. **For field-level metrics, verify fields exist on both sides.** Confirm that `sourceField` exists in the source table's column list AND `targetField` exists in the target table's column list. Field names are case-sensitive on most warehouses.
 4. **Check field type compatibility.** The metric must be compatible with the column types on both sides. For example, `NUMERIC_MEAN` requires numeric columns in both the source and target tables. If the source column is numeric but the target is a string, the comparison will fail.
 5. If any field does not exist or types are incompatible, stop and ask the user to clarify. Do not guess.
@@ -42,7 +48,7 @@ Before constructing alert conditions, you MUST verify that both tables exist and
 | `source_warehouse` | string | Warehouse name or UUID for the source table. Required if `source_table` is not an MCON. |
 | `target_warehouse` | string | Warehouse name or UUID for the target table. Required if `target_table` is not an MCON. |
 | `segment_fields` | array of string | Fields to segment the comparison by. Must exist in BOTH tables with the same name. |
-| `domain_id` | string (uuid) | Domain UUID (use `getDomains` to list). Only one domain can be assigned per monitor. |
+| `domain_id` | string (uuid) | Domain UUID (use `get_domains` to list). Only one domain can be assigned per monitor. |
 
 ---
 

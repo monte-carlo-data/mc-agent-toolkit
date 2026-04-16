@@ -30,7 +30,7 @@ Activate when the user:
 Do not activate when the user is:
 
 - Just triaging or investigating an alert without remediation intent (use prevent skill's Workflow 3)
-- Creating or configuring monitors (use the monitor-creation skill)
+- Creating or configuring monitors (use the monitoring-advisor skill)
 - Running a change impact assessment before code changes (use the prevent skill's Workflow 4)
 - Asking about general data quality best practices without a specific incident
 - Exploring table health or lineage without an active issue to fix

@@ -1,6 +1,12 @@
 # Table Monitor Reference
 
-Detailed reference for building `createTableMonitorMac` tool calls.
+Detailed reference for building `create_table_monitor_mac` tool calls.
+
+## Critical Constraints
+
+- **NEVER guess column names.** Always verify table and schema names from `get_table` or `search` before building the asset selection.
+
+---
 
 ## When to Use
 
@@ -26,7 +32,7 @@ Use a table monitor when the user wants to:
 |-----------|------|-------------|
 | `name` | string | Unique identifier for the table monitor. Must be unique across all table monitors in the same namespace. |
 | `description` | string | Human-readable description of what the monitor checks (max 512 characters). |
-| `warehouse` | string | Warehouse name or UUID. Use `getTable` or `search` to find it. |
+| `warehouse` | string | Warehouse name or UUID. Use `get_table` or `search` to find it. |
 | `asset_selection` | object | Asset selection config defining which tables to monitor (see Asset Selection below). |
 
 ## Optional Parameters
@@ -34,7 +40,7 @@ Use a table monitor when the user wants to:
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `alert_conditions` | array of strings | `["last_updated_on", "schema", "total_row_count", "total_row_count_last_changed_on"]` | Metric names to monitor (see Alert Conditions below). |
-| `domain_id` | string (uuid) | none | Domain UUID (use `getDomains` to list). |
+| `domain_id` | string (uuid) | none | Domain UUID (use `get_domains` to list). |
 
 ---
 
@@ -42,7 +48,7 @@ Use a table monitor when the user wants to:
 
 Before creating a table monitor, resolve the warehouse name or UUID. The `warehouse` parameter is required and must match an existing warehouse in the Monte Carlo account.
 
-1. If the user provides a table name, call `getTable` to retrieve the table details -- the response includes the warehouse name and UUID.
+1. If the user provides a table name, call `get_table` to retrieve the table details -- the response includes the warehouse name and UUID.
 2. If the user provides a database or schema name without a specific table, call `search` with the database or schema name to find assets and identify the warehouse.
 3. Use either the warehouse name or UUID in the `warehouse` parameter.
 

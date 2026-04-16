@@ -10,6 +10,32 @@ Run LLM-evaluated quality checks on agent outputs. Best for:
 - **Content safety** — does the output avoid PII/secrets?
 - **Custom evaluation criteria** — via custom transforms
 
+## Constraints
+
+> **CRITICAL:** Agent monitors can ONLY be created on the `traceTableMcon` returned by
+> `get_agent_metadata`. You cannot use any other table or MCON — the API will reject it
+> with "table must be validated".
+
+> **CRITICAL:** Always use the exact `traceTableMcon` from `get_agent_metadata` as the
+> `data_source.mcon` — NEVER modify, truncate, or reconstruct it.
+
+> **IMPORTANT:** Always use `FIXED` (uppercase) for `scheduleType` in schedule configs.
+> All schedule type values must be uppercase. Using lowercase causes
+> "Expected type ScheduleType" errors.
+
+> **IMPORTANT:** Agent span filters always need at least the `agent` field set.
+
+> **IMPORTANT:** Use predefined transforms when possible — they have known output field
+> names (see the predefined transforms tables below). Custom transforms require you to
+> set the `alias` parameter correctly, which becomes the output field name used in
+> `alert_conditions.fields`.
+
+> **NEVER** set the `field` parameter on predefined transforms — omit it entirely.
+> Setting `field` on a predefined transform causes "Field X doesn't exist" errors
+> because the transform output field name is predetermined.
+
+> **NEVER** use a `context` field on transforms — it is not supported and will cause errors.
+
 ## Key characteristics
 
 - Requires `sampling_config` — controls how many traces are sampled for evaluation
@@ -166,3 +192,11 @@ create_agent_evaluation_monitor(
     dry_run=True
 )
 ```
+
+## Common errors
+
+| Error message | Cause | Fix |
+|--------------|-------|-----|
+| "table must be validated" | MCON doesn't match a registered trace table | Verify the exact `traceTableMcon` from `get_agent_metadata` — use it as-is, do not modify |
+| "Field X doesn't exist" | Wrong transform output field name used in `alert_conditions.fields` | For predefined transforms, use the documented output field name (e.g., `relevance_score` for `answer_relevance`); for custom transforms, verify the `alias` matches |
+| "Expected type ScheduleType" | Schedule type is lowercase or invalid | Use `FIXED` (uppercase) — all schedule type values must be uppercase |

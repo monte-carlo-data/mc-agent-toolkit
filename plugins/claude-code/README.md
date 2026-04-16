@@ -35,7 +35,7 @@ Restart Claude Code after installing.
 
 | Feature | Description | Details |
 |---|---|---|
-| **Monitor Creation** | Guides AI agents through creating monitors correctly — validates tables, fields, and parameters before generating monitors-as-code YAML. | [Skill README](../../skills/monitor-creation/README.md) |
+| **Monitoring Advisor** | Analyzes data coverage, creates monitors for warehouse tables and AI agents — covers coverage gaps, use-case analysis, data monitor creation, and agent observability. | [Skill README](../../skills/monitoring-advisor/README.md) |
 | **Prevent** | Gates dbt model edits with impact assessments, generates monitors-as-code, and produces targeted validation queries. Full hook enforcement. | [Skill README](../../skills/prevent/README.md) |
 | **Generate Validation Notebook** | Generates SQL validation notebooks for dbt model changes from a PR or local repo. | [Skill README](../../skills/generate-validation-notebook/README.md) |
 | **Push Ingestion** | Generates warehouse-specific collection scripts for pushing metadata, lineage, and query logs to Monte Carlo. Includes 10 `/mc-*` slash commands. | [Skill README](../../skills/push-ingestion/README.md) |

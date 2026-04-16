@@ -35,7 +35,7 @@ Activate when the user:
 
 Do not activate when the user is:
 
-- Creating monitors (use the monitor-creation skill)
+- Creating monitors (use the monitoring-advisor skill)
 - Running impact assessments before code changes (use the prevent skill)
 - Looking at storage costs (use the storage-cost-analysis skill)
 - Exploring pipeline performance without a specific incident (use the performance-diagnosis skill)

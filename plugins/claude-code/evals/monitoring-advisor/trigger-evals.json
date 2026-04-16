@@ -6,31 +6,31 @@
       "id": "should-01",
       "prompt": "What should I monitor in my Snowflake warehouse? I'm not sure where to start.",
       "expected": "trigger",
-      "rationale": "Broad monitoring guidance request — core skill use case"
+      "rationale": "Broad monitoring guidance request -- core skill use case"
     },
     {
       "id": "should-02",
       "prompt": "Where are my coverage gaps? I want to see which critical tables don't have monitors.",
       "expected": "trigger",
-      "rationale": "Directly asks about coverage gaps — primary activation trigger"
+      "rationale": "Directly asks about coverage gaps -- primary activation trigger"
     },
     {
       "id": "should-03",
       "prompt": "Show me my use cases and which ones are protected by monitors.",
       "expected": "trigger",
-      "rationale": "Use-case analysis with coverage mapping — explicit trigger phrase"
+      "rationale": "Use-case analysis with coverage mapping -- explicit trigger phrase"
     },
     {
       "id": "should-04",
       "prompt": "I want to understand what's monitored vs. not in our data warehouse.",
       "expected": "trigger",
-      "rationale": "Monitored vs. unmonitored analysis — listed in activation triggers"
+      "rationale": "Monitored vs. unmonitored analysis -- listed in activation triggers"
     },
     {
       "id": "should-05",
       "prompt": "We have tables with anomalies but no monitors. Can you help me find and prioritize them?",
       "expected": "trigger",
-      "rationale": "Unmonitored tables with anomalies — importance-based prioritization"
+      "rationale": "Unmonitored tables with anomalies -- importance-based prioritization"
     },
     {
       "id": "should-06",
@@ -48,31 +48,31 @@
       "id": "should-08",
       "prompt": "We just onboarded Monte Carlo. Help me figure out a monitoring strategy for our warehouse.",
       "expected": "trigger",
-      "rationale": "New customer wanting monitoring strategy — coverage analysis use case"
+      "rationale": "New customer wanting monitoring strategy -- coverage analysis use case"
     },
     {
       "id": "should-09",
       "prompt": "How's our data coverage looking? Are there any high-importance tables without monitors?",
       "expected": "trigger",
-      "rationale": "Data coverage assessment — directly matches activation triggers"
+      "rationale": "Data coverage assessment -- directly matches activation triggers"
     },
     {
       "id": "should-10",
       "prompt": "I want to do a use-case analysis to see which business processes depend on which tables and whether they're covered.",
       "expected": "trigger",
-      "rationale": "Use-case criticality analysis — explicit trigger keyword"
+      "rationale": "Use-case criticality analysis -- explicit trigger keyword"
     },
     {
       "id": "should-11",
       "prompt": "Can you show me a breakdown of monitored vs. unmonitored tables grouped by schema?",
       "expected": "trigger",
-      "rationale": "Coverage breakdown by schema — warehouse discovery + gap analysis"
+      "rationale": "Coverage breakdown by schema -- warehouse discovery + gap analysis"
     },
     {
       "id": "should-12",
       "prompt": "We're getting too many alerts on low-priority tables and missing issues on critical ones. Help me reprioritize.",
       "expected": "trigger",
-      "rationale": "Coverage mismatch — needs use-case criticality reassessment"
+      "rationale": "Coverage mismatch -- needs use-case criticality reassessment"
     },
     {
       "id": "should-13",
@@ -96,79 +96,109 @@
       "id": "should-16",
       "prompt": "Help me set up monitoring for my AI agents — I want to track latency and token usage.",
       "expected": "trigger",
-      "rationale": "AI agent monitoring request — monitoring-advisor delegates to agent-monitoring skill"
+      "rationale": "AI agent monitoring request -- agent monitor creation is part of this skill"
     },
     {
       "id": "should-17",
       "prompt": "Which of our AI agents have the worst latency? I want to create alerts for them.",
       "expected": "trigger",
-      "rationale": "Agent observability with monitor creation intent — coverage analysis for agents"
+      "rationale": "Agent observability with monitor creation intent"
     },
     {
       "id": "should-18",
       "prompt": "I want to monitor my agent's response quality and catch runaway tool call loops.",
       "expected": "trigger",
-      "rationale": "Agent evaluation and trajectory monitoring — handled via agent-monitoring skill delegation"
+      "rationale": "Agent evaluation and trajectory monitoring"
+    },
+    {
+      "id": "should-19",
+      "prompt": "Create a freshness monitor on the orders table with a 2-hour threshold.",
+      "expected": "trigger",
+      "rationale": "Direct data monitor creation -- now handled by this unified skill"
+    },
+    {
+      "id": "should-20",
+      "prompt": "Set up a custom SQL rule monitor that checks for NULL values in the revenue column of daily_metrics.",
+      "expected": "trigger",
+      "rationale": "Specific data monitor creation -- now handled by this unified skill"
+    },
+    {
+      "id": "should-21",
+      "prompt": "Monitor my AI agent for excessive tool calls and set up an alert if it loops more than 5 times.",
+      "expected": "trigger",
+      "rationale": "Agent trajectory monitor creation -- agent monitoring is part of this skill"
+    },
+    {
+      "id": "should-22",
+      "prompt": "Add a null rate monitor on the email and user_id columns of the users table.",
+      "expected": "trigger",
+      "rationale": "Direct metric monitor creation for specific fields"
+    },
+    {
+      "id": "should-23",
+      "prompt": "Set up a validation rule to ensure order status is always in the allowed set.",
+      "expected": "trigger",
+      "rationale": "Data validation monitor creation"
+    },
+    {
+      "id": "should-24",
+      "prompt": "Compare row counts between our staging and production orders tables.",
+      "expected": "trigger",
+      "rationale": "Comparison monitor creation between two tables"
+    },
+    {
+      "id": "should-25",
+      "prompt": "I want to evaluate my chat agent's answer relevance and alert if it drops below a threshold.",
+      "expected": "trigger",
+      "rationale": "Agent evaluation monitor creation with quality scoring"
     },
     {
       "id": "should-not-01",
-      "prompt": "Create a freshness monitor on the orders table with a 2-hour threshold.",
+      "prompt": "We got a freshness alert on raw_events. What happened and what's downstream?",
       "expected": "no-trigger",
-      "rationale": "Specific monitor creation for a known table — use monitor-creation skill"
+      "rationale": "Active alert triage -- use prevent skill's Workflow 3"
     },
     {
       "id": "should-not-02",
-      "prompt": "We got a freshness alert on raw_events. What happened and what's downstream?",
+      "prompt": "I'm modifying the stg_payments dbt model to change a join. What's the blast radius?",
       "expected": "no-trigger",
-      "rationale": "Active alert triage — use prevent skill's Workflow 3"
+      "rationale": "Impact assessment before code change -- use prevent skill"
     },
     {
       "id": "should-not-03",
-      "prompt": "I'm modifying the stg_payments dbt model to change a join. What's the blast radius?",
+      "prompt": "How do I delete the volume monitor I set up on dim_customers?",
       "expected": "no-trigger",
-      "rationale": "Impact assessment before code change — use prevent skill"
+      "rationale": "Editing/deleting an existing monitor -- not coverage analysis or creation"
     },
     {
       "id": "should-not-04",
-      "prompt": "How do I delete the volume monitor I set up on dim_customers?",
+      "prompt": "Can you help me push metadata from our Databricks warehouse to Monte Carlo?",
       "expected": "no-trigger",
-      "rationale": "Editing/deleting an existing monitor — not coverage analysis"
+      "rationale": "Push ingestion -- use push-ingestion skill"
     },
     {
       "id": "should-not-05",
-      "prompt": "Can you help me push metadata from our Databricks warehouse to Monte Carlo?",
+      "prompt": "Help me write a Python script to parse Airflow logs.",
       "expected": "no-trigger",
-      "rationale": "Push ingestion — use push-ingestion skill"
+      "rationale": "General scripting -- unrelated to monitoring"
     },
     {
       "id": "should-not-06",
-      "prompt": "Help me write a Python script to parse Airflow logs.",
+      "prompt": "How do I configure Slack notifications for Monte Carlo incidents?",
       "expected": "no-trigger",
-      "rationale": "General scripting — unrelated to monitoring coverage"
+      "rationale": "Notification setup -- not monitoring coverage or creation"
     },
     {
       "id": "should-not-07",
-      "prompt": "How do I configure Slack notifications for Monte Carlo incidents?",
+      "prompt": "Can you update the threshold on my existing row count monitor for the users table?",
       "expected": "no-trigger",
-      "rationale": "Notification setup — not coverage analysis"
+      "rationale": "Modifying an existing monitor -- not creation or coverage analysis"
     },
     {
       "id": "should-not-08",
-      "prompt": "Set up a custom SQL rule monitor that checks for NULL values in the revenue column of daily_metrics.",
-      "expected": "no-trigger",
-      "rationale": "Specific monitor creation — use monitor-creation skill"
-    },
-    {
-      "id": "should-not-09",
-      "prompt": "Can you update the threshold on my existing row count monitor for the users table?",
-      "expected": "no-trigger",
-      "rationale": "Modifying an existing monitor — not coverage analysis"
-    },
-    {
-      "id": "should-not-10",
       "prompt": "I need to add a new column to the orders model in models/marts/orders.sql.",
       "expected": "no-trigger",
-      "rationale": "dbt model edit — use prevent skill for impact assessment"
+      "rationale": "dbt model edit -- use prevent skill for impact assessment"
     }
   ]
 }
