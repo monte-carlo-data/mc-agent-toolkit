@@ -35,7 +35,7 @@ Install the plugin for your editor — it bundles the skill, hooks, MCP server, 
 
 3. Authenticate: run `/mcp` in your editor, select `monte-carlo-mcp`, and complete the OAuth flow.
 
-4. Verify: ask your editor "Test my Monte Carlo connection" — it should call `testConnection` and confirm.
+4. Verify: ask your editor "Test my Monte Carlo connection" — it should call `test_connection` and confirm.
 
 <details>
 <summary>Legacy: header-based auth (for MCP clients without HTTP transport)</summary>
