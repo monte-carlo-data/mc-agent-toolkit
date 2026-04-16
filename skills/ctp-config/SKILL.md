@@ -1,22 +1,22 @@
 ---
 name: ctp-config
-description: "Build a Connection Auth Rules configuration for a Monte Carlo connection type. Fetches live connector schemas and transform steps from the apollo-agent repo."
+description: "Build a Connection Auth Rules for a Monte Carlo connection type. Fetches live connector schemas and transform steps from the apollo-agent repo."
 version: 1.0.0
 ---
 
 # Connection Auth Rules Builder
 
-Use this skill when the user wants to build a Connection Auth Rules configuration (stored as `ctp_config`) for a Monte Carlo connection. The config is stored on the `Connection` object in the monolith and tells the Apollo agent how to transform flat credentials into the driver-specific `connect_args` format.
+Use this skill when the user wants to build a Connection Auth Rules (stored as `ctp_config`) for a Monte Carlo connection. The config is stored on the `Connection` object in the monolith and tells the Apollo agent how to transform flat credentials into the driver-specific `connect_args` format.
 
 ## When to activate this skill
 
 Activate when the user:
 
-- Asks to create, build, or generate a Connection Auth Rules configuration
-- Asks what fields are needed for a connection type's Connection Auth Rules config
+- Asks to create, build, or generate a Connection Auth Rules
+- Asks what fields are needed for a connection type's Connection Auth Rules
 - Wants to customize credential transformation for a connection
 - Asks about `MapperConfig`, `TransformStep`, or `CtpConfig`
-- Says things like "help me write a Connection Auth Rules config", "what's the connection auth rules format for X"
+- Says things like "help me write Connection Auth Rules for X", "what's the connection auth rules format for X"
 
 ## When NOT to activate this skill
 
@@ -127,7 +127,7 @@ Steps run in order before the mapper. The mapper can reference step outputs via 
 
 ## Step 6 — Output the final config
 
-Produce the complete Connection Auth Rules configuration as a Python dict (ready to serialize to JSON for storage). This is stored as `ctp_config` on the `Connection` model:
+Produce the complete Connection Auth Rules as a Python dict (ready to serialize to JSON for storage). This is stored as `ctp_config` on the `Connection` model:
 
 ```python
 {
@@ -154,7 +154,7 @@ Produce the complete Connection Auth Rules configuration as a Python dict (ready
 }
 ```
 
-Also show the equivalent JSON, since this is what gets stored in the monolith's `Connection.ctp_config` field and entered in the "Connection auth rules configuration" field in the UI.
+Also show the equivalent JSON, since this is what gets stored in the monolith's `Connection.ctp_config` field and entered in the "Connection auth rules" field in the UI.
 
 Remind the user that validation happens server-side via `validateConnectionCtpConfig` — they should test the config through that mutation (or the Validate button in the UI) after saving it.
 
