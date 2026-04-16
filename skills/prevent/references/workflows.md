@@ -69,7 +69,7 @@ Skip Workflow 4 for new models — there is no existing blast radius to assess.
 
 ## Workflow 2: Add a monitor — when new transformation logic is added
 
-> **For detailed monitor creation guidance** — including parameter validation, field-type compatibility checks, and common error prevention — see the `monitor-creation` skill (`skills/monitor-creation/SKILL.md`). The workflow below is a quick-path for the common "just added a column, offer a monitor" case within a prevent session.
+> **For detailed monitor creation guidance** — including parameter validation, field-type compatibility checks, and common error prevention — see `monitoring-advisor/references/data-monitor-creation.md`. The workflow below is a quick-path for the common "just added a column, offer a monitor" case within a prevent session.
 
 When the user adds a new column, filter, or business rule, suggest adding a monitor. First, choose the monitor type based on what the new logic does:
 

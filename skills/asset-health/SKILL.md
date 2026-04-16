@@ -35,7 +35,7 @@ Activate when the user:
 ## When NOT to activate this skill
 
 - **Profiling or exploring table data** (row counts, column stats, distributions) → use `explore-table`
-- **Creating or suggesting monitors** → use `monitor-creation`
+- **Creating or suggesting monitors** → use `monitoring-advisor`
 - **Active incident triage** (investigating root cause of a firing alert) → use prevent skill Workflow 3
 
 ## Health report format

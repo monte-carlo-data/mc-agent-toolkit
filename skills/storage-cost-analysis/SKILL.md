@@ -32,7 +32,7 @@ Activate when the user:
 Do not activate when the user is:
 
 - Just querying data or exploring table contents
-- Creating or modifying monitors (use the monitor-creation skill)
+- Creating or modifying monitors (use the monitoring-advisor skill)
 - Investigating data quality incidents (use the prevent skill)
 - Looking at pipeline performance (use the performance-diagnosis skill)
 
