@@ -182,9 +182,33 @@ history further?"
 
 ---
 
+## Phase 5: Apply Changes (if user requests)
+
+If the user asks to apply a recommendation, use `create_metric_monitor` to update the monitor.
+Always pass the existing `uuid` to update rather than create.
+
+### Applying changes
+1. **Always dry-run first** (`dry_run=True`, the default) — show the user the preview and confirm
+   before applying.
+2. **On confirmation**, call again with `dry_run=False`.
+3. **Check the returned UUID** — if it differs from the one you passed, tell the user the old
+   monitor was replaced with a new one.
+
+### Limitations with custom SQL monitors
+`create_metric_monitor` only supports standard built-in metrics (ROW_COUNT_CHANGE, NULL_COUNT,
+NUMERIC_MEAN, etc.) in its `alert_conditions`. It does **not** support custom SQL expressions as
+the metric definition. If the monitor uses `custom_metric` with `sql_expression` in its config,
+you cannot safely update it via this tool — you would clobber the SQL conditions.
+
+In that case, tell the user:
+> This monitor uses custom SQL metrics that can't be updated through the API tool. Please update
+> the threshold directly in the UI: go to the monitor, edit the alert condition, and change the
+> threshold value.
+
+---
+
 ## Guidelines
 
-- **Read-only.** This skill analyzes and recommends — it never modifies the monitor.
 - **Be specific.** Generic advice like "reduce sensitivity" is less useful than exact config changes.
 - **Prefer surgical changes.** A targeted WHERE condition beats a blunt sensitivity reduction.
 - **Preserve signal.** Always explain what genuine anomalies would still be caught after tuning.
