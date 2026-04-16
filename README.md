@@ -8,6 +8,8 @@ The toolkit bundles the following capabilities as a single **mc-agent-toolkit** 
 
 | Feature | Description | Details |
 |---|---|---|
+| **Context Detection** | Detects user context and routes to the right skill or workflow. Inspects workspace signals, conversation intent, and scoped API data. | [SKILL](skills/context-detection/SKILL.md) |
+| **Incident Response** | Orchestrates incident response — triage alerts, investigate root causes, remediate issues, and add monitoring to prevent recurrence. | [SKILL](skills/incident-response/SKILL.md) |
 | **Asset Health** | Checks the health of a data table — surfaces last activity, alerts, monitoring coverage, importance, and upstream dependency health. | [README](skills/asset-health/README.md) |
 | **Monitoring Advisor** | Analyzes data coverage, creates monitors for warehouse tables and AI agents — covers coverage gaps, use-case analysis, data monitor creation, and agent observability. | [README](skills/monitoring-advisor/README.md) |
 | **Proactive Monitoring** | Guides users from coverage analysis to monitor creation. Sequences asset-health assessment, gap identification via monitoring-advisor, and monitor creation into a guided workflow. | [SKILL](skills/proactive-monitoring/SKILL.md) |
