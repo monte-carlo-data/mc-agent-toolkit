@@ -67,6 +67,9 @@ class AgentRunner:
                 max_turns=self._max_turns,
                 model=self._model,
                 mcp_servers=self._mcp_servers,
+                # Ignore user/project MCP config so globally-installed servers
+                # don't leak into the eval and skew results.
+                extra_args={"strict-mcp-config": None},
             )
             if i > 0 and accumulated.session_id:
                 options.resume = accumulated.session_id
@@ -491,10 +494,14 @@ def main() -> None:
     parser.add_argument("--parallel", type=int, default=1, help="Run N cases concurrently (default: 1)")
     parser.add_argument("--verbose", action="store_true", help="Print full traces")
     parser.add_argument("--dry-run", action="store_true", help="Validate cases only")
+    parser.add_argument(
+        "--skip-missing-skill", action="store_true",
+        help="If SKILL.md is missing, warn and run without skill content (useful for baselines)",
+    )
     args = parser.parse_args()
 
     mcp_servers = get_mcp_server_config(args.env)
-    skill_content = load_skill_content(args.skill)
+    skill_content = load_skill_content(args.skill, skip_missing=args.skip_missing_skill)
 
     agent = AgentRunner(
         model=args.model,

@@ -38,6 +38,23 @@ make sync
 
 See `Makefile` for all targets and options.
 
+### MCP isolation
+
+Live evals run with `--strict-mcp-config`, so only the MCP servers declared in
+`constants.py` are loaded. Globally-installed MCP servers (e.g. `mc-data-mcp`)
+do not leak into the eval environment, keeping runs reproducible across
+machines.
+
+### Baseline runs for new skills
+
+When bootstrapping a new skill, you may want to run the eval suite before
+`SKILL.md` exists to generate a baseline. Pass `--skip-missing-skill` and the
+runner will warn and proceed with empty skill content:
+
+```bash
+uv run python run_live_evals.py --skill my-new-skill --skip-missing-skill
+```
+
 ## Adding eval cases
 
 ### Trigger evals

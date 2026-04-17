@@ -47,10 +47,17 @@ def get_mcp_server_config(env: str) -> dict:
     }
 
 
-def load_skill_content(skill_name: str) -> str:
-    """Read the full SKILL.md content for appending to system prompt."""
+def load_skill_content(skill_name: str, skip_missing: bool = False) -> str:
+    """Read the full SKILL.md content for appending to system prompt.
+
+    If skip_missing is True and the skill is not found, warn and return empty
+    content. Useful for generating a baseline before a new skill exists.
+    """
     skill_md = SKILLS_DIR / skill_name / "SKILL.md"
     if not skill_md.exists():
+        if skip_missing:
+            print(f"Warning: SKILL.md not found: {skill_md} (skipping)")
+            return ""
         print(f"Error: SKILL.md not found: {skill_md}")
         sys.exit(1)
     return skill_md.read_text()
