@@ -82,6 +82,8 @@ Then proceed to Step 2 with the identified alert context.
 
 **This is the core step.** Most workflow entries start here.
 
+**Investigate linearly — do not re-call tools.** Walk through the investigation once: (1) find the table, (2) fetch its alerts and freshness, (3) check lineage, (4) check recent queries/ETL. Call each tool at most once per table. If a tool result is insufficient, move to the next signal rather than re-calling with different params — burning turns on redundant calls exhausts the budget before the root cause is reached.
+
 **Transition to Step 3:** When the root cause is identified (or the investigation reaches its limit), summarize findings and tell the user:
 
 > "Root cause identified: [summary]. Would you like me to help remediate this, or is the investigation sufficient?"
