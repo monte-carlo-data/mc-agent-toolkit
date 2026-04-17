@@ -1,3 +1,13 @@
+# Test-data dependencies (dev env):
+#  - row_count_change_input_data (analytics-snowflake) — used in cd-03 clear
+#    health check. Rich surface area (495 downstream, 41 monitors). Keep the
+#    table existing and monitored.
+#  - monolith_public_monolith_incidentmodel (analytics-snowflake) — used in cd-02
+#    turn 2 investigation. Shallow lineage, ~1 recent alert. Keep the alert
+#    present or the case will lose signal.
+#
+# If these tables change or alerts clear, update prompts accordingly.
+
 cases:
   - id: cd-01-vague-data-issue
     turns:
@@ -33,7 +43,7 @@ cases:
           must_not_call:
             - get_alerts
             - get_monitors
-      - prompt: "the row_count_change_input_data table in analytics-snowflake warehouse got an alert, investigate it"
+      - prompt: "the monolith_public_monolith_incidentmodel table in analytics-snowflake warehouse got an alert, investigate it"
         criteria:
           # Turn 2: User named the specific table — agent should investigate
           must_call:
