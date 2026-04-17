@@ -40,6 +40,21 @@ Session-start welcome is handled by the plugin's `welcome` SessionStart hook (ba
 
 Follow these steps in order.
 
+### Step 0: Fast-path clear intent (stop early if matched)
+
+Before doing anything else, check whether the user's message unambiguously matches a single existing skill. If so, **skip the rest of this workflow** and immediately load that skill — do NOT read `references/signal-definitions.md`, do NOT make API probes.
+
+| Clear user intent | Skill to load immediately |
+|---|---|
+| "Check health of [named table]" / "status of [named table]" | `../asset-health/SKILL.md` |
+| "Create a [monitor type] on [named table]" | `../monitoring-advisor/SKILL.md` |
+| "Investigate alert on [named table]" / "why is [named table] stale/broken?" | `../incident-response/SKILL.md` |
+| "What should I monitor?" / "where are my coverage gaps?" | `../proactive-monitoring/SKILL.md` |
+
+Context-detection is for **ambiguous** requests only. If the request is clear, routing through this skill wastes turns and tokens.
+
+If no clear match, proceed to Step 1.
+
 ### Step 1: Categorize intent
 
 Read `references/signal-definitions.md` for the full signal catalog. Determine which category the user's message falls into:
