@@ -67,7 +67,7 @@ Before starting, determine which step to enter based on the user's context:
 **Scope MCP calls tightly.** On large accounts, broad queries return hundreds of results, overflow the tool-result token limit, spill to disk, and force chunk reads — burning user tokens and exhausting the turn budget. Minimum scoping for tools this workflow touches:
 
 - `get_alerts` → time filter (`created_after`, default last 7 days) + at least one of `warehouse`, `table_names`, `severity`
-- `search` → needed to resolve a table name to its MCON (`get_table` requires MCON). Always pass `limit` (e.g. 5), the table name as `query`, and filter by `warehouse_uuid` or `database`/`schema`. `warehouse_types` alone is too broad. If multiple matches and a warehouse was named, pick that match; if still ambiguous, ask the user
+- `search` → needed to resolve a table name to its MCON (`get_table` requires MCON). Always pass `limit` (e.g. 5), the table name as `query`, and filter by `warehouse_uuid` or `database`/`schema`. `warehouse_types` alone is too broad. If multiple matches return: (1) auto-pick the match whose `warehouse_display_name` matches the user's named warehouse — do NOT stop to ask; (2) failing that, prefer the `is_key_asset: true` match; (3) only ask the user when none of these resolve it
 - `get_monitors` → filter by `mcons` or `warehouse_uuid`
 
 If scope is missing, ask the user before calling: "Which warehouse?", "How far back — today, this week?", "Any specific severity?".

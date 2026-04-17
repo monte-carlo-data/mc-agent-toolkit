@@ -85,7 +85,11 @@ Only make API calls when you have enough context to scope them:
 **Always scope MCP calls tightly.** Unscoped `get_alerts`, `search`, or `get_monitors` on large accounts can return hundreds of results, overflow the tool-result token limit, spill to disk, and force expensive chunk reads — burning user tokens and risking workflow failure. Minimum scoping:
 
 - `get_alerts` → time filter (`created_after`, default last 7 days) + at least one of `warehouse`, `table_names`, `severity`
-- `search` → needed to resolve a table name to its MCON (`get_table` requires MCON). ALWAYS pass `limit` (e.g. 5), the table name as `query`, and filter by `warehouse_uuid` or `database`/`schema`. `warehouse_types` alone ("snowflake") matches thousands of tables. If `search` returns multiple matches and the user named a warehouse, pick the match in that warehouse; if still ambiguous, ask the user.
+- `search` → needed to resolve a table name to its MCON (`get_table` requires MCON). ALWAYS pass `limit` (e.g. 5), the table name as `query`, and filter by `warehouse_uuid` or `database`/`schema`. `warehouse_types` alone ("snowflake") matches thousands of tables. Disambiguation rules when multiple matches return:
+  1. If the user named a warehouse (e.g. "analytics-snowflake") → auto-pick the match whose `warehouse_display_name` matches and proceed. Do NOT stop to ask.
+  2. If the user named a database/schema → auto-pick the match in that database/schema.
+  3. If one match is flagged `is_key_asset: true` and others aren't → auto-pick the key asset.
+  4. Only ask the user to disambiguate when none of the above resolve it.
 - `get_monitors` → always filter by `mcons` (table MCON) or `warehouse_uuid`
 
 If you don't have enough scope, ask the user before calling.
