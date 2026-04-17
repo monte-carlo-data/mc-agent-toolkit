@@ -31,5 +31,5 @@
     "./commands/incident-response/",
     "./commands/proactive-monitoring/"
   ],
-  "hooks": ["./hooks/prevent/hooks.json"]
+  "hooks": ["./hooks/prevent/hooks.json", "./hooks/welcome/hooks.json"]
 }
