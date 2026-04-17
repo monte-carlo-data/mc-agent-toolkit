@@ -80,6 +80,8 @@ Then call `update_alert` for each classified alert:
 | Possible data incident      | *(no change)*        |
 | Other                       | *(no change)*        |
 
+For alerts classified as **natural data variation**, also call `mark_event_as_normal` — this signals the ML threshold detector to recalibrate and avoid re-alerting on the same pattern. Only has an effect on monitors using automated (ML-based) thresholds.
+
 Do not update status for untroubleshot alerts.
 
 **Recommendation mode:**
@@ -87,6 +89,7 @@ Do not update status for untroubleshot alerts.
 Do not call any write tools. Instead, for each alert output:
 - The comment you would post
 - The status you would set (or "no change")
+- Whether you would call `mark_event_as_normal`
 
 ---
 

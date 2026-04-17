@@ -122,9 +122,9 @@ Only update status for alerts that went through full troubleshooting. Leave untr
 
 ### Additional Monte Carlo actions
 
+- **Mark events as normal** — for alerts classified as natural variation, marking the underlying events as normal allows the detector to adapt thresholds to prevent further alerts on similar patterns. Only applies to monitors using automated (ML-based) thresholds — has no effect on static-threshold monitors.
 - **Declare an incident** (`update_alert` with `declared_incident_severity`) — promotes the alert to an incident, escalating visibility. Values: `SEV_1`–`SEV_4`. Use `NO_SEVERITY` to clear. Appropriate for verified ongoing incidents.
 - **Assign ownership** (`set_alert_owner`) — route a confirmed incident or required investigation to the right person.
-- **Mark events as normal** — for alerts classified as natural variation, marking the underlying events as normal allows the detector to adapt thresholds to prevent further alerts on similar patterns. (Not yet available via MCP).
 
 ### External integrations
 
