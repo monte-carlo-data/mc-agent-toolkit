@@ -92,7 +92,9 @@ Use this framework to generate recommendations:
 
 ### Sensitivity tuning
 - If anomalies are consistently marginal (observed value just barely above threshold) AND assessed
-  as normal variation → recommend lowering sensitivity: `"sensitivity": "low"`
+  as normal variation → recommend lowering sensitivity one step:
+  - If current sensitivity is `HIGH` → recommend `"sensitivity": "medium"`
+  - If current sensitivity is `MEDIUM` or `AUTO` → recommend `"sensitivity": "low"`
 - If current sensitivity is already `LOW` and still noisy → note this isn't a sensitivity issue
 
 ### WHERE condition / segment exclusion
