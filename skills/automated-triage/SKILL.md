@@ -1,7 +1,7 @@
 ---
 name: monte-carlo-automated-triage
 description: Triage Monte Carlo alerts interactively or build an automated workflow. Fetch, score, and troubleshoot alerts using MCP tools now, or design a reusable workflow that runs on a schedule.
-version: 1.1.0
+version: 1.1.1
 ---
 
 # Monte Carlo Automated Triage
@@ -49,6 +49,7 @@ All tools are available via the `monte-carlo` MCP server.
 | `update_alert`                        | default  | Update an alert's status and/or declare an incident by setting severity                                           |
 | `set_alert_owner`                     | default  | Assign an owner to an alert by email                                                                              |
 | `create_or_update_alert_comment`      | default  | Post or update a triage comment on an alert                                                                       |
+| `mark_event_as_normal`                | default  | Mark all anomaly events in an alert as normal, triggering ML threshold recalibration to prevent re-alerting on the same pattern |
 
 ---
 
@@ -98,12 +99,12 @@ If the user's request already makes the intent clear — e.g. "triage my freshne
 
 The user wants to look at specific alerts now. Use the triage tools directly to investigate and report findings. Do not frame this as workflow-building.
 
-1. Clarify scope if needed — which alert types, time window, or specific tables? If the user already specified (e.g. "recent freshness alerts"), proceed without asking.
-2. Fetch alerts with `get_alerts`, run `alert_assessment` in parallel on all of them, and report the results clearly.
+1. Clarify the scope (Ask about the time window and whether the user is interested in a specific domain, audience or alert type).
+2. Fetch alerts with `get_alerts` (applying any domain or audience filter from step 1), run `alert_assessment` in parallel on all of them, and report the results clearly.
 3. For any alert where both confidence and impact are MEDIUM or higher, offer to run `run_troubleshooting_agent` for a deeper root cause analysis. Wait for confirmation before running it.
 4. Summarise findings. Do not prompt to save a workflow file or set up automation unless the user brings it up.
 
-**Write tools in interactive triage:** After findings are clear, proactively offer relevant actions — updating status, declaring a severity, assigning an owner, or posting a comment. Ask before executing.
+**Write tools in interactive triage:** After findings are clear, proactively offer relevant actions — updating status, declaring a severity, assigning an owner, posting a comment, or marking events as normal (for alerts that are natural data variation). Ask before executing.
 
 ---
 
