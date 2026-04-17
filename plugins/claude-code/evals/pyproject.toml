@@ -1,9 +1,14 @@
 [project]
 name = "mc-agent-toolkit-evals"
-version = "0.1.0"
-description = "Trigger accuracy evals for mc-agent-toolkit skills"
+version = "0.2.0"
+description = "Trigger and live evals for mc-agent-toolkit skills"
 requires-python = ">=3.11"
-dependencies = ["anthropic>=0.40"]
+dependencies = [
+    "anthropic>=0.40",
+    "claude-agent-sdk>=0.1.0",
+    "python-dotenv>=1.2.2",
+    "pyyaml>=6.0",
+]
 
 [tool.uv]
 dev-dependencies = []
