@@ -5,11 +5,17 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Cursor will be d
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.7.0] - 2026-04-16
+## [1.7.0] - 2026-04-17
 
 ### Changed
 
-- 48f1322 feat(automated-triage): add interactive triage mode and action guard (AI-192) (#54)
+- Add tune-monitor skill for monitor noise reduction analysis
+
+## [1.6.1] - 2026-04-16
+
+### Changed
+
+- Add connection-auth-rules skill for building Connection Auth Rules configs
 
 ## [1.6.0] - 2026-04-16
 

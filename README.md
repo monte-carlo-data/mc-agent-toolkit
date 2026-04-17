@@ -19,6 +19,7 @@ The toolkit bundles the following capabilities as a single **mc-agent-toolkit** 
 | **Performance Diagnosis** | Diagnoses slow pipelines and expensive queries across Airflow, dbt, and Databricks with tiered investigation. | [README](skills/performance-diagnosis/README.md) |
 | **Remediation** | Investigates and remediates data quality alerts — runs TSA root cause analysis, discovers available tools, executes fixes (or escalates), and documents the resolution. | [README](skills/remediation/README.md) |
 | **Tune Monitor** | Analyzes a Monte Carlo metric monitor's alert history and recommends configuration changes to reduce noise — sensitivity, WHERE conditions, segment exclusions, schedule, and aggregation. | [SKILL](skills/tune-monitor/SKILL.md) |
+| **Connection Auth Rules** | Build a Connection Auth Rules configuration for a Monte Carlo connection type. Fetches live connector schemas and transform steps from the apollo-agent repo. | [SKILL](skills/connection-auth-rules/SKILL.md) |
 
 ## Installing the plugin (recommended)
 
