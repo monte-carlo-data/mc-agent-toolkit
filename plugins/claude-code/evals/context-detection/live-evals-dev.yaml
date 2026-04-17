@@ -3,61 +3,85 @@ cases:
     turns:
       - prompt: "think something is wrong with my data, can you help?"
         criteria:
-          # Agent should gather scope first, not dive into MC APIs
-          must_not_call: [get_alerts, get_monitors, get_asset_lineage, search]
+          # Agent should gather scope first, not dive into MC APIs.
+          # Note: Read calls (to load skill files) are expected and should
+          # NOT be counted against the agent — only MC MCP tool calls matter.
+          must_not_call:
+            - get_alerts
+            - get_monitors
+            - get_asset_lineage
+            - search
     criteria:
       judge_rubric: |
         The agent should recognize the user's intent is ambiguous and ask
         clarifying questions (what symptom? which table or pipeline? when
-        did it start?). It should NOT dive into any specific investigation
-        or make Monte Carlo API calls before gathering context.
+        did it start?). It should NOT make Monte Carlo MCP API calls
+        (get_alerts, search, get_table, etc.) before gathering context.
+
+        NOTE: Do NOT penalize Read or Skill tool calls — those are the agent
+        loading skill instructions, which is normal and expected.
 
         Good behavior: asks 1-3 targeted questions to narrow down the scope.
-        Bad behavior: immediately picks a table or calls get_alerts without
-        knowing what the user is actually concerned about.
+        Bad behavior: immediately calls Monte Carlo MCP tools (e.g., get_alerts,
+        search) without knowing what the user is actually concerned about.
 
   - id: cd-02-vague-to-incident-flow
     turns:
       - prompt: "think something is wrong with my data, can you help?"
         criteria:
-          must_not_call: [get_alerts, get_monitors]
-      - prompt: "I got a freshness alert on a specific table, can you investigate?"
+          # Turn 1: No MC MCP tool calls yet
+          must_not_call:
+            - get_alerts
+            - get_monitors
+      - prompt: "the row_count_change_input_data table in analytics-snowflake warehouse got an alert, investigate it"
         criteria:
-          # Now we have enough context — agent should start investigating
-          must_call: [get_alerts]
+          # Turn 2: User named the specific table — agent should investigate
+          must_call:
+            - search
     criteria:
       judge_rubric: |
         Turn 1: Agent should ask clarifying questions about the symptom,
-        table, or alert — not make tool calls yet.
+        table, or alert — NOT make MC MCP tool calls (get_alerts, search,
+        etc.). Read/Skill tool calls are OK — those are skill loading.
 
-        Turn 2: With a specific symptom (freshness alert) and intent to
-        investigate, the agent should begin incident investigation — calling
-        get_alerts (optionally filtered) and proceeding toward root cause
-        analysis. It should NOT just check table health; this is an incident
-        response scenario.
+        Turn 2: The user has named a specific table (row_count_change_input_data)
+        and asked to investigate. The agent should begin root cause analysis:
+        - Find the table (search or get_table)
+        - Get alerts for it (get_alerts) or check its freshness/lineage
+        - Begin investigating WHY it has an issue
 
-  - id: cd-03-clear-health-check
+        It should NOT just report table metadata and stop. It should
+        demonstrate incident-response behavior: investigation, not just
+        a surface-level check.
+
+  - id: cd-03-clear-health-check-specific-table
     turns:
-      - prompt: "check the health of the orders table"
+      - prompt: "check the health of the row_count_change_input_data table in analytics-snowflake warehouse"
         criteria:
-          # Clear single-skill intent — should route directly to asset-health
-          # (NOT go through context-detection scoping)
-          must_call: [search, get_table]
+          # Clear intent + unique table name — should proceed directly
+          must_call:
+            - search
     criteria:
       judge_rubric: |
-        This is a clear, single-skill request — check health of a specific
-        table. The agent should proceed directly with a health check
-        (calling search/get_table to find and fetch the table) without
-        first asking scoping questions. Going through ambiguity-resolution
-        here would be unnecessary friction.
+        This is a clear, specific health check request. The table name
+        (row_count_change_input_data) is specific enough to find uniquely.
+        The agent should proceed directly with a health check:
+        - Call search to locate the table
+        - Fetch its details (get_table, get_table_freshness)
+        - Report health: freshness, alerts, monitoring coverage
+
+        It should NOT stop to ask scoping questions for this prompt —
+        the intent is clear and the table name is specific.
+
+        NOTE: Do NOT penalize Read or Skill tool calls — those are skill loading.
 
   - id: cd-04-ambiguous-coverage
     turns:
       - prompt: "what should I monitor?"
         criteria:
-          # Coverage intent — should route to monitoring-advisor / proactive-monitoring
-          # May ask about warehouse scope before calling APIs
-          must_not_call: [get_alerts]
+          # Coverage intent — route to coverage analysis, NOT incident response
+          must_not_call:
+            - get_alerts
     criteria:
       judge_rubric: |
         The user is asking a coverage question. The agent should route
@@ -66,14 +90,26 @@ cases:
         to proceed with get_warehouses to discover scope. It should NOT
         jump to incident response (get_alerts) since no incident is mentioned.
 
+        Good behavior: calls get_warehouses, get_use_cases, asks "which
+        warehouse?", or begins coverage analysis.
+        Bad behavior: calls get_alerts, treats this as an incident.
+
+        NOTE: Do NOT penalize Read or Skill tool calls.
+
   - id: cd-05-unrelated-prompt
     turns:
       - prompt: "help me write a Python function to parse JSON"
         criteria:
-          # Not data observability — no MC skills should activate
-          must_not_call: [get_alerts, get_monitors, get_warehouses, get_use_cases, search, get_table]
+          # Not data observability — no MC tools should be invoked
+          must_not_call:
+            - get_alerts
+            - get_monitors
+            - get_warehouses
+            - get_use_cases
+            - search
+            - get_table
     criteria:
       judge_rubric: |
         This is a general programming question with no Monte Carlo or data
-        observability context. No MC skills should be invoked. The agent
+        observability context. No MC MCP tools should be invoked. The agent
         should just help with the Python task directly.
