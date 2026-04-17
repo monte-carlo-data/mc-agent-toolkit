@@ -1,6 +1,13 @@
 ---
 name: monte-carlo-proactive-monitoring
 description: Guide users from coverage analysis to monitor creation. USE WHEN user asks what should I monitor, where are my gaps, improve coverage, or wants a systematic approach to monitoring across their data estate.
+when_to_use: |
+  Invoke when the user wants to IMPROVE monitoring coverage across their data estate — identify gaps, prioritize what to monitor, or take a systematic approach to observability.
+  Example triggers: "what should I monitor?", "where are my coverage gaps?", "improve monitoring across my warehouse", "help me prioritize which tables to monitor", "audit my coverage".
+
+  Covers: warehouse/use-case discovery → gap analysis → monitor prioritization → handoff to monitoring-advisor for actual monitor creation.
+
+  Do NOT invoke when the user has a specific incident to investigate (use incident-response) or wants to create a single known monitor on a known table (use monitoring-advisor directly).
 version: 1.0.0
 ---
 

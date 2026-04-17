@@ -1,6 +1,13 @@
 ---
 name: monte-carlo-context-detection
 description: Route data-related requests to the right Monte Carlo skill or workflow. USE WHEN alerts, incidents, data broken, stale, coverage gaps, data quality, or any ambiguous data observability request.
+when_to_use: |
+  Invoke for ambiguous or incomplete data-observability requests that don't clearly name a specific skill.
+  Example triggers: "something is wrong with my data", "I have alerts firing", "check my pipelines", "what should I monitor?", "my data looks off".
+
+  CRITICAL on vague first turns: ALWAYS ask 1–3 targeted clarifying questions FIRST (what symptom? which table/warehouse? when did it start?). Do NOT call Monte Carlo MCP tools (get_alerts, search, get_table, etc.) on turn 1 until the user has named a specific table, warehouse, or alert. Calling tools prematurely on a vague prompt wastes turns and frustrates the user.
+
+  Do NOT invoke when the user's intent clearly matches a single existing skill (e.g. "check health of orders table" → asset-health; "create a volume monitor on X" → monitoring-advisor).
 version: 1.0.0
 ---
 

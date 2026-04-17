@@ -1,6 +1,13 @@
 ---
 name: monte-carlo-incident-response
 description: Orchestrate incident response — triage, root cause, remediate, prevent recurrence. USE WHEN active alerts, data broken, stale, pipeline failure, or investigate and fix a data incident.
+when_to_use: |
+  Invoke when the user has an active data incident to handle — alerts firing, a table looks stale or broken, a pipeline failed, or they want to investigate root cause on a named table.
+  Example triggers: "my orders table is stale, figure out why", "I have an unresolved alert on X, help me investigate", "alerts are firing — what should I do?", "investigate the most critical alert".
+
+  Covers the full workflow: triage (classify/prioritize alerts) → root cause analysis (lineage, freshness history, query changes) → remediation → prevent recurrence.
+
+  Do NOT invoke for coverage or "what should I monitor" requests (use proactive-monitoring instead) or for creating a specific monitor on a known table (use monitoring-advisor).
 version: 1.0.0
 ---
 
