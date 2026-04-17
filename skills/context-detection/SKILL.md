@@ -67,6 +67,14 @@ Only make API calls when you have enough context to scope them:
 - **Coverage/monitoring** → skip API probe, route directly to proactive monitoring workflow (it handles its own API calls)
 - **If MCP tool calls fail** (auth not configured) → skip API, fall back to conversation intent alone
 
+**Always scope MCP calls tightly.** Unscoped `get_alerts`, `search`, or `get_monitors` on large accounts can return hundreds of results, overflow the tool-result token limit, spill to disk, and force expensive chunk reads — burning user tokens and risking workflow failure. Minimum scoping:
+
+- `get_alerts` → time filter (`created_after`, default last 7 days) + at least one of `warehouse`, `table_names`, `severity`
+- `search` → warehouse or database/schema filter; avoid broad string matches that return 500+ results
+- `get_monitors` → always filter by table or warehouse
+
+If you don't have enough scope, ask the user before calling.
+
 ### Step 4: Route
 
 Based on the combined signals from Steps 1-3:
