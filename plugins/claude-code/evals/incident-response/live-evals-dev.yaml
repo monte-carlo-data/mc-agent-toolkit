@@ -51,15 +51,18 @@ cases:
     turns:
       - prompt: "my monolith_public_monolith_incidentmodel table in analytics-snowflake looks stale, can you figure out why?"
         criteria:
-          # Specific symptom + specific table — go straight to RCA
-          must_call: [search, get_table]
+          # Specific symptom + specific table — go straight to RCA.
+          # Per skill guidance, skip `search` when table + warehouse are
+          # named — query get_table directly.
+          must_call: [get_table]
     criteria:
       judge_rubric: |
         The user has identified both the symptom (staleness) and the table
         (monolith_public_monolith_incidentmodel). The agent should conduct root cause
         analysis:
-        - Find the table (search)
-        - Get its details and freshness history (get_table, get_table_freshness)
+        - Query the table directly (get_table) — skip `search` since the
+          name and warehouse are given
+        - Get freshness history (get_table_freshness)
         - Check upstream dependencies (get_asset_lineage)
         - Look for recent ETL or query changes
 
