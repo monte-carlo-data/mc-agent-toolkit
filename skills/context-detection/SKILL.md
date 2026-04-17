@@ -13,10 +13,7 @@ version: 1.0.0
 
 # Monte Carlo Context Detection
 
-This skill determines which Monte Carlo skill or workflow best fits the user's current context. It operates in two modes:
-
-1. **Session-start welcome** — On the first response in a session, check for workspace signals and briefly mention available capabilities.
-2. **Reactive routing** — When activated by the CLAUDE.md routing table for ambiguous or multi-step data-related messages, gather signals and route to the right skill or workflow.
+This skill determines which Monte Carlo skill or workflow best fits the user's current context. It activates reactively for ambiguous or multi-step data-related messages, gathers signals, and routes to the right skill or workflow.
 
 Reference file for signal definitions: `references/signal-definitions.md` (relative to this file). Read it before routing.
 
@@ -37,27 +34,11 @@ This skill is activated by the CLAUDE.md routing table when:
 
 ---
 
-## Mode 1: Session-Start Welcome
+## Workflow: Reactive Routing
 
-**When:** First response in a session (infer from empty conversation history).
+Session-start welcome is handled by the plugin's `welcome` SessionStart hook (bash-side dbt/MC workspace detection). This skill is purely reactive — it activates for ambiguous or multi-step data-related messages and routes them.
 
-**Action:**
-1. Glob for `dbt_project.yml` and `montecarlo.yml` in the workspace root
-2. If either exists, append this brief note to your response:
-
-> "I see this is a dbt project with Monte Carlo. If you run into data issues, I can help triage alerts, investigate root causes, and set up monitoring. I'll also flag impact when you edit models. Ask me anything or type `/mc` to see what's available."
-
-**Rules:**
-- Brief, natural language — do not list skill names
-- Once per session, appended to whatever you're responding about
-- Workspace glob only — no API calls
-- Silent if neither file is found
-
----
-
-## Mode 2: Reactive Routing
-
-When activated for an ambiguous or multi-step data-related message, follow these steps in order.
+Follow these steps in order.
 
 ### Step 1: Categorize intent
 
