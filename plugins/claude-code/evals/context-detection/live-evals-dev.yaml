@@ -46,10 +46,10 @@ cases:
       - prompt: "the monolith_public_monolith_incidentmodel table in analytics-snowflake warehouse got an alert, investigate it"
         criteria:
           # Turn 2: user named the specific table — agent should investigate.
-          # Don't require `search`: our guidance says to skip it when table +
-          # warehouse are already named. Require get_alerts (or get_table)
-          # instead, since at least one of them must be called to investigate.
+          # `search` is expected (needed to resolve table name → MCON for
+          # downstream get_table call). get_alerts should also fire.
           must_call:
+            - search
             - get_alerts
     criteria:
       judge_rubric: |
@@ -80,22 +80,25 @@ cases:
     turns:
       - prompt: "check the health of the row_count_change_input_data table in analytics-snowflake warehouse"
         criteria:
-          # Clear intent + table + warehouse — should proceed directly with
-          # a health check. Per skill guidance, skip `search` when table +
-          # warehouse are already named. Require get_table instead.
+          # Clear intent + table + warehouse. Agent should proceed directly
+          # with a health check: search (to resolve name → MCON) then
+          # get_table for details.
           must_call:
+            - search
             - get_table
     criteria:
       judge_rubric: |
         This is a clear, specific health check request. Table + warehouse
         are named, so the agent should proceed directly:
-        - Query the table directly via get_table (skip `search` — it's
-          unnecessary when the name and warehouse are given)
-        - Fetch freshness, alerts, monitoring coverage
+        - Use search (tightly scoped — limit + warehouse filter) to resolve
+          the name to an MCON
+        - Fetch details via get_table, then freshness, alerts, monitoring coverage
         - Report health
 
         It should NOT stop to ask scoping questions for this prompt —
-        the intent is clear and the table name is specific.
+        the intent is clear and the table name is specific. If search
+        returns multiple matches, it should pick the one in the named
+        warehouse (analytics-snowflake) and proceed.
 
         NOTE: Do NOT penalize Read or Skill tool calls — those are skill loading.
 

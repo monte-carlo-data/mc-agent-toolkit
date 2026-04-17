@@ -85,7 +85,7 @@ Only make API calls when you have enough context to scope them:
 **Always scope MCP calls tightly.** Unscoped `get_alerts`, `search`, or `get_monitors` on large accounts can return hundreds of results, overflow the tool-result token limit, spill to disk, and force expensive chunk reads — burning user tokens and risking workflow failure. Minimum scoping:
 
 - `get_alerts` → time filter (`created_after`, default last 7 days) + at least one of `warehouse`, `table_names`, `severity`
-- `search` → ALWAYS pass `limit` (e.g. 10) and filter by `database` or `schema` (not just `warehouse_types` — "snowflake" alone can match thousands of tables). **Skip `search` entirely when the user has already named the table and warehouse** — the downstream skill can query the table directly via `get_table` or lineage tools.
+- `search` → needed to resolve a table name to its MCON (`get_table` requires MCON). ALWAYS pass `limit` (e.g. 5), the table name as `query`, and filter by `warehouse_uuid` or `database`/`schema`. `warehouse_types` alone ("snowflake") matches thousands of tables. If `search` returns multiple matches and the user named a warehouse, pick the match in that warehouse; if still ambiguous, ask the user.
 - `get_monitors` → always filter by `mcons` (table MCON) or `warehouse_uuid`
 
 If you don't have enough scope, ask the user before calling.

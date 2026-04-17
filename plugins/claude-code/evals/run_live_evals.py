@@ -488,7 +488,7 @@ def main() -> None:
     parser.add_argument("--env", default="dev", choices=["dev", "prod"], help="MCP environment (default: dev)")
     parser.add_argument("--model", default="claude-sonnet-4-6", help="Agent model (default: claude-sonnet-4-6)")
     parser.add_argument("--judge-model", default="claude-sonnet-4-6", help="Judge model (default: claude-sonnet-4-6)")
-    parser.add_argument("--max-turns", type=int, default=15, help="Max agent turns (default: 15)")
+    parser.add_argument("--max-turns", type=int, default=30, help="Max agent turns (default: 30)")
     parser.add_argument("--threshold", type=float, default=0.80, help="Min pass rate (default: 0.80)")
     parser.add_argument("--case", default=None, help="Run a single case by ID")
     parser.add_argument("--parallel", type=int, default=1, help="Run N cases concurrently (default: 1)")
