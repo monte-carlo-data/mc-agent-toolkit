@@ -64,7 +64,13 @@ Before starting, determine which step to enter based on the user's context:
 
 **When to run:** Only when the user doesn't already have a specific alert or incident to investigate. This step helps narrow down "I have alerts" into "these specific alerts need attention."
 
-**Scope `get_alerts` before calling.** Always pass a time filter (`created_after`, typically last 7 days) plus at least one of: `warehouse`, `table_names`, or `severity`. Large Monte Carlo accounts can return hundreds of alerts — an unscoped call overflows the tool-result token limit, spills to disk, and wastes turns. If the user hasn't given enough scope, ask before calling: "Which warehouse?", "How far back — today, this week?", "Any specific severity?".
+**Scope MCP calls tightly.** On large accounts, broad queries return hundreds of results, overflow the tool-result token limit, spill to disk, and force chunk reads — burning user tokens and exhausting the turn budget. Minimum scoping for tools this workflow touches:
+
+- `get_alerts` → time filter (`created_after`, default last 7 days) + at least one of `warehouse`, `table_names`, `severity`
+- `search` → always pass `limit` (e.g. 10) and filter by `database` or `schema`; `warehouse_types` alone is too broad. **Skip `search` entirely when the user has already named the table** — use `get_table` directly
+- `get_monitors` → filter by `mcons` or `warehouse_uuid`
+
+If scope is missing, ask the user before calling: "Which warehouse?", "How far back — today, this week?", "Any specific severity?".
 
 **Transition to Step 2:** Once high-priority alert(s) are identified, tell the user:
 
