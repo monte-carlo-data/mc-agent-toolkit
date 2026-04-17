@@ -1,0 +1,94 @@
+cases:
+  - id: ir-01-specific-alert-investigation
+    turns:
+      - prompt: "I have an unresolved alert on a table, help me investigate what's going on"
+        criteria:
+          # Should go straight to investigation — skip triage since user has specific intent
+          must_call: [get_alerts]
+    criteria:
+      judge_rubric: |
+        The user has a specific incident to investigate. The agent should
+        begin investigation by fetching alerts (to identify the specific
+        alert) and then proceed toward root cause analysis (lineage, ETL
+        checks, query analysis). It should demonstrate incident-response
+        behavior: investigation, not just a surface-level health check.
+
+        Good: calls get_alerts, then explores the specific alert (lineage,
+        freshness history, queries).
+        Bad: just calls get_table once and reports basic metadata.
+
+  - id: ir-02-vague-alerts-firing
+    turns:
+      - prompt: "I have alerts firing, what should I do?"
+        criteria:
+          # Should start with triage flow — fetch alerts, score, classify
+          must_call: [get_alerts]
+    criteria:
+      judge_rubric: |
+        The user knows alerts exist but hasn't identified which to focus on.
+        The agent should behave like the incident response workflow:
+        1. Fetch recent alerts (get_alerts)
+        2. Assess/classify them (alert_assessment or by severity)
+        3. Offer to investigate high-priority ones
+
+        It should NOT dump raw alert data without any structure. It should
+        NOT jump to a random specific table. Triage-style prioritization
+        is expected.
+
+  - id: ir-03-stale-table-investigation
+    turns:
+      - prompt: "my orders table looks stale, can you figure out why?"
+        criteria:
+          # Specific symptom + specific table — go straight to RCA
+          must_call: [search, get_table]
+    criteria:
+      judge_rubric: |
+        The user has identified both the symptom (staleness) and the table
+        (orders). The agent should conduct root cause analysis:
+        - Find the table (search)
+        - Get its details and freshness history (get_table, get_table_freshness)
+        - Check upstream dependencies (get_asset_lineage)
+        - Look for recent ETL or query changes
+
+        The agent should NOT just check generic health — it should
+        specifically investigate why the table is stale (lineage, ETL,
+        queries). This is RCA, not a health check.
+
+  - id: ir-04-multi-turn-incident-flow
+    turns:
+      - prompt: "there's an active alert I need to handle"
+        criteria:
+          must_call: [get_alerts]
+      - prompt: "ok, let's investigate the most critical one and figure out the root cause"
+        criteria:
+          # Should proceed with RCA tools
+          must_call: [get_asset_lineage]
+    criteria:
+      judge_rubric: |
+        Turn 1: Agent fetches alerts to identify which are active/critical.
+        It may ask for severity or time filters, or proceed with a default
+        scope.
+
+        Turn 2: Agent picks the critical alert and investigates it deeply —
+        checking lineage, upstream dependencies, ETL issues, query changes.
+        This demonstrates the incident response sequence: triage → RCA.
+
+        Good: agent moves from alert identification to investigation naturally,
+        calling RCA-appropriate tools.
+        Bad: agent just re-summarizes the alert without investigating.
+
+  - id: ir-05-coverage-not-incident
+    turns:
+      - prompt: "I want to improve monitoring coverage across my warehouse"
+        criteria:
+          # NOT an incident — should NOT trigger incident response
+          must_not_call: [get_alerts]
+    criteria:
+      judge_rubric: |
+        This is a coverage/monitoring request, not an incident. The agent
+        should NOT invoke the incident response workflow. Instead it should
+        move toward coverage analysis (monitoring-advisor): discover
+        warehouses, explore use cases, identify gaps.
+
+        Good: calls get_warehouses, get_use_cases, or get_unmonitored_tables_with_anomalies.
+        Bad: calls get_alerts or treats this as an incident.

@@ -1,0 +1,79 @@
+cases:
+  - id: cd-01-vague-data-issue
+    turns:
+      - prompt: "think something is wrong with my data, can you help?"
+        criteria:
+          # Agent should gather scope first, not dive into MC APIs
+          must_not_call: [get_alerts, get_monitors, get_asset_lineage, search]
+    criteria:
+      judge_rubric: |
+        The agent should recognize the user's intent is ambiguous and ask
+        clarifying questions (what symptom? which table or pipeline? when
+        did it start?). It should NOT dive into any specific investigation
+        or make Monte Carlo API calls before gathering context.
+
+        Good behavior: asks 1-3 targeted questions to narrow down the scope.
+        Bad behavior: immediately picks a table or calls get_alerts without
+        knowing what the user is actually concerned about.
+
+  - id: cd-02-vague-to-incident-flow
+    turns:
+      - prompt: "think something is wrong with my data, can you help?"
+        criteria:
+          must_not_call: [get_alerts, get_monitors]
+      - prompt: "I got a freshness alert on a specific table, can you investigate?"
+        criteria:
+          # Now we have enough context — agent should start investigating
+          must_call: [get_alerts]
+    criteria:
+      judge_rubric: |
+        Turn 1: Agent should ask clarifying questions about the symptom,
+        table, or alert — not make tool calls yet.
+
+        Turn 2: With a specific symptom (freshness alert) and intent to
+        investigate, the agent should begin incident investigation — calling
+        get_alerts (optionally filtered) and proceeding toward root cause
+        analysis. It should NOT just check table health; this is an incident
+        response scenario.
+
+  - id: cd-03-clear-health-check
+    turns:
+      - prompt: "check the health of the orders table"
+        criteria:
+          # Clear single-skill intent — should route directly to asset-health
+          # (NOT go through context-detection scoping)
+          must_call: [search, get_table]
+    criteria:
+      judge_rubric: |
+        This is a clear, single-skill request — check health of a specific
+        table. The agent should proceed directly with a health check
+        (calling search/get_table to find and fetch the table) without
+        first asking scoping questions. Going through ambiguity-resolution
+        here would be unnecessary friction.
+
+  - id: cd-04-ambiguous-coverage
+    turns:
+      - prompt: "what should I monitor?"
+        criteria:
+          # Coverage intent — should route to monitoring-advisor / proactive-monitoring
+          # May ask about warehouse scope before calling APIs
+          must_not_call: [get_alerts]
+    criteria:
+      judge_rubric: |
+        The user is asking a coverage question. The agent should route
+        toward coverage analysis (monitoring-advisor or proactive-monitoring
+        workflow). It's acceptable to ask which warehouse to analyze, or
+        to proceed with get_warehouses to discover scope. It should NOT
+        jump to incident response (get_alerts) since no incident is mentioned.
+
+  - id: cd-05-unrelated-prompt
+    turns:
+      - prompt: "help me write a Python function to parse JSON"
+        criteria:
+          # Not data observability — no MC skills should activate
+          must_not_call: [get_alerts, get_monitors, get_warehouses, get_use_cases, search, get_table]
+    criteria:
+      judge_rubric: |
+        This is a general programming question with no Monte Carlo or data
+        observability context. No MC skills should be invoked. The agent
+        should just help with the Python task directly.
