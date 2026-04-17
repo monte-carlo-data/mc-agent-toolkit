@@ -64,6 +64,8 @@ Before starting, determine which step to enter based on the user's context:
 
 **When to run:** Only when the user doesn't already have a specific alert or incident to investigate. This step helps narrow down "I have alerts" into "these specific alerts need attention."
 
+**Scope `get_alerts` before calling.** Always pass a time filter (`created_after`, typically last 7 days) plus at least one of: `warehouse`, `table_names`, or `severity`. Large Monte Carlo accounts can return hundreds of alerts — an unscoped call overflows the tool-result token limit, spills to disk, and wastes turns. If the user hasn't given enough scope, ask before calling: "Which warehouse?", "How far back — today, this week?", "Any specific severity?".
+
 **Transition to Step 2:** Once high-priority alert(s) are identified, tell the user:
 
 > "I've identified [N] high-priority alerts. Let me investigate the root cause of [specific alert/table]. Moving to root cause analysis."
