@@ -6,8 +6,11 @@ Skills are platform-agnostic instruction sets that tell an AI coding agent what 
 
 | Skill | Description |
 |---|---|
+| **[Context Detection](context-detection/)** | Detects user context and routes to the right skill or workflow. Inspects workspace signals, conversation intent, and scoped API data to suggest or auto-activate the best skill. |
+| **[Incident Response](incident-response/)** | Orchestrates incident response — triage alerts, investigate root causes, remediate issues, and add monitoring to prevent recurrence. Sequences existing skills into a guided workflow. |
 | **[Asset Health](asset-health/)** | Checks the health of a data table — surfaces last activity, alerts, monitoring coverage, importance, and upstream dependency health from Monte Carlo. |
 | **[Monitoring Advisor](monitoring-advisor/)** | Analyzes data coverage, creates monitors for warehouse tables and AI agents — covers coverage gaps, use-case analysis, data monitor creation, and agent observability. |
+| **[Proactive Monitoring](proactive-monitoring/)** | Guides users from coverage analysis to monitor creation. Sequences asset-health assessment, gap identification via monitoring-advisor, and monitor creation into a guided workflow. |
 | **[Prevent](prevent/)** | Surfaces Monte Carlo context (lineage, alerts, blast radius) before code changes, generates monitors-as-code, and produces targeted validation queries. |
 | **[Generate Validation Notebook](generate-validation-notebook/)** | Generates SQL validation notebooks for dbt model changes, with targeted queries comparing baseline and development data. |
 | **[Push Ingestion](push-ingestion/)** | Generates warehouse-specific collection scripts for pushing metadata, lineage, and query logs to Monte Carlo. |

@@ -21,6 +21,15 @@
   ],
   "skills": "./skills/",
   "mcpServers": "./.mcp.json",
-  "commands": ["./commands/prevent/", "./commands/push-ingestion/", "./commands/monitoring-advisor/", "./commands/tune-monitor/"],
-  "hooks": "./hooks/prevent/hooks.json"
+  "commands": [
+    "./commands/prevent/",
+    "./commands/push-ingestion/",
+    "./commands/monitoring-advisor/",
+    "./commands/tune-monitor/",
+    "./commands/automated-triage/",
+    "./commands/catalog/",
+    "./commands/incident-response/",
+    "./commands/proactive-monitoring/"
+  ],
+  "hooks": ["./hooks/prevent/hooks.json", "./hooks/welcome/hooks.json"]
 }
