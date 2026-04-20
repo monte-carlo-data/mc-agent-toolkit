@@ -65,15 +65,45 @@ Plugins reference skills via symlinks so that skills are authored once and share
 
 These standards exist so the toolkit stays coherent as it grows. New skill PRs should comply; existing skills are being brought up to compliance incrementally.
 
-### Search before you add
+### Extend or split?
 
-Before opening a PR for a new skill, search the existing `skills/` directory for overlapping intent. If an existing skill's scope can be extended to cover the new behavior (via a `references/` file, a new routing entry, or a modest description tweak), prefer extension over addition. Fewer atomic skills is easier for both the agent and the humans to reason about.
+**Default: extend an existing skill.** Splitting is the exception — a new atomic skill
+is one more thing the router has to disambiguate, and one more entry in the catalog.
+Only split if one of the tests below forces it.
 
-If the new behavior genuinely doesn't fit an existing skill, proceed — but call out in the PR description which peers you considered and why they didn't fit.
+1. **Find the nearest peer.** Search `skills/` for candidates that share any of:
+   - the same capability bucket,
+   - overlapping user phrasings in `description` or `when_to_use`,
+   - the same primary MCP surface or data input.
+
+   For each candidate, try to write a realistic user prompt that *should* route
+   to your new skill but could plausibly activate the candidate instead. If you
+   can write one, that candidate is a peer — continue to step 2 with it. If no
+   candidate survives this test, there's no routing collision; create the new
+   skill and stop here.
+
+2. **Budget check.** Open the peer's `SKILL.md`. If adding a sentence to
+   `description` or a bullet to `when_to_use` would push the combined text past
+   ~1,400 characters (the 1,536 ceiling minus headroom), you must split. Routing
+   quality degrades once the frontmatter is truncated.
+
+3. **Surface check.** Does the new behavior hit a different MCP surface, produce
+   a different output artifact, or belong to a different capability bucket than
+   the peer? If yes, split. If no, extend.
+
+4. **Otherwise, extend.** Phrasing overlap, "it feels like its own thing," or
+   wanting a cleaner file on its own are not reasons to split. Add a bullet to
+   the peer's `when_to_use`, add a `references/` file if the workflow needs more
+   room, and move on.
+
+**PR requirement.** If you split, name the peer(s) you considered in the PR
+description and point to which test above forced the split. If none did, extend.
 
 ### Capability buckets
 
-Every user-facing skill belongs to one of the following capability buckets. Declare the bucket in the PR description when adding a new skill:
+Capability buckets are how we organize the toolkit's story in [our public documentation](https://docs.getmontecarlo.com/docs/agent-toolkit) — they're the sections customers read when deciding which skills matter for their use case. They don't affect how skills are loaded or routed (the agent discovers skills by name and `when_to_use`, not by bucket). The bucket is a communication tool, not a technical one.
+
+Every user-facing skill belongs to one of the following buckets. Declare the bucket in the PR description when adding a new skill so we know where it lands in the public docs:
 
 - **Trust** — foundational pre-query and pre-build checks so the agent doesn't reach for data that isn't ready (e.g., `asset-health`).
 - **Incident Response** — reactive investigation and fix workflows (e.g., `analyze-root-cause`, `remediation`, `automated-triage`).
@@ -99,13 +129,12 @@ description: |
   A one-paragraph description of what the skill does and when it activates.
 when_to_use: |
   Explicit activation cues and example user phrasings.
-version: 1.0.0
 ---
 ```
 
-- `name`, `description`, `version` are always required.
-- `when_to_use` is required for Claude Code and strongly recommended for all skills. It is a Claude-specific convention today but likely to be adopted by other editors.
-- Additional fields are allowed but ignored by most harnesses.
+- `name` and `description` are required by Claude Code.
+- `when_to_use` is strongly recommended — it's a Claude-specific convention today but likely to be adopted by other editors.
+- Additional fields are allowed but ignored by Claude. Plugin versions live in the plugin manifests (`plugins/*/.*-plugin/plugin.json`) and are managed by `scripts/bump-version.sh`, not at the skill level.
 
 ### Description hygiene
 
