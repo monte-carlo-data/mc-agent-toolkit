@@ -6,7 +6,7 @@ Monte Carlo's official toolkit for AI coding agents. Brings data observability â
 
 The toolkit bundles the following capabilities as a single **mc-agent-toolkit** plugin. Each feature is a [skill](skills/) that can also be used standalone.
 
-Some skills sequence other skills into guided workflows (e.g. Incident Response, Proactive Monitoring); the rest are atomic capabilities. Both are loaded the same way and available by name â€” workflow skills are listed first below.
+Some skills sequence other skills into guided workflows (e.g. Incident Response, Proactive Monitoring); the rest are atomic capabilities. Both are loaded the same way and available by name.
 
 | Feature | Description | Details |
 |---|---|---|
