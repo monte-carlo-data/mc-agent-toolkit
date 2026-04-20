@@ -9,7 +9,6 @@ List all available Monte Carlo skills and workflows. Present them grouped by cat
 | Command | Description |
 |---------|-------------|
 | `/mc-incident-response` | Triage, investigate, fix, and prevent data incidents. Sequences automated-triage, root cause analysis, remediation, and monitor creation. |
-| `/mc-proactive-monitoring` | Assess coverage gaps and create monitors. Sequences asset-health, coverage analysis, and monitor creation. |
 
 ## Skills
 

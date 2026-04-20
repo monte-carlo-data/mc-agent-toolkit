@@ -28,8 +28,7 @@
     "./commands/tune-monitor/",
     "./commands/automated-triage/",
     "./commands/catalog/",
-    "./commands/incident-response/",
-    "./commands/proactive-monitoring/"
+    "./commands/incident-response/"
   ],
   "hooks": ["./hooks/prevent/hooks.json", "./hooks/welcome/hooks.json"]
 }

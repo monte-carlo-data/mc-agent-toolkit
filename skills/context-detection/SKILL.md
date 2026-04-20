@@ -49,7 +49,6 @@ Before doing anything else, check whether the user's message unambiguously match
 | "Check health of [named table]" / "status of [named table]" | `../asset-health/SKILL.md` |
 | "Create a [monitor type] on [named table]" | `../monitoring-advisor/SKILL.md` |
 | "Investigate alert on [named table]" / "why is [named table] stale/broken?" | `../incident-response/SKILL.md` |
-| "What should I monitor?" / "where are my coverage gaps?" | `../proactive-monitoring/SKILL.md` |
 
 Context-detection is for **ambiguous** requests only. If the request is clear, routing through this skill wastes turns and tokens.
 
@@ -79,7 +78,7 @@ Only make API calls when you have enough context to scope them:
 
 - **Specific asset** → call `get_alerts` with the table's MCON or name filter, and `get_monitors` for that table
 - **Active incident with scope** → call `get_alerts` with the user's time range / severity filters
-- **Coverage/monitoring** → skip API probe, route directly to proactive monitoring workflow (it handles its own API calls)
+- **Coverage/monitoring** → skip API probe, route directly to `monitoring-advisor` (coverage and monitor creation)
 - **If MCP tool calls fail** (auth not configured) → skip API, fall back to conversation intent alone
 
 **Always scope MCP calls tightly.** Unscoped `get_alerts`, `search`, or `get_monitors` on large accounts can return hundreds of results, overflow the tool-result token limit, spill to disk, and force expensive chunk reads — burning user tokens and risking workflow failure. Minimum scoping:
@@ -101,7 +100,7 @@ Based on the combined signals from Steps 1-3:
 | Combined signals | Confidence | Action |
 |-----------------|------------|--------|
 | Active alerts found + incident intent | High | **Auto-activate** incident response workflow: read and follow `../incident-response/SKILL.md` |
-| Coverage intent + data project detected | High | **Auto-activate** proactive monitoring workflow: read and follow `../proactive-monitoring/SKILL.md` |
+| Coverage intent + data project detected | High | **Auto-activate** `monitoring-advisor`: read and follow `../monitoring-advisor/SKILL.md` |
 | User asks to create a specific monitor (type + table known) | High | **Auto-activate** monitoring-advisor: read and follow `../monitoring-advisor/SKILL.md` |
 | Table mentioned + "health" / "status" / "check" intent | High | **Auto-activate** asset-health: read and follow `../asset-health/SKILL.md` |
 | Ambiguous or conflicting signals | Low | **Suggest** options and wait for user to choose |
@@ -112,7 +111,7 @@ Based on the combined signals from Steps 1-3:
 
 > "Based on what you've described, I can:
 > 1. **Investigate alerts** — triage and fix active data issues (incident response workflow)
-> 2. **Improve monitoring** — find coverage gaps and create monitors (proactive monitoring workflow)
+> 2. **Improve monitoring** — find coverage gaps and create monitors (monitoring-advisor)
 >
 > Which would be most helpful?"
 

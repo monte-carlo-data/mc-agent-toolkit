@@ -7,7 +7,7 @@ when_to_use: |
 
   Covers the full workflow: triage (classify/prioritize alerts) → root cause analysis (lineage, freshness history, query changes) → remediation → prevent recurrence.
 
-  Do NOT invoke for coverage or "what should I monitor" requests (use proactive-monitoring instead) or for creating a specific monitor on a known table (use monitoring-advisor).
+  Do NOT invoke for coverage or "what should I monitor" requests or for creating a specific monitor on a known table — use `monitoring-advisor` instead.
 version: 1.0.0
 ---
 
@@ -29,7 +29,7 @@ Activate when:
 
 ## When NOT to activate this workflow
 
-- User wants to create monitors or check coverage without an active incident — use proactive monitoring workflow
+- User wants to create monitors or check coverage without an active incident — use `monitoring-advisor`
 - User is editing a dbt model — defer to `prevent` skill (auto-activates via hooks)
 - User wants to check table health without an incident context — use `asset-health` directly
 - A skill is already active and handling the user's request
