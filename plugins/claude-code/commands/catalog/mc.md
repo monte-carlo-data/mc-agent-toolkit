@@ -34,6 +34,4 @@ These skills don't have dedicated commands but activate automatically when you a
 | Performance Diagnosis | "slow pipeline", "expensive queries", "query performance" |
 | Prevent | Auto-activates via hooks when you edit dbt models or SQL files |
 
-Context detection also routes automatically when you ask data-related questions.
-
 **User provided input**: $ARGUMENTS
