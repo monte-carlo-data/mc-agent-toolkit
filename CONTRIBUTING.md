@@ -55,9 +55,82 @@ Plugins reference skills via symlinks so that skills are authored once and share
 ## Adding a new skill
 
 1. Create a new directory under `skills/` with a kebab-case name (e.g., `skills/my-new-skill/`).
-2. Add a `SKILL.md` with valid YAML frontmatter (`name` and `description` are required). Follow the [Agent Skills specification](https://agentskills.io).
+2. Add a `SKILL.md` with valid YAML frontmatter (`name` and `description` are required). Follow the [Agent Skills specification](https://agentskills.io) and the [Skill authoring standards](#skill-authoring-standards) below.
 3. Optionally add supporting directories: `scripts/`, `references/`, `assets/`.
 4. Test the skill locally by copying it to `~/.claude/skills/my-new-skill/` and verifying Claude discovers and activates it correctly.
+
+## Skill authoring standards
+
+These standards exist so the toolkit stays coherent as it grows. New skill PRs should comply; existing skills are being brought up to compliance incrementally.
+
+### Search before you add
+
+Before opening a PR for a new skill, search the existing `skills/` directory for overlapping intent. If an existing skill's scope can be extended to cover the new behavior (via a `references/` file, a new routing entry, or a modest description tweak), prefer extension over addition. Fewer atomic skills is easier for both the agent and the humans to reason about.
+
+If the new behavior genuinely doesn't fit an existing skill, proceed — but call out in the PR description which peers you considered and why they didn't fit.
+
+### Capability buckets
+
+Every skill belongs to one of the following capability buckets. Declare the bucket in the PR description when adding a new skill:
+
+- **Trust** — foundational data-in-MC hygiene and pre-query checks (e.g., `asset-health`, `connection-auth-rules`, `push-ingestion`).
+- **Incident Response** — reactive investigation and fix workflows (e.g., `analyze-root-cause`, `remediation`, `automated-triage`).
+- **Monitoring** — proactive coverage analysis and monitor creation/tuning (e.g., `monitoring-advisor`).
+- **Prevent** — silent, auto-activating skills that shape code changes before and after they happen (e.g., `prevent`, `generate-validation-notebook`).
+- **Optimize** — cost and performance work on existing data assets (e.g., `storage-cost-analysis`, `performance-diagnosis`).
+
+If none of these fit, that's a signal to discuss with the toolkit maintainers before merging — a genuinely new bucket is a meaningful addition to the toolkit's story.
+
+Note: the toolkit also includes *agent-routing* skills (context detection, workflow orchestration). These are meta-skills, not capability skills; new routing skills are owned by the agent-toolkit core team, not contributed ad hoc.
+
+### Frontmatter schema
+
+Every `SKILL.md` requires the following frontmatter fields:
+
+```yaml
+---
+name: kebab-case-skill-name
+description: |
+  A one-paragraph description of what the skill does and when it activates.
+when_to_use: |
+  Explicit activation cues and example user phrasings.
+version: 1.0.0
+---
+```
+
+- `name`, `description`, `version` are always required.
+- `when_to_use` is required for Claude Code and strongly recommended for all skills. It is a Claude-specific convention today but likely to be adopted by other editors.
+- Additional fields are allowed but ignored by most harnesses.
+
+### Description hygiene
+
+The `description` field is the primary mechanism by which the agent decides whether to activate the skill. Descriptions are not free-form marketing copy — they are routing instructions.
+
+- **Length:** ≤1,024 characters. Claude Code truncates the combined `description` + `when_to_use` text to 1,536 characters when loading the skill listing, so stay within that combined budget.
+- **Voice:** third person. Describe what the skill does, not what "this skill" does. Avoid openings like "This skill…" or "Use this skill when…".
+- **Front-load triggers:** specific verbs, artifact names, and representative user phrasings should appear in the first sentence, where they have the highest weight during skill ranking.
+- **Be specific:** vague descriptions ("helps with data quality") under-route. Concrete descriptions ("investigates data incidents using alert lookup, lineage tracing, and ETL checks; activates on 'something is broken', 'triage my alerts', 'why is this failing'") route reliably.
+
+### `when_to_use` conventions
+
+Use `when_to_use` to extend the activation surface without bloating the main description:
+
+- List explicit activation cues: verbs, artifact names, user phrasings.
+- Include example user prompts in quotes where helpful: `"how is table X"`, `"tune this monitor"`, `"reduce false positives on..."`.
+- Call out what the skill does **not** cover if a peer skill is likely to get confused (see Disambiguation below).
+
+### Disambiguation
+
+If a new skill's scope overlaps a peer skill, the `description` or `when_to_use` must name the peer and explain the boundary. This prevents activation ambiguity.
+
+Example: if adding a skill that acts on alerts, explicitly call out how it differs from `analyze-root-cause` and `remediation` — investigation vs. action.
+
+### Naming
+
+- Use kebab-case (e.g., `monitoring-advisor`, not `MonitoringAdvisor`).
+- Keep names short and verb- or noun-phrase based.
+
+The existing skill catalog has an inconsistency between `monte-carlo-*`-prefixed names and bare names (carried over from separate authoring contexts). Standardization will happen in a dedicated follow-up; for now, match the convention used by neighboring skills in the same bucket.
 
 ## Adding a new skill to the Claude Code plugin
 
