@@ -18,6 +18,7 @@ Skills are platform-agnostic instruction sets that tell an AI coding agent what 
 | **[Remediation](remediation/)** | Investigates and remediates data quality alerts — runs TSA root cause analysis, discovers available tools, executes fixes (or escalates), and documents the resolution. |
 | **[Tune Monitor](tune-monitor/)** | Analyzes a Monte Carlo metric monitor's alert history and recommends configuration changes to reduce noise — sensitivity, WHERE conditions, segment exclusions, schedule, and aggregation. |
 | **[Connection Auth Rules](connection-auth-rules/)** | Build a Connection Auth Rules configuration for a Monte Carlo connection type. Fetches live connector schemas and transform steps from the apollo-agent repo. |
+| **[Evaluate](evaluate/)** | Scaffolds evaluation suites for AI agents — initializes config, bootstraps test cases by synthesizing from agent source and extracting from existing tests, and promotes approved cases into a committed suite. |
 
 ## Standalone Installation
 
