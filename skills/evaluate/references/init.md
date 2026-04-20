@@ -16,9 +16,13 @@ Before starting the flow:
 
 ---
 
-## Question flow (5 questions, in order)
+## Question flow (5 questions, sequential — one per turn)
 
-Ask all five before writing any files. Hold answers in memory; confirm the full plan before the first `Write` tool call.
+**Ask one question at a time.** Present the question with detected candidates, wait for the user's answer or edit, confirm, then move to the next question. Do NOT present all five as a batch proposal — the user should have the chance to think about and edit each field on its own turn. A "yes, that's right" or equivalent to one question is the signal to move to the next.
+
+After all five answers are confirmed, present the consolidated summary (see "Confirm the plan before writing" below) and get a final approval before any file is written.
+
+The order matters: earlier answers inform later defaults (question 5's dimensions depend on question 4's output type).
 
 ### 1. Agent name
 
@@ -48,13 +52,13 @@ Used by the bootstrap **synthesis** pass (step 5). These files describe how the 
 
 Used by the bootstrap **extraction** pass (step 4). These files contain examples of expected agent behavior — existing tests, docstrings with examples, README usage snippets.
 
-- **Detect candidates.** Walk outward from `agent_root` to find the existing test tree:
+- **Detect candidates.** Walk outward from `agent_root` to find test and example trees. Search broadly — multiple test trees may coexist in one repo:
   - `tests/` inside `agent_root` if present
-  - Parallel test tree (e.g., `../../../tests/ai_agent/<agent_name>/`) — check for `test_*.py` matching the agent name
+  - Any directory matching `tests*/<agent_name>/` or `tests*/<parent>/<agent_name>/` in ancestor directories (e.g., `../../tests/ai_agent/<agent_name>/`, `../../tests_evals/ai_agent/<agent_name>/`). The `tests*` glob catches sibling conventions like `tests_evals/`, `tests_integration/`, `tests_e2e/` — include every match.
   - `README.md` inside `agent_root`
   - `CLAUDE.md` inside `agent_root` (engineer-facing docs often contain usage examples)
   - `docs/`, `examples/` if present
-- **Don't assume a convention.** In messy monorepos the test tree may not mirror the source tree. If nothing obvious turns up, ask the user to point to the test files directly rather than guessing.
+- **Don't assume a convention.** In messy monorepos the test tree may not mirror the source tree, and there may be multiple parallel test trees. If nothing obvious turns up, ask the user to point to the test files directly rather than guessing.
 - **Ask:** "These files look like existing examples of the agent's behavior. Confirm, add, or remove: [list]"
 - **Paths are relative to `agent_root`** and may traverse outward (per SPEC §6).
 
