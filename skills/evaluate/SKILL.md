@@ -1,6 +1,6 @@
 ---
 name: monte-carlo-evaluate
-description: Scaffold evaluation suites for AI agents — init configs, bootstrap test cases by synthesizing from agent source and extracting from existing tests, promote approved cases. Later slices add eval runs and regression detection.
+description: Scaffold evaluation suites for AI agents — initialize a config, bootstrap test cases by synthesizing from agent source and extracting from existing tests, and promote approved cases into a committed suite.
 when_to_use: |
   Activate whenever tests/eval/eval-config.yaml exists at or above the
   current working directory, OR when the user explicitly asks to set up,
@@ -8,8 +8,8 @@ when_to_use: |
   "set up eval agent", "init eval agent", "add evals to this agent",
   "scaffold evals for <agent>", "create a test suite for this agent",
   "bootstrap test cases"). Also activate when the user asks to evaluate
-  an agent's behavior, run golden cases or test cases, or (slice 3+)
-  diagnose why a case regressed. Do NOT activate for non-agent repos —
+  an agent's behavior, or run golden cases or test cases.
+  Do NOT activate for non-agent repos —
   dbt projects, infra repos, ad-hoc SQL — even if the user says
   "help me evaluate this" or "let's run some tests". If
   tests/eval/eval-config.yaml is absent and no setup phrasing is
@@ -19,7 +19,7 @@ version: 1.0.0
 
 # Monte Carlo Evaluate Skill
 
-This skill scaffolds per-agent evaluation suites for AI agents. It sets up the directory layout, writes an `eval-config.yaml` and an `invoke.py` stub, bootstraps an initial set of test cases by synthesizing from the agent's source and extracting from existing tests, and supports promoting approved cases from a draft area into the committed suite.
+This skill scaffolds evaluation suites for AI agents. It sets up the directory layout, writes an `eval-config.yaml` and an `invoke.py` stub, bootstraps an initial set of test cases by synthesizing from the agent's source and extracting from existing tests, and supports promoting approved cases from a draft area into the committed suite.
 
 The product's full design — schema, architecture, slice boundaries — lives in `SPEC.md` (next to this file). This `SKILL.md` is the router: it decides when to engage and dispatches to workflow-specific reference files.
 
@@ -30,7 +30,7 @@ Reference files live next to this file. **Use the Read tool** (not MCP resources
 - Promote flow (`_draft/` → `cases/`): `references/promote.md`
 - Case YAML schema and validation rules: `references/schema.md`
 
-Slice-2 (run, diagnose) and slice-3 (baseline) references are not present yet.
+Slice-2 (run) and slice-3 (diagnose, baseline) references are not present yet.
 
 ---
 
@@ -55,7 +55,7 @@ Trigger phrases include:
 - "add evals to this agent"
 - "scaffold evals for <agent>"
 - "create a test suite for this agent"
-- "bootstrap test cases for <agent>"
+- "bootstrap test cases"
 
 In Mode B, confirm the target agent and the `source_paths` / `reference_paths` before writing any files. Init is not destructive but must not guess.
 
