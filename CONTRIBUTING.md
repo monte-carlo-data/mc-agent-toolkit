@@ -57,7 +57,9 @@ Plugins reference skills via symlinks so that skills are authored once and share
 1. Create a new directory under `skills/` with a kebab-case name (e.g., `skills/my-new-skill/`).
 2. Add a `SKILL.md` with valid YAML frontmatter (`name` and `description` are required). Follow the [Agent Skills specification](https://agentskills.io) and the [Skill authoring standards](#skill-authoring-standards) below.
 3. Optionally add supporting directories: `scripts/`, `references/`, `assets/`.
-4. Test the skill locally by copying it to `~/.claude/skills/my-new-skill/` and verifying Claude discovers and activates it correctly.
+4. [Register the skill with the orchestration layer](#orchestration-registration) so it's discoverable via context detection and the `/mc` catalog.
+5. Add a trigger-eval entry under `plugins/claude-code/evals/<skill-name>/` so skill activation can be measured. See [live evals framework (PR #53)](https://github.com/monte-carlo-data/mc-agent-toolkit/pull/53) and existing eval files for the expected structure.
+6. Test the skill locally by copying it to `~/.claude/skills/my-new-skill/` and verifying Claude discovers and activates it correctly.
 
 ## Skill authoring standards
 
@@ -71,17 +73,20 @@ If the new behavior genuinely doesn't fit an existing skill, proceed — but cal
 
 ### Capability buckets
 
-Every skill belongs to one of the following capability buckets. Declare the bucket in the PR description when adding a new skill:
+Every user-facing skill belongs to one of the following capability buckets. Declare the bucket in the PR description when adding a new skill:
 
-- **Trust** — foundational data-in-MC hygiene and pre-query checks (e.g., `asset-health`, `connection-auth-rules`, `push-ingestion`).
+- **Trust** — foundational pre-query and pre-build checks so the agent doesn't reach for data that isn't ready (e.g., `asset-health`).
 - **Incident Response** — reactive investigation and fix workflows (e.g., `analyze-root-cause`, `remediation`, `automated-triage`).
-- **Monitoring** — proactive coverage analysis and monitor creation/tuning (e.g., `monitoring-advisor`).
+- **Monitoring** — proactive coverage analysis and monitor creation/tuning (e.g., `monitoring-advisor`, `tune-monitor`).
 - **Prevent** — silent, auto-activating skills that shape code changes before and after they happen (e.g., `prevent`, `generate-validation-notebook`).
 - **Optimize** — cost and performance work on existing data assets (e.g., `storage-cost-analysis`, `performance-diagnosis`).
 
 If none of these fit, that's a signal to discuss with the toolkit maintainers before merging — a genuinely new bucket is a meaningful addition to the toolkit's story.
 
-Note: the toolkit also includes *agent-routing* skills (context detection, workflow orchestration). These are meta-skills, not capability skills; new routing skills are owned by the agent-toolkit core team, not contributed ad hoc.
+Two other kinds of skills sit outside the user-facing buckets and don't need a bucket declaration:
+
+- **Setup skills** — admin/onboarding only, invoked by name during initial setup rather than discovered through routing (e.g., `push-ingestion`, `connection-auth-rules`).
+- **Agent-routing skills** — context detection and workflow orchestration (`context-detection`, `incident-response`, `proactive-monitoring`). These are meta-skills, not capability skills; new routing skills are owned by the agent-toolkit core team, not contributed ad hoc.
 
 ### Frontmatter schema
 
@@ -131,6 +136,18 @@ Example: if adding a skill that acts on alerts, explicitly call out how it diffe
 - Keep names short and verb- or noun-phrase based.
 
 The existing skill catalog has an inconsistency between `monte-carlo-*`-prefixed names and bare names (carried over from separate authoring contexts). Standardization will happen in a dedicated follow-up; for now, match the convention used by neighboring skills in the same bucket.
+
+### Orchestration registration
+
+The toolkit uses an agent-routing layer (added in [PR #56](https://github.com/monte-carlo-data/mc-agent-toolkit/pull/56)) that decides which skill to invoke on ambiguous requests and sequences skills into workflows. When a new atomic skill lands without registering with this layer, it becomes reachable only by explicit invocation and the orchestration layer silently rots.
+
+Every new user-facing atomic skill PR must include, in the same diff:
+
+1. **Signal definition** — add a row to `skills/context-detection/references/signal-definitions.md` under *Conversation Signals* (and/or *Workspace Signals*) describing the keywords, artifacts, and user phrasings that should route to the new skill. This is the map context-detection uses to route ambiguous requests.
+2. **Workflow orchestrator updates (if applicable)** — if the skill belongs in an existing workflow (`skills/incident-response/SKILL.md` or `skills/proactive-monitoring/SKILL.md`), add it to the appropriate step.
+3. **Catalog entry** — add a row to `plugins/claude-code/commands/catalog/mc.md` so the `/mc` catalog lists the new skill.
+
+Setup and agent-routing skills are exempt from this rule. Setup skills are invoked by name, not routed to; routing skills *are* the orchestration layer.
 
 ## Adding a new skill to the Claude Code plugin
 
