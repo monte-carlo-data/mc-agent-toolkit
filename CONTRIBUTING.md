@@ -55,9 +55,128 @@ Plugins reference skills via symlinks so that skills are authored once and share
 ## Adding a new skill
 
 1. Create a new directory under `skills/` with a kebab-case name (e.g., `skills/my-new-skill/`).
-2. Add a `SKILL.md` with valid YAML frontmatter (`name` and `description` are required). Follow the [Agent Skills specification](https://agentskills.io).
+2. Add a `SKILL.md` with valid YAML frontmatter (`name` and `description` are required). Follow the [Agent Skills specification](https://agentskills.io) and the [Skill authoring standards](#skill-authoring-standards) below.
 3. Optionally add supporting directories: `scripts/`, `references/`, `assets/`.
-4. Test the skill locally by copying it to `~/.claude/skills/my-new-skill/` and verifying Claude discovers and activates it correctly.
+4. [Register the skill with the orchestration layer](#orchestration-registration) so it's discoverable via context detection and the `/mc` catalog.
+5. Add a trigger-eval entry under `plugins/claude-code/evals/<skill-name>/` so skill activation can be measured. See [live evals framework (PR #53)](https://github.com/monte-carlo-data/mc-agent-toolkit/pull/53) and existing eval files for the expected structure.
+6. Test the skill locally by copying it to `~/.claude/skills/my-new-skill/` and verifying Claude discovers and activates it correctly.
+
+## Skill authoring standards
+
+These standards exist so the toolkit stays coherent as it grows. New skill PRs should comply; existing skills are being brought up to compliance incrementally.
+
+### Extend or split?
+
+**Default: extend an existing skill.** Splitting is the exception — a new atomic skill
+is one more thing the router has to disambiguate, and one more entry in the catalog.
+Only split if one of the tests below forces it.
+
+1. **Find the nearest peer.** Search `skills/` for candidates that share any of:
+   - the same capability bucket,
+   - overlapping user phrasings in `description` or `when_to_use`,
+   - the same primary MCP surface or data input.
+
+   For each candidate, try to write a realistic user prompt that *should* route
+   to your new skill but could plausibly activate the candidate instead. If you
+   can write one, that candidate is a peer — continue to step 2 with it. If no
+   candidate survives this test, there's no routing collision; create the new
+   skill and stop here.
+
+2. **Budget check.** Open the peer's `SKILL.md`. If adding a sentence to
+   `description` or a bullet to `when_to_use` would push the combined text past
+   ~1,400 characters (the 1,536 ceiling minus headroom), you must split. Routing
+   quality degrades once the frontmatter is truncated.
+
+3. **Surface check.** Does the new behavior hit a different MCP surface, produce
+   a different output artifact, or belong to a different capability bucket than
+   the peer? If yes, split. If no, extend.
+
+4. **Otherwise, extend.** Phrasing overlap, "it feels like its own thing," or
+   wanting a cleaner file on its own are not reasons to split. Add a bullet to
+   the peer's `when_to_use`, add a `references/` file if the workflow needs more
+   room, and move on.
+
+**PR requirement.** If you split, name the peer(s) you considered in the PR
+description and point to which test above forced the split. If none did, extend.
+
+### Capability buckets
+
+Capability buckets are how we organize the toolkit's story in [our public documentation](https://docs.getmontecarlo.com/docs/agent-toolkit) — they're the sections customers read when deciding which skills matter for their use case. They don't affect how skills are loaded or routed (the agent discovers skills by name and `when_to_use`, not by bucket). The bucket is a communication tool, not a technical one.
+
+Every user-facing skill belongs to one of the following buckets. Declare the bucket in the PR description when adding a new skill so we know where it lands in the public docs:
+
+- **Trust** — foundational pre-query and pre-build checks so the agent doesn't reach for data that isn't ready (e.g., `asset-health`).
+- **Incident Response** — reactive investigation and fix workflows (e.g., `analyze-root-cause`, `remediation`, `automated-triage`).
+- **Monitoring** — proactive coverage analysis and monitor creation/tuning (e.g., `monitoring-advisor`, `tune-monitor`).
+- **Prevent** — silent, auto-activating skills that shape code changes before and after they happen (e.g., `prevent`, `generate-validation-notebook`).
+- **Optimize** — cost and performance work on existing data assets (e.g., `storage-cost-analysis`, `performance-diagnosis`).
+
+If none of these fit, that's a signal to discuss with the toolkit maintainers before merging — a genuinely new bucket is a meaningful addition to the toolkit's story.
+
+Two other kinds of skills sit outside the user-facing buckets and don't need a bucket declaration:
+
+- **Setup skills** — admin/onboarding only, invoked by name during initial setup rather than discovered through routing (e.g., `push-ingestion`, `connection-auth-rules`).
+- **Agent-routing skills** — context detection and workflow orchestration (`context-detection`, `incident-response`, `proactive-monitoring`). These are meta-skills, not capability skills; new routing skills are owned by the agent-toolkit core team, not contributed ad hoc.
+
+### Frontmatter schema
+
+Every `SKILL.md` requires the following frontmatter fields:
+
+```yaml
+---
+name: kebab-case-skill-name
+description: |
+  A one-paragraph description of what the skill does and when it activates.
+when_to_use: |
+  Explicit activation cues and example user phrasings.
+---
+```
+
+- `name` and `description` are required by Claude Code.
+- `when_to_use` is strongly recommended — it's a Claude-specific convention today but likely to be adopted by other editors.
+- Additional fields are allowed but ignored by Claude. Plugin versions live in the plugin manifests (`plugins/*/.*-plugin/plugin.json`) and are managed by `scripts/bump-version.sh`, not at the skill level.
+
+### Description hygiene
+
+The `description` field is the primary mechanism by which the agent decides whether to activate the skill. Descriptions are not free-form marketing copy — they are routing instructions.
+
+- **Length:** ≤1,024 characters. Claude Code truncates the combined `description` + `when_to_use` text to 1,536 characters when loading the skill listing, so stay within that combined budget.
+- **Voice:** third person. Describe what the skill does, not what "this skill" does. Avoid openings like "This skill…" or "Use this skill when…".
+- **Front-load triggers:** specific verbs, artifact names, and representative user phrasings should appear in the first sentence, where they have the highest weight during skill ranking.
+- **Be specific:** vague descriptions ("helps with data quality") under-route. Concrete descriptions ("investigates data incidents using alert lookup, lineage tracing, and ETL checks; activates on 'something is broken', 'triage my alerts', 'why is this failing'") route reliably.
+
+### `when_to_use` conventions
+
+Use `when_to_use` to extend the activation surface without bloating the main description:
+
+- List explicit activation cues: verbs, artifact names, user phrasings.
+- Include example user prompts in quotes where helpful: `"how is table X"`, `"tune this monitor"`, `"reduce false positives on..."`.
+- Call out what the skill does **not** cover if a peer skill is likely to get confused (see Disambiguation below).
+
+### Disambiguation
+
+If a new skill's scope overlaps a peer skill, the `description` or `when_to_use` must name the peer and explain the boundary. This prevents activation ambiguity.
+
+Example: if adding a skill that acts on alerts, explicitly call out how it differs from `analyze-root-cause` and `remediation` — investigation vs. action.
+
+### Naming
+
+- Use kebab-case (e.g., `monitoring-advisor`, not `MonitoringAdvisor`).
+- Keep names short and verb- or noun-phrase based.
+
+The existing skill catalog has an inconsistency between `monte-carlo-*`-prefixed names and bare names (carried over from separate authoring contexts). Standardization will happen in a dedicated follow-up; for now, match the convention used by neighboring skills in the same bucket.
+
+### Orchestration registration
+
+The toolkit uses an agent-routing layer (added in [PR #56](https://github.com/monte-carlo-data/mc-agent-toolkit/pull/56)) that decides which skill to invoke on ambiguous requests and sequences skills into workflows. When a new atomic skill lands without registering with this layer, it becomes reachable only by explicit invocation and the orchestration layer silently rots.
+
+Every new user-facing atomic skill PR must include, in the same diff:
+
+1. **Signal definition** — add a row to `skills/context-detection/references/signal-definitions.md` under *Conversation Signals* (and/or *Workspace Signals*) describing the keywords, artifacts, and user phrasings that should route to the new skill. This is the map context-detection uses to route ambiguous requests.
+2. **Workflow orchestrator updates (if applicable)** — if the skill belongs in an existing workflow (`skills/incident-response/SKILL.md` or `skills/proactive-monitoring/SKILL.md`), add it to the appropriate step.
+3. **Catalog entry** — add a row to `plugins/claude-code/commands/catalog/mc.md` so the `/mc` catalog lists the new skill.
+
+Setup and agent-routing skills are exempt from this rule. Setup skills are invoked by name, not routed to; routing skills *are* the orchestration layer.
 
 ## Adding a new skill to the Claude Code plugin
 
