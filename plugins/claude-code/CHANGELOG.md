@@ -5,6 +5,17 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Claude Code will
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0] - 2026-04-20
+
+### Added
+
+- `context-detection` skill that routes ambiguous data-related asks to the right workflow by probing available MCP tools
+- `incident-response` workflow skill that runs a root-cause investigation for a reported alert or incident
+- `proactive-monitoring` workflow skill that walks users from "what should I monitor?" to concrete monitor creation
+- `/mc` catalog command
+- SessionStart welcome hook — a minimal one-line greeting triggered only when a dbt project or `montecarlo.yml` is detected in the workspace
+- `when_to_use` frontmatter on the new workflow skills so the router has explicit trigger examples
+
 ## [1.7.1] - 2026-04-17
 
 ### Changed
