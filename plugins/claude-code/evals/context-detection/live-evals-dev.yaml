@@ -112,8 +112,8 @@ cases:
     criteria:
       judge_rubric: |
         The user is asking a coverage question. The agent should route
-        toward coverage analysis (monitoring-advisor). It's acceptable to
-        ask which warehouse to analyze, or
+        toward coverage analysis (monitoring-advisor or proactive-monitoring
+        workflow). It's acceptable to ask which warehouse to analyze, or
         to proceed with get_warehouses to discover scope. It should NOT
         jump to incident response (get_alerts) since no incident is mentioned.
 
