@@ -18,7 +18,6 @@ List all available Monte Carlo skills and workflows. Present them grouped by cat
 | `/mc-triage` | Triage Monte Carlo alerts — score, classify, and investigate interactively or build an automated workflow |
 | `/monitoring-advisor` | Analyze data coverage, identify gaps, and create monitors for warehouse tables and AI agents |
 | `/mc-validate` | Generate and run validation queries for dbt model changes |
-| `/tune-monitor` | Tune an existing Monte Carlo monitor's thresholds and configuration |
 | `/mc-build-*` | Push ingestion commands — build metadata, lineage, and query log collectors |
 
 ## Skills Available via Natural Language
