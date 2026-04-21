@@ -71,37 +71,11 @@ These standards exist so the toolkit stays coherent as it grows. New skill PRs s
 
 ### Extend or split?
 
-**Default: extend an existing skill.** Splitting is the exception — a new atomic skill
-is one more thing the router has to disambiguate, and one more entry in the catalog.
-Only split if one of the tests below forces it.
+**Default: extend an existing skill.** Splitting is the exception — a new atomic skill is one more thing the router has to disambiguate, and one more entry in the catalog. Only split if a rule forces it.
 
-1. **Find the nearest peer.** Search `skills/` for candidates that share any of:
-   - the same capability bucket,
-   - overlapping user phrasings in `description` or `when_to_use`,
-   - the same primary MCP surface or data input.
+The full decision algorithm — 4-step test, collision detection, budget and surface checks — lives in [`.claude/skills/skill-author/references/decision-rules.md`](.claude/skills/skill-author/references/decision-rules.md). That file is the source of truth. Read it before authoring a new skill, or let `/skill-author` walk you through it.
 
-   For each candidate, try to write a realistic user prompt that *should* route
-   to your new skill but could plausibly activate the candidate instead. If you
-   can write one, that candidate is a peer — continue to step 2 with it. If no
-   candidate survives this test, there's no routing collision; create the new
-   skill and stop here.
-
-2. **Budget check.** Open the peer's `SKILL.md`. If adding a sentence to
-   `description` or a bullet to `when_to_use` would push the combined text past
-   ~1,400 characters (the 1,536 ceiling minus headroom), you must split. Routing
-   quality degrades once the frontmatter is truncated.
-
-3. **Surface check.** Does the new behavior hit a different MCP surface, produce
-   a different output artifact, or belong to a different capability bucket than
-   the peer? If yes, split. If no, extend.
-
-4. **Otherwise, extend.** Phrasing overlap, "it feels like its own thing," or
-   wanting a cleaner file on its own are not reasons to split. Add a bullet to
-   the peer's `when_to_use`, add a `references/` file if the workflow needs more
-   room, and move on.
-
-**PR requirement.** If you split, name the peer(s) you considered in the PR
-description and point to which test above forced the split. If none did, extend.
+**PR requirement.** If you split, name the peer(s) you considered in the PR description and point to which step of the decision-rules forced the split. If none did, extend.
 
 ### Capability buckets
 

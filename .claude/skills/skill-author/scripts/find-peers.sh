@@ -1,57 +1,29 @@
 #!/usr/bin/env bash
-# Find peer skills by bucket + keyword overlap.
-# Ranks by number of distinct keywords matched (descending); ties broken alphabetically.
-# Outputs one peer-name per line (possibly empty).
+# Dump every skill's frontmatter (name + description + when_to_use) so Claude can
+# reason about which skills are peers to the new/extended one. Replaces the old
+# bucket+keyword filtering, which was too brittle to be useful — baseline evals
+# showed false positives from substring bucket matches and false negatives from
+# stopword-dominated keyword ranking.
+#
+# Output is the raw frontmatter block for each skill, separated by `=== <name> ===`
+# headers. Claude reads it and applies the 4-step decision-rules test itself.
 set -euo pipefail
 
-SKILLS_DIR=""
-BUCKET=""
-KEYWORDS=""
+SKILLS_DIR="${1:-skills}"
 
-while [ $# -gt 0 ]; do
-  case "$1" in
-    --skills-dir) SKILLS_DIR="$2"; shift 2 ;;
-    --bucket) BUCKET="$2"; shift 2 ;;
-    --keywords) KEYWORDS="$2"; shift 2 ;;
-    *) echo "Unknown arg: $1" >&2; exit 2 ;;
-  esac
-done
-
-if [ -z "$SKILLS_DIR" ] || [ -z "$BUCKET" ] || [ -z "$KEYWORDS" ]; then
-  echo "Usage: find-peers.sh --skills-dir DIR --bucket NAME --keywords csv" >&2
+if [ ! -d "$SKILLS_DIR" ]; then
+  echo "find-peers.sh: skills dir '$SKILLS_DIR' not found" >&2
   exit 2
 fi
 
-bucket_lc="$(echo "$BUCKET" | tr '[:upper:]' '[:lower:]')"
-IFS=',' read -ra kw_arr <<< "$KEYWORDS"
-
-ranked=""
-for skill_dir in "$SKILLS_DIR"/*/; do
-  [ -d "$skill_dir" ] || continue
-  sm="$skill_dir/SKILL.md"
+found=0
+for sm in "$SKILLS_DIR"/*/SKILL.md; do
   [ -f "$sm" ] || continue
-
-  content_lc="$(tr '[:upper:]' '[:lower:]' < "$sm")"
-
-  if ! echo "$content_lc" | grep -qF "$bucket_lc"; then
-    continue
-  fi
-
-  hits=0
-  for kw in "${kw_arr[@]}"; do
-    kw_lc="$(echo "$kw" | tr '[:upper:]' '[:lower:]' | xargs)"
-    [ -z "$kw_lc" ] && continue
-    if echo "$content_lc" | grep -qF "$kw_lc"; then
-      hits=$((hits + 1))
-    fi
-  done
-  [ "$hits" -gt 0 ] || continue
-
-  name="$(basename "$skill_dir")"
-  ranked+="$(printf '%d\t%s' "$hits" "$name")"$'\n'
+  found=1
+  name="$(basename "$(dirname "$sm")")"
+  echo "=== $name ==="
+  awk '/^---[[:space:]]*$/{c++; if(c==2)exit; next} c==1' "$sm"
+  echo
 done
 
-[ -z "$ranked" ] && exit 0
-
-# Sort by hits desc, then name asc. Emit names only.
-printf '%s' "$ranked" | sort -t$'\t' -k1,1nr -k2,2 | awk -F'\t' '{print $2}'
+[ "$found" -eq 1 ] || { echo "find-peers.sh: no SKILL.md files in '$SKILLS_DIR'" >&2; exit 2; }

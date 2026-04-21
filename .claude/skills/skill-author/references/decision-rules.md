@@ -1,9 +1,10 @@
 # Extend-or-split decision rules
 
-Source of truth: `CONTRIBUTING.md § Skill authoring standards → Extend or split?` at the repo root.
-This file is a Claude-facing restatement. If it drifts from `CONTRIBUTING.md`, trust CONTRIBUTING.
+**Canonical source.** `CONTRIBUTING.md § Skill authoring standards → Extend or split?` summarizes and links here; if the two disagree, this file wins.
 
 **Default:** extend an existing peer skill. Split only when a rule forces it.
+
+**Forbidden buckets.** Agent-routing skills are owned by the toolkit core team per `CONTRIBUTING § Capability buckets` — do not author them via `/skill-author`. If the contributor's Q1 answer is `Agent-routing`, halt and refuse before peer search. Do not proceed.
 
 ## The 4-step test
 
@@ -11,9 +12,9 @@ Apply in order. Stop at the first step that decides.
 
 ### Step 1 — Find the nearest peer
 
-Run `find-peers.sh --bucket <B> --keywords <k1,k2,...>` against `skills/`.
+`find-peers.sh` (run in Pre-load) dumps every skill's `name + description + when_to_use`. Read the dump and reason about which skills could plausibly activate on the new skill's Q4 prompts.
 
-For each candidate returned, ask: *can you write a realistic user prompt that should route to the new skill but could plausibly activate the candidate instead?*
+For each plausible candidate, ask: *can you write a realistic user prompt that should route to the new skill but could plausibly activate the candidate instead?*
 
 - If no candidate survives this test → **there is no routing collision. Go to new-skill path. Stop.**
 - If at least one survives → that is the peer. Continue to Step 2.
@@ -43,9 +44,11 @@ If the verdict is SPLIT, the contributor must name the peer(s) considered and ci
 
 ## Worked example
 
+This example walks the tree for an **ambiguous new-skill** request — the case where Phase 0's Gate C doesn't fast-path, so the full decision applies. (Clear-extend requests skip the tree via Gate C; clear name collisions halt at Gate B.)
+
 - Survey answers: bucket = Monitoring, surface = BigQuery INFORMATION_SCHEMA, purpose = "detect stale partitions," phrasings = ["find stale partitions", "partition freshness"].
-- Peer search returns: `monitoring-advisor`, `tune-monitor`.
-- Step 1: `monitoring-advisor` passes the collision test (prompt "find stale partitions" could plausibly activate it). Continue.
-- Step 2: `monitoring-advisor`'s combined front-matter is 920 chars. Adding a 180-char bullet = 1,100. OK, no budget pressure.
-- Step 3: same bucket (Monitoring), same primary surface (BigQuery), output overlaps (monitor recommendations). No surface pressure.
+- Peer dump shows: `monitoring-advisor`, `tune-monitor`, and others.
+- Step 1: `monitoring-advisor`'s current scope ("create monitors for warehouse tables") plausibly activates on "find stale partitions." Peer survives. Continue.
+- Step 2: measure `monitoring-advisor`'s actual combined `description + when_to_use` length and add the proposed bullet. If the sum stays under 1,400, no budget pressure. Continue.
+- Step 3: same bucket (Monitoring), same primary surface (warehouse table reads, BigQuery is a subset), output overlaps (monitor recommendations). No surface pressure.
 - Step 4: **extend** `monitoring-advisor` with the new phrasings.

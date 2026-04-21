@@ -2,87 +2,59 @@
 
 setup() {
   SCRIPT="$BATS_TEST_DIRNAME/../find-peers.sh"
-  CATALOG_A="$BATS_TEST_DIRNAME/fixtures/skills-catalog-a"
 }
 
-@test "returns matching peer when bucket and keyword match" {
-  run "$SCRIPT" --skills-dir "$CATALOG_A" --bucket "Incident Response" --keywords "alerts,lineage"
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"alpha"* ]]
-  [[ "$output" != *"beta"* ]]
-  [[ "$output" != *"gamma"* ]]
-}
-
-@test "returns multiple peers when multiple match the bucket" {
+@test "dumps frontmatter for every skill under the dir" {
   TMP=$(mktemp -d)
-  cp -r "$CATALOG_A"/* "$TMP/"
-  mkdir -p "$TMP/delta"
-  cat > "$TMP/delta/SKILL.md" <<'EOF'
+  mkdir -p "$TMP/alpha" "$TMP/beta"
+  cat > "$TMP/alpha/SKILL.md" <<'EOF'
 ---
-name: delta
-description: Proactive monitor coverage review. Activates on "coverage", "monitor gaps".
+name: alpha
+description: Alpha does X.
 when_to_use: |
-  Monitoring bucket.
+  When the user asks about X.
+---
+
+Body content here.
+EOF
+  cat > "$TMP/beta/SKILL.md" <<'EOF'
+---
+name: beta
+description: Beta does Y.
 ---
 EOF
-  run "$SCRIPT" --skills-dir "$TMP" --bucket "Monitoring" --keywords "monitor"
+  run "$SCRIPT" "$TMP"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"beta"* ]]
-  [[ "$output" == *"delta"* ]]
+  [[ "$output" == *"=== alpha ==="* ]]
+  [[ "$output" == *"=== beta ==="* ]]
+  [[ "$output" == *"description: Alpha does X."* ]]
+  [[ "$output" == *"description: Beta does Y."* ]]
+  [[ "$output" == *"When the user asks about X."* ]]
+  [[ "$output" != *"Body content here."* ]]
 }
 
-@test "returns empty when no peers match" {
-  run "$SCRIPT" --skills-dir "$CATALOG_A" --bucket "Trust" --keywords "asset,health"
-  [ "$status" -eq 0 ]
-  [ -z "$output" ]
-}
-
-@test "ranks peers by number of distinct keyword hits" {
-  TMP=$(mktemp -d)
-  mkdir -p "$TMP/one-hit" "$TMP/three-hit" "$TMP/two-hit"
-  cat > "$TMP/one-hit/SKILL.md" <<'EOF'
----
-name: one-hit
-description: Incident Response bucket. Mentions alerts only.
----
-EOF
-  cat > "$TMP/three-hit/SKILL.md" <<'EOF'
----
-name: three-hit
-description: Incident Response bucket. Mentions alerts, lineage, and freshness.
----
-EOF
-  cat > "$TMP/two-hit/SKILL.md" <<'EOF'
----
-name: two-hit
-description: Incident Response bucket. Mentions alerts and lineage.
----
-EOF
-  run "$SCRIPT" --skills-dir "$TMP" --bucket "Incident Response" --keywords "alerts,lineage,freshness"
-  [ "$status" -eq 0 ]
-  # Expect descending-hits order: three-hit (3), two-hit (2), one-hit (1)
-  expected=$'three-hit\ntwo-hit\none-hit'
-  [ "$output" = "$expected" ]
-}
-
-@test "breaks ties alphabetically" {
-  TMP=$(mktemp -d)
-  mkdir -p "$TMP/zebra" "$TMP/apple" "$TMP/mango"
-  for name in zebra apple mango; do
-    cat > "$TMP/$name/SKILL.md" <<EOF
----
-name: $name
-description: Monitoring bucket. Mentions monitor.
----
-EOF
-  done
-  run "$SCRIPT" --skills-dir "$TMP" --bucket "Monitoring" --keywords "monitor"
-  [ "$status" -eq 0 ]
-  expected=$'apple\nmango\nzebra'
-  [ "$output" = "$expected" ]
-}
-
-@test "exits 2 on missing arguments" {
-  run "$SCRIPT"
+@test "exits 2 when skills dir is missing" {
+  run "$SCRIPT" /nonexistent-path-$$
   [ "$status" -eq 2 ]
+}
+
+@test "exits 2 when skills dir has no SKILL.md files" {
+  TMP=$(mktemp -d)
+  run "$SCRIPT" "$TMP"
+  [ "$status" -eq 2 ]
+}
+
+@test "defaults to ./skills when no arg given" {
+  TMP=$(mktemp -d)
+  mkdir -p "$TMP/skills/gamma"
+  cat > "$TMP/skills/gamma/SKILL.md" <<'EOF'
+---
+name: gamma
+description: Gamma.
+---
+EOF
+  cd "$TMP"
+  run "$SCRIPT"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"=== gamma ==="* ]]
 }
