@@ -54,6 +54,10 @@ Plugins reference skills via symlinks so that skills are authored once and share
 
 ## Adding a new skill
 
+**Prefer `/skill-author`.** Repo contributors can run `/skill-author` in a Claude session at the repo root. It interviews you, applies the extend-or-split rules below, and walks the full registration checklist. Requires Anthropic's `skill-creator` plugin (`/plugin install skill-creator@claude-plugins-official`).
+
+Manual steps (if you prefer):
+
 1. Create a new directory under `skills/` with a kebab-case name (e.g., `skills/my-new-skill/`).
 2. Add a `SKILL.md` with valid YAML frontmatter (`name` and `description` are required). Follow the [Agent Skills specification](https://agentskills.io) and the [Skill authoring standards](#skill-authoring-standards) below.
 3. Optionally add supporting directories: `scripts/`, `references/`, `assets/`.
