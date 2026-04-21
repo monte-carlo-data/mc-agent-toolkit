@@ -5,6 +5,12 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Claude Code will
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.1] - 2026-04-20
+
+### Fixed
+
+- Plugin update failed on 1.8.0 with `commands path not found` for `incident-response` and `proactive-monitoring`. The 1.8.0 manifest declared these command paths but the directories were never committed. Added the missing `/monte-carlo-incident-response` and `/monte-carlo-proactive-monitoring` slash-command files so the paths resolve and the workflows documented in `/mc` are actually invokable.
+
 ## [1.8.0] - 2026-04-20
 
 ### Added
