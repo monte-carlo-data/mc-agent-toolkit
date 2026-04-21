@@ -14,4 +14,3 @@ temp/
 __pycache__/
 *.pyc
 .work/
-/docs/
