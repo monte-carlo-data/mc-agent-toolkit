@@ -26,7 +26,7 @@ You are being invoked by mc-agent-toolkit's `/skill-author` with pre-collected c
 - Third-person voice. Describe what the skill does, not what "this skill" does.
 - Do **not** open with "This skill…" or "Use this skill when…".
 - Do **not** use the "pushy" voice pattern ("Make sure to use this skill whenever…"); use concrete triggers instead.
-- `name` is kebab-case, matches `{{NAME}}`.
+- `name` is `monte-carlo-{{NAME}}` (the canonical prefixed form; `{{NAME}}` is the directory name).
 - `when_to_use` is required (not optional).
 
 **Eval artifacts are scratch, not shipped:**

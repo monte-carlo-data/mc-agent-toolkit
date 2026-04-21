@@ -54,7 +54,7 @@ done
 
 # Scripts run without crashing on valid input
 assert_script_runs "find-peers.sh dumps skills" bash "$SKILL_DIR/scripts/find-peers.sh" skills
-assert_script_runs "lint-skill.py accepts a known skill" python3 "$SKILL_DIR/scripts/lint-skill.py" tune-monitor
+assert_script_runs "lint-skill.py accepts a compliant skill" python3 "$SKILL_DIR/scripts/lint-skill.py" monitoring-advisor
 
 if [ "$fail" -eq 0 ]; then
   echo "skill-author smoke test: OK"

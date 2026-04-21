@@ -54,9 +54,9 @@ Plugins reference skills via symlinks so that skills are authored once and share
 
 ## Adding a new skill
 
-**Prefer `/skill-author`.** Repo contributors can run `/skill-author` in a Claude session at the repo root. It interviews you, applies the extend-or-split rules below, and walks the full registration checklist. Requires Anthropic's `skill-creator` plugin (`/plugin install skill-creator@claude-plugins-official`).
+**You should use `/skill-author`.** Repo contributors can run `/skill-author` in a Claude session at the repo root. It interviews you, applies the extend-or-split rules below, and walks the full registration checklist. Requires Anthropic's `skill-creator` plugin (`/plugin install skill-creator@claude-plugins-official`).
 
-Manual steps (if you prefer):
+Manual steps (only if `/skill-author` is unavailable):
 
 1. Create a new directory under `skills/` with a kebab-case name (e.g., `skills/my-new-skill/`).
 2. Add a `SKILL.md` with valid YAML frontmatter (`name` and `description` are required). Follow the [Agent Skills specification](https://agentskills.io) and the [Skill authoring standards](#skill-authoring-standards) below.
@@ -139,10 +139,12 @@ Example: if adding a skill that acts on alerts, explicitly call out how it diffe
 
 ### Naming
 
-- Use kebab-case (e.g., `monitoring-advisor`, not `MonitoringAdvisor`).
-- Keep names short and verb- or noun-phrase based.
+Applies to customer-facing skills under `skills/`. Dev-only skills under `.claude/skills/` (e.g., `skill-author`) are out of scope — they aren't shipped to customers and don't need the prefix.
 
-The existing skill catalog has an inconsistency between `monte-carlo-*`-prefixed names and bare names (carried over from separate authoring contexts). Standardization will happen in a dedicated follow-up; for now, match the convention used by neighboring skills in the same bucket.
+- Directory names are kebab-case (e.g., `monitoring-advisor`, not `MonitoringAdvisor`). Keep them short and verb- or noun-phrase based.
+- The `name` field inside `SKILL.md` frontmatter is the canonical form **`monte-carlo-<directory>`** (e.g., directory `monitoring-advisor` → `name: monte-carlo-monitoring-advisor`). `lint-skill.py` enforces this; `/skill-author` produces it automatically.
+
+A few existing skills in `skills/` (`connection-auth-rules`, `generate-validation-notebook`, `push-ingestion`, `tune-monitor`) still use bare names and are tech debt to be renamed in a follow-up.
 
 ### Orchestration registration
 

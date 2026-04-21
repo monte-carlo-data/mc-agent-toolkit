@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
-"""Lint a skill's SKILL.md frontmatter against mc-agent-toolkit standards.
+"""Lint a customer-facing skill's SKILL.md frontmatter against mc-agent-toolkit standards.
+
+Scope: skills under `skills/`. Dev-only skills under `.claude/skills/` (e.g., skill-author
+itself) are out of scope and not required to follow the prefix rule — don't point this
+script at them.
 
 Parses YAML frontmatter (handles scalar, block, and folded forms), then checks:
-- name matches directory and is kebab-case
+- name equals `monte-carlo-<dir>` (canonical) and is kebab-case
 - description present, <= 1024 chars, no first-person opener
 - when_to_use present (strongly recommended per CONTRIBUTING)
 - combined description + when_to_use <= 1400 chars (headroom under 1536 truncation)
@@ -74,8 +78,12 @@ def lint(name: str, skills_root: Path) -> tuple[list[str], list[str]]:
     warnings: list[str] = []
 
     actual_name = fm.get("name", "")
-    if actual_name != name:
-        errors.append(f"name '{actual_name}' does not match directory '{name}'")
+    expected = f"monte-carlo-{name}"
+    if actual_name != expected:
+        errors.append(
+            f"name '{actual_name}' should be '{expected}' "
+            f"(canonical form: 'monte-carlo-<directory>')"
+        )
     if actual_name and not KEBAB_RE.match(actual_name):
         errors.append(f"name '{actual_name}' is not kebab-case")
 

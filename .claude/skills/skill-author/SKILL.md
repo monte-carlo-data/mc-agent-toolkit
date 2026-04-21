@@ -118,12 +118,14 @@ Continue to the shared version-bump step.
 
 ### Propose name
 
-Suggest 2–3 kebab-case candidates. Short is better. Re-run Gate B against each candidate:
+Suggest 2–3 kebab-case **directory names**. Short is better. Re-run Gate B against each candidate:
 
 - Exact match → drop the candidate.
 - Near match (token-overlap with any existing skill) → drop or explicitly flag.
 
 Only present candidates that survive Gate B. Wait for the contributor to pick one. Before handoff, re-verify `skills/<chosen>/` does not exist.
+
+**Note the two-level naming:** the directory is `skills/<chosen>/`, but the `name` field inside the generated SKILL.md frontmatter should be `monte-carlo-<chosen>` — the canonical prefixed form. The handoff preamble passes both, and `lint-skill.py` verifies them after scaffold.
 
 ### Handoff to `skill-creator`
 
