@@ -5,7 +5,7 @@ This is the template `skill-author` uses when invoking Anthropic's `skill-creato
 ## Template
 
 You are being invoked by mc-agent-toolkit's `/skill-author` with pre-collected context.
-**Use the pre-filled answers below. Minimize follow-up questions. Do not run your eval/iterate loop — this repo uses a separate evals framework.**
+**Use the pre-filled answers below to skip your initial interview. Then run your full workflow — test cases, iterate loop, and description optimizer — using the answers as the starting draft. If the contributor tells you mid-flow to skip iteration ("just vibe with me"), honor that.**
 
 **Mode:** {{NEW_SKILL | IMPROVE_EXISTING}}
 
@@ -29,16 +29,15 @@ You are being invoked by mc-agent-toolkit's `/skill-author` with pre-collected c
 - `name` is kebab-case, matches `{{NAME}}`.
 - `when_to_use` is required (not optional).
 
-**Scaffold only:**
-- Produce `skills/{{NAME}}/SKILL.md` and, if the workflow warrants, `references/` files.
-- Do **not** create `evals/evals.json`. MC uses `plugins/claude-code/evals/{{NAME}}/` (handled by `skill-author` post-step).
-- Do **not** run subagents, benchmarks, or the A/B description optimizer. `skill-author` orchestrates those separately if at all.
+**Eval artifacts are scratch, not shipped:**
+- Your `skills/{{NAME}}/evals/evals.json` and sibling `skills/{{NAME}}-workspace/` drive the iteration loop but are not the repo's eval format. `skill-author` will delete them after you return.
+- mc-agent-toolkit's real evals live at `plugins/claude-code/evals/{{NAME}}/` with a different schema (trace-based: `must_call`, `must_not_call`, `judge_rubric`). Authoring those is handled by `skill-author` as a separate registration step — don't attempt to write that format yourself.
 
-**When done:** return control to `skill-author`. It will lint the generated SKILL.md and walk the registration checklist.
+**When done:** return control to `skill-author`. It will lint the generated SKILL.md, clean up scratch artifacts, and walk the registration checklist.
 
 ## Improve-existing mode differences
 
 When `{{MODE}} == IMPROVE_EXISTING`:
 - **Target path:** the existing `skills/{{PEER_NAME}}/` (edit in place, not new scaffold).
 - **Pre-filled answers** describe the *extension*, not a new skill.
-- Otherwise identical: same voice rules, skip evals, skip iterate loop.
+- Otherwise identical: same voice rules, same full workflow, same scratch-artifact cleanup.

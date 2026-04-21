@@ -1,6 +1,7 @@
 ---
 name: skill-author
 description: Authors or extends a skill in mc-agent-toolkit. Interviews the contributor, applies CONTRIBUTING's extend-or-split rules, then edits a peer skill or hands off to Anthropic's skill-creator and walks the registration checklist.
+disable-model-invocation: true
 when_to_use: |
   Invoked explicitly as /skill-author when a contributor wants to add, extend, or draft a new skill for mc-agent-toolkit. Not auto-routed. Requires Anthropic's skills-creator plugin to be installed.
 ---
@@ -9,11 +10,17 @@ when_to_use: |
 
 ## Pre-load
 
-Before anything else, run the prereq check. Abort immediately on non-zero exit — do not proceed to the survey if prereqs fail.
+Confirm `CONTRIBUTING.md` is present at the repo root. Abort on failure — the skill can't operate without the authoring rules.
 
 ```bash
-!bash .claude/skills/skill-author/scripts/check-prereqs.sh
+!test -f CONTRIBUTING.md || (echo "CONTRIBUTING.md missing at repo root — run /skill-author from inside mc-agent-toolkit." && exit 1)
 ```
+
+**Then verify `skill-creator` is callable in this session.** Scan the available-skills list in the current system reminders for a skill named `skill-creator` (may appear bare or namespaced, e.g. `skills-creator:skill-creator`). If it is not in the list, abort with **exactly this message, no extra explanation**:
+
+> `skill-creator` plugin is required. Run `/plugin install skill-creator@claude-plugins-official`, enable it, then restart this session and re-run `/skill-author`.
+
+Do **not** fall back to manually scaffolding SKILL.md — handing off to `skill-creator` is a core part of this workflow.
 
 Then load authoritative rules:
 
@@ -63,31 +70,23 @@ If the user overrides, capture their reason verbatim (it becomes part of the PR 
 
 Reached only when verdict is EXTEND.
 
-### Edit-scope sub-survey
-
-Ask: *Is this extension trivial or material?*
-- **Trivial** — one bullet added to `when_to_use`, or a single-line `description` tweak.
-- **Material** — new `references/` file, body restructure, expanded activation surface.
-
-### Trivial path
-
-1. Draft the edit based on survey answers (use phrasings from Q4 verbatim in `when_to_use`).
-2. Show the unified diff against the peer's current `SKILL.md`.
-3. Wait for user confirmation.
-4. Apply the edit with `Edit` tool.
-5. **Proposed bump:** `patch`. Escalate to `minor` if the edit touches activation surface (phrasings in `description` or `when_to_use`, or any routing-relevant field). Surface the proposed level and reasoning to the user.
-
-### Material path
-
 Invoke Anthropic's `skill-creator` via the `Skill` tool in **improve-existing mode**, passing the handoff preamble from `references/handoff-preamble.md` with:
 - `MODE = IMPROVE_EXISTING`
 - `NAME = <peer name>`
 - `PEER_NAME = <peer name>`
 - Purpose/output/persona/disambiguation filled from survey answers.
 
+`skill-creator` runs its full workflow — test cases, iterate loop, and description optimizer. If the contributor wants a lighter-touch edit, they can tell `skill-creator` mid-flow to skip iteration.
+
 When `skill-creator` returns, the peer's `skills/<peer>/SKILL.md` has been updated in place.
 
-**Proposed bump:** `minor`.
+### Post-handoff cleanup
+
+Delete `skill-creator`'s scratch artifacts — they drove iteration but are not the repo's eval format:
+
+```bash
+!rm -rf skills/<peer>/evals/ skills/<peer>-workspace/
+```
 
 ### Partial registration review
 
@@ -128,7 +127,17 @@ Invoke `skill-creator` via the `Skill` tool using the handoff preamble from `ref
 - `PERSONA_WORKFLOW` from Q6.
 - `PEER_NAME, DISAMBIGUATION` from Q7.
 
-`skill-creator` will scaffold `skills/<name>/SKILL.md` (and possibly `references/` files). It should skip evals and minimize follow-up questions per preamble.
+`skill-creator` will scaffold `skills/<name>/SKILL.md` (and possibly `references/` files) and run its full workflow — test cases, iterate loop, and description optimizer. The pre-filled answers in the preamble let it skip the initial interview. If the contributor asks mid-flow for a lighter-touch pass, `skill-creator` honors that.
+
+### Post-handoff cleanup
+
+Delete `skill-creator`'s scratch artifacts — they drove iteration but are not the repo's eval format:
+
+```bash
+!rm -rf skills/<name>/evals/ skills/<name>-workspace/
+```
+
+The real eval file (`plugins/claude-code/evals/<name>/live-evals-dev.yaml`) is authored in the registration checklist step below.
 
 ### Lint generated SKILL.md
 
@@ -172,11 +181,10 @@ Continue to the shared version-bump step.
 
 Both Phase 2a and Phase 2b converge here.
 
-1. Present the proposed bump level (`patch` or `minor`) with a one-line reason:
+1. Present the proposed bump level (`patch` or `minor`) with a one-line reason, based on what actually changed:
    - "New skill: MINOR per CONTRIBUTING § Version bumping."
-   - "Material extend: MINOR per CONTRIBUTING."
-   - "Trivial extend: PATCH per CONTRIBUTING."
-   - "Trivial extend that changed activation surface: MINOR (escalated)."
+   - "Extend changed activation surface (phrasings in `description` or `when_to_use`): MINOR per CONTRIBUTING."
+   - "Extend did not touch activation surface: PATCH per CONTRIBUTING."
 2. Ask: "Proceed with this level, or override?" Valid overrides: `patch`, `minor`, `major`.
 3. Run:
    ```bash

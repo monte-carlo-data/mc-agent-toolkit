@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Find peer skills by bucket + keyword overlap.
+# Ranks by number of distinct keywords matched (descending); ties broken alphabetically.
 # Outputs one peer-name per line (possibly empty).
 set -euo pipefail
 
@@ -24,6 +25,7 @@ fi
 bucket_lc="$(echo "$BUCKET" | tr '[:upper:]' '[:lower:]')"
 IFS=',' read -ra kw_arr <<< "$KEYWORDS"
 
+ranked=""
 for skill_dir in "$SKILLS_DIR"/*/; do
   [ -d "$skill_dir" ] || continue
   sm="$skill_dir/SKILL.md"
@@ -35,16 +37,21 @@ for skill_dir in "$SKILLS_DIR"/*/; do
     continue
   fi
 
-  matched=0
+  hits=0
   for kw in "${kw_arr[@]}"; do
     kw_lc="$(echo "$kw" | tr '[:upper:]' '[:lower:]' | xargs)"
     [ -z "$kw_lc" ] && continue
     if echo "$content_lc" | grep -qF "$kw_lc"; then
-      matched=1
-      break
+      hits=$((hits + 1))
     fi
   done
-  [ "$matched" -eq 1 ] || continue
+  [ "$hits" -gt 0 ] || continue
 
-  basename "$skill_dir"
+  name="$(basename "$skill_dir")"
+  ranked+="$(printf '%d\t%s' "$hits" "$name")"$'\n'
 done
+
+[ -z "$ranked" ] && exit 0
+
+# Sort by hits desc, then name asc. Emit names only.
+printf '%s' "$ranked" | sort -t$'\t' -k1,1nr -k2,2 | awk -F'\t' '{print $2}'
