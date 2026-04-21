@@ -21,7 +21,7 @@ fi
 
 REMOTE="$(cd "$REPO_ROOT" && git remote get-url origin 2>/dev/null || true)"
 if [[ "$REMOTE" != *"agent-toolkit"* ]] && [[ "$(basename "$REPO_ROOT")" != *"agent-toolkit"* ]]; then
-  echo "Current repo is not mcd-agent-toolkit (remote: $REMOTE). Run /skill-author from inside mcd-agent-toolkit." >&2
+  echo "Current repo is not mc-agent-toolkit (remote: $REMOTE). Run /skill-author from inside mc-agent-toolkit." >&2
   exit 3
 fi
 

@@ -4,12 +4,12 @@ This is the template `skill-author` uses when invoking Anthropic's `skill-creato
 
 ## Template
 
-You are being invoked by mcd-agent-toolkit's `/skill-author` with pre-collected context.
+You are being invoked by mc-agent-toolkit's `/skill-author` with pre-collected context.
 **Use the pre-filled answers below. Minimize follow-up questions. Do not run your eval/iterate loop — this repo uses a separate evals framework.**
 
 **Mode:** {{NEW_SKILL | IMPROVE_EXISTING}}
 
-**Target path:** `skills/{{NAME}}/` in the mcd-agent-toolkit repo (not your default workspace).
+**Target path:** `skills/{{NAME}}/` in the mc-agent-toolkit repo (not your default workspace).
 
 **Pre-filled answers:**
 - What should this skill enable Claude to do? {{PURPOSE}}
