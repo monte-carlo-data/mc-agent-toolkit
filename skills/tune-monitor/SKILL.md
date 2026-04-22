@@ -20,6 +20,23 @@ them:
 
 ---
 
+## Prerequisites
+
+- **Required:** Monte Carlo MCP server (`monte-carlo-mcp`) must be configured and authenticated
+
+---
+
+## Available MCP tools
+
+| Tool | Purpose |
+|---|---|
+| `get_monitor_report` | Fetch a monitor's alert history, incident details, and troubleshooting summaries |
+| `get_monitors` | Fetch monitor configuration (type, thresholds, schedule, segments) |
+| `create_metric_monitor` | Update a metric monitor's configuration (used in Phase 5) |
+| `create_custom_rule` | Update a custom SQL monitor's configuration (used in Phase 5) |
+
+---
+
 ## Phase 0: Validate Input
 
 Extract the monitor UUID from `$ARGUMENTS`. It must be a valid UUID (format:
