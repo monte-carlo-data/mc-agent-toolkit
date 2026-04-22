@@ -1,10 +1,10 @@
 # Handoff preamble for Anthropic's `skill-creator`
 
-This is the template `skill-author` uses when invoking Anthropic's `skill-creator` via the `Skill` tool. Claude fills in the bracketed placeholders from survey answers.
+This is the template `toolkit-skill-author` uses when invoking Anthropic's `skill-creator` via the `Skill` tool. Claude fills in the bracketed placeholders from survey answers.
 
 ## Template
 
-You are being invoked by mc-agent-toolkit's `/skill-author` with pre-collected context.
+You are being invoked by mc-agent-toolkit's `/toolkit-skill-author` with pre-collected context.
 **Use the pre-filled answers below to skip your initial interview. Then run your full workflow — test cases, iterate loop, and description optimizer — using the answers as the starting draft. If the contributor tells you mid-flow to skip iteration ("just vibe with me"), honor that.**
 
 **Mode:** {{NEW_SKILL | IMPROVE_EXISTING}}
@@ -33,13 +33,13 @@ You are being invoked by mc-agent-toolkit's `/skill-author` with pre-collected c
 - `description`: per the length rule above.
 - `when_to_use`: required (not optional).
 - `bucket`: `{{BUCKET}}` — one of Trust / Incident Response / Monitoring / Prevent / Optimize / Setup. Tracks which capability bucket the skill belongs to in the public docs.
-- Do **not** emit a `version` field. Versions live in the plugin manifests (`plugins/*/.*-plugin/plugin.json`), not in SKILL.md. `skill-author` will bump them separately via `scripts/bump-version.sh` after you return.
+- Do **not** emit a `version` field. Versions live in the plugin manifests (`plugins/*/.*-plugin/plugin.json`), not in SKILL.md. `toolkit-skill-author` will bump them separately via `scripts/bump-version.sh` after you return.
 
 **Eval artifacts are scratch, not shipped:**
-- Your `skills/{{NAME}}/evals/evals.json` and sibling `skills/{{NAME}}-workspace/` drive the iteration loop but are not the repo's eval format. `skill-author` will delete them after you return.
-- mc-agent-toolkit's real evals live at `plugins/claude-code/evals/{{NAME}}/live-evals-dev.yaml` — a YAML schema with `cases: [{ id, turns: [{ prompt, criteria: { must_call, must_not_call } }], criteria: { judge_rubric } }]`. Authoring that file is handled by `skill-author` in the registration checklist — don't attempt to write it yourself, and don't produce a `trigger-evals.json` or any JSON variant.
+- Your `skills/{{NAME}}/evals/evals.json` and sibling `skills/{{NAME}}-workspace/` drive the iteration loop but are not the repo's eval format. `toolkit-skill-author` will delete them after you return.
+- mc-agent-toolkit's real evals live at `plugins/claude-code/evals/{{NAME}}/live-evals-dev.yaml` — a YAML schema with `cases: [{ id, turns: [{ prompt, criteria: { must_call, must_not_call } }], criteria: { judge_rubric } }]`. Authoring that file is handled by `toolkit-skill-author` in the registration checklist — don't attempt to write it yourself, and don't produce a `trigger-evals.json` or any JSON variant.
 
-**When done:** return control to `skill-author`. It will lint the generated SKILL.md, clean up scratch artifacts, and walk the registration checklist.
+**When done:** return control to `toolkit-skill-author`. It will lint the generated SKILL.md, clean up scratch artifacts, and walk the registration checklist.
 
 ## Improve-existing mode differences
 

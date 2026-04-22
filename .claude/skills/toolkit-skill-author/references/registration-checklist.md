@@ -1,6 +1,6 @@
 # Registration checklist
 
-After Phase 2a (extend) or Phase 2b (new skill), walk the relevant subset of these steps. `skill-author` tracks each as a TodoWrite item and confirms before writing any file.
+After Phase 2a (extend) or Phase 2b (new skill), walk the relevant subset of these steps. `toolkit-skill-author` tracks each as a TodoWrite item and confirms before writing any file.
 
 ## Full checklist (new skill)
 
@@ -44,7 +44,7 @@ No symlink or commands changes for extend (they already exist for the peer).
 
 ## Setup-bucket confirmation prompt
 
-When Q1 = Setup, `skill-author` prompts:
+When Q1 = Setup, `toolkit-skill-author` prompts:
 
 > Setup skills are exempt from signal-definitions and `/mc` catalog registration per `CONTRIBUTING § Capability buckets`. Skip these steps? [Y/n]
 
@@ -58,4 +58,4 @@ After the relevant registration subset, run:
 ./scripts/bump-version.sh <patch|minor>
 ```
 
-See `CONTRIBUTING.md § Version bumping` for semver rules. `skill-author` proposes the level; user can override.
+See `CONTRIBUTING.md § Version bumping` for semver rules. `toolkit-skill-author` proposes the level; user can override.

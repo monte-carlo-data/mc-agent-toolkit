@@ -1,12 +1,12 @@
 ---
-name: skill-author
+name: toolkit-skill-author
 description: Authors or extends a skill in mc-agent-toolkit. Gates for forbidden buckets and name collisions, applies CONTRIBUTING's extend-or-split rules, then edits a peer skill or hands off to Anthropic's skill-creator and walks the registration checklist.
 disable-model-invocation: true
 when_to_use: |
-  Invoked explicitly as /skill-author when a contributor wants to add, extend, or draft a new skill for mc-agent-toolkit. Not auto-routed. Requires Anthropic's skill-creator plugin.
+  Invoked explicitly as /toolkit-skill-author when a contributor wants to add, extend, or draft a new skill for mc-agent-toolkit. Not auto-routed. Requires Anthropic's skill-creator plugin.
 ---
 
-# skill-author
+# toolkit-skill-author
 
 ## Pre-load
 
@@ -16,7 +16,7 @@ when_to_use: |
 
 **Verify `skill-creator` is callable in this session.** Scan the available-skills list for a skill named `skill-creator` (bare or namespaced, e.g. `skill-creator:skill-creator`). If absent, abort with **exactly this message**:
 
-> `skill-creator` plugin is required. Run `/plugin install skill-creator@claude-plugins-official`, enable it, then restart this session and re-run `/skill-author`.
+> `skill-creator` plugin is required. Run `/plugin install skill-creator@claude-plugins-official`, enable it, then restart this session and re-run `/toolkit-skill-author`.
 
 Do **not** fall back to manually scaffolding SKILL.md — the handoff is core to the workflow.
 
@@ -24,12 +24,12 @@ Load authoritative context:
 
 ```bash
 !cat CONTRIBUTING.md
-!bash .claude/skills/skill-author/scripts/find-peers.sh skills
+!bash .claude/skills/toolkit-skill-author/scripts/find-peers.sh skills
 ```
 
-- @.claude/skills/skill-author/references/decision-rules.md
-- @.claude/skills/skill-author/references/handoff-preamble.md
-- @.claude/skills/skill-author/references/registration-checklist.md
+- @.claude/skills/toolkit-skill-author/references/decision-rules.md
+- @.claude/skills/toolkit-skill-author/references/handoff-preamble.md
+- @.claude/skills/toolkit-skill-author/references/registration-checklist.md
 
 ## Phase 0 — Parse intent and apply gates
 
@@ -45,7 +45,7 @@ Apply the gates below **before** any survey question. Each gate halts when it fi
 
 If `bucket` is `Agent-routing` (or a synonym like "agent routing", "routing skill"), refuse:
 
-> Agent-routing skills are owned by the toolkit core team per `CONTRIBUTING § Capability buckets` — not authored via `/skill-author`. Halting.
+> Agent-routing skills are owned by the toolkit core team per `CONTRIBUTING § Capability buckets` — not authored via `/toolkit-skill-author`. Halting.
 
 Do not proceed. If `bucket` is unstated, this gate re-applies after Q1.
 
@@ -59,7 +59,7 @@ If `action` is `new` and `target_name` is given, lowercase both `target_name` an
 ### Gate C — Fast-path for clear extend
 
 If `action` is `extend` and `target_name` names an existing skill:
-- **Re-check the bucket.** If `target_name` is one of the agent-routing skills (`context-detection`, `incident-response`, `proactive-monitoring`), fire Gate A's refusal — those are owned by the core team and cannot be extended via `/skill-author` either.
+- **Re-check the bucket.** If `target_name` is one of the agent-routing skills (`context-detection`, `incident-response`, `proactive-monitoring`), fire Gate A's refusal — those are owned by the core team and cannot be extended via `/toolkit-skill-author` either.
 - Otherwise: skip the Phase 1 survey, use the initial prompt as the extension description, and jump directly to **Phase 2a — Extend**. If the prompt is missing fields the handoff preamble needs (purpose, phrasings, output artifact), ask only for those specific fields — do not re-run the full Q1–Q4 survey.
 
 Otherwise, continue to Phase 1. **New-skill requests always run the decision tree** — the gate against hidden collisions is the tree itself.
@@ -96,7 +96,7 @@ When `skill-creator` returns:
 
 ```bash
 !rm -rf skills/<peer>/evals/ skills/<peer>-workspace/
-!python3 .claude/skills/skill-author/scripts/lint-skill.py <peer>
+!python3 .claude/skills/toolkit-skill-author/scripts/lint-skill.py <peer>
 ```
 
 Scratch-artifact cleanup removes skill-creator's iteration files (they drove the loop but aren't the repo's eval format). Lint surfaces any frontmatter violations.
@@ -135,7 +135,7 @@ When `skill-creator` returns:
 
 ```bash
 !rm -rf skills/<name>/evals/ skills/<name>-workspace/
-!python3 .claude/skills/skill-author/scripts/lint-skill.py <name>
+!python3 .claude/skills/toolkit-skill-author/scripts/lint-skill.py <name>
 ```
 
 If lint prints ERROR lines, surface them and wait for the contributor to fix (manually or via a regenerate pass) before proceeding.

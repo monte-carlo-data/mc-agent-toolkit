@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Lint a customer-facing skill's SKILL.md frontmatter against mc-agent-toolkit standards.
 
-Scope: skills under `skills/`. Dev-only skills under `.claude/skills/` (e.g., skill-author
+Scope: skills under `skills/`. Dev-only skills under `.claude/skills/` (e.g., toolkit-skill-author
 itself) are out of scope and not required to follow the prefix rule — don't point this
 script at them.
 
@@ -32,7 +32,7 @@ VALID_BUCKETS = {
     "Optimize",
     "Setup",
     # Agent-routing skills are outside the user-facing capability buckets
-    # (orchestrators, owned by the toolkit core team). /skill-author blocks
+    # (orchestrators, owned by the toolkit core team). /toolkit-skill-author blocks
     # new ones at Gate A, but existing routers still carry this bucket value.
     "Agent-routing",
 }

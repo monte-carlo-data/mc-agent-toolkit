@@ -54,9 +54,9 @@ Plugins reference skills via symlinks so that skills are authored once and share
 
 ## Adding a new skill
 
-**You should use `/skill-author`.** Repo contributors can run `/skill-author` in a Claude session at the repo root. It interviews you, applies the extend-or-split rules below, and walks the full registration checklist. Requires Anthropic's `skill-creator` plugin (`/plugin install skill-creator@claude-plugins-official`).
+**You should use `/toolkit-skill-author`.** Repo contributors can run `/toolkit-skill-author` in a Claude session at the repo root. It interviews you, applies the extend-or-split rules below, and walks the full registration checklist. Requires Anthropic's `skill-creator` plugin (`/plugin install skill-creator@claude-plugins-official`).
 
-Manual steps (only if `/skill-author` is unavailable):
+Manual steps (only if `/toolkit-skill-author` is unavailable):
 
 1. Create a new directory under `skills/` with a kebab-case name (e.g., `skills/my-new-skill/`).
 2. Add a `SKILL.md` with valid YAML frontmatter (`name` and `description` are required). Follow the [Agent Skills specification](https://agentskills.io) and the [Skill authoring standards](#skill-authoring-standards) below.
@@ -73,7 +73,7 @@ These standards exist so the toolkit stays coherent as it grows. New skill PRs s
 
 **Default: extend an existing skill.** Splitting is the exception — a new atomic skill is one more thing the router has to disambiguate, and one more entry in the catalog. Only split if a rule forces it.
 
-The full decision algorithm — 4-step test, collision detection, budget and surface checks — lives in [`.claude/skills/skill-author/references/decision-rules.md`](.claude/skills/skill-author/references/decision-rules.md). That file is the source of truth. Read it before authoring a new skill, or let `/skill-author` walk you through it.
+The full decision algorithm — 4-step test, collision detection, budget and surface checks — lives in [`.claude/skills/toolkit-skill-author/references/decision-rules.md`](.claude/skills/toolkit-skill-author/references/decision-rules.md). That file is the source of truth. Read it before authoring a new skill, or let `/toolkit-skill-author` walk you through it.
 
 **PR requirement.** If you split, name the peer(s) you considered in the PR description and point to which step of the decision-rules forced the split. If none did, extend.
 
@@ -141,10 +141,10 @@ Example: if adding a skill that acts on alerts, explicitly call out how it diffe
 
 ### Naming
 
-Applies to customer-facing skills under `skills/`. Dev-only skills under `.claude/skills/` (e.g., `skill-author`) are out of scope — they aren't shipped to customers and don't need the prefix.
+Applies to customer-facing skills under `skills/`. Dev-only skills under `.claude/skills/` (e.g., `toolkit-skill-author`) are out of scope — they aren't shipped to customers and don't need the prefix.
 
 - Directory names are kebab-case (e.g., `monitoring-advisor`, not `MonitoringAdvisor`). Keep them short and verb- or noun-phrase based.
-- The `name` field inside `SKILL.md` frontmatter is the canonical form **`monte-carlo-<directory>`** (e.g., directory `monitoring-advisor` → `name: monte-carlo-monitoring-advisor`). `lint-skill.py` enforces this; `/skill-author` produces it automatically.
+- The `name` field inside `SKILL.md` frontmatter is the canonical form **`monte-carlo-<directory>`** (e.g., directory `monitoring-advisor` → `name: monte-carlo-monitoring-advisor`). `lint-skill.py` enforces this; `/toolkit-skill-author` produces it automatically.
 
 A few existing skills in `skills/` (`connection-auth-rules`, `generate-validation-notebook`, `push-ingestion`, `tune-monitor`) still use bare names and are tech debt to be renamed in a follow-up.
 

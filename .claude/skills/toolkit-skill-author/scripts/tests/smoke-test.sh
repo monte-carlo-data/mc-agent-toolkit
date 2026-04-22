@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# Verify every path and script that skill-author's SKILL.md references still exists
+# Verify every path and script that toolkit-skill-author's SKILL.md references still exists
 # and behaves as expected. Catches drift when registration targets move or scripts
-# are renamed — without this, skill-author would fail silently mid-flow.
+# are renamed — without this, toolkit-skill-author would fail silently mid-flow.
 #
-# Run from repo root:  bash .claude/skills/skill-author/scripts/smoke-test.sh
+# Run from repo root:  bash .claude/skills/toolkit-skill-author/scripts/smoke-test.sh
 # Exits 0 on pass, 1 on any failure.
 set -u
 
-SKILL_DIR=".claude/skills/skill-author"
+SKILL_DIR=".claude/skills/toolkit-skill-author"
 fail=0
 
 assert_file() {
@@ -32,7 +32,7 @@ assert_script_runs() {
   fi
 }
 
-# Core skill-author files
+# Core toolkit-skill-author files
 assert_file "CONTRIBUTING.md"
 assert_file "$SKILL_DIR/SKILL.md"
 assert_file "$SKILL_DIR/references/decision-rules.md"
@@ -72,9 +72,9 @@ assert_script_runs "lint-skill.py accepts a compliant skill" python3 "$SKILL_DIR
 rm -rf "$FIXTURE"
 
 if [ "$fail" -eq 0 ]; then
-  echo "skill-author smoke test: OK"
+  echo "toolkit-skill-author smoke test: OK"
   exit 0
 else
-  echo "skill-author smoke test: FAILED"
+  echo "toolkit-skill-author smoke test: FAILED"
   exit 1
 fi

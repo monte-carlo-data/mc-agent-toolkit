@@ -4,7 +4,7 @@
 
 **Default:** extend an existing peer skill. Split only when a rule forces it.
 
-**Forbidden buckets.** Agent-routing skills are owned by the toolkit core team per `CONTRIBUTING § Capability buckets` — do not author them via `/skill-author`. If the contributor's Q1 answer is `Agent-routing`, halt and refuse before peer search. Do not proceed.
+**Forbidden buckets.** Agent-routing skills are owned by the toolkit core team per `CONTRIBUTING § Capability buckets` — do not author them via `/toolkit-skill-author`. If the contributor's Q1 answer is `Agent-routing`, halt and refuse before peer search. Do not proceed.
 
 ## The 4-step test
 
@@ -40,7 +40,7 @@ Phrasing overlap, "it feels like its own thing," or wanting a cleaner file are n
 
 ## PR requirement
 
-If the verdict is SPLIT, the contributor must name the peer(s) considered and cite which step forced the split. `skill-author` captures this as the override reason and surfaces it for the PR description.
+If the verdict is SPLIT, the contributor must name the peer(s) considered and cite which step forced the split. `toolkit-skill-author` captures this as the override reason and surfaces it for the PR description.
 
 ## Worked example
 
