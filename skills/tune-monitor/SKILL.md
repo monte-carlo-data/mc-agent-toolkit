@@ -68,13 +68,10 @@ From the `get_monitors` config response, determine the monitor type:
 file. The reference contains type-specific config fields to extract, recommendation guidance, and
 apply-changes instructions.
 
-If the monitor type is not metric or custom SQL, tell the user:
+If the monitor type is not metric or custom SQL, stop and tell the user:
 
-> This skill currently supports tuning metric monitors and custom SQL monitors. This monitor is a
-> {type} monitor — I can still analyze its report, but I won't have type-specific tuning
-> recommendations.
-
-Then proceed with Phase 2 using only the general recommendations from this file.
+> This skill supports tuning metric monitors and custom SQL monitors. This monitor is a {type}
+> monitor, which is not supported.
 
 ---
 
