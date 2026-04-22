@@ -6,6 +6,7 @@ description: |
   alert lookup, lineage tracing, ETL checks, query analysis, and data
   profiling. Activates when a user asks about data issues, incidents,
   alerts, or why data looks wrong.
+bucket: Incident Response
 version: 1.0.0
 ---
 

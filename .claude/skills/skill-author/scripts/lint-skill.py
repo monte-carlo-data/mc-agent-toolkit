@@ -10,6 +10,9 @@ Parses YAML frontmatter (handles scalar, block, and folded forms), then checks:
 - description present, <= 1024 chars, no first-person opener
 - when_to_use present (strongly recommended per CONTRIBUTING)
 - combined description + when_to_use <= 1400 chars (headroom under 1536 truncation)
+- bucket present and is one of the canonical capability buckets
+- `version` field WARN (ignored by Claude — plugin versions live in manifests —
+  but many legacy skills carry it; don't fail lint on that).
 
 Exits 0 if clean, 1 on any ERROR, 2 on usage / file errors.
 """
@@ -21,6 +24,18 @@ MAX_DESCRIPTION = 1024
 MAX_COMBINED = 1400
 FIRST_PERSON_RE = re.compile(r"^\s*(this skill|use this skill)", re.IGNORECASE)
 KEBAB_RE = re.compile(r"^[a-z][a-z0-9]*(-[a-z0-9]+)*$")
+VALID_BUCKETS = {
+    "Trust",
+    "Incident Response",
+    "Monitoring",
+    "Prevent",
+    "Optimize",
+    "Setup",
+    # Agent-routing skills are outside the user-facing capability buckets
+    # (orchestrators, owned by the toolkit core team). /skill-author blocks
+    # new ones at Gate A, but existing routers still carry this bucket value.
+    "Agent-routing",
+}
 
 
 def parse_frontmatter(text: str) -> dict[str, str]:
@@ -105,6 +120,23 @@ def lint(name: str, skills_root: Path) -> tuple[list[str], list[str]]:
         errors.append(
             f"description + when_to_use = {combined} chars "
             f"(max {MAX_COMBINED} for headroom under 1536 truncation)"
+        )
+
+    bucket = fm.get("bucket", "").strip()
+    if not bucket:
+        errors.append(
+            f"bucket is missing (required; one of: {', '.join(sorted(VALID_BUCKETS))})"
+        )
+    elif bucket not in VALID_BUCKETS:
+        errors.append(
+            f"bucket '{bucket}' is not a valid capability bucket "
+            f"(expected one of: {', '.join(sorted(VALID_BUCKETS))})"
+        )
+
+    if "version" in fm:
+        warnings.append(
+            "version field in SKILL.md is ignored by Claude — plugin versions "
+            "live in plugins/*/.*-plugin/plugin.json (new skills don't need it)"
         )
 
     print(f"skill: {name}")

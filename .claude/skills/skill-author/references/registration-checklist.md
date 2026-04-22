@@ -10,7 +10,22 @@ Use when Phase 2b concludes with a scaffolded `skills/<name>/SKILL.md`.
    *Skipped if bucket = Setup (after user confirmation).*
 2. **`/mc` catalog entry.** Append a row to `plugins/claude-code/commands/catalog/mc.md`.
    *Skipped if bucket = Setup (after user confirmation).*
-3. **Eval scaffold.** Create `plugins/claude-code/evals/<name>/` following the existing framework (see `plugins/claude-code/evals/<any-existing-skill>/` for structure). At minimum: a trigger-eval file with representative prompts collected in Phase 2b Q4.
+3. **Eval scaffold.** Create `plugins/claude-code/evals/<name>/live-evals-dev.yaml` using the YAML schema the repo already ships for every other skill. Read `plugins/claude-code/evals/monitoring-advisor/live-evals-dev.yaml` or `plugins/claude-code/evals/context-detection/live-evals-dev.yaml` as templates before writing. Schema:
+
+   ```yaml
+   cases:
+     - id: <slug-id>
+       turns:
+         - prompt: "<realistic user prompt>"
+           criteria:
+             must_call: [mcp_tool_1, mcp_tool_2]      # optional
+             must_not_call: [forbidden_tool]           # optional
+       criteria:
+         judge_rubric: |
+           <free-form description of desired behavior>
+   ```
+
+   Seed with the Q4 phrasings plus 2–3 should-not-trigger near-misses. Do **not** create `trigger-evals.json` or any other JSON variant — YAML is the canonical format.
 4. **Editor plugin symlinks.** For each editor in `plugins/` (claude-code, cursor, opencode, codex), add a relative symlink:
    ```
    plugins/<editor>/skills/<name> -> ../../../skills/<name>

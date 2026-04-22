@@ -102,17 +102,19 @@ Every `SKILL.md` requires the following frontmatter fields:
 
 ```yaml
 ---
-name: kebab-case-skill-name
+name: monte-carlo-kebab-case-skill-name
 description: |
   A one-paragraph description of what the skill does and when it activates.
 when_to_use: |
   Explicit activation cues and example user phrasings.
+bucket: Monitoring
 ---
 ```
 
-- `name` and `description` are required by Claude Code.
+- `name` and `description` are required by Claude Code. `name` is the canonical prefixed form (see [Naming](#naming)).
 - `when_to_use` is strongly recommended — it's a Claude-specific convention today but likely to be adopted by other editors.
-- Additional fields are allowed but ignored by Claude. Plugin versions live in the plugin manifests (`plugins/*/.*-plugin/plugin.json`) and are managed by `scripts/bump-version.sh`, not at the skill level.
+- `bucket` tracks which capability bucket the skill belongs to for the public docs. Valid values: Trust / Incident Response / Monitoring / Prevent / Optimize / Setup. Ignored by Claude at runtime — it's a catalog/docs hint.
+- A `version` field is ignored by Claude. Some existing skills carry it; new skills don't need it. Plugin versions live in the plugin manifests (`plugins/*/.*-plugin/plugin.json`) and are managed by `scripts/bump-version.sh` — those are what matter for release.
 
 ### Description hygiene
 

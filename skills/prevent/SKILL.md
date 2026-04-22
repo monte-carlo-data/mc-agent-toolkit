@@ -8,6 +8,7 @@ description: |
   logic. After a change is made, generates targeted SQL validation queries to
   verify the change behaved as intended. Do not wait to be asked: run the
   appropriate workflow as soon as a relevant file or table is referenced.
+bucket: Prevent
 version: 1.0.0
 ---
 

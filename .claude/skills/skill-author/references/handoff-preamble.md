@@ -19,6 +19,7 @@ You are being invoked by mc-agent-toolkit's `/skill-author` with pre-collected c
 **Body context (inform the SKILL.md body, do NOT copy verbatim into frontmatter):**
 - Persona / workflow: {{PERSONA_WORKFLOW}}
 - Disambiguation from nearest peer `{{PEER_NAME}}`: {{DISAMBIGUATION}}
+- Bucket: {{BUCKET}} (also emitted as the `bucket` frontmatter field — see below)
 
 **MC-specific voice and length rules (override your defaults):**
 - `description` ≤ 1,024 characters.
@@ -26,12 +27,17 @@ You are being invoked by mc-agent-toolkit's `/skill-author` with pre-collected c
 - Third-person voice. Describe what the skill does, not what "this skill" does.
 - Do **not** open with "This skill…" or "Use this skill when…".
 - Do **not** use the "pushy" voice pattern ("Make sure to use this skill whenever…"); use concrete triggers instead.
-- `name` is `monte-carlo-{{NAME}}` (the canonical prefixed form; `{{NAME}}` is the directory name).
-- `when_to_use` is required (not optional).
+
+**Required frontmatter fields (and fields NOT to emit):**
+- `name`: `monte-carlo-{{NAME}}` — canonical prefixed form; `{{NAME}}` is the directory name.
+- `description`: per the length rule above.
+- `when_to_use`: required (not optional).
+- `bucket`: `{{BUCKET}}` — one of Trust / Incident Response / Monitoring / Prevent / Optimize / Setup. Tracks which capability bucket the skill belongs to in the public docs.
+- Do **not** emit a `version` field. Versions live in the plugin manifests (`plugins/*/.*-plugin/plugin.json`), not in SKILL.md. `skill-author` will bump them separately via `scripts/bump-version.sh` after you return.
 
 **Eval artifacts are scratch, not shipped:**
 - Your `skills/{{NAME}}/evals/evals.json` and sibling `skills/{{NAME}}-workspace/` drive the iteration loop but are not the repo's eval format. `skill-author` will delete them after you return.
-- mc-agent-toolkit's real evals live at `plugins/claude-code/evals/{{NAME}}/` with a different schema (trace-based: `must_call`, `must_not_call`, `judge_rubric`). Authoring those is handled by `skill-author` as a separate registration step — don't attempt to write that format yourself.
+- mc-agent-toolkit's real evals live at `plugins/claude-code/evals/{{NAME}}/live-evals-dev.yaml` — a YAML schema with `cases: [{ id, turns: [{ prompt, criteria: { must_call, must_not_call } }], criteria: { judge_rubric } }]`. Authoring that file is handled by `skill-author` in the registration checklist — don't attempt to write it yourself, and don't produce a `trigger-evals.json` or any JSON variant.
 
 **When done:** return control to `skill-author`. It will lint the generated SKILL.md, clean up scratch artifacts, and walk the registration checklist.
 

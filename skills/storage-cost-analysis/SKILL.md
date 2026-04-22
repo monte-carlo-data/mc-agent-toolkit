@@ -5,6 +5,7 @@ description: |
   recommends safe cleanup actions with cost savings estimates. Uses lineage
   to verify downstream dependencies before recommending removal. Activates
   when a user asks about storage costs, unused tables, or warehouse cleanup.
+bucket: Optimize
 version: 1.0.0
 ---
 

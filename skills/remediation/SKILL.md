@@ -1,6 +1,7 @@
 ---
 name: monte-carlo-remediation
 description: Investigate and remediate data quality alerts using Monte Carlo MCP tools. Runs root cause analysis, assesses blast radius, discovers available tools (MCP/CLI/API), proposes and executes fixes, or escalates with full context when uncertain.
+bucket: Incident Response
 version: 1.0.0
 ---
 

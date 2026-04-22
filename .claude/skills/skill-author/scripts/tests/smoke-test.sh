@@ -54,7 +54,22 @@ done
 
 # Scripts run without crashing on valid input
 assert_script_runs "find-peers.sh dumps skills" bash "$SKILL_DIR/scripts/find-peers.sh" skills
-assert_script_runs "lint-skill.py accepts a compliant skill" python3 "$SKILL_DIR/scripts/lint-skill.py" monitoring-advisor
+
+# Lint against a synthetic compliant skill (real skills in skills/ have legacy
+# version/bucket debt that the linter correctly flags — not what this test
+# measures).
+FIXTURE=$(mktemp -d)
+mkdir -p "$FIXTURE/smoke-fixture"
+cat > "$FIXTURE/smoke-fixture/SKILL.md" <<'EOF'
+---
+name: monte-carlo-smoke-fixture
+description: A fixture skill for smoke-testing lint-skill.py.
+when_to_use: When smoke-testing.
+bucket: Monitoring
+---
+EOF
+assert_script_runs "lint-skill.py accepts a compliant skill" python3 "$SKILL_DIR/scripts/lint-skill.py" smoke-fixture "$FIXTURE"
+rm -rf "$FIXTURE"
 
 if [ "$fail" -eq 0 ]; then
   echo "skill-author smoke test: OK"

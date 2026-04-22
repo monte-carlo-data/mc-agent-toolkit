@@ -1,6 +1,7 @@
 ---
 name: monte-carlo-automated-triage
 description: Triage Monte Carlo alerts interactively or build an automated workflow. Fetch, score, and troubleshoot alerts using MCP tools now, or design a reusable workflow that runs on a schedule.
+bucket: Incident Response
 version: 1.1.1
 ---
 
