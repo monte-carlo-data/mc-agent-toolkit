@@ -33,6 +33,8 @@ If you already have the MCON:
 
 For monitor types that require a timestamp column (metric monitors), review the column names and identify likely timestamp candidates. Present them to the user if ambiguous.
 
+**CRITICAL: The `warehouse` parameter on creation tools is a UUID, not a name.** Extract it from the `get_table` response (the resource / warehouse UUID). If you only have a warehouse name and no MCON, call `get_warehouses` to resolve it -- NEVER pass a warehouse name string like `databricks-aws-agent` or `snowflake-prod`, the backend will reject with `Warehouse not found`.
+
 ### Step 3: Handle domain assignment
 
 **ALWAYS resolve a `domain_uuids` value BEFORE calling any creation tool.** Missing or empty domain assignment is one of the top failure modes — the backend will reject the monitor with `Domain assignment is required for this monitor. Please provide one and only one valid domain UUID.`
@@ -169,6 +171,7 @@ All tools are available via the `monte-carlo` MCP server.
 | `get_table`                     | Schema, stats, metadata, domain membership, capabilities     |
 | `get_validation_predicates`     | List available validation rule types for a warehouse         |
 | `get_domains`                   | List MC domains (only needed if table has no domain info)    |
+| `get_warehouses`                | Resolve warehouse UUIDs from names; needed when a name is the only identifier |
 | `create_metric_monitor_mac`     | Generate metric monitor YAML (dry-run)                       |
 | `create_validation_monitor_mac` | Generate validation monitor YAML (dry-run)                   |
 | `create_comparison_monitor_mac` | Generate comparison monitor YAML (dry-run)                   |
