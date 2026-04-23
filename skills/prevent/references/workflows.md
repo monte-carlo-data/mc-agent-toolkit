@@ -466,7 +466,14 @@ Instructions:
 Then tell the engineer:
 > "Validation queries saved to `validation/<table_name>_<timestamp>.sql`.
 > Replace `<YOUR_DEV_DATABASE>` with your dev database and run in Snowflake
-> or your preferred SQL client to verify the change behaved as expected."
+> or your preferred SQL client — or let me run them against your sandbox
+> now by saying `/mc-validate run`."
+
+**Always end Workflow 5 with the `/mc-validate run` offer**, regardless of how
+Workflow 5 was triggered (auto-activated or explicitly invoked). For YAML/docs-only
+diffs where no SQL validation is useful, skip query generation entirely and tell
+the engineer: "YAML-only diff; no SQL validation needed. `dbt test --select
+<model>` can still exercise newly-added schema tests."
 
 ---
 
@@ -476,3 +483,223 @@ Then tell the engineer:
 - Does not generate Monte Carlo notebook YAML
 - Does not trigger automatically — only on explicit engineer request
 - Does not activate if Workflow 4 has not run for this table in this session
+
+---
+
+## Workflow 6: Sandbox build — invoked by `/mc-validate run`
+
+**Trigger:** `/mc-validate run` (never automatic).
+
+**Required session context:** Workflow 5 has produced a `validation/<table>_<ts>.sql`
+for at least one changed model.
+
+### Goal
+
+Materialize the changed model(s) into the engineer's dev database with
+`dbt build --select <model>` so validation queries have something real to read
+from. Skip automatically for YAML/docs-only diffs.
+
+### Sequence
+
+1. **Find `profiles.yml`.** Check `~/.dbt/profiles.yml` first, then the dbt
+   project root (which is typically `analytics/` in MC's `dbt` repo — detect
+   the same way `generate-validation-notebook` does, by walking up from the
+   changed model file until a `dbt_project.yml` is found).
+
+2. **Resolve the active target** using the sandbox script:
+
+   ```bash
+   python3 ${CLAUDE_PLUGIN_ROOT}/skills/prevent/scripts/sandbox/parse_profiles.py <profiles.yml>
+   ```
+
+   On error (missing file, unparseable YAML, unresolvable target), skip this
+   step and ask the engineer for their dev database directly.
+
+3. **Classify the resolved database:**
+
+   ```bash
+   python3 ${CLAUDE_PLUGIN_ROOT}/skills/prevent/scripts/sandbox/classify_sandbox.py <database>
+   ```
+
+   Categories: `personal`, `dev`, `shared-dev`, `prod`, `unknown`.
+
+4. **Detect hard-coded `database:` in the model config:**
+
+   ```bash
+   python3 ${CLAUDE_PLUGIN_ROOT}/skills/prevent/scripts/sandbox/detect_hardcoded_db.py <model.sql>
+   ```
+
+   If a value is returned, surface it to the engineer and use it in place of
+   the profile's database for this model. Warn that the build will land in the
+   hard-coded location regardless of their profile.
+
+5. **Decide whether to build** (diff-aware):
+   - If the session diff is **YAML / markdown / docs only** → skip the build,
+     note "no rebuild needed for YAML-only change," continue to Workflow 7.
+   - Otherwise → prompt:
+
+     ```
+     Run `dbt build --select <model>` to rebuild into <database> before validating? [Y/n]
+     ```
+
+6. **Hard-stop for prod classification.** If the classifier returned `prod`
+   (or the hard-coded `database:` value classifies as `prod`) and the engineer
+   approves the build, **refuse**: "Target resolves to shared prod. Aborting
+   the build. Please fix your profiles.yml and re-run." Do not proceed.
+
+7. **Execute the build.** Run from the dbt project root:
+
+   ```bash
+   dbt build --select <model>
+   ```
+
+   For multiple models, pass them in one invocation: `--select m1 m2 m3`. Do
+   not add `--full-refresh` or `+<model>` unless the engineer explicitly asked.
+   Stream stdout to the user.
+
+8. **Handle test failures.** `dbt build` may succeed the run phase but fail
+   tests. Treat this as a soft block and prompt:
+
+   ```
+   ✓ run succeeded
+   ✗ N of M tests failed: <failing test names>
+
+   Tests failed. Run validation queries anyway? [y/N]
+   ```
+
+9. **Emit a session marker** on success (or on skip, with reason):
+
+   ```
+   <!-- MC_BUILD_RAN: <model_name> -->
+   ```
+
+### What this workflow does NOT do
+
+- Does not run `dbt run-operation`. If the engineer asks, refuse and instruct
+  them to run it manually.
+- Does not auto-add `--full-refresh` or `+<model>` cascades.
+- Does not attempt to recover from `dbt debug` / connection failures; surface
+  the error and stop.
+
+---
+
+## Workflow 7: Execute validation queries — invoked by `/mc-validate run`
+
+**Trigger:** `/mc-validate run` (never automatic).
+
+**Required session context:** Workflow 5 has produced a `validation/<table>_<ts>.sql`,
+and Workflow 6 has either completed (or been explicitly skipped with
+`--skip-build`, or been no-op'd for a YAML-only diff).
+
+### Goal
+
+Substitute the `<YOUR_DEV_DATABASE>` placeholder in the generated queries with
+a user-confirmed value, verify each query is read-only, execute them via the
+Snowflake MCP, and present per-query verdicts plus a consolidated summary.
+
+### Sequence
+
+1. **Propose a dev-database value.** If Workflow 6 resolved a database from
+   `profiles.yml` (step 2–4 there), reuse that value. Otherwise, the engineer
+   either passed `--dev-db <NAME>` or has not provided one — in which case
+   prompt for it.
+
+2. **Show the execution plan and require confirmation.** Scan the generated
+   SQL for fully-qualified references and list every database that will be
+   touched, so the engineer can see exactly where queries will run:
+
+   ```
+   Execution plan:
+
+     Dev database (from profiles.yml target 'prod'):
+       → PERSONAL_ACHEN   (classified: personal sandbox ✓)
+
+     Other databases referenced literally in queries:
+       → analytics        (used in N query)
+
+   Proceed? [Y / type new dev database / cancel]
+   ```
+
+   Advisory text varies by classification:
+   - `personal` / `dev` / `shared-dev` → `(classified: personal sandbox ✓)` etc.
+   - `prod` → `⚠ classified as prod — this doesn't look like a dev database`
+   - `unknown` → `(unrecognized — is this your dev database?)`
+
+   If the engineer types a new value, re-classify it and re-confirm before
+   continuing.
+
+3. **Substitute placeholders:**
+
+   ```bash
+   python3 ${CLAUDE_PLUGIN_ROOT}/skills/prevent/scripts/sandbox/substitute_placeholders.py \
+     validation/<table>_<ts>.sql --dev-db <CONFIRMED_DEV_DB>
+   ```
+
+   This writes `validation/<table>_<ts>.run.sql` and reports the count of
+   substitutions + the list of literal databases found.
+
+4. **Read-only pre-check** (mandatory):
+
+   ```bash
+   python3 ${CLAUDE_PLUGIN_ROOT}/skills/prevent/scripts/sandbox/readonly_check.py \
+     validation/<table>_<ts>.run.sql
+   ```
+
+   If the script exits non-zero, **abort execution**. Report the rejected
+   keyword and the query it came from. Do not send anything to Snowflake MCP.
+
+5. **Show the final SQL** (per query, as a fenced SQL block) to the engineer
+   before sending to Snowflake MCP. This is the last point at which they can
+   cancel.
+
+6. **Execute each query via Snowflake MCP** (e.g. the `mcp__snowflake__query`
+   tool — confirm the exact tool name available in the session). Apply a 60s
+   per-query timeout by default. On error (including timeout), continue with
+   remaining queries but mark the failed one.
+
+7. **Report per-query verdicts** using the "What to look for" comment block
+   attached to each query in the generated `.sql`:
+
+   - Print a short human heading per query (e.g. "Row count comparison: prod vs dev").
+   - Show the result as a compact table (cap 20 rows; truncate with a note
+     above 20).
+   - Emit one of `✅` / `⚠️` / `🔴` with a one-line reason grounded in the
+     "What to look for" comment — do not invent "healthy" from nothing.
+   - For `⚠️` and `🔴`, add a follow-up hint.
+
+8. **Consolidated summary** at the end, e.g.:
+
+   ```
+   ## Validation summary: <model>
+
+   ✅ Row count comparison
+   ✅ Sample data preview
+   ⚠️ Null rate on days_since_contract_start (4.2% null in dev — expected ~0%)
+   ✅ Core segmentation counts
+   ✅ Uniqueness check on account_id
+
+   Overall: 4 of 5 checks clean. 1 warning worth investigating before merging.
+   ```
+
+9. **Emit a session marker** per model after execution:
+
+   ```
+   <!-- MC_VALIDATE_RAN: <model_name> -->
+   ```
+
+### Multi-model behavior
+
+If Workflow 5 generated files for multiple models, run steps 3–8 per model
+with its own substituted file and its own verdicts section. Finish with a
+top-level summary listing one status line per model.
+
+### What this workflow does NOT do
+
+- Does not execute any statement that isn't read-only (rejected by step 4).
+- Does not guess a dev database when `profiles.yml` / `--dev-db` don't provide
+  one — it asks.
+- Does not fall back to any execution path other than Snowflake MCP unless
+  the MCP is unavailable, in which case it leaves the substituted `.run.sql`
+  on disk and tells the engineer to run it manually.
+- Does not re-run queries — each invocation is a fresh execution of all
+  queries in the current file.
