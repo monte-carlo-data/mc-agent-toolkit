@@ -191,6 +191,16 @@ Each workflow has detailed step-by-step instructions in `references/workflows.md
 **When:** Explicit engineer request only (e.g. "validate this change", "ready to commit").
 **What:** Generates 3-5 targeted SQL queries to verify the change behaved as intended. Uses Workflow 4 context — requires both impact assessment and file edit in session.
 
+### 6. Sandbox build — invoked by `/mc-validate run`
+
+**When:** Only when `/mc-validate run` is invoked by the engineer.
+**What:** Parses `profiles.yml`, classifies the active database, detects hard-coded `database:` in the model's `{{ config() }}`, then runs `dbt build --select <model>` into the engineer's dev database. Refuses to build against shared prod. Skipped automatically for YAML/docs-only diffs.
+
+### 7. Execute validation queries — invoked by `/mc-validate run`
+
+**When:** Only when `/mc-validate run` is invoked by the engineer, after (or alongside) Workflow 6.
+**What:** Substitutes `<YOUR_DEV_DATABASE>` in Workflow-5 output with a user-confirmed value, runs a read-only pre-check on every query, executes via the Snowflake MCP, and reports per-query verdicts plus a consolidated summary.
+
 ---
 
 ## Post-synthesis confirmation rules
@@ -249,3 +259,17 @@ Use only the table/model name (NOT the full MCON). This allows the plugin's hook
 to remind the engineer about monitor coverage at commit time. Only output this
 marker when the gap is specifically about the columns or logic being changed —
 not for general table-level monitor absence.
+
+### Sandbox build ran
+
+Emit after a successful `dbt build` in Workflow 6 (or after a deliberate skip
+— e.g. YAML-only diff — including the skip reason). One marker per model.
+
+<!-- MC_BUILD_RAN: <table_name> -->
+
+### Validation executed
+
+Emit after Workflow 7 finishes executing validation queries for a model,
+regardless of individual per-query verdicts. One marker per model.
+
+<!-- MC_VALIDATE_RAN: <table_name> -->
