@@ -111,6 +111,21 @@ When omitted, the monitor queries all rows on each run. This works well for smal
 - **NEVER** apply `FUTURE_TIMESTAMP_COUNT`, `PAST_TIMESTAMP_COUNT`, or `UNIX_ZERO_TIMESTAMP_COUNT` to non-timestamp columns.
 - When in doubt, `NULL_COUNT`, `NULL_RATE`, `UNIQUE_COUNT`, and `UNIQUE_RATE` are safe for any column type.
 
+### Common metric-name mistakes
+
+The `NUMERIC_*` prefix pattern covers mean/median/min/max/stddev but **not** sum: the metric is `SUM`, not `NUMERIC_SUM`. Backend rejects with `Invalid metric: NUMERIC_SUM`.
+
+Other names agents guess-and-get-wrong:
+
+| Guessed (wrong) | Use instead |
+|---|---|
+| `NUMERIC_SUM` | `SUM` |
+| `APPROX_DISTINCT_COUNT`, `COUNT_DISTINCT` | `UNIQUE_COUNT` |
+| `COUNT_NULL`, `NULLS` | `NULL_COUNT` |
+| `ROW_COUNT` (as a column metric) | `ROW_COUNT_CHANGE` (table-level only) |
+
+If the metric you want isn't in the compatibility matrix above, it doesn't exist — use the closest alternative or fall back to a custom SQL monitor.
+
 ---
 
 ## Alert Conditions
