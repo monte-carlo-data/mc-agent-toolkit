@@ -77,6 +77,15 @@ Based on the monitor type, read the detailed reference for parameter guidance:
 
 All reference files are in the same directory as this file.
 
+**CRITICAL: Enum values come from the per-type reference. Never invent them by analogy.** The tool call will be rejected if you pass an enum value that isn't in the backend's accepted set. This applies to every enum-shaped parameter:
+
+- `metric` (metric monitor, comparison monitor) — the per-type file lists the valid names; guessing by pattern fails (e.g. `NUMERIC_SUM` looks plausible but the real name is `SUM`; `APPROX_DISTINCT_COUNT` and `COUNT_DISTINCT` aren't valid — use `UNIQUE_COUNT`).
+- `operator` (metric, custom_sql, comparison) — stick to the list in the per-type reference; subsets apply per threshold type (e.g. Absolute Threshold in custom_sql supports fewer operators than the full set).
+- predicate `name` (validation monitor) — confirm with `get_validation_predicates` before using anything beyond the common ones; guessing predicates like `match_pattern` or `regex_match` without confirming fails with `Predicate '<name>' not supported`.
+- `schedule.type`, `aggregate_by`, `threshold type` — lowercase/uppercase and exact spelling matter; don't approximate.
+
+If you're unsure whether an enum value is valid, ask the user or fall back to the safest documented value (`AUTO` for operator, `UNIQUE_COUNT` / `NULL_COUNT` for metric, etc.) — never guess.
+
 ### Step 5: Ask about scheduling
 
 **Skip this step for table monitors.** Table monitors do not support the `schedule` field in MaC YAML -- adding it will cause a validation error on `montecarlo monitors apply`. Table monitor scheduling is managed automatically by Monte Carlo.
