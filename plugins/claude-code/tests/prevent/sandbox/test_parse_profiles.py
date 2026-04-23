@@ -113,3 +113,12 @@ def test_target_not_defined(tmp_path):
     code, _, err = _run(path)
     assert code == 1
     assert "ghost" in err
+
+
+def test_profile_not_found(tmp_path):
+    path = tmp_path / "profiles.yml"
+    path.write_text(TWO_TARGET)
+    code, _, err = _run(path, profile_name="nonexistent_profile")
+    assert code == 1
+    assert "nonexistent_profile" in err
+    assert "not found" in err.lower()

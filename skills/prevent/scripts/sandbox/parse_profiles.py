@@ -80,10 +80,12 @@ def parse(profiles_path: Path, profile: str | None, target: str | None) -> dict:
 
 
 def main() -> int:
-    p = argparse.ArgumentParser()
-    p.add_argument("profiles_path", type=Path)
-    p.add_argument("--profile", default=None)
-    p.add_argument("--target", default=None)
+    p = argparse.ArgumentParser(
+        description="Parse a dbt profiles.yml and emit the active target's resolved context as JSON."
+    )
+    p.add_argument("profiles_path", type=Path, help="Path to profiles.yml")
+    p.add_argument("--profile", default=None, help="Profile name (default: first profile in file)")
+    p.add_argument("--target", default=None, help="Target name (default: profile's 'target' field)")
     args = p.parse_args()
     try:
         result = parse(args.profiles_path, args.profile, args.target)
