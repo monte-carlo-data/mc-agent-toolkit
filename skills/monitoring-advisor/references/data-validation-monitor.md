@@ -196,6 +196,13 @@ Any predicate can be inverted by setting `"negated": true` in the predicate obje
 - **"status must be in [active, pending]"** becomes `in_set` with values `["active", "pending"]` and `negated: true` -- meaning "alert when status is NOT in [active, pending]".
 - **"id must not be null"** becomes `null` with `negated: false` -- meaning "alert when id IS null" (no inversion needed since the condition already matches invalid data).
 
+### Semantic gotchas
+
+Two constraints the backend enforces that don't show up in the predicate list:
+
+- **Predicate/field-type compatibility.** Predicates have a target data type. `is_not_a_number` (NaN detection), `is_negative`, `is_between_0_and_1`, `numeric_*` — these only work on numeric columns; the backend rejects them on string/text fields with messages like `'not a number (NaN)' does not support fields of type 'string'`. Same pattern for `is_future_date` on non-timestamp columns. Use `get_validation_predicates` to confirm a predicate is supported for the target column type, and check the column's type from `get_table` before picking one.
+- **Field references on the RIGHT side of a BINARY.** The right-hand side is usually a `LITERAL` or `SQL` (subquery). You can put a `FIELD` reference on the right **only** when the left field is a date/timestamp column, OR when the operator is `in_set` (`in`). Other combinations are rejected with `Fields are only allowed on the right side for date and timestamp fields, or when using the 'in' operator`.
+
 ---
 
 ## Examples
