@@ -653,14 +653,10 @@ Snowflake MCP, and present per-query verdicts plus a consolidated summary.
    keyword and the query it came from. Do not send anything to Snowflake MCP.
 
    **If the script exits zero, tell the engineer explicitly** — the point of
-   this check is confidence, and a silent pass doesn't build it. Output a
-   short line before step 5, e.g.:
+   this check is confidence, and a silent pass doesn't build it. Output one
+   short line before step 5:
 
-   > ✓ Read-only pre-check passed. All N queries verified as SELECT-only
-   > against the write-keyword list (INSERT, UPDATE, DELETE, MERGE, CREATE,
-   > DROP, TRUNCATE, ALTER, COPY, PUT, GET, LIST, REMOVE, UNLOAD, GRANT,
-   > REVOKE, CALL, EXECUTE, USE, SET). No data-modifying statement can
-   > reach Snowflake from this file.
+   > ✓ Read-only pre-check passed — N queries verified SELECT-only, no writes can reach Snowflake.
 
 5. **Show the final SQL** (per query, as a fenced SQL block) to the engineer
    before sending to Snowflake MCP. This is the last point at which they can
