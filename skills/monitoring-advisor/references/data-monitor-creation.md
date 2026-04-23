@@ -29,6 +29,8 @@ If you don't have the table MCON:
 If you already have the MCON:
 1. Call `get_table` with the MCON, `include_fields: true`, and `include_table_capabilities: true`.
 
+**If `search` returns zero results, or `get_table` shows the table is not ingested:** STOP. The table must already exist in Monte Carlo before a monitor can be created against it. Ask the user to confirm the correct table name, or to ingest the table first — do not call the creation tool with an unverified table.
+
 **CRITICAL: You need the actual column names from `get_table` results. NEVER guess or hallucinate column names.** This is the most common source of monitor creation failures.
 
 **Pre-call column-verification gate (run this immediately before calling any creation tool):**
