@@ -5,10 +5,7 @@ import sys
 from pathlib import Path
 
 
-SCRIPT = (
-    Path(__file__).resolve().parents[3]
-    / "skills" / "prevent" / "scripts" / "sandbox" / "substitute_placeholders.py"
-)
+SCRIPT = Path(__file__).resolve().parents[1] / "substitute_placeholders.py"
 
 
 def _run(sql_path: Path, dev_db: str) -> tuple[int, dict, str]:

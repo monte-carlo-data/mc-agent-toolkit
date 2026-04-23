@@ -5,10 +5,7 @@ import sys
 from pathlib import Path
 
 
-SCRIPT = (
-    Path(__file__).resolve().parents[3]
-    / "skills" / "prevent" / "scripts" / "sandbox" / "readonly_check.py"
-)
+SCRIPT = Path(__file__).resolve().parents[1] / "readonly_check.py"
 
 
 def _run(path: Path) -> tuple[int, dict]:

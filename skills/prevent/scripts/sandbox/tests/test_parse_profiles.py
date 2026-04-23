@@ -6,10 +6,7 @@ from pathlib import Path
 
 import pytest
 
-SCRIPT = (
-    Path(__file__).resolve().parents[3]
-    / "skills" / "prevent" / "scripts" / "sandbox" / "parse_profiles.py"
-)
+SCRIPT = Path(__file__).resolve().parents[1] / "parse_profiles.py"
 
 
 def _run(profiles_path: Path, profile_name: str | None = None, target_name: str | None = None) -> tuple[int, dict, str]:

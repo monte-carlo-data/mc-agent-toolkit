@@ -5,10 +5,7 @@ import sys
 from pathlib import Path
 
 
-SCRIPT = (
-    Path(__file__).resolve().parents[3]
-    / "skills" / "prevent" / "scripts" / "sandbox" / "detect_hardcoded_db.py"
-)
+SCRIPT = Path(__file__).resolve().parents[1] / "detect_hardcoded_db.py"
 
 
 def _run(path: Path) -> dict:

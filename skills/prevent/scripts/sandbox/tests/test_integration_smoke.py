@@ -5,10 +5,7 @@ import sys
 from pathlib import Path
 
 
-SANDBOX_DIR = (
-    Path(__file__).resolve().parents[3]
-    / "skills" / "prevent" / "scripts" / "sandbox"
-)
+SANDBOX_DIR = Path(__file__).resolve().parents[1]
 
 PROFILES = """
 default:

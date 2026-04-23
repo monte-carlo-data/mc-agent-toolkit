@@ -6,10 +6,7 @@ from pathlib import Path
 
 import pytest
 
-SCRIPT = (
-    Path(__file__).resolve().parents[3]
-    / "skills" / "prevent" / "scripts" / "sandbox" / "classify_sandbox.py"
-)
+SCRIPT = Path(__file__).resolve().parents[1] / "classify_sandbox.py"
 
 
 def _run(name: str) -> dict:
