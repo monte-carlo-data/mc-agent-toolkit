@@ -74,14 +74,15 @@ When omitted, the monitor queries all rows on each run. This works well for smal
 
 ### How to pick it
 
-1. You should already have the column names from `get_table` with `include_fields: true` (done in Step 2 of the main skill).
+1. You should already have the column names **and their data types** from `get_table` with `include_fields: true` (done in Step 2 of the main skill).
 2. Look for columns whose names suggest a timestamp: `created_at`, `updated_at`, `modified_at`, `timestamp`, `event_timestamp`, or columns with `_ts`, `_dt`, `_time` suffixes, or `date`, `datetime`.
-3. If the user specified one, verify it exists in the column list.
-4. If exactly one obvious candidate exists, suggest it.
-5. If multiple candidates exist, present them and ask the user.
-6. If NO obvious timestamp columns exist, omit the field — the monitor will do a whole-table scan. For very large tables, consider whether a custom SQL monitor would be more efficient.
+3. **Verify the column's data type is an actual datetime/timestamp/date type** — not a string, number, or other type that happens to have a timestampy name. The backend rejects non-datetime types with `Field <name> is not a valid type to group the metrics by; it cannot be interpreted as a datetime.`
+4. If the user specified one, verify it exists in the column list AND has a datetime type.
+5. If exactly one obvious candidate exists (correct type), suggest it.
+6. If multiple candidates exist, present them and ask the user.
+7. If NO datetime-typed columns exist, omit the field — the monitor will do a whole-table scan. For very large tables, consider whether a custom SQL monitor would be more efficient.
 
-**NEVER** guess a timestamp field name — either confirm it exists in the schema or omit it.
+**NEVER** guess a timestamp field name, and never pick a column based on its name alone — always confirm the datatype from `get_table`, or omit the field.
 
 ### Common timestamp field mistakes
 
