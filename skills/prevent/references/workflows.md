@@ -657,6 +657,18 @@ Snowflake MCP, and present per-query verdicts plus a consolidated summary.
    per-query timeout by default. On error (including timeout), continue with
    remaining queries but mark the failed one.
 
+   **Do not write per-query files to disk.** Read `.run.sql` once, split the
+   queries in memory, and pass each query string directly to the Snowflake MCP
+   tool. The `validation/` directory should end up with only two files per
+   model: `<table>_<ts>.sql` (original from Workflow 5) and `<table>_<ts>.run.sql`
+   (substituted). No `.q1.sql` / `.q2.sql` / `.query-1.sql` fragments.
+
+   Splitting: Workflow-5 queries are separated by blank lines between top-level
+   statements, with each query preceded by a `/* ... */` comment block that
+   contains its name and "What to look for" guidance. Parse that structure in
+   memory — the comment is metadata for the verdict in step 7, not a file to
+   write.
+
 7. **Report per-query verdicts** using the "What to look for" comment block
    attached to each query in the generated `.sql`:
 
