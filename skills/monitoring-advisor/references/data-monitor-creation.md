@@ -31,6 +31,14 @@ If you already have the MCON:
 
 **CRITICAL: You need the actual column names from `get_table` results. NEVER guess or hallucinate column names.** This is the most common source of monitor creation failures.
 
+**Pre-call column-verification gate (run this immediately before calling any creation tool):**
+
+1. List every column name you intend to put in the tool arguments — across every slot: `fields`, `segment_fields`, `aggregate_time_field`, BINARY `left`/`right` FIELD references, comparison `source_field`/`target_field`, and any per-type slot listed in the Tier-3 reference.
+2. For each name, confirm it appears verbatim in the `get_table.fields` list you fetched in this step. Names are case-sensitive on most warehouses (Snowflake often returns uppercase column names — match exactly).
+3. If any name is missing, STOP. Do not call the creation tool. Ask the user to confirm the correct column name, or suggest the closest matches from the actual column list — do NOT substitute a similar-sounding name on your own.
+
+If you reached this step without calling `get_table` (or equivalent) for the target table, go back — you cannot skip the fetch.
+
 For monitor types that require a timestamp column (metric monitors), review the column names and identify likely timestamp candidates. Present them to the user if ambiguous.
 
 **CRITICAL: The `warehouse` parameter on creation tools is a UUID, not a name.** Extract it from the `get_table` response (the resource / warehouse UUID). If you only have a warehouse name and no MCON, call `get_warehouses` to resolve it -- NEVER pass a warehouse name string like `databricks-aws-agent` or `snowflake-prod`, the backend will reject with `Warehouse not found`.
