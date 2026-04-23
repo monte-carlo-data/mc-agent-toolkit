@@ -28,7 +28,8 @@ BAD_CREATE = "CREATE TABLE x (id INT);\n"
 BAD_DROP = "DROP TABLE x;\n"
 BAD_CALL = "CALL sp_do_thing();\n"
 BAD_USE = "USE DATABASE raw;\nSELECT 1;\n"
-BAD_MULTI = "SELECT 1;\nSELECT 2;\n"
+OK_MULTI_SELECT = "SELECT 1;\nSELECT 2;\nSELECT 3;\n"
+MIXED_WRITE_IN_MULTI = "SELECT 1;\nDROP TABLE x;\nSELECT 2;\n"
 
 
 def test_ok_select(tmp_path):
@@ -102,12 +103,23 @@ def test_rejects_use(tmp_path):
     assert _run(f)[1]["rejected"] == "USE"
 
 
-def test_rejects_multi_statement(tmp_path):
+def test_accepts_multi_select(tmp_path):
+    """Multiple SELECT statements in one file are fine — Workflow 5 output shape."""
     f = tmp_path / "q.sql"
-    f.write_text(BAD_MULTI)
+    f.write_text(OK_MULTI_SELECT)
+    code, data = _run(f)
+    assert code == 0
+    assert data == {"ok": True, "rejected": None}
+
+
+def test_rejects_write_among_multi_statement(tmp_path):
+    """A write statement anywhere in the file still gets rejected, even if
+    other statements are pure reads."""
+    f = tmp_path / "q.sql"
+    f.write_text(MIXED_WRITE_IN_MULTI)
     code, data = _run(f)
     assert code == 1
-    assert data["rejected"] == "MULTI_STATEMENT"
+    assert data["rejected"] == "DROP"
 
 
 def test_rejects_get_stage(tmp_path):

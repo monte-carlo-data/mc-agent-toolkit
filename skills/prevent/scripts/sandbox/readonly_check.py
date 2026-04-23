@@ -8,9 +8,14 @@ Usage:
 Exit 0 with {"ok": true, "rejected": null} if safe.
 Exit 1 with {"ok": false, "rejected": "<KEYWORD>"} if not.
 
-Rejects any of: INSERT, UPDATE, DELETE, MERGE, CREATE, DROP, TRUNCATE,
-ALTER, COPY, PUT, GRANT, REVOKE, CALL, EXECUTE, USE.
-Rejects multi-statement files (more than one non-trailing `;`).
+Rejects any write-like keyword: INSERT, UPDATE, DELETE, MERGE, CREATE, DROP,
+TRUNCATE, ALTER, COPY, PUT, GET, LIST, REMOVE, UNLOAD, GRANT, REVOKE, CALL,
+EXECUTE, USE, SET.
+
+Multi-statement files (several SELECTs separated by `;`) are accepted —
+the keyword scan catches a rogue write statement regardless of how many
+statements share the file. The caller is expected to split statements in
+memory and send them to the warehouse one at a time.
 """
 
 import argparse
@@ -42,17 +47,10 @@ def _strip_sql(src: str) -> str:
 
 def check(sql: str) -> tuple[bool, str | None]:
     cleaned = _strip_sql(sql)
-    # Keyword check runs first so the specific rejected keyword is surfaced
-    # even when the file also contains multiple statements.
     upper = cleaned.upper()
     for kw in REJECTED_KEYWORDS:
         if re.search(rf"\b{kw}\b", upper):
             return False, kw
-    # Multi-statement check: strip trailing semicolon then look for any remaining.
-    stripped = cleaned.strip()
-    without_trailing = stripped[:-1] if stripped.endswith(";") else stripped
-    if ";" in without_trailing:
-        return False, "MULTI_STATEMENT"
     return True, None
 
 
