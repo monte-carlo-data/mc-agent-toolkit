@@ -41,7 +41,7 @@ Use a table monitor when the user wants to:
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `alert_conditions` | array of strings | `["last_updated_on", "schema", "total_row_count", "total_row_count_last_changed_on"]` | Metric names to monitor (see Alert Conditions below). |
-| `domain_id` | string (uuid) | none | Domain UUID (use `get_domains` to list). |
+| `domain_uuids` | array of string (uuid) | none | Domain UUIDs (use `get_domains` to list). Data monitors accept exactly one UUID in the list. |
 
 ---
 

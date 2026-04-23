@@ -35,7 +35,7 @@ If you already have the MCON:
 
 **Pre-call column-verification gate (run this immediately before calling any creation tool):**
 
-1. List every column name you intend to put in the tool arguments — across every slot: `fields`, `segment_fields`, `aggregate_time_field`, BINARY `left`/`right` FIELD references, comparison `source_field`/`target_field`, and any per-type slot listed in the Tier-3 reference.
+1. List every column name you plan to put in the tool arguments, in every slot the per-type reference describes (see the Tier-3 file for the authoritative list of column-bearing parameters).
 2. For each name, confirm it appears verbatim in the `get_table.fields` list you fetched in this step. Names are case-sensitive on most warehouses (Snowflake often returns uppercase column names — match exactly).
 3. If any name is missing, STOP. Do not call the creation tool. Ask the user to confirm the correct column name, or suggest the closest matches from the actual column list — do NOT substitute a similar-sounding name on your own.
 
@@ -79,14 +79,7 @@ Based on the monitor type, read the detailed reference for parameter guidance:
 
 All reference files are in the same directory as this file.
 
-**CRITICAL: Enum values come from the per-type reference. Never invent them by analogy.** The tool call will be rejected if you pass an enum value that isn't in the backend's accepted set. This applies to every enum-shaped parameter:
-
-- `metric` (metric monitor, comparison monitor) — the per-type file lists the valid names; guessing by pattern fails (e.g. `NUMERIC_SUM` looks plausible but the real name is `SUM`; `APPROX_DISTINCT_COUNT` and `COUNT_DISTINCT` aren't valid — use `UNIQUE_COUNT`).
-- `operator` (metric, custom_sql, comparison) — stick to the list in the per-type reference; subsets apply per threshold type (e.g. Absolute Threshold in custom_sql supports fewer operators than the full set).
-- predicate `name` (validation monitor) — confirm with `get_validation_predicates` before using anything beyond the common ones; guessing predicates like `match_pattern` or `regex_match` without confirming fails with `Predicate '<name>' not supported`.
-- `schedule.type`, `aggregate_by`, `threshold type` — lowercase/uppercase and exact spelling matter; don't approximate.
-
-If you're unsure whether an enum value is valid, ask the user or fall back to the safest documented value (`AUTO` for operator, `UNIQUE_COUNT` / `NULL_COUNT` for metric, etc.) — never guess.
+**CRITICAL: Every enum value comes from the per-type reference.** `metric`, `operator`, predicate `name`, `schedule.type`, `aggregate_by`, and any other enum-shaped parameter must match the exact strings documented in the Tier-3 file for this monitor type. Never invent values by analogy or adjust casing — the backend rejects anything outside the documented set. Subsets apply per threshold type (e.g. custom_sql Absolute Threshold allows fewer operators than the full list); the per-type file spells those out too. If you're unsure, ask the user rather than guessing.
 
 ### Step 5: Ask about scheduling
 

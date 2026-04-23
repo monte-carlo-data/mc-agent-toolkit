@@ -47,7 +47,7 @@ If you find yourself contorting another monitor type to fit the user's intent, s
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `domain_id` | string (uuid) | Domain UUID (use `get_domains` to list). Only one domain can be assigned per monitor. |
+| `domain_uuids` | array of string (uuid) | Domain UUIDs (use `get_domains` to list). Data monitors accept exactly one UUID in the list. |
 
 ---
 
@@ -58,7 +58,7 @@ Each alert condition compares the query result against a threshold.
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `operator` | string | Yes | One of: `EQ`, `NEQ`, `LT`, `LTE`, `GT`, `GTE`, `OUTSIDE_RANGE`, `INSIDE_RANGE`, `NOOP`. Note: the inequality operator is `NEQ` (not `NE`). |
-| `thresholdValue` | number | Yes | Numeric threshold to compare the query result against. |
+| `threshold_value` | number | Yes | Numeric threshold to compare the query result against. |
 
 ### Threshold types
 
@@ -147,7 +147,7 @@ Alert when orders reference customers that don't exist.
   "alert_conditions": [
     {
       "operator": "GT",
-      "thresholdValue": 0
+      "threshold_value": 0
     }
   ]
 }
@@ -166,7 +166,7 @@ Alert when total revenue for the past 24 hours drops below a minimum.
   "alert_conditions": [
     {
       "operator": "LT",
-      "thresholdValue": 10000
+      "threshold_value": 10000
     }
   ]
 }
@@ -185,7 +185,7 @@ Alert when the duplicate rate on a key field exceeds 1%.
   "alert_conditions": [
     {
       "operator": "GT",
-      "thresholdValue": 0.01
+      "threshold_value": 0.01
     }
   ]
 }
@@ -204,11 +204,11 @@ Alert when a value falls outside an acceptable range. Multiple conditions act as
   "alert_conditions": [
     {
       "operator": "LT",
-      "thresholdValue": 20
+      "threshold_value": 20
     },
     {
       "operator": "GT",
-      "thresholdValue": 500
+      "threshold_value": 500
     }
   ]
 }
@@ -227,7 +227,7 @@ Alert when the latest row in a downstream table is more than 2 hours behind the 
   "alert_conditions": [
     {
       "operator": "GT",
-      "thresholdValue": 120
+      "threshold_value": 120
     }
   ]
 }

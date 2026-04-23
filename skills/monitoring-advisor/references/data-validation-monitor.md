@@ -66,7 +66,7 @@ Before constructing the `alert_condition`, verify that every field name you plan
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `warehouse` | string | Warehouse name or UUID. Required if `table` is not an MCON. |
-| `domain_id` | string (uuid) | Domain UUID (use `get_domains` to list). |
+| `domain_uuids` | array of string (uuid) | Domain UUIDs (use `get_domains` to list). Data monitors accept exactly one UUID in the list. |
 
 ---
 

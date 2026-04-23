@@ -40,7 +40,7 @@ Use a metric monitor when the user wants to:
 | `aggregate_by` | string | `"day"` | Time interval: `"hour"`, `"day"`, `"week"`, `"month"`. |
 | `where_condition` | string | none | SQL WHERE clause (without `WHERE` keyword) to filter rows before computing metrics. |
 | `interval_minutes` | int | auto | Schedule interval in minutes. Must be compatible with `aggregate_by` (see note below). If not specified, the tool defaults to the minimum valid interval for the chosen `aggregate_by`. |
-| `domain_id` | string (uuid) | none | Domain UUID (use `get_domains` to list). |
+| `domain_uuids` | array of string (uuid) | none | Domain UUIDs (use `get_domains` to list). Data monitors accept exactly one UUID in the list. |
 
 ---
 
@@ -150,7 +150,7 @@ Each alert condition has:
 - Works well for organic metrics that vary day-to-day (row counts, null rates on evolving data, numeric distributions).
 - Some metrics **require** `AUTO` -- see the table below.
 
-### When to use explicit thresholds (`GT`, `LT`, `EQ`, `GTE`, `LTE`, `NE`)
+### When to use explicit thresholds (`GT`, `LT`, `EQ`, `GTE`, `LTE`, `NEQ`)
 
 - Use when there is a known business rule or data contract (e.g., "null rate on `email` should never exceed 5%", "order amount must always be greater than 0").
 - Provides deterministic alerting -- no training period needed, alerts fire immediately when the condition is met.
@@ -163,7 +163,7 @@ Each alert condition has:
 | `ROW_COUNT_CHANGE` | `AUTO` only | Anomaly detection on row count delta. |
 | `TIME_SINCE_LAST_ROW_COUNT_CHANGE` | `AUTO` only | Anomaly detection on staleness duration. |
 | `RELATIVE_ROW_COUNT` | `AUTO` only | Anomaly detection on segment distribution. Requires `segment_fields`. |
-| All other metrics | `AUTO`, `GT`, `LT`, `EQ`, `GTE`, `LTE`, `NE` | Any operator is valid. |
+| All other metrics | `AUTO`, `GT`, `LT`, `EQ`, `GTE`, `LTE`, `NEQ` | Any operator is valid. |
 
 ---
 
@@ -306,7 +306,7 @@ Each alert condition has:
   "table": "MCON++a1b2c3d4-e5f6-7890-abcd-ef1234567890++1++1++warehouse:billing.payments",
   "aggregate_time_field": "processed_at",
   "aggregate_by": "day",
-  "domain_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "domain_uuids": ["f47ac10b-58cc-4372-a567-0e02b2c3d479"],
   "alert_conditions": [
     {
       "metric": "NUMERIC_MEAN",
