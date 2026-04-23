@@ -29,21 +29,35 @@ If you don't have the table MCON:
 If you already have the MCON:
 1. Call `get_table` with the MCON, `include_fields: true`, and `include_table_capabilities: true`.
 
+**If `search` returns zero results, or `get_table` shows the table is not ingested:** STOP. The table must already exist in Monte Carlo before a monitor can be created against it. Ask the user to confirm the correct table name, or to ingest the table first — do not call the creation tool with an unverified table.
+
 **CRITICAL: You need the actual column names from `get_table` results. NEVER guess or hallucinate column names.** This is the most common source of monitor creation failures.
+
+**Pre-call column-verification gate (run this immediately before calling any creation tool):**
+
+1. List every column name you plan to put in the tool arguments, in every slot the per-type reference describes (see the Tier-3 file for the authoritative list of column-bearing parameters).
+2. For each name, confirm it appears verbatim in the `get_table.fields` list you fetched in this step. Names are case-sensitive on most warehouses (Snowflake often returns uppercase column names — match exactly).
+3. If any name is missing, STOP. Do not call the creation tool. Ask the user to confirm the correct column name, or suggest the closest matches from the actual column list — do NOT substitute a similar-sounding name on your own.
+
+If you reached this step without calling `get_table` (or equivalent) for the target table, go back — you cannot skip the fetch.
 
 For monitor types that require a timestamp column (metric monitors), review the column names and identify likely timestamp candidates. Present them to the user if ambiguous.
 
+**CRITICAL: The `warehouse` parameter on creation tools is a UUID, not a name.** Extract it from the `get_table` response (the resource / warehouse UUID). If you only have a warehouse name and no MCON, call `get_warehouses` to resolve it -- NEVER pass a warehouse name string like `databricks-aws-agent` or `snowflake-prod`, the backend will reject with `Warehouse not found`.
+
 ### Step 3: Handle domain assignment
 
-**ALWAYS check the table's `domains` BEFORE calling any creation tool.**
+**ALWAYS resolve a `domain_uuids` value BEFORE calling any creation tool.** Missing or empty domain assignment is one of the top failure modes — the backend will reject the monitor with `Domain assignment is required for this monitor. Please provide one and only one valid domain UUID.`
 
-Monitors must be assigned to a domain that contains the table being monitored. The `get_table` response includes a `domains` list with `uuid` and `name`.
+The tool field is `domain_uuids` (a list). For data monitors, provide exactly one UUID.
 
-1. If `domains` is empty: skip domain assignment.
-2. If `domains` has exactly one entry: default `domain_id` to that domain's UUID.
-3. If `domains` has multiple entries: present only those domains and ask the user to pick.
+Use the `domains` list on the `get_table` response (each entry has `uuid` and `name`):
 
-Do NOT present all account domains as options -- only domains that contain the table are valid.
+1. If the table's `domains` has exactly one entry: default `domain_uuids` to `[<that uuid>]`.
+2. If the table's `domains` has multiple entries: present only those domains and ask the user to pick.
+3. If the table's `domains` is empty: call `get_domains` to see the account's domains. If the account has one or more, ask the user to pick one (do not invent a selection) -- note that domains that don't contain the table may still be rejected on apply. If `get_domains` returns zero domains, only then may `domain_uuids` be omitted.
+
+Do NOT present all account domains as options when the table already has domains listed -- prefer domains that contain the table.
 
 ---
 
@@ -64,6 +78,8 @@ Based on the monitor type, read the detailed reference for parameter guidance:
 | **Table**      | `data-table-monitor.md`      |
 
 All reference files are in the same directory as this file.
+
+**CRITICAL: Every enum value comes from the per-type reference.** `metric`, `operator`, predicate `name`, `schedule.type`, `aggregate_by`, and any other enum-shaped parameter must match the exact strings documented in the Tier-3 file for this monitor type. Never invent values by analogy or adjust casing — the backend rejects anything outside the documented set. Subsets apply per threshold type (e.g. custom_sql Absolute Threshold allows fewer operators than the full list); the per-type file spells those out too. If you're unsure, ask the user rather than guessing.
 
 ### Step 5: Ask about scheduling
 
@@ -167,6 +183,7 @@ All tools are available via the `monte-carlo` MCP server.
 | `get_table`                     | Schema, stats, metadata, domain membership, capabilities     |
 | `get_validation_predicates`     | List available validation rule types for a warehouse         |
 | `get_domains`                   | List MC domains (only needed if table has no domain info)    |
+| `get_warehouses`                | Resolve warehouse UUIDs from names; needed when a name is the only identifier |
 | `create_metric_monitor_mac`     | Generate metric monitor YAML (dry-run)                       |
 | `create_validation_monitor_mac` | Generate validation monitor YAML (dry-run)                   |
 | `create_comparison_monitor_mac` | Generate comparison monitor YAML (dry-run)                   |

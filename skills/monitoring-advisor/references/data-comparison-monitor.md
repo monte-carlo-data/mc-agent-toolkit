@@ -48,7 +48,7 @@ Before constructing alert conditions, you MUST verify that both tables exist and
 | `source_warehouse` | string | Warehouse name or UUID for the source table. Required if `source_table` is not an MCON. |
 | `target_warehouse` | string | Warehouse name or UUID for the target table. Required if `target_table` is not an MCON. |
 | `segment_fields` | array of string | Fields to segment the comparison by. Must exist in BOTH tables with the same name. |
-| `domain_id` | string (uuid) | Domain UUID (use `get_domains` to list). Only one domain can be assigned per monitor. |
+| `domain_uuids` | array of string (uuid) | Domain UUIDs (use `get_domains` to list). Data monitors accept exactly one UUID in the list. |
 
 ---
 
@@ -72,11 +72,23 @@ Each condition compares a metric between the source and target tables.
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `metric` | string | Yes | The metric to compare (see Metrics Reference below). |
+| `type` | string | Yes (for non-AUTO thresholds) | Threshold type — one of `comparison_delta` (static threshold on source↔target diff) or `AUTO` (anomaly detection). Omitting `type` defaults to AUTO-style behavior. |
 | `sourceField` | string | For field-level metrics | Column in the source table. Required for ALL metrics except `ROW_COUNT`. |
 | `targetField` | string | For field-level metrics | Column in the target table. Required for ALL metrics except `ROW_COUNT`. |
-| `thresholdValue` | number | No | Threshold for acceptable difference between source and target. |
+| `thresholdValue` | number | **Required for `comparison_delta`-type conditions**; optional for `AUTO`-type anomaly detection. | Threshold for acceptable difference between source and target. Omitting it on a delta-type condition is rejected with `threshold_value is required for comparison_delta type`. |
 | `isThresholdRelative` | boolean | No | `false` = absolute difference (default), `true` = percentage difference. |
 | `customMetric` | object | No | Custom SQL expressions for source and target (see Custom Metrics below). |
+
+### Threshold types
+
+Two threshold types are supported on comparison alert conditions:
+
+| `type` | Behavior | Required fields |
+|---|---|---|
+| `AUTO` (default when `type` is omitted) | Monte Carlo learns normal variance and alerts on anomalies. | `metric`, `sourceField` / `targetField` (unless `ROW_COUNT`) |
+| `comparison_delta` | Static threshold on the source↔target difference. | `metric`, `sourceField` / `targetField` (unless `ROW_COUNT`), `thresholdValue` |
+
+If the user wants a specific numeric tolerance (e.g. "alert if source and target row counts differ by more than 100"), use `comparison_delta` and set `thresholdValue`. If they want "alert when the difference looks unusual," use `AUTO` — no `thresholdValue` needed.
 
 ---
 
@@ -404,7 +416,7 @@ Compare both row counts and field-level metrics in a single monitor.
   "description": "Full comparison of orders between staging and production",
   "source_table": "MCON++a1b2c3d4-e5f6-7890-abcd-ef1234567890++1++1++staging:core.orders",
   "target_table": "MCON++b2c3d4e5-f6a7-8901-bcde-f12345678901++1++1++production:core.orders",
-  "domain_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "domain_uuids": ["f47ac10b-58cc-4372-a567-0e02b2c3d479"],
   "alert_conditions": [
     {
       "metric": "ROW_COUNT",
