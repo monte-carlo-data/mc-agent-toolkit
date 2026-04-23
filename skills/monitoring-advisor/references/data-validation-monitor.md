@@ -6,6 +6,9 @@ Detailed reference for building `create_validation_monitor_mac` tool calls.
 
 - **NEVER guess column names.** Always get them from `get_table`. Every field referenced in a validation condition must exist in the table schema exactly as spelled.
 - **IMPORTANT: Conditions match INVALID data, not valid data.** The monitor alerts when it finds rows matching the condition, so the condition must describe the BAD rows. Getting this backwards is the number one mistake with validation monitors.
+- **NEVER put a SELECT statement in a condition-level `SQL` node.** `{"type": "SQL", "sql": "..."}` as a top-level condition must be a boolean predicate expression (e.g. `amount < 0 OR amount > 1e9`), not a full query. Backend error: `Invalid SQL expression. Please provide a direct expression; it shouldn't begin with SELECT.`
+- **NEVER use an aggregate or SQL expression in a `FIELD` value.** `{"type": "FIELD", "field": "COUNT(*)"}` is rejected as `Field "COUNT(*)" doesn't exist`. Fields are column names only — use `get_table` to list valid ones. For counts/aggregates, fall back to a custom SQL monitor.
+- **NEVER put a `SQL` value on the LEFT side of a BINARY condition.** Only `FIELD` references are allowed on the left. A `SQL` value is valid only on the right side (typically as a scalar subquery). Backend error: `Filter left side value must be a field or map key: FilterValueSql(...)`.
 
 ---
 
@@ -149,9 +152,9 @@ Value descriptors appear in the `value`, `left`, and `right` arrays of UNARY and
 
 | Type | Field | Description | Example |
 |------|-------|-------------|---------|
-| `FIELD` | `"field": "column_name"` | References a column in the table. | `{"type": "FIELD", "field": "user_id"}` |
+| `FIELD` | `"field": "column_name"` | References a column in the table. Must be a plain column name — never an aggregate like `COUNT(*)` or a SQL snippet. | `{"type": "FIELD", "field": "user_id"}` |
 | `LITERAL` | `"literal": "value"` | A static value (always a string, even for numbers). | `{"type": "LITERAL", "literal": "100"}` |
-| `SQL` | `"sql": "SELECT ..."` | A SQL expression or subquery. | `{"type": "SQL", "sql": "SELECT MAX(id) FROM ref_table"}` |
+| `SQL` | `"sql": "..."` | A scalar SQL expression or subquery. **Right-side only** — cannot appear on the `left` of a BINARY. Valid forms: a scalar subquery (`SELECT MAX(id) FROM ref_table`) or a scalar expression. | `{"type": "SQL", "sql": "SELECT MAX(id) FROM ref_table"}` |
 
 ---
 
