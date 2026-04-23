@@ -35,15 +35,17 @@ For monitor types that require a timestamp column (metric monitors), review the 
 
 ### Step 3: Handle domain assignment
 
-**ALWAYS check the table's `domains` BEFORE calling any creation tool.**
+**ALWAYS resolve a `domain_uuids` value BEFORE calling any creation tool.** Missing or empty domain assignment is one of the top failure modes — the backend will reject the monitor with `Domain assignment is required for this monitor. Please provide one and only one valid domain UUID.`
 
-Monitors must be assigned to a domain that contains the table being monitored. The `get_table` response includes a `domains` list with `uuid` and `name`.
+The tool field is `domain_uuids` (a list). For data monitors, provide exactly one UUID.
 
-1. If `domains` is empty: skip domain assignment.
-2. If `domains` has exactly one entry: default `domain_id` to that domain's UUID.
-3. If `domains` has multiple entries: present only those domains and ask the user to pick.
+Use the `domains` list on the `get_table` response (each entry has `uuid` and `name`):
 
-Do NOT present all account domains as options -- only domains that contain the table are valid.
+1. If the table's `domains` has exactly one entry: default `domain_uuids` to `[<that uuid>]`.
+2. If the table's `domains` has multiple entries: present only those domains and ask the user to pick.
+3. If the table's `domains` is empty: call `get_domains` to see the account's domains. If the account has one or more, ask the user to pick one (do not invent a selection) -- note that domains that don't contain the table may still be rejected on apply. If `get_domains` returns zero domains, only then may `domain_uuids` be omitted.
+
+Do NOT present all account domains as options when the table already has domains listed -- prefer domains that contain the table.
 
 ---
 
