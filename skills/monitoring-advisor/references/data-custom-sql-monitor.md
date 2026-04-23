@@ -47,7 +47,7 @@ If you find yourself contorting another monitor type to fit the user's intent, s
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `domain_id` | string (uuid) | Domain UUID (use `get_domains` to list). Only one domain can be assigned per monitor. |
+| `domain_uuids` | array of string (uuid) | Domain UUIDs (use `get_domains` to list). Data monitors accept exactly one UUID in the list. |
 
 ---
 
@@ -57,12 +57,33 @@ Each alert condition compares the query result against a threshold.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `operator` | string | Yes | `"GT"`, `"LT"`, `"EQ"`, `"GTE"`, `"LTE"`, `"NE"` |
-| `thresholdValue` | number | Yes | Numeric threshold to compare the query result against. |
+| `operator` | string | Yes | One of: `EQ`, `NEQ`, `LT`, `LTE`, `GT`, `GTE`, `OUTSIDE_RANGE`, `INSIDE_RANGE`, `NOOP`. Note: the inequality operator is `NEQ` (not `NE`). |
+| `threshold_value` | number | Yes | Numeric threshold to compare the query result against. |
+
+### Threshold types
+
+Custom SQL monitors support two threshold types — `absolute` (default) and `change`. Each requires a different set of fields:
+
+| `type` | Behavior | Required fields (in addition to `operator`) |
+|---|---|---|
+| `absolute` (default) | Compare the query result directly against a fixed value. | `threshold_value` |
+| `change` | Compare the query result against a recent baseline (e.g. 2-day rolling MAX). | `threshold_value`, `baseline_agg_function`, `baseline_interval_minutes`, `is_threshold_relative` |
+
+**`change`-type required fields:**
+
+- `baseline_agg_function` — how to aggregate baseline samples. One of: `AVG`, `MIN`, `MAX`. Backend rejects anything else: `Must be one of: AVG, MIN, MAX.`
+- `baseline_interval_minutes` — lookback window for the baseline, in minutes. Must be between `0` and `129600` (90 days).
+- `is_threshold_relative` — `true` if `threshold_value` is a percentage (relative to baseline), `false` if it is an absolute delta. Required — the backend rejects with `is_threshold_relative is a required field. Set to True if threshold value is % else False`.
+
+Omitting any of these on a `change`-type condition produces stacked `required` / `Aggregate function is required` / `Lookback Interval in minutes should be between 0 and 129600` errors. Use snake_case for all field names here — mixing camelCase (`baselineAggFunction`) causes `Unknown field` rejections.
+
+### Operator subsets by threshold type
+
+Not every operator is accepted for every threshold type. The `absolute` threshold type only supports: `EQ`, `NEQ`, `LT`, `LTE`, `GT`, `GTE`, `OUTSIDE_RANGE`, `INSIDE_RANGE`. Using e.g. `NOOP` with an Absolute Threshold is rejected as `Absolute Threshold only supports these operators: {EQ, NEQ, LT, LTE, GT, GTE, OUTSIDE_RANGE, INSIDE_RANGE}`.
 
 ### No AUTO Support
 
-Custom SQL monitors do **NOT** support `AUTO` (anomaly detection). You must specify an explicit operator and threshold for every alert condition. This is a common mistake -- if the user asks for anomaly detection, steer them toward a metric monitor instead, which does support `AUTO`.
+Custom SQL monitors do **NOT** support `AUTO` / `AUTO_HIGH` / `AUTO_LOW` (anomaly detection). You must specify an explicit operator and threshold for every alert condition. This is a common mistake -- if the user asks for anomaly detection, steer them toward a metric monitor instead, which does support `AUTO`.
 
 If the user is unsure what threshold to set, help them reason about it: "What value would indicate a problem? If the query returns X, should that fire an alert?"
 
@@ -126,7 +147,7 @@ Alert when orders reference customers that don't exist.
   "alert_conditions": [
     {
       "operator": "GT",
-      "thresholdValue": 0
+      "threshold_value": 0
     }
   ]
 }
@@ -145,7 +166,7 @@ Alert when total revenue for the past 24 hours drops below a minimum.
   "alert_conditions": [
     {
       "operator": "LT",
-      "thresholdValue": 10000
+      "threshold_value": 10000
     }
   ]
 }
@@ -164,7 +185,7 @@ Alert when the duplicate rate on a key field exceeds 1%.
   "alert_conditions": [
     {
       "operator": "GT",
-      "thresholdValue": 0.01
+      "threshold_value": 0.01
     }
   ]
 }
@@ -183,11 +204,11 @@ Alert when a value falls outside an acceptable range. Multiple conditions act as
   "alert_conditions": [
     {
       "operator": "LT",
-      "thresholdValue": 20
+      "threshold_value": 20
     },
     {
       "operator": "GT",
-      "thresholdValue": 500
+      "threshold_value": 500
     }
   ]
 }
@@ -206,7 +227,7 @@ Alert when the latest row in a downstream table is more than 2 hours behind the 
   "alert_conditions": [
     {
       "operator": "GT",
-      "thresholdValue": 120
+      "threshold_value": 120
     }
   ]
 }

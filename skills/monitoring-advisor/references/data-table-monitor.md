@@ -5,6 +5,7 @@ Detailed reference for building `create_table_monitor_mac` tool calls.
 ## Critical Constraints
 
 - **NEVER guess column names.** Always verify table and schema names from `get_table` or `search` before building the asset selection.
+- **`alert_conditions` is a flat list of strings** — metric names like `"last_updated_on"`, `"schema"`, `"total_row_count"`. NEVER pass dicts like `{"metric": "last_updated_on", "operator": "AUTO"}`. That shape is rejected with `Input should be a valid string [type=string_type, input_value={'metric': '...', 'operator': 'AUTO'}]`. Table monitors do not take per-condition operators — they use anomaly detection on the named metrics by default.
 
 ---
 
@@ -40,7 +41,7 @@ Use a table monitor when the user wants to:
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `alert_conditions` | array of strings | `["last_updated_on", "schema", "total_row_count", "total_row_count_last_changed_on"]` | Metric names to monitor (see Alert Conditions below). |
-| `domain_id` | string (uuid) | none | Domain UUID (use `get_domains` to list). |
+| `domain_uuids` | array of string (uuid) | none | Domain UUIDs (use `get_domains` to list). Data monitors accept exactly one UUID in the list. |
 
 ---
 

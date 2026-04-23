@@ -40,7 +40,7 @@ Use a metric monitor when the user wants to:
 | `aggregate_by` | string | `"day"` | Time interval: `"hour"`, `"day"`, `"week"`, `"month"`. |
 | `where_condition` | string | none | SQL WHERE clause (without `WHERE` keyword) to filter rows before computing metrics. |
 | `interval_minutes` | int | auto | Schedule interval in minutes. Must be compatible with `aggregate_by` (see note below). If not specified, the tool defaults to the minimum valid interval for the chosen `aggregate_by`. |
-| `domain_id` | string (uuid) | none | Domain UUID (use `get_domains` to list). |
+| `domain_uuids` | array of string (uuid) | none | Domain UUIDs (use `get_domains` to list). Data monitors accept exactly one UUID in the list. |
 
 ---
 
@@ -74,14 +74,15 @@ When omitted, the monitor queries all rows on each run. This works well for smal
 
 ### How to pick it
 
-1. You should already have the column names from `get_table` with `include_fields: true` (done in Step 2 of the main skill).
+1. You should already have the column names **and their data types** from `get_table` with `include_fields: true` (done in Step 2 of the main skill).
 2. Look for columns whose names suggest a timestamp: `created_at`, `updated_at`, `modified_at`, `timestamp`, `event_timestamp`, or columns with `_ts`, `_dt`, `_time` suffixes, or `date`, `datetime`.
-3. If the user specified one, verify it exists in the column list.
-4. If exactly one obvious candidate exists, suggest it.
-5. If multiple candidates exist, present them and ask the user.
-6. If NO obvious timestamp columns exist, omit the field — the monitor will do a whole-table scan. For very large tables, consider whether a custom SQL monitor would be more efficient.
+3. **Verify the column's data type is an actual datetime/timestamp/date type** — not a string, number, or other type that happens to have a timestampy name. The backend rejects non-datetime types with `Field <name> is not a valid type to group the metrics by; it cannot be interpreted as a datetime.`
+4. If the user specified one, verify it exists in the column list AND has a datetime type.
+5. If exactly one obvious candidate exists (correct type), suggest it.
+6. If multiple candidates exist, present them and ask the user.
+7. If NO datetime-typed columns exist, omit the field — the monitor will do a whole-table scan. For very large tables, consider whether a custom SQL monitor would be more efficient.
 
-**NEVER** guess a timestamp field name — either confirm it exists in the schema or omit it.
+**NEVER** guess a timestamp field name, and never pick a column based on its name alone — always confirm the datatype from `get_table`, or omit the field.
 
 ### Common timestamp field mistakes
 
@@ -111,6 +112,21 @@ When omitted, the monitor queries all rows on each run. This works well for smal
 - **NEVER** apply `FUTURE_TIMESTAMP_COUNT`, `PAST_TIMESTAMP_COUNT`, or `UNIX_ZERO_TIMESTAMP_COUNT` to non-timestamp columns.
 - When in doubt, `NULL_COUNT`, `NULL_RATE`, `UNIQUE_COUNT`, and `UNIQUE_RATE` are safe for any column type.
 
+### Common metric-name mistakes
+
+The `NUMERIC_*` prefix pattern covers mean/median/min/max/stddev but **not** sum: the metric is `SUM`, not `NUMERIC_SUM`. Backend rejects with `Invalid metric: NUMERIC_SUM`.
+
+Other names agents guess-and-get-wrong:
+
+| Guessed (wrong) | Use instead |
+|---|---|
+| `NUMERIC_SUM` | `SUM` |
+| `APPROX_DISTINCT_COUNT`, `COUNT_DISTINCT` | `UNIQUE_COUNT` |
+| `COUNT_NULL`, `NULLS` | `NULL_COUNT` |
+| `ROW_COUNT` (as a column metric) | `ROW_COUNT_CHANGE` (table-level only) |
+
+If the metric you want isn't in the compatibility matrix above, it doesn't exist — use the closest alternative or fall back to a custom SQL monitor.
+
 ---
 
 ## Alert Conditions
@@ -120,8 +136,8 @@ Each alert condition has:
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `metric` | string | Yes | The metric to monitor (see Metrics Reference below). |
-| `operator` | string | Yes | `"AUTO"` (anomaly detection), `"GT"`, `"LT"`, `"EQ"`, `"GTE"`, `"LTE"`, `"NE"`. |
-| `threshold` | number | For explicit operators | The threshold value. Required when using `GT`, `LT`, `EQ`, `GTE`, `LTE`, or `NE`. Not used with `AUTO`. |
+| `operator` | string | Yes | `"AUTO"` (anomaly detection), `"GT"`, `"LT"`, `"EQ"`, `"GTE"`, `"LTE"`, `"NEQ"`. Note: the inequality operator is `NEQ`, not `NE`. |
+| `threshold` | number | For explicit operators | The threshold value. Required when using `GT`, `LT`, `EQ`, `GTE`, `LTE`, or `NEQ`. Not used with `AUTO`. |
 | `fields` | array of string | Depends | Column names to apply the metric to. Required for field-level metrics. Not needed for table-level metrics. |
 
 ---
@@ -134,7 +150,7 @@ Each alert condition has:
 - Works well for organic metrics that vary day-to-day (row counts, null rates on evolving data, numeric distributions).
 - Some metrics **require** `AUTO` -- see the table below.
 
-### When to use explicit thresholds (`GT`, `LT`, `EQ`, `GTE`, `LTE`, `NE`)
+### When to use explicit thresholds (`GT`, `LT`, `EQ`, `GTE`, `LTE`, `NEQ`)
 
 - Use when there is a known business rule or data contract (e.g., "null rate on `email` should never exceed 5%", "order amount must always be greater than 0").
 - Provides deterministic alerting -- no training period needed, alerts fire immediately when the condition is met.
@@ -147,7 +163,7 @@ Each alert condition has:
 | `ROW_COUNT_CHANGE` | `AUTO` only | Anomaly detection on row count delta. |
 | `TIME_SINCE_LAST_ROW_COUNT_CHANGE` | `AUTO` only | Anomaly detection on staleness duration. |
 | `RELATIVE_ROW_COUNT` | `AUTO` only | Anomaly detection on segment distribution. Requires `segment_fields`. |
-| All other metrics | `AUTO`, `GT`, `LT`, `EQ`, `GTE`, `LTE`, `NE` | Any operator is valid. |
+| All other metrics | `AUTO`, `GT`, `LT`, `EQ`, `GTE`, `LTE`, `NEQ` | Any operator is valid. |
 
 ---
 
@@ -290,7 +306,7 @@ Each alert condition has:
   "table": "MCON++a1b2c3d4-e5f6-7890-abcd-ef1234567890++1++1++warehouse:billing.payments",
   "aggregate_time_field": "processed_at",
   "aggregate_by": "day",
-  "domain_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "domain_uuids": ["f47ac10b-58cc-4372-a567-0e02b2c3d479"],
   "alert_conditions": [
     {
       "metric": "NUMERIC_MEAN",
