@@ -60,9 +60,26 @@ Each alert condition compares the query result against a threshold.
 | `operator` | string | Yes | One of: `EQ`, `NEQ`, `LT`, `LTE`, `GT`, `GTE`, `OUTSIDE_RANGE`, `INSIDE_RANGE`, `NOOP`. Note: the inequality operator is `NEQ` (not `NE`). |
 | `thresholdValue` | number | Yes | Numeric threshold to compare the query result against. |
 
+### Threshold types
+
+Custom SQL monitors support two threshold types — `absolute` (default) and `change`. Each requires a different set of fields:
+
+| `type` | Behavior | Required fields (in addition to `operator`) |
+|---|---|---|
+| `absolute` (default) | Compare the query result directly against a fixed value. | `threshold_value` |
+| `change` | Compare the query result against a recent baseline (e.g. 2-day rolling MAX). | `threshold_value`, `baseline_agg_function`, `baseline_interval_minutes`, `is_threshold_relative` |
+
+**`change`-type required fields:**
+
+- `baseline_agg_function` — how to aggregate baseline samples. One of: `AVG`, `MIN`, `MAX`. Backend rejects anything else: `Must be one of: AVG, MIN, MAX.`
+- `baseline_interval_minutes` — lookback window for the baseline, in minutes. Must be between `0` and `129600` (90 days).
+- `is_threshold_relative` — `true` if `threshold_value` is a percentage (relative to baseline), `false` if it is an absolute delta. Required — the backend rejects with `is_threshold_relative is a required field. Set to True if threshold value is % else False`.
+
+Omitting any of these on a `change`-type condition produces stacked `required` / `Aggregate function is required` / `Lookback Interval in minutes should be between 0 and 129600` errors. Use snake_case for all field names here — mixing camelCase (`baselineAggFunction`) causes `Unknown field` rejections.
+
 ### Operator subsets by threshold type
 
-Not every operator is accepted for every threshold type. The **Absolute Threshold** type (used for static thresholds) only supports: `EQ`, `NEQ`, `LT`, `LTE`, `GT`, `GTE`, `OUTSIDE_RANGE`, `INSIDE_RANGE`. Using e.g. `NOOP` with an Absolute Threshold is rejected as `Absolute Threshold only supports these operators: {EQ, NEQ, LT, LTE, GT, GTE, OUTSIDE_RANGE, INSIDE_RANGE}`.
+Not every operator is accepted for every threshold type. The `absolute` threshold type only supports: `EQ`, `NEQ`, `LT`, `LTE`, `GT`, `GTE`, `OUTSIDE_RANGE`, `INSIDE_RANGE`. Using e.g. `NOOP` with an Absolute Threshold is rejected as `Absolute Threshold only supports these operators: {EQ, NEQ, LT, LTE, GT, GTE, OUTSIDE_RANGE, INSIDE_RANGE}`.
 
 ### No AUTO Support
 
