@@ -135,8 +135,8 @@ Each alert condition has:
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `metric` | string | Yes | The metric to monitor (see Metrics Reference below). |
-| `operator` | string | Yes | `"AUTO"` (anomaly detection), `"GT"`, `"LT"`, `"EQ"`, `"GTE"`, `"LTE"`, `"NE"`. |
-| `threshold` | number | For explicit operators | The threshold value. Required when using `GT`, `LT`, `EQ`, `GTE`, `LTE`, or `NE`. Not used with `AUTO`. |
+| `operator` | string | Yes | `"AUTO"` (anomaly detection), `"GT"`, `"LT"`, `"EQ"`, `"GTE"`, `"LTE"`, `"NEQ"`. Note: the inequality operator is `NEQ`, not `NE`. |
+| `threshold` | number | For explicit operators | The threshold value. Required when using `GT`, `LT`, `EQ`, `GTE`, `LTE`, or `NEQ`. Not used with `AUTO`. |
 | `fields` | array of string | Depends | Column names to apply the metric to. Required for field-level metrics. Not needed for table-level metrics. |
 
 ---

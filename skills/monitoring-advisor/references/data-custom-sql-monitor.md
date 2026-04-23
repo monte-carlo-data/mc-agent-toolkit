@@ -57,12 +57,16 @@ Each alert condition compares the query result against a threshold.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `operator` | string | Yes | `"GT"`, `"LT"`, `"EQ"`, `"GTE"`, `"LTE"`, `"NE"` |
+| `operator` | string | Yes | One of: `EQ`, `NEQ`, `LT`, `LTE`, `GT`, `GTE`, `OUTSIDE_RANGE`, `INSIDE_RANGE`, `NOOP`. Note: the inequality operator is `NEQ` (not `NE`). |
 | `thresholdValue` | number | Yes | Numeric threshold to compare the query result against. |
+
+### Operator subsets by threshold type
+
+Not every operator is accepted for every threshold type. The **Absolute Threshold** type (used for static thresholds) only supports: `EQ`, `NEQ`, `LT`, `LTE`, `GT`, `GTE`, `OUTSIDE_RANGE`, `INSIDE_RANGE`. Using e.g. `NOOP` with an Absolute Threshold is rejected as `Absolute Threshold only supports these operators: {EQ, NEQ, LT, LTE, GT, GTE, OUTSIDE_RANGE, INSIDE_RANGE}`.
 
 ### No AUTO Support
 
-Custom SQL monitors do **NOT** support `AUTO` (anomaly detection). You must specify an explicit operator and threshold for every alert condition. This is a common mistake -- if the user asks for anomaly detection, steer them toward a metric monitor instead, which does support `AUTO`.
+Custom SQL monitors do **NOT** support `AUTO` / `AUTO_HIGH` / `AUTO_LOW` (anomaly detection). You must specify an explicit operator and threshold for every alert condition. This is a common mistake -- if the user asks for anomaly detection, steer them toward a metric monitor instead, which does support `AUTO`.
 
 If the user is unsure what threshold to set, help them reason about it: "What value would indicate a problem? If the query returns X, should that fire an alert?"
 
