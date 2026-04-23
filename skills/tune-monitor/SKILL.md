@@ -33,7 +33,7 @@ them:
 | `get_monitor_report` | Fetch a monitor's alert history, incident details, and troubleshooting summaries |
 | `get_monitors` | Fetch monitor configuration (type, thresholds, schedule, segments) |
 | `create_metric_monitor` | Update a metric monitor's configuration (used in Phase 5) |
-| `create_custom_rule` | Update a custom SQL monitor's configuration (used in Phase 5) |
+| `create_custom_sql_monitor` | Update a custom SQL monitor's configuration (used in Phase 5) |
 
 ---
 

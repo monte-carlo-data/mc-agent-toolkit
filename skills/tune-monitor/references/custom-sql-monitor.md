@@ -81,7 +81,7 @@ dialect:
 
 ## Applying changes
 
-Use `create_custom_rule` to update the monitor.
+Use `create_custom_sql_monitor` to update the monitor.
 
 1. **Always pass the existing identifier** to update rather than create a new monitor.
 2. **Always dry-run first** — show the user the preview and ask for confirmation before applying.
