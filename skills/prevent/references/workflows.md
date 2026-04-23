@@ -652,9 +652,20 @@ Snowflake MCP, and present per-query verdicts plus a consolidated summary.
    If the script exits non-zero, **abort execution**. Report the rejected
    keyword and the query it came from. Do not send anything to Snowflake MCP.
 
+   **If the script exits zero, tell the engineer explicitly** — the point of
+   this check is confidence, and a silent pass doesn't build it. Output a
+   short line before step 5, e.g.:
+
+   > ✓ Read-only pre-check passed. All N queries verified as SELECT-only
+   > against the write-keyword list (INSERT, UPDATE, DELETE, MERGE, CREATE,
+   > DROP, TRUNCATE, ALTER, COPY, PUT, GET, LIST, REMOVE, UNLOAD, GRANT,
+   > REVOKE, CALL, EXECUTE, USE, SET). No data-modifying statement can
+   > reach Snowflake from this file.
+
 5. **Show the final SQL** (per query, as a fenced SQL block) to the engineer
    before sending to Snowflake MCP. This is the last point at which they can
-   cancel.
+   cancel. Having seen the ✓ from step 4 plus the exact SQL here, the
+   engineer has everything they need to press proceed with confidence.
 
 6. **Execute each query via Snowflake MCP** (e.g. the `mcp__snowflake__query`
    tool — confirm the exact tool name available in the session). Apply a 60s
