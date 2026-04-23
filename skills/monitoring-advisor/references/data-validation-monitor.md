@@ -9,6 +9,7 @@ Detailed reference for building `create_validation_monitor_mac` tool calls.
 - **NEVER put a SELECT statement in a condition-level `SQL` node.** `{"type": "SQL", "sql": "..."}` as a top-level condition must be a boolean predicate expression (e.g. `amount < 0 OR amount > 1e9`), not a full query. Backend error: `Invalid SQL expression. Please provide a direct expression; it shouldn't begin with SELECT.`
 - **NEVER use an aggregate or SQL expression in a `FIELD` value.** `{"type": "FIELD", "field": "COUNT(*)"}` is rejected as `Field "COUNT(*)" doesn't exist`. Fields are column names only — use `get_table` to list valid ones. For counts/aggregates, fall back to a custom SQL monitor.
 - **NEVER put a `SQL` value on the LEFT side of a BINARY condition.** Only `FIELD` references are allowed on the left. A `SQL` value is valid only on the right side (typically as a scalar subquery). Backend error: `Filter left side value must be a field or map key: FilterValueSql(...)`.
+- **`alert_condition` is a dict (JSON object), NEVER a JSON-encoded string.** Pass the condition tree as a structured object — `{"type": "GROUP", "operator": "AND", "conditions": [...]}`. Serializing it to a string first is rejected with `Input should be a valid dictionary [type=dict_type, input_value='{"conditions":[...]'...]`.
 
 ---
 
