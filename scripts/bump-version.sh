@@ -148,7 +148,9 @@ for file in "${VERSION_FILES[@]}"; do
   if [[ "$DRY_RUN" == true ]]; then
     echo "[dry-run] Would update version in $file"
   else
-    sed -i '' "s/\"version\": \"$CURRENT_VERSION\"/\"version\": \"$NEW_VERSION\"/" "$filepath"
+    # Replace the first "version" field regardless of its current value, so
+    # plugins that drifted out of sync get normalized to $NEW_VERSION.
+    sed -i '' -E '1,/"version"[[:space:]]*:/s|("version"[[:space:]]*:[[:space:]]*")[^"]*(")|\1'"$NEW_VERSION"'\2|' "$filepath"
     echo "Updated version in $file"
   fi
 done
