@@ -74,7 +74,7 @@ Each condition compares a metric between the source and target tables.
 | `metric` | string | Yes | The metric to compare (see Metrics Reference below). |
 | `sourceField` | string | For field-level metrics | Column in the source table. Required for ALL metrics except `ROW_COUNT`. |
 | `targetField` | string | For field-level metrics | Column in the target table. Required for ALL metrics except `ROW_COUNT`. |
-| `thresholdValue` | number | No | Threshold for acceptable difference between source and target. |
+| `thresholdValue` | number | **Required for `comparison_delta`-type conditions**; optional for `AUTO`-type anomaly detection. | Threshold for acceptable difference between source and target. Omitting it on a delta-type condition is rejected with `threshold_value is required for comparison_delta type`. |
 | `isThresholdRelative` | boolean | No | `false` = absolute difference (default), `true` = percentage difference. |
 | `customMetric` | object | No | Custom SQL expressions for source and target (see Custom Metrics below). |
 
