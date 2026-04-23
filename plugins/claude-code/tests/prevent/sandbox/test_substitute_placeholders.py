@@ -53,13 +53,29 @@ def test_no_placeholders_present(tmp_path):
     assert data["literal_databases"] == ["analytics"]
 
 
-def test_output_dir_sibling_by_default(tmp_path):
+def test_output_dir_is_run_subdir_by_default(tmp_path):
     src = tmp_path / "q.sql"
     src.write_text("SELECT 1 FROM <YOUR_DEV_DATABASE>.prod.t;\n")
     _, data, _ = _run(src, "DEV_X")
     out_path = Path(data["output_path"])
-    assert out_path.parent == src.parent
-    assert out_path.name.endswith(".run.sql")
+    assert out_path.parent == src.parent / "run"
+    assert out_path.parent.exists()
+    assert out_path.name == "q.run.sql"
+
+
+def test_explicit_output_path_respected(tmp_path):
+    src = tmp_path / "q.sql"
+    src.write_text("SELECT 1 FROM <YOUR_DEV_DATABASE>.prod.t;\n")
+    custom = tmp_path / "custom" / "elsewhere.sql"
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT), str(src), "--dev-db", "DEV_X", "--output", str(custom)],
+        capture_output=True, text=True,
+    )
+    assert result.returncode == 0
+    data = json.loads(result.stdout)
+    out_path = Path(data["output_path"])
+    assert out_path == custom
+    assert out_path.exists()
 
 
 def test_missing_file(tmp_path):

@@ -63,7 +63,7 @@ def main() -> int:
         "--output",
         type=Path,
         default=None,
-        help="Output path (default: input path with .run.sql suffix)",
+        help="Output path (default: <input_dir>/run/<input_stem>.run.sql)",
     )
     args = p.parse_args()
     if not args.path.exists():
@@ -72,7 +72,13 @@ def main() -> int:
     original = args.path.read_text()
     substituted, replaced_count = substitute(original, args.dev_db)
     literals = find_literal_databases(substituted, args.dev_db)
-    out_path = args.output or args.path.with_suffix(".run.sql")
+    if args.output is not None:
+        out_path = args.output
+    else:
+        run_dir = args.path.parent / "run"
+        run_dir.mkdir(parents=True, exist_ok=True)
+        out_path = run_dir / (args.path.stem + ".run.sql")
+    out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(substituted)
     print(json.dumps({
         "output_path": str(out_path),

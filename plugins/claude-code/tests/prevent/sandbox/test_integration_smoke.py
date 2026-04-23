@@ -69,12 +69,14 @@ def test_happy_path(tmp_path):
     assert code == 0
     assert json.loads(out)["database"] is None
 
-    # 4. Substitute placeholders.
+    # 4. Substitute placeholders. Default output lives in validation/run/.
     code, out, _ = _run("substitute_placeholders.py", str(sql), "--dev-db", "personal_alice")
     assert code == 0
     sub_info = json.loads(out)
     assert sub_info["replaced_count"] == 2
     assert "analytics" in sub_info["literal_databases"]
+    from pathlib import Path as _P
+    assert _P(sub_info["output_path"]).parent == sql.parent / "run"
 
     # 5. Read-only check on the substituted output.
     code, out, _ = _run("readonly_check.py", sub_info["output_path"])
