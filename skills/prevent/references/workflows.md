@@ -570,7 +570,7 @@ from. Skip automatically for YAML/docs-only diffs.
 9. **Emit a session marker** on success (or on skip, with reason):
 
    ```
-   <!-- MC_BUILD_RAN: <model_name> -->
+   <!-- MC_BUILD_RAN: <table_name> -->
    ```
 
 ### What this workflow does NOT do
@@ -684,7 +684,7 @@ Snowflake MCP, and present per-query verdicts plus a consolidated summary.
 9. **Emit a session marker** per model after execution:
 
    ```
-   <!-- MC_VALIDATE_RAN: <model_name> -->
+   <!-- MC_VALIDATE_RAN: <table_name> -->
    ```
 
 ### Multi-model behavior

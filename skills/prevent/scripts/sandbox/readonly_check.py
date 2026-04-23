@@ -21,8 +21,10 @@ from pathlib import Path
 
 
 REJECTED_KEYWORDS = [
+    # Most-specific first: MERGE before UPDATE so "MERGE ... UPDATE SET" reports MERGE.
     "INSERT", "DELETE", "MERGE", "UPDATE", "CREATE", "DROP", "TRUNCATE",
-    "ALTER", "COPY", "PUT", "GRANT", "REVOKE", "CALL", "EXECUTE", "USE",
+    "ALTER", "COPY", "PUT", "GET", "LIST", "REMOVE", "UNLOAD",
+    "GRANT", "REVOKE", "CALL", "EXECUTE", "USE", "SET",
 ]
 
 _LINE_COMMENT_RE = re.compile(r"--[^\n]*")

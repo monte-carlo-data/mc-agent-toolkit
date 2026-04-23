@@ -16,6 +16,7 @@ Rules (uppercase-insensitive):
     unknown     -> everything else (empty string included)
 """
 
+import argparse
 import json
 import sys
 
@@ -38,11 +39,12 @@ def classify(database: str) -> str:
 
 
 def main() -> int:
-    if len(sys.argv) != 2:
-        print("usage: classify_sandbox.py <database_name>", file=sys.stderr)
-        return 2
-    database = sys.argv[1]
-    print(json.dumps({"database": database, "classification": classify(database)}))
+    p = argparse.ArgumentParser(
+        description="Classify a database name as personal / dev / shared-dev / prod / unknown."
+    )
+    p.add_argument("database", help="Database name to classify")
+    args = p.parse_args()
+    print(json.dumps({"database": args.database, "classification": classify(args.database)}))
     return 0
 
 

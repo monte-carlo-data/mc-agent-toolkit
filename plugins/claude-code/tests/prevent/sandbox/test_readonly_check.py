@@ -111,3 +111,27 @@ def test_rejects_multi_statement(tmp_path):
     code, data = _run(f)
     assert code == 1
     assert data["rejected"] == "MULTI_STATEMENT"
+
+
+def test_rejects_get_stage(tmp_path):
+    f = tmp_path / "q.sql"
+    f.write_text("GET @stage FILE 'out.csv';\n")
+    assert _run(f)[1]["rejected"] == "GET"
+
+
+def test_rejects_put(tmp_path):
+    f = tmp_path / "q.sql"
+    f.write_text("PUT file:///tmp/x.csv @stage;\n")
+    assert _run(f)[1]["rejected"] == "PUT"
+
+
+def test_rejects_unload(tmp_path):
+    f = tmp_path / "q.sql"
+    f.write_text("UNLOAD ('SELECT 1') TO '@stage';\n")
+    assert _run(f)[1]["rejected"] == "UNLOAD"
+
+
+def test_rejects_set_session_var(tmp_path):
+    f = tmp_path / "q.sql"
+    f.write_text("SET v = 1;\nSELECT 1;\n")
+    assert _run(f)[1]["rejected"] == "SET"
