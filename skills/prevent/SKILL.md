@@ -1,13 +1,22 @@
 ---
 name: monte-carlo-prevent
-description: |
-  Automatically activates when a dbt model, SQL file, or table is referenced.
-  Surfaces Monte Carlo context — table health, active alerts, lineage, blast
-  radius — before any code is written, and uses those findings to shape code
-  recommendations. Generates and optionally deploys monitors for new transformation
-  logic. After a change is made, generates targeted SQL validation queries to
-  verify the change behaved as intended. Do not wait to be asked: run the
-  appropriate workflow as soon as a relevant file or table is referenced.
+description: Shift-left safety net for dbt/SQL model changes. Runs change impact assessment before edits, generates post-change SQL validation queries, and executes them via `/mc-validate run`. Activates when a dbt model is opened or about to be modified.
+when_to_use: |
+  Invoke when the user is about to modify, is modifying, or just modified a dbt model or SQL pipeline. The core value is edit-time safety: pre-edit impact assessment + post-edit validation.
+
+  Invoke automatically — do not wait to be asked — when:
+  - a .sql file or file under models/ is opened or referenced in an IDE context
+  - the user describes intent to change a model's logic, columns, joins, filters, or parameters (REQUIRED before edits — runs change impact assessment)
+  - the user asks to "validate this change", "verify my edit", or runs `/mc-validate run`
+
+  Example triggers: "I'm going to add a column to dim_users", "let me refactor this join", "validate my change", "/mc-validate run".
+
+  Do NOT invoke for — these belong to peer skills:
+  - "how is table X?" / "check health of X" → asset-health
+  - "create a monitor for X" / "what should I monitor?" → monitoring-advisor
+  - "triage this alert" / "why did X fail?" → automated-triage or incident-response
+
+  Prevent may still surface lightweight health and alert context as input to its impact assessment (Workflow 1 feeds Workflow 4), but it is not the right skill for a standalone health or alert question.
 version: 1.0.0
 ---
 
