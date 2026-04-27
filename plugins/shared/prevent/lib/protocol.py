@@ -12,6 +12,7 @@ import subprocess
 from lib.cache import (
     add_edited_table,
     cleanup_stale_cache,
+    clear_monitor_gap,
     get_edited_tables,
     get_impact_check_age_seconds,
     get_impact_check_state,
@@ -245,6 +246,8 @@ def evaluate_pre_commit(inp: HookInput) -> HookOutput:
             f"\n\nMonitor coverage: the impact assessment found no custom monitors "
             f"on {gap_list}. Generate monitor definitions before committing? (yes / no)"
         )
+        for t in gap_tables:
+            clear_monitor_gap(inp.session_id, t)
 
     return HookOutput(action="context", context=message)
 
@@ -289,6 +292,8 @@ def evaluate_turn_end(inp: HookInput) -> HookOutput:
             f"→ Yes: I'll suggest monitors for the new or changed logic\n"
             f"→ No: Skip for now"
         )
+        for t in gap_tables:
+            clear_monitor_gap(session_id, t)
 
     move_to_pending_validation(session_id)
     return HookOutput(action="block", reason=reason)
