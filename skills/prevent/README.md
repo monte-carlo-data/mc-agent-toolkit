@@ -62,9 +62,25 @@ If your MCP client doesn't support HTTP transport, use `.mcp.json.example` with 
 
 ## How to use it
 
-Open your dbt project (or any data engineering codebase) in your editor. From there, you can either reference a few models or tables you plan to work on — or just prompt the editor with the change you want to make. The skill activates automatically based on what you're doing; no special commands needed.
+Open your dbt project (or any data engineering codebase) in your editor. Describe the change you want to make — or reference a model file together with an edit (`@models/orders.sql add a column`). The skill activates automatically when you express change intent; no special commands needed.
 
-**Workflow 1 — Table health check (delegated):** Opens when you reference a `.sql` file, dbt model, or table name. Hands off to the `monte-carlo-asset-health` skill, which surfaces freshness, row count, importance, lineage, and active alerts. If you express change intent, prevent escalates to Workflow 2 (impact assessment) using the data asset-health just gathered.
+### End-to-end flow
+
+```mermaid
+flowchart LR
+    A["Describe a<br/>change"] --> B["W1<br/>fetch table<br/>context<br/>(silent)"]
+    B --> C["W2<br/>impact<br/>assessment"]
+    C --> D{"Proceed?"}
+    D -- yes --> E["Edit<br/>applied"]
+    E --> F{"Monitor<br/>gap?"}
+    F -- yes --> G["W6<br/>generate<br/>monitor"]
+    E --> H["/mc-validate<br/>run"]
+    H --> I["W3<br/>validation<br/>queries"]
+```
+
+W1 (asset-health) runs silently and feeds W2 — you see one report, not two. W6 delegates to `monte-carlo-monitoring-advisor`. Standalone health questions ("how is X doing?") go directly to `monte-carlo-asset-health`, not to prevent.
+
+**Workflow 1 — Asset health pre-fetch (silent):** Runs as a precursor to Workflow 2 whenever you express change intent on a table that hasn't been seen this session. Hands off to `monte-carlo-asset-health` to gather lineage, alerts, monitors, and freshness. The report is used as data for the impact assessment, not shown directly — you only see disambiguation prompts (when multiple matching tables exist) or stop-the-world warnings (active critical alerts, severe staleness).
 
 **Workflow 2 — Change impact assessment:** Fires automatically before any SQL edit — including filter changes, bugfixes, reverts, and parameter tweaks, not just schema changes. Surfaces downstream blast radius, active incidents, column exposure in recent queries, and monitor coverage. Reports a risk tier (High / Medium / Low) and translates the findings into a specific code recommendation. If the MC data suggests your planned approach is risky, Claude will recommend a safer alternative and explain why — citing the specific tables, alert counts, and read volumes it found.
 
