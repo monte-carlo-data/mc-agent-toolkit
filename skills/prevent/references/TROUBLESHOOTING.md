@@ -14,7 +14,7 @@ curl -s -o /dev/null -w "%{http_code}" https://mcp.getmontecarlo.com/mcp
 ### Monitor creation errors:
 
 **`montecarlo monitors apply` fails with "Unknown field":**
-Monitor definition files must have `montecarlo:` as the root key — do not copy the `validation:` or `custom_sql:` output from the MCP tools directly. Reformat using the `montecarlo: > custom_sql:` structure shown in Workflow 2.
+Monitor definition files must have `montecarlo:` as the root key — do not copy the `validation:` or `custom_sql:` output from the MCP tools directly. Reformat using the `montecarlo: > custom_sql:` structure shown in Workflow 6.
 
 **`montecarlo monitors apply` fails with "Not a Monte Carlo project":**
 Ensure `montecarlo.yml` (the project config) exists in the working directory. This file must contain only `version`, `namespace`, and `default_resource` — not monitor definitions.

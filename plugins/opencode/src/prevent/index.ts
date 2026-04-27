@@ -20,6 +20,7 @@ import {
   getImpactCheckAgeSeconds,
   hasMonitorGap,
   markMonitorGap,
+  clearMonitorGap,
   addEditedTable,
   getEditedTables,
   getPendingValidationTables,
@@ -227,6 +228,9 @@ export const McPrevent: Plugin = async ({ client, directory, worktree }) => {
             message +=
               `\n\nMonitor coverage: the impact assessment found no custom monitors ` +
               `on ${gapList}. Generate monitor definitions before committing? (yes / no)`;
+            for (const t of gapTables) {
+              clearMonitorGap(sessionID, t);
+            }
           }
 
           // Inject context by throwing — the LLM will see this message and can
@@ -297,6 +301,9 @@ export const McPrevent: Plugin = async ({ client, directory, worktree }) => {
             `on ${gapList}. Would you like to generate monitor definitions?\n\n` +
             `> Yes: suggest monitors for the new or changed logic\n` +
             `> No: skip for now`;
+          for (const t of gapTables) {
+            clearMonitorGap(sessionID, t);
+          }
         }
 
         moveToPendingValidation(sessionID);

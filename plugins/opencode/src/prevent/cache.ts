@@ -170,6 +170,20 @@ export function markMonitorGap(
   writeSecure(mgPath(sessionId, tableName), String(Date.now() / 1000));
 }
 
+/**
+ * Remove the monitor-gap marker for a table. Called by hooks after the
+ * coverage prompt has been delivered so subsequent post-edit / pre-commit
+ * prompts don't re-nag for the same gap. A fresh Workflow 2 run will
+ * re-emit MC_MONITOR_GAP if the gap persists.
+ */
+export function clearMonitorGap(
+  sessionId: string,
+  tableName: string
+): void {
+  const path = mgPath(sessionId, tableName);
+  if (existsSync(path)) unlinkSync(path);
+}
+
 // --- Turn-level edit accumulator ---
 
 export function getEditedTables(sessionId: string): string[] {
