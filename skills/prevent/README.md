@@ -68,17 +68,16 @@ Open your dbt project (or any data engineering codebase) in your editor. Describ
 
 ```mermaid
 flowchart LR
-    A["Describe a<br/>change"] --> B["W1<br/>fetch table<br/>context<br/>(silent)"]
-    B --> C["W2<br/>impact<br/>assessment"]
+    A["Describe a<br/>change"] --> B["Fetch table<br/>context<br/>(silent)"]
+    B --> C["Impact<br/>assessment"]
     C --> D{"Proceed?"}
     D -- yes --> E["Edit<br/>applied"]
     E --> F{"Monitor<br/>gap?"}
-    F -- yes --> G["W6<br/>generate<br/>monitor"]
-    E --> H["/mc-validate<br/>run"]
-    H --> I["W3<br/>validation<br/>queries"]
+    F -- yes --> G["Generate<br/>monitor"]
+    E -.->|"any time<br/>(manual or<br/>post-edit)"| H["/mc-validate<br/>→ validation<br/>queries"]
 ```
 
-W1 (asset-health) runs silently and feeds W2 — you see one report, not two. W6 delegates to `monte-carlo-monitoring-advisor`. Standalone health questions ("how is X doing?") go directly to `monte-carlo-asset-health`, not to prevent.
+The first step runs silently and feeds the impact assessment — you see one report, not two. Monitor generation hands off to `monte-carlo-monitoring-advisor`. Standalone health questions ("how is X doing?") go directly to `monte-carlo-asset-health`, not to prevent.
 
 **Workflow 1 — Asset health pre-fetch (silent):** Runs as a precursor to Workflow 2 whenever you express change intent on a table that hasn't been seen this session. Hands off to `monte-carlo-asset-health` to gather lineage, alerts, monitors, and freshness. The report is used as data for the impact assessment, not shown directly — you only see disambiguation prompts (when multiple matching tables exist) or stop-the-world warnings (active critical alerts, severe staleness).
 
