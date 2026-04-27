@@ -1,6 +1,17 @@
 ---
 name: monte-carlo-prevent
 description: Shift-left safety net for dbt/SQL model edits. Surfaces health context (via asset-health), runs change impact assessment before edits, generates SQL validation queries after, and offers monitor generation (via monitoring-advisor) post-edit.
+when_to_use: |
+  Invoke when the user expresses intent to change a dbt or SQL model — adding, dropping, renaming, refactoring a column or filter, fixing a bug in model logic, tweaking a parameter, or referencing a model file paired with an edit verb.
+  Example triggers: "add an is_active column to client_hub", "refactor the join logic in stg_payments", "drop the legacy_id column from dim_users", "@models/orders.sql add a filter".
+
+  Do NOT invoke for:
+  - Plain health questions about a table ("how is X doing?", "is X healthy?") — those go to monte-carlo-asset-health.
+  - Alert investigation or incident triage ("freshness alert on X", "why did X fail?") — those go to monte-carlo-automated-triage or monte-carlo-incident-response.
+  - Standalone monitor creation requests without an edit context ("create a monitor for X", "what should I monitor?", "show coverage gaps") — those go to monte-carlo-monitoring-advisor.
+  - Performance or pipeline diagnosis ("why is X slow?", "investigate the query plan") — those go to monte-carlo-performance-diagnosis.
+  - Edits to non-model files: seed CSVs (seeds/), analysis files (analyses/), dbt config (dbt_project.yml, profiles.yml, packages.yml).
+  - Bare file opens or reads without an edit verb ("open stg_orders.sql so I can see what it does") — that's navigation, not change intent.
 version: 1.0.0
 ---
 

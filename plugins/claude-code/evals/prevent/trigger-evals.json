@@ -59,49 +59,49 @@
     {
       "id": "should-not-01",
       "prompt": "How is the dim_customers table doing? Any active alerts?",
-      "expected": "do_not_trigger",
+      "expected": "no-trigger",
       "rationale": "Plain health question -- belongs to monte-carlo-asset-health, not prevent"
     },
     {
       "id": "should-not-02",
       "prompt": "We got a freshness alert on raw_events. What's going on?",
-      "expected": "do_not_trigger",
+      "expected": "no-trigger",
       "rationale": "Alert investigation -- belongs to monte-carlo-automated-triage or monte-carlo-incident-response"
     },
     {
       "id": "should-not-03",
       "prompt": "Can you open models/staging/stg_orders.sql so I can see what it does?",
-      "expected": "do_not_trigger",
+      "expected": "no-trigger",
       "rationale": "File open without change intent -- post-refactor, prevent only activates on edit intent"
     },
     {
       "id": "should-not-04",
       "prompt": "Create a monitor for null values in the email column of users.",
-      "expected": "do_not_trigger",
+      "expected": "no-trigger",
       "rationale": "Direct monitor creation request without edit context -- belongs to monte-carlo-monitoring-advisor"
     },
     {
       "id": "should-not-05",
       "prompt": "Show me coverage gaps across our warehouse -- which critical tables have no monitors?",
-      "expected": "do_not_trigger",
+      "expected": "no-trigger",
       "rationale": "Coverage analysis -- monitoring-advisor territory, no model edit involved"
     },
     {
       "id": "should-not-06",
       "prompt": "Add a new row to seeds/country_codes.csv for South Sudan.",
-      "expected": "do_not_trigger",
+      "expected": "no-trigger",
       "rationale": "Seed file edit -- explicitly excluded from prevent's scope"
     },
     {
       "id": "should-not-07",
       "prompt": "Update the dbt_project.yml to add a new model path.",
-      "expected": "do_not_trigger",
+      "expected": "no-trigger",
       "rationale": "dbt config file -- not a model, explicitly excluded"
     },
     {
       "id": "should-not-08",
       "prompt": "Why is the orders pipeline running slow? Can you investigate the query plan?",
-      "expected": "do_not_trigger",
+      "expected": "no-trigger",
       "rationale": "Performance diagnosis -- belongs to monte-carlo-performance-diagnosis, not prevent"
     }
   ]
