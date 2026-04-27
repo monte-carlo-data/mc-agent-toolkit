@@ -77,15 +77,13 @@ flowchart LR
     E -.->|"any time<br/>(manual or<br/>post-edit)"| H["/mc-validate<br/>→ validation<br/>queries"]
 ```
 
-The first step runs silently and feeds the impact assessment — you see one report, not two. Monitor generation hands off to `monte-carlo-monitoring-advisor`. Standalone health questions ("how is X doing?") go directly to `monte-carlo-asset-health`, not to prevent.
+**Impact assessment** — Before any SQL edit (including filter changes, bugfixes, reverts, and parameter tweaks), prevent surfaces the change's blast radius: downstream models, active alerts, column exposure in recent queries, and monitor coverage. You get a risk tier (High / Medium / Low) and a recommendation tied to your specific change. If the data suggests your approach is risky, Claude proposes a safer alternative.
 
-**Workflow 1 — Asset health pre-fetch (silent):** Runs as a precursor to Workflow 2 whenever you express change intent on a table that hasn't been seen this session. Hands off to `monte-carlo-asset-health` to gather lineage, alerts, monitors, and freshness. The report is used as data for the impact assessment, not shown directly — you only see disambiguation prompts (when multiple matching tables exist) or stop-the-world warnings (active critical alerts, severe staleness).
+**Validation queries** — When you're ready to test a change, say "generate validation queries", "validate this change", or run `/mc-validate`. Prevent generates 3–5 targeted SQL queries based on what you actually changed — null checks, before/after row counts, distribution checks — saved to `validation/<table_name>_<timestamp>.sql` with inline comments describing a passing result.
 
-**Workflow 2 — Change impact assessment:** Fires automatically before any SQL edit — including filter changes, bugfixes, reverts, and parameter tweaks, not just schema changes. Surfaces downstream blast radius, active incidents, column exposure in recent queries, and monitor coverage. Reports a risk tier (High / Medium / Low) and translates the findings into a specific code recommendation. If the MC data suggests your planned approach is risky, Claude will recommend a safer alternative and explain why — citing the specific tables, alert counts, and read volumes it found.
+**Monitor coverage** — After you finish an edit, if the impact assessment found a coverage gap, prevent prompts you to add a monitor. On yes, it hands off to `monte-carlo-monitoring-advisor` to produce a validation, metric, comparison, or custom SQL monitor as code.
 
-**Workflow 3 — Change validation queries:** After you've made a change and are ready to test it, say something like "generate validation queries" or "validate this change". Claude generates 3–5 targeted SQL queries based on the Workflow 2 findings and the diff — null checks, before/after row counts, distribution checks — using the exact column names, filter logic, and business rules from your change. Queries are saved to `validation/<table_name>_<timestamp>.sql` with inline comments explaining what a passing result looks like for each check. Does not activate automatically; only runs when you ask.
-
-**Workflow 6 — Add monitor (delegated, post-edit):** After you finish an edit, the post-edit hook prompts you about monitor coverage if the impact assessment found a gap. On yes, prevent hands off to the `monte-carlo-monitoring-advisor` skill, which generates a validation, metric, comparison, or custom SQL monitor as code. Workflows 4 and 5 are reserved for sandbox-build / execute-validation steps that land via `/mc-validate run`.
+For standalone health questions ("how is X doing?"), go directly to `monte-carlo-asset-health` instead — prevent activates only when you're about to change something.
 
 ### Deploying generated monitors
 
