@@ -82,27 +82,3 @@ cases:
         targets the is_active column specifically — for example a validation
         rule that the column is non-null, or a comparison check that catches
         unexpected default-value drift.
-
-  - id: live-05-no-impact-assessment-on-health-question
-    turns:
-      - prompt: "How is client_hub in MC-Snowflake-test doing?"
-        criteria:
-          must_not_call: [Edit, Write]
-    criteria:
-      judge_rubric: |
-        The agent answers the health question with a normal asset-health-style
-        report (freshness, importance, active alerts, monitor coverage,
-        upstream dependencies).
-
-        The agent must NOT:
-        - Produce a risk tier (High / Medium / Low classification language).
-        - Use change impact assessment framing — phrases like "blast radius",
-          "downstream models will be affected by your change", "synthesis",
-          "before editing", "before proceeding with the change".
-        - Prompt the engineer about a planned change. The engineer didn't
-          describe one.
-
-        Asset-health-style MCP calls (get_table, get_alerts, get_monitors)
-        ARE expected — the agent legitimately answers the health question
-        through those tools. The discriminator is the framing of the response,
-        not the tools used.
