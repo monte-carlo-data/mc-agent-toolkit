@@ -226,7 +226,7 @@ class TestEvaluateTurnEnd:
 
 
 class TestMonitorGapCleared:
-    def test_turn_end_clears_gap_after_prompting(self, monkeypatch):
+    def test_turn_end_clears_gap_after_prompting(self):
         session_id = "test_clear_turnend"
         cache.mark_impact_check_injected(session_id, "orders")
         cache.mark_monitor_gap(session_id, "orders")
@@ -256,7 +256,7 @@ class TestMonitorGapCleared:
         assert cache.has_monitor_gap(session_id, "orders") is False, \
             "gap should be cleared after the pre-commit prompt is delivered"
 
-    def test_turn_end_does_not_clear_when_no_gap(self, monkeypatch):
+    def test_turn_end_does_not_clear_when_no_gap(self):
         session_id = "test_no_clear"
         cache.mark_impact_check_injected(session_id, "orders")
         cache.add_edited_table(session_id, "orders")
