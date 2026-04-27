@@ -186,6 +186,15 @@ def evaluate_pre_edit(inp: HookInput) -> HookOutput:
         "in their editor settings before proceeding."
     )
 
+    workflow_order_note = (
+        "If Workflow 1 (asset-health delegation) has not yet run for this table "
+        "this session, run it first via the Skill tool — it surfaces the table's "
+        "health, lineage, alerts, and monitors as framing. Then run Workflow 2 "
+        "(change impact assessment), reusing the asset-health data rather than "
+        "re-fetching. If Workflow 1 already ran for this table, skip directly to "
+        "Workflow 2."
+    )
+
     if table_name.startswith("macro:"):
         macro_name = table_name.removeprefix("macro:")
         reason = (
@@ -193,14 +202,14 @@ def evaluate_pre_edit(inp: HookInput) -> HookOutput:
             f"models at compile time — changes here affect every model that calls it. "
             f"Identify which models use this macro, then run the change impact "
             f"assessment for the affected models before editing this file. "
-            f"{hook_triggered_note} {no_bypass_note}"
+            f"{workflow_order_note} {hook_triggered_note} {no_bypass_note}"
         )
     else:
         reason = (
             f"Monte Carlo Prevent: run the change impact assessment "
             f"for {table_name} before editing this file. Present the full "
             f"impact report and synthesis step, then ask the user whether to proceed before retrying the edit. "
-            f"{hook_triggered_note} {no_bypass_note}"
+            f"{workflow_order_note} {hook_triggered_note} {no_bypass_note}"
         )
 
     return HookOutput(action="deny", reason=reason)

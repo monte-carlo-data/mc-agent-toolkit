@@ -181,6 +181,14 @@ export const McPrevent: Plugin = async ({ client, directory, worktree }) => {
               "markers for tables whose lineage and monitor coverage were fetched " +
               "directly via Monte Carlo tools.";
 
+            const workflowOrderNote =
+              "If Workflow 1 (asset-health delegation) has not yet run for this table " +
+              "this session, run it first via the Skill tool — it surfaces the table's " +
+              "health, lineage, alerts, and monitors as framing. Then run Workflow 2 " +
+              "(change impact assessment), reusing the asset-health data rather than " +
+              "re-fetching. If Workflow 1 already ran for this table, skip directly to " +
+              "Workflow 2.";
+
             if (tableName.startsWith("macro:")) {
               const macroName = tableName.slice("macro:".length);
               throw new Error(
@@ -188,6 +196,8 @@ export const McPrevent: Plugin = async ({ client, directory, worktree }) => {
                   `models at compile time — changes here affect every model that calls it. ` +
                   `Identify which models use this macro, then run the change impact ` +
                   `assessment for the affected models before editing this file. ` +
+                  workflowOrderNote +
+                  " " +
                   hookTriggeredNote
               );
             } else {
@@ -195,6 +205,8 @@ export const McPrevent: Plugin = async ({ client, directory, worktree }) => {
                 `Monte Carlo Prevent: run the change impact assessment ` +
                   `for ${tableName} before editing this file. Present the full ` +
                   `impact report and synthesis step, then retry the edit. ` +
+                  workflowOrderNote +
+                  " " +
                   hookTriggeredNote
               );
             }
