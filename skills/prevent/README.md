@@ -83,8 +83,6 @@ flowchart LR
 
 **Monitor coverage** — After you finish an edit, if the impact assessment found a coverage gap, prevent prompts you to add a monitor. On yes, it hands off to `monte-carlo-monitoring-advisor` to produce a validation, metric, comparison, or custom SQL monitor as code.
 
-For standalone health questions ("how is X doing?"), go directly to `monte-carlo-asset-health` instead — prevent activates only when you're about to change something.
-
 ### Deploying generated monitors
 
 When Claude generates a monitor, it saves the YAML to `monitors/<table>.yml`. Deploy with:
