@@ -109,8 +109,13 @@ def main():
 
     evals_path = Path(args.evals) if args.evals else EVALS_DIR / args.skill / "trigger-evals.json"
     if not evals_path.exists():
-        print(f"Error: Eval cases not found: {evals_path}")
-        sys.exit(1)
+        # An explicit --evals path was given but doesn't exist — that's a real error.
+        if args.evals:
+            print(f"Error: Eval cases not found: {evals_path}")
+            sys.exit(1)
+        # Default path missing — skill has no trigger-evals (live-evals-only). Skip gracefully.
+        print(f"No trigger-evals for {args.skill} (live-evals-only skill). Skipping.")
+        sys.exit(0)
 
     cases = json.loads(evals_path.read_text())["cases"]
     skill_name, skill_description = load_skill_description(skill_dir)
