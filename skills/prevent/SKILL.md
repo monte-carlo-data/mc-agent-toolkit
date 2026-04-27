@@ -20,11 +20,24 @@ Reference files live next to this skill file. **Use the Read tool** (not MCP res
 
 - References or opens a `.sql` file or dbt model (files in `models/`) → run Workflow 1 (delegates to asset-health for the health report)
 - Mentions a table name, dataset, or dbt model name in passing → run Workflow 1
-- Describes a planned change to a model (new column, join update, filter change, refactor) → **STOP — run Workflow 2 before writing any code**
-- Adds a new column, metric, or output expression to an existing model → run Workflow 2 first; the post-edit hook will offer Workflow 6 (monitor generation) afterward
+- Describes a planned change to a model (new column, join update, filter change, refactor) → **STOP — run Workflow 1 first if it has not run for this table this session, then Workflow 2, before writing any code**
+- Adds a new column, metric, or output expression to an existing model → same rule: Workflow 1 first (if not yet run for this table), then Workflow 2; the post-edit hook will offer Workflow 6 (monitor generation) afterward
 - Asks about data quality, freshness, row counts, or anomalies → run Workflow 1
 
 Present the results as context the engineer needs before proceeding — not as a response to a question.
+
+### Change intent on a fresh table — run Workflow 1 first
+
+When the user references a model **and** describes a change in the same prompt
+(e.g. `@models/clients/client_hub.sql add an is_active column`), the table has
+not yet been seen in the session. In that case run **Workflow 1 first** so the
+asset-health report frames the table for the engineer (freshness, alerts, key
+downstream assets), then proceed to Workflow 2 with that data already in hand.
+Workflow 2's data-gathering step will reuse asset-health's results, so this
+costs one extra Skill-tool invocation, not extra MCP calls.
+
+If Workflow 1 already ran for this table earlier in the session, skip directly
+to Workflow 2 — re-running asset-health is redundant.
 
 ## When NOT to activate this skill
 
