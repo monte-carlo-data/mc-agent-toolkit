@@ -40,8 +40,34 @@ from claude_agent_sdk import (
     query,
 )
 
-from constants import EVALS_DIR, get_mcp_server_config, load_skill_content
+from constants import EVALS_DIR, get_mcp_server_config, load_combined_skill_content
 from models import CaseResult, ConversationTrace, EvalCase, Turn, TurnCriteria
+
+
+# ---------------------------------------------------------------------------
+# Helpers — eval file resolution and peer skill loading
+# ---------------------------------------------------------------------------
+
+def _resolve_eval_file(skill: str, env: str) -> Path:
+    """Locate the YAML file for this skill and env. Mirrors EvalRunner's logic."""
+    env_specific = EVALS_DIR / skill / f"live-evals-{env}.yaml"
+    generic = EVALS_DIR / skill / "live-evals.yaml"
+    if env_specific.exists():
+        return env_specific
+    if generic.exists():
+        return generic
+    print(f"Error: no live-evals YAML found for skill '{skill}' (env={env})")
+    sys.exit(1)
+
+
+def _read_peer_skills(eval_file: Path) -> list[str]:
+    """Read top-level peer_skills list from the YAML, or [] if absent."""
+    data = yaml.safe_load(eval_file.read_text()) or {}
+    peers = data.get("peer_skills") or []
+    if not isinstance(peers, list) or not all(isinstance(p, str) for p in peers):
+        print(f"Error: peer_skills in {eval_file} must be a list of strings")
+        sys.exit(1)
+    return peers
 
 
 # ---------------------------------------------------------------------------
@@ -411,14 +437,7 @@ class EvalRunner:
 
     def _resolve_eval_file(self) -> Path:
         """Find the eval YAML: env-specific first, then generic fallback."""
-        env_specific = EVALS_DIR / self._skill / f"live-evals-{self._env}.yaml"
-        generic = EVALS_DIR / self._skill / "live-evals.yaml"
-        if env_specific.exists():
-            return env_specific
-        if generic.exists():
-            return generic
-        print(f"Error: No eval file found. Tried:\n  {env_specific}\n  {generic}")
-        sys.exit(1)
+        return _resolve_eval_file(self._skill, self._env)
 
     def _print_header(self, cases: list[EvalCase], parallel: int = 1) -> None:
         print(f"Skill:      {self._skill}")
@@ -501,7 +520,15 @@ def main() -> None:
     args = parser.parse_args()
 
     mcp_servers = get_mcp_server_config(args.env)
-    skill_content = load_skill_content(args.skill, skip_missing=args.skip_missing_skill)
+    eval_file = _resolve_eval_file(args.skill, args.env)
+    peer_skills = _read_peer_skills(eval_file)
+    skill_content = load_combined_skill_content(
+        args.skill,
+        peer_skills=peer_skills,
+        skip_missing=args.skip_missing_skill,
+    )
+    if peer_skills:
+        print(f"Peer skills: {', '.join(peer_skills)}")
 
     agent = AgentRunner(
         model=args.model,

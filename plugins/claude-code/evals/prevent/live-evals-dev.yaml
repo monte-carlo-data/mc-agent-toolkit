@@ -1,25 +1,26 @@
+peer_skills:
+  - asset-health
+  - monitoring-advisor
+
 cases:
-  - id: live-01-impact-assessment-from-file-mention
+  - id: live-01-disambiguation-asks
     turns:
-      - prompt: "@analytics/models/clients/client_hub.sql add a column 'is_active', default to true"
+      - prompt: "I want to add an is_active column with default true to client_hub. What's the impact?"
         criteria:
           must_call: [search]
           must_not_call: [Edit, Write]
     criteria:
       judge_rubric: |
         The agent should:
-        1. Look up the client_hub table via Monte Carlo (search + get_table or
-           via the asset-health skill's MCP calls: get_alerts, get_asset_lineage,
-           get_monitors).
-        2. Recognize that multiple client_hub matches exist across MC connections
-           and ask the engineer which one to assess (e.g. MC-Snowflake-test vs
-           other warehouses). Do not silently pick one.
-        3. Produce a change impact assessment with a risk tier (High / Medium /
-           Low) and a recommendation tied to the proposed is_active column.
-        4. Wait for confirmation before proposing any edit. The agent must NOT
-           call the Edit or Write tool during this turn.
+        1. Search Monte Carlo for client_hub.
+        2. Recognize that multiple client_hub matches exist across MC
+           connections and present them to the engineer (full_table_id,
+           warehouse, importance, key-asset flag) and ask which one to assess.
+        3. NOT silently pick one and run the assessment.
+        4. NOT produce a final risk tier yet — the assessment can't complete
+           until the engineer disambiguates.
 
-  - id: live-02-impact-assessment-standalone
+  - id: live-02-impact-assessment-with-warehouse
     turns:
       - prompt: "I want to add an is_active column with default true to client_hub in the MC-Snowflake-test warehouse. What's the impact?"
         criteria:
