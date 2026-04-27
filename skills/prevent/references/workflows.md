@@ -164,7 +164,7 @@ If risk is 🔴 High:
 2. Include in the recommendation: "Notify: <audience names / channels>"
 3. Proactively suggest:
    - Notifying owners of downstream key assets (`setAlertOwner` / `createOrUpdateAlertComment` on active alerts)
-   - Adding a monitor for the new logic before deploying (Workflow 2)
+   - Adding a monitor for the new logic before deploying (Workflow 6)
    - Running `montecarlo monitors apply --dry-run` after changes to verify nothing breaks
 
 ### Synthesis: translate findings into code recommendations
@@ -186,12 +186,12 @@ Explicitly connect each key finding to a specific recommendation:
 
 - Monitors on affected columns:
   → Call out that the change will affect monitor coverage
-  → Recommend updating monitors alongside the code change (offer Workflow 2)
+  → Recommend updating monitors alongside the code change (offer Workflow 6)
   → Explain: "The existing monitor on [column] will need to be updated to
      account for this change"
 
 - New output column or logic being added:
-  → Always offer Workflow 2 after the impact assessment, regardless
+  → Always offer Workflow 6 after the impact assessment, regardless
     of existing monitor coverage
   → Do not skip this step even if risk tier is 🟢 Low
   → Say explicitly: "This adds new output logic — would you like me
