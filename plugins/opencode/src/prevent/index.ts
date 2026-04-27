@@ -182,12 +182,15 @@ export const McPrevent: Plugin = async ({ client, directory, worktree }) => {
               "directly via Monte Carlo tools.";
 
             const workflowOrderNote =
-              "If Workflow 1 (asset-health delegation) has not yet run for this table " +
-              "this session, run it first via the Skill tool — it surfaces the table's " +
-              "health, lineage, alerts, and monitors as framing. Then run Workflow 2 " +
-              "(change impact assessment), reusing the asset-health data rather than " +
-              "re-fetching. If Workflow 1 already ran for this table, skip directly to " +
-              "Workflow 2.";
+              "If Workflow 1 (asset-health pre-fetch) has not yet run for this table " +
+              "this session, run it first via the Skill tool to gather lineage / alerts " +
+              "/ monitors as data for the impact assessment. Read W1's report as data " +
+              "and do NOT relay it to the engineer — only surface a disambiguation " +
+              "prompt (if asset-health asks which match to use) or a one-line " +
+              "stop-the-world warning (active critical alerts, severe staleness). " +
+              "Then run Workflow 2 (change impact assessment), reusing the asset-health " +
+              "data rather than re-fetching. Workflow 2 is the user-facing artifact. " +
+              "If Workflow 1 already ran for this table, skip directly to Workflow 2.";
 
             if (tableName.startsWith("macro:")) {
               const macroName = tableName.slice("macro:".length);

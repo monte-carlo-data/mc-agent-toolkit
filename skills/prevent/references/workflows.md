@@ -6,13 +6,17 @@ executing a workflow.
 
 ---
 
-## Workflow 1: Table health check (delegated)
+## Workflow 1: Asset health pre-fetch (silent delegation)
 
-**Trigger:** A `.sql` file or dbt model is opened, referenced, or a table name
-is mentioned in the context of an upcoming edit.
+**Trigger:** The user expresses change intent for a table that hasn't been
+seen in this session. Workflow 1 only ever runs as a precursor to Workflow 2 —
+it does not run on bare file mentions or general "how is X doing" questions.
+Those go directly to `monte-carlo-asset-health` via its own activation rules.
 
-**Goal:** Surface Monte Carlo context (health, lineage, alerts, monitors) for
-the table before the engineer makes any change.
+**Goal:** Gather Monte Carlo context (health, lineage, alerts, monitors) for
+the table so Workflow 2 can incorporate it into the change-focused impact
+assessment. The report itself is data for W2 — not a separate user-facing
+artifact.
 
 ### Sequence
 
@@ -23,21 +27,26 @@ the table before the engineer makes any change.
    (`get_table`, `get_alerts`, `get_asset_lineage`, `get_monitors`). Asset-health
    is the source of truth for health data.
 
-3. Once the report returns, present it to the engineer as-is, then resume in
-   prevent:
+3. Once the report returns, **read it as data and proceed to Workflow 2**.
+   Do not relay the full report to the engineer — Workflow 2's impact
+   assessment is the user-facing artifact and already cites the relevant
+   alerts / lineage / monitors. Two exceptions where you **must** surface
+   output from W1:
 
-   - If the user's prompt or session context indicates **change intent** (any
-     verb in Workflow 2's trigger list — see SKILL.md), proceed to Workflow 2
-     (change impact assessment). Workflow 2 will reuse the data asset-health
-     just gathered.
-   - If there is **no change intent**, stop. The asset-health report is the
-     answer.
+   - **Disambiguation prompt.** If asset-health returns multiple matches and
+     asks the engineer which one to assess, surface that question and wait
+     for the answer before continuing — the user must pick.
+   - **Stop-the-world signals.** If asset-health's report shows the table is
+     already on fire (active critical alerts firing, freshness severely
+     stale), say so in one short line before W2 begins so the engineer
+     knows the table state is degraded.
 
 ### What this workflow does NOT do
 
 - Does not call any MCP tools directly. All data comes from asset-health.
-- Does not auto-escalate to Workflow 2 if there's no change intent. The skill
-  trigger list in SKILL.md is the gate.
+- Does not run standalone. Workflow 1 only fires as part of the W1 → W2 chain.
+- Does not produce a user-facing report. The full health report stays in
+  prevent's context, not in the conversation.
 
 ---
 

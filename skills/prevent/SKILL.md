@@ -16,25 +16,33 @@ Reference files live next to this skill file. **Use the Read tool** (not MCP res
 
 ## When to activate this skill
 
+**Prevent is the edit-lifecycle skill.** Activate only when the user expresses
+intent to change a dbt model. Bare file mentions, table-name mentions in
+passing, or general health questions are **not** prevent's territory — those
+belong to `monte-carlo-asset-health` and will activate that skill on their own.
+
 **Do not wait to be asked.** Run the appropriate workflow automatically whenever the user:
 
-- References or opens a `.sql` file or dbt model (files in `models/`) → run Workflow 1 (delegates to asset-health for the health report)
-- Mentions a table name, dataset, or dbt model name in passing → run Workflow 1
 - Describes a planned change to a model (new column, join update, filter change, refactor) → **STOP — run Workflow 1 first if it has not run for this table this session, then Workflow 2, before writing any code**
 - Adds a new column, metric, or output expression to an existing model → same rule: Workflow 1 first (if not yet run for this table), then Workflow 2; the post-edit hook will offer Workflow 6 (monitor generation) afterward
-- Asks about data quality, freshness, row counts, or anomalies → run Workflow 1
+- References a model file with an edit verb in the same prompt (e.g. `@models/clients/client_hub.sql add an is_active column`) → same rule: Workflow 1 first, then Workflow 2
 
-Present the results as context the engineer needs before proceeding — not as a response to a question.
+Present the W2 impact assessment as context the engineer needs before proceeding — not as a response to a question.
 
-### Change intent on a fresh table — run Workflow 1 first
+### Workflow 1 runs silently when chained to Workflow 2
 
-When the user references a model **and** describes a change in the same prompt
-(e.g. `@models/clients/client_hub.sql add an is_active column`), the table has
-not yet been seen in the session. In that case run **Workflow 1 first** so the
-asset-health report frames the table for the engineer (freshness, alerts, key
-downstream assets), then proceed to Workflow 2 with that data already in hand.
-Workflow 2's data-gathering step will reuse asset-health's results, so this
-costs one extra Skill-tool invocation, not extra MCP calls.
+When the user expresses change intent, Workflow 1 invokes `monte-carlo-asset-health`
+purely as a data-gathering step. Read asset-health's report from your context, but
+**do not relay the full report to the engineer** — the user-facing artifact is
+Workflow 2's impact assessment, which already cites the relevant alerts / lineage /
+monitors. Showing both creates duplicate reading.
+
+Two exceptions where you **must** surface output from W1 to the engineer:
+
+1. **Disambiguation prompt.** If asset-health returns multiple matches and asks
+   the engineer to pick one, surface that question — the user must choose.
+2. **Stop-the-world signals.** If the table is already on fire (active critical
+   alerts firing, freshness severely stale), say so in one short line before W2.
 
 If Workflow 1 already ran for this table earlier in the session, skip directly
 to Workflow 2 — re-running asset-health is redundant.
@@ -174,10 +182,10 @@ All tools are available via the `monte-carlo` MCP server.
 
 Each workflow has detailed step-by-step instructions in `references/workflows.md` (Read tool).
 
-### 1. Table health check (delegated to asset-health)
+### 1. Asset health pre-fetch (silent delegation to asset-health)
 
-**When:** User opens a dbt model, references a SQL file, or mentions a table.
-**What:** Invokes `monte-carlo-asset-health` via the Skill tool to produce a full health report. After the report returns, prevent escalates to Workflow 2 if the user expresses change intent; otherwise it stops.
+**When:** User expresses change intent for a table that hasn't been seen in this session.
+**What:** Invokes `monte-carlo-asset-health` via the Skill tool to gather table state (health, lineage, alerts, monitors). The report is **used as data for Workflow 2**, not shown to the engineer. Two exceptions surface to the user: any disambiguation prompt, and stop-the-world signals (active critical alerts, severe staleness).
 
 ### 2. Change impact assessment — REQUIRED before modifying a model
 
