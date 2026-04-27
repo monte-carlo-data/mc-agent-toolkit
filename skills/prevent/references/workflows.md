@@ -163,7 +163,7 @@ If risk is 🔴 High:
 1. Call `getAudiences()` to retrieve configured notification audiences
 2. Include in the recommendation: "Notify: <audience names / channels>"
 3. Proactively suggest:
-   - Notifying owners of downstream key assets (`setAlertOwner` / `createOrUpdateAlertComment` on active alerts)
+   - Notifying owners of downstream key assets manually via the audience channels listed above (alert mutation is handled by `monte-carlo-incident-response`)
    - Adding a monitor for the new logic before deploying (Workflow 6)
    - Running `montecarlo monitors apply --dry-run` after changes to verify nothing breaks
 
