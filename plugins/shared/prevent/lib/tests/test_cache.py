@@ -20,6 +20,9 @@ from lib.cache import (
     move_to_pending_validation,
     get_pending_validation_tables,
     clear_pending_validation,
+    mark_monitor_gap,
+    has_monitor_gap,
+    clear_monitor_gap,
 )
 
 
@@ -128,20 +131,17 @@ class TestSessionIdValidation:
 
 class TestClearMonitorGap:
     def test_clear_removes_marker(self):
-        from lib.cache import mark_monitor_gap, has_monitor_gap, clear_monitor_gap
         mark_monitor_gap("test_clear_session", "orders")
         assert has_monitor_gap("test_clear_session", "orders") is True
         clear_monitor_gap("test_clear_session", "orders")
         assert has_monitor_gap("test_clear_session", "orders") is False
 
     def test_clear_when_not_marked_is_noop(self):
-        from lib.cache import has_monitor_gap, clear_monitor_gap
         assert has_monitor_gap("test_clear_session", "never_marked") is False
         clear_monitor_gap("test_clear_session", "never_marked")  # no exception
         assert has_monitor_gap("test_clear_session", "never_marked") is False
 
     def test_clear_one_table_does_not_affect_another(self):
-        from lib.cache import mark_monitor_gap, has_monitor_gap, clear_monitor_gap
         mark_monitor_gap("test_clear_session", "orders")
         mark_monitor_gap("test_clear_session", "users")
         clear_monitor_gap("test_clear_session", "orders")
