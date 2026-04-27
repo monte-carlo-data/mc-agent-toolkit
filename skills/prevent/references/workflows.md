@@ -73,7 +73,12 @@ If asset-health did not run (the engineer invoked impact assessment directly,
 without a prior file-open trigger), call MCP tools yourself in this order:
 
 ```
-1. search(query="<table_name>") + getTable(mcon="<mcon>")
+1. search(query="<table_name>")
+   → list of candidate MCONs across MC connections.
+   If multiple results are returned, present them in a table (full_table_id,
+   warehouse, importance, key-asset flag) and ask the engineer which one to
+   assess. Do not pick one automatically. Once they choose, call
+   getTable(mcon="<mcon>") for that single MCON.
    → importance score, query volume (reads/writes per day), key asset flag
 
 2. getAssetLineage(mcon="<mcon>")
