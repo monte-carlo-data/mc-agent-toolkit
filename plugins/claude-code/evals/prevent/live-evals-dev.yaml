@@ -1,0 +1,107 @@
+cases:
+  - id: live-01-impact-assessment-from-file-mention
+    turns:
+      - prompt: "@analytics/models/clients/client_hub.sql add a column 'is_active', default to true"
+        criteria:
+          must_call: [search]
+          must_not_call: [Edit, Write]
+    criteria:
+      judge_rubric: |
+        The agent should:
+        1. Look up the client_hub table via Monte Carlo (search + get_table or
+           via the asset-health skill's MCP calls: get_alerts, get_asset_lineage,
+           get_monitors).
+        2. Recognize that multiple client_hub matches exist across MC connections
+           and ask the engineer which one to assess (e.g. MC-Snowflake-test vs
+           other warehouses). Do not silently pick one.
+        3. Produce a change impact assessment with a risk tier (High / Medium /
+           Low) and a recommendation tied to the proposed is_active column.
+        4. Wait for confirmation before proposing any edit. The agent must NOT
+           call the Edit or Write tool during this turn.
+
+  - id: live-02-impact-assessment-standalone
+    turns:
+      - prompt: "I want to add an is_active column with default true to client_hub in the MC-Snowflake-test warehouse. What's the impact?"
+        criteria:
+          must_call: [search, get_table, get_asset_lineage, get_monitors]
+          must_not_call: [Edit, Write]
+    criteria:
+      judge_rubric: |
+        The agent should produce a risk-tiered impact assessment grounded in
+        actual Monte Carlo data: downstream models / key assets, monitor
+        coverage on the affected columns, recent query volume, and any active
+        alerts. The recommendation must reference the specific change (adding
+        is_active with default true) rather than generic guidance.
+
+        The warehouse is named in the prompt, so no disambiguation question is
+        expected. The agent must not attempt an edit.
+
+  - id: live-03-validation-queries-manual
+    turns:
+      - prompt: "I'm planning to add an is_active column with default true to client_hub in MC-Snowflake-test. Run the impact assessment."
+        criteria:
+          must_call: [search, get_table, get_asset_lineage, get_monitors]
+          must_not_call: [Edit]
+      - prompt: "Looks fine. Now generate validation queries for this change."
+    criteria:
+      judge_rubric: |
+        After the impact assessment in turn 1, turn 2 should produce 3-5
+        targeted SQL validation queries for the is_active addition. Each
+        query should:
+        - Be tied to the specific change (e.g. null check on is_active,
+          before/after row count comparison, distribution check on the
+          new default value, schema-shape verification).
+        - Include an inline comment describing what a passing result looks
+          like for that check.
+
+        Generic templates ("SELECT COUNT(*) FROM table") without ties to the
+        is_active column or the engineer's intent should fail the rubric.
+
+        The agent may legitimately Write the queries to a file under
+        validation/ — that path is allowed in turn 2.
+
+  - id: live-04-monitor-delegation
+    turns:
+      - prompt: "Add an is_active column with default true to client_hub in MC-Snowflake-test. Run the impact assessment first."
+        criteria:
+          must_call: [search, get_table, get_asset_lineage, get_monitors]
+          must_not_call: [Edit, Write]
+      - prompt: "Yes generate a monitor for this new column."
+    criteria:
+      judge_rubric: |
+        Turn 1 produces a standard impact assessment. Turn 2 should hand off
+        monitor generation to the monitoring-advisor skill — not generate
+        monitor YAML inline as part of prevent. The handoff is observable
+        via the monitoring-advisor's MCP calls (one of:
+        get_validation_predicates, create_validation_monitor_mac,
+        create_metric_monitor_mac, create_comparison_monitor_mac,
+        create_custom_sql_monitor_mac) appearing in the turn 2 trace.
+
+        The output should include monitor YAML (or describe the YAML) that
+        targets the is_active column specifically — for example a validation
+        rule that the column is non-null, or a comparison check that catches
+        unexpected default-value drift.
+
+  - id: live-05-no-impact-assessment-on-health-question
+    turns:
+      - prompt: "How is client_hub in MC-Snowflake-test doing?"
+        criteria:
+          must_not_call: [Edit, Write]
+    criteria:
+      judge_rubric: |
+        The agent answers the health question with a normal asset-health-style
+        report (freshness, importance, active alerts, monitor coverage,
+        upstream dependencies).
+
+        The agent must NOT:
+        - Produce a risk tier (High / Medium / Low classification language).
+        - Use change impact assessment framing — phrases like "blast radius",
+          "downstream models will be affected by your change", "synthesis",
+          "before editing", "before proceeding with the change".
+        - Prompt the engineer about a planned change. The engineer didn't
+          describe one.
+
+        Asset-health-style MCP calls (get_table, get_alerts, get_monitors)
+        ARE expected — the agent legitimately answers the health question
+        through those tools. The discriminator is the framing of the response,
+        not the tools used.
