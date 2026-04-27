@@ -369,6 +369,12 @@ Then tell the engineer:
 
 ---
 
+> **Note:** Workflow numbers 4 and 5 are reserved for the sandbox-build and
+> execute-validation steps that land when the `achen/mc-validate-run` branch
+> merges. The numbering jump from 3 to 6 is intentional, not a typo.
+
+---
+
 ## Workflow 6: Add monitor (delegated, post-edit)
 
 **Trigger:** *Never auto-invoked from a file-open or table-mention trigger.*
