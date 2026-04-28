@@ -8,6 +8,7 @@ when_to_use: |
   Covers: warehouse/use-case discovery → gap analysis → monitor prioritization → handoff to monitoring-advisor for actual monitor creation.
 
   Do NOT invoke when the user has a specific incident to investigate (use incident-response) or wants to create a single known monitor on a known table (use monitoring-advisor directly).
+bucket: Agent-routing
 version: 1.0.0
 ---
 
