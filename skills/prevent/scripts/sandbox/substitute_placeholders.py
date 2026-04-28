@@ -31,10 +31,24 @@ _FQ_RE = re.compile(
 )
 _LINE_COMMENT_RE = re.compile(r"--[^\n]*")
 _BLOCK_COMMENT_RE = re.compile(r"/\*.*?\*/", re.DOTALL)
+_SINGLE_QUOTED_RE = re.compile(r"'(?:[^'\\]|\\.)*'")
+_DOUBLE_QUOTED_RE = re.compile(r'"(?:[^"\\]|\\.)*"')
 
 
-def _strip_comments(sql: str) -> str:
-    return _LINE_COMMENT_RE.sub(" ", _BLOCK_COMMENT_RE.sub(" ", sql))
+def _strip_noncode(sql: str) -> str:
+    """Remove comments and string literals so regex scans don't false-positive
+    on identifiers that happen to appear inside literal text. Mirrors
+    `readonly_check.py:_strip_sql` so the two scripts stay in lock-step on
+    what counts as "code"."""
+    no_block = _BLOCK_COMMENT_RE.sub(" ", sql)
+    no_line = _LINE_COMMENT_RE.sub(" ", no_block)
+    no_single = _SINGLE_QUOTED_RE.sub("''", no_line)
+    no_double = _DOUBLE_QUOTED_RE.sub('""', no_single)
+    return no_double
+
+
+# Backwards-compatible alias — older callers (and tests) may import this name.
+_strip_comments = _strip_noncode
 
 
 def substitute(sql: str, dev_db: str) -> tuple[str, int]:
@@ -43,8 +57,13 @@ def substitute(sql: str, dev_db: str) -> tuple[str, int]:
 
 
 def find_literal_databases(sql: str, dev_db: str) -> list[str]:
-    """Return distinct database names used in fully-qualified refs, excluding dev_db."""
-    code_only = _strip_comments(sql)
+    """Return distinct database names used in fully-qualified refs, excluding dev_db.
+
+    Strips comments AND string literals before scanning, so that a SQL like
+    ``WHERE meta = 'analytics.prod.client_hub'`` does not falsely surface
+    ``analytics`` in the literal-databases list — that text is data, not a
+    reference."""
+    code_only = _strip_noncode(sql)
     dbs = {m.group(1) for m in _FQ_RE.finditer(code_only)}
     dbs.discard(dev_db)
     return sorted(dbs)

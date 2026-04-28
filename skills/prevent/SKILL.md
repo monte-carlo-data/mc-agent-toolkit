@@ -209,28 +209,22 @@ Each workflow has detailed step-by-step instructions in `references/workflows.md
 **When:** Explicit engineer request only (e.g. "validate this change", "ready to commit"), or via `/mc-validate run`.
 **What:** Generates 3–5 targeted SQL queries to verify the change behaved as intended. Uses Workflow 2 context — requires both impact assessment and file edit in session.
 
-### 4. *(reserved)* Sandbox build — invoked by `/mc-validate run`
+### 4. Sandbox build — invoked by `/mc-validate run`
 
-Lands when `achen/mc-validate-run` merges. See that branch's design.
+**When:** Only when `/mc-validate run` is invoked by the engineer.
+**What:** Parses `profiles.yml`, classifies the active database, detects hard-coded `database:` in the model's `{{ config() }}`, then runs `dbt build --select <model>` into the engineer's dev database. Refuses to build against shared prod. Skipped automatically for YAML/docs-only diffs.
 
-### 5. *(reserved)* Execute validation queries — invoked by `/mc-validate run`
+### 5. Execute validation queries — invoked by `/mc-validate run`
 
-Lands when `achen/mc-validate-run` merges. See that branch's design.
+**When:** Only when `/mc-validate run` is invoked by the engineer, after (or alongside) Workflow 4.
+**What:** Substitutes `<YOUR_DEV_DATABASE>` in Workflow-3 output with a user-confirmed value, runs a read-only pre-check on every query, executes via the Snowflake MCP, and reports per-query verdicts plus a consolidated summary.
 
 ### 6. Add monitor (delegated to monitoring-advisor, post-edit)
 
 **When:** Post-edit hook injects the coverage prompt (driven by `MC_MONITOR_GAP` from Workflow 2), or the engineer explicitly asks to add a monitor.
 **What:** Asks "Generate monitor definitions? (yes/no)". On yes, invokes `monte-carlo-monitoring-advisor` via the Skill tool with the model name and changed columns/logic. Prevent's responsibility ends at delegation — it does not wait for monitoring-advisor or emit a completion marker.
 
-### 6. Sandbox build — invoked by `/mc-validate run`
-
-**When:** Only when `/mc-validate run` is invoked by the engineer.
-**What:** Parses `profiles.yml`, classifies the active database, detects hard-coded `database:` in the model's `{{ config() }}`, then runs `dbt build --select <model>` into the engineer's dev database. Refuses to build against shared prod. Skipped automatically for YAML/docs-only diffs.
-
-### 7. Execute validation queries — invoked by `/mc-validate run`
-
-**When:** Only when `/mc-validate run` is invoked by the engineer, after (or alongside) Workflow 6.
-**What:** Substitutes `<YOUR_DEV_DATABASE>` in Workflow-5 output with a user-confirmed value, runs a read-only pre-check on every query, executes via the Snowflake MCP, and reports per-query verdicts plus a consolidated summary.
+> **Workflow numbering note:** numbers are assigned by execution order (W1 → W2 → optional W3 → optional W4/W5 → optional W6), not by insertion order in this file. `references/workflows.md` is the source of truth.
 
 ---
 

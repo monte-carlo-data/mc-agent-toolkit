@@ -87,6 +87,16 @@ flowchart LR
 
 **Execute validation queries (`/mc-validate run`)** — Immediately after the sandbox build, substitutes `<YOUR_DEV_DATABASE>` in the generated SQL with a user-confirmed value, surfaces every database the queries will touch (including literal prod references for parity checks), enforces read-only before execution, runs each query through the Snowflake MCP, and reports per-query ✅/⚠️/🔴 verdicts plus a consolidated summary grounded in each query's "What to look for" comment.
 
+#### `/mc-validate run` prerequisites
+
+The `run` subcommand only works if all three of the following are in place — otherwise the flow will fail mid-build with a confusing error. Verify before invoking:
+
+- **dbt installed** and a `dbt_project.yml` discoverable from the changed model (the workflow walks up from the model file to find it).
+- **`profiles.yml`** present (typically in `~/.dbt/profiles.yml`) with a working Snowflake target. The skill parses it to resolve your dev database.
+- **Snowflake MCP server** registered in the editor session — the skill detects this by looking for an `mcp__snowflake__*` tool. Without it, queries cannot execute and the substituted SQL is left on disk for you to run manually.
+
+The `run` subcommand performs a connection pre-flight check before kicking off the build. If any prerequisite is missing, it aborts early and tells you what to fix — rather than failing after a partial build.
+
 ### Deploying generated monitors
 
 When Claude generates a monitor, it saves the YAML to `monitors/<table>.yml`. Deploy with:

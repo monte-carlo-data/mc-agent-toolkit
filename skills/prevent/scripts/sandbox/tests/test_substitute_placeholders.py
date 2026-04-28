@@ -79,3 +79,32 @@ def test_missing_file(tmp_path):
     code, _, err = _run(tmp_path / "nope.sql", "PERSONAL_ACHEN")
     assert code == 1
     assert "not found" in err.lower()
+
+
+def test_string_literal_db_ref_not_listed(tmp_path):
+    """Regression: a db.schema.table inside a string literal must not be
+    reported as a literal database reference. Such text is data, not a ref."""
+    src = tmp_path / "q.sql"
+    src.write_text(
+        "SELECT * FROM <YOUR_DEV_DATABASE>.prod.t "
+        "WHERE meta = 'analytics.prod.client_hub';\n"
+    )
+    code, data, _ = _run(src, "PERSONAL_ACHEN")
+    assert code == 0
+    # The string-literal `'analytics.prod.client_hub'` is data; it must NOT
+    # surface as a real cross-database reference.
+    assert data["literal_databases"] == []
+
+
+def test_string_literal_does_not_mask_real_ref(tmp_path):
+    """A real cross-DB ref alongside a string-literal red herring should
+    still be reported."""
+    src = tmp_path / "q.sql"
+    src.write_text(
+        "SELECT * FROM <YOUR_DEV_DATABASE>.prod.t "
+        "JOIN analytics.prod.client_hub USING (id) "
+        "WHERE meta = 'staging.foo.bar';\n"
+    )
+    code, data, _ = _run(src, "PERSONAL_ACHEN")
+    assert code == 0
+    assert data["literal_databases"] == ["analytics"]

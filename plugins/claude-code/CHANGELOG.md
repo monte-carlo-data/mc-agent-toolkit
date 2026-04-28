@@ -42,7 +42,6 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - `scripts/bump-version.sh` normalizes drifted plugin versions. Before this release, claude-code was at 1.8.1 while codex/copilot/cursor/opencode were stuck at 1.7.0 because the script's sed only matched the claude-code version. The non-monotonic 1.7.0 → 1.8.2 jump on those four plugins is intentional — they caught up to the canonical version in this PR. Future bumps stay in sync automatically.
 
-
 ## [1.8.1] - 2026-04-20
 
 ### Fixed
