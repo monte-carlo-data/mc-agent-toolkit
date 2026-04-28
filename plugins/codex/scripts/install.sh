@@ -11,7 +11,7 @@ set -e
 # 7. Triggers OAuth login
 
 PLUGIN_NAME="mc-agent-toolkit"
-REPO_URL="https://github.com/monte-carlo-data/mcd-agent-toolkit.git"
+REPO_URL="https://github.com/monte-carlo-data/mc-agent-toolkit.git"
 PLUGIN_SRC="plugins/codex"
 SHARED_LIB="plugins/shared/prevent/lib"
 SHARED_SKILLS=("skills/prevent" "skills/generate-validation-notebook" "skills/push-ingestion")
@@ -23,7 +23,7 @@ SERVER_NAME="monte-carlo-mcp"
 SERVER_URL="https://mcp.getmontecarlo.com/mcp"
 
 # --- Parse arguments ---
-# Usage: install.sh [--local /path/to/mcd-agent-toolkit] <target-repo>
+# Usage: install.sh [--local /path/to/mc-agent-toolkit] <target-repo>
 SOURCE_DIR=""
 TARGET_REPO=""
 
@@ -61,7 +61,7 @@ if [ -n "$SOURCE_DIR" ]; then
 else
   # --- Clone from GitHub ---
   TMPDIR_ROOT="${TMPDIR:-/tmp}"
-  CLONE_DIR="$TMPDIR_ROOT/mcd-agent-toolkit-$$"
+  CLONE_DIR="$TMPDIR_ROOT/mc-agent-toolkit-$$"
 
   cleanup() { rm -rf "$CLONE_DIR"; }
   trap cleanup EXIT

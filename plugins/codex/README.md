@@ -7,7 +7,7 @@ Data observability skills and enforcement hooks for AI coding agents, powered by
 Run the install script from your target repo:
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/monte-carlo-data/mcd-agent-toolkit/main/plugins/codex/scripts/install.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/monte-carlo-data/mc-agent-toolkit/main/plugins/codex/scripts/install.sh)
 ```
 
 Or specify a target repo path:

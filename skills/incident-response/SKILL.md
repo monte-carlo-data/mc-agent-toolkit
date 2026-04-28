@@ -8,6 +8,7 @@ when_to_use: |
   Covers the full workflow: triage (classify/prioritize alerts) → root cause analysis (lineage, freshness history, query changes) → remediation → prevent recurrence.
 
   Do NOT invoke for coverage or "what should I monitor" requests (use proactive-monitoring instead) or for creating a specific monitor on a known table (use monitoring-advisor).
+bucket: Agent-routing
 version: 1.0.0
 ---
 

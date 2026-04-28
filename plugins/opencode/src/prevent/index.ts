@@ -20,6 +20,7 @@ import {
   getImpactCheckAgeSeconds,
   hasMonitorGap,
   markMonitorGap,
+  clearMonitorGap,
   addEditedTable,
   getEditedTables,
   getPendingValidationTables,
@@ -180,6 +181,17 @@ export const McPrevent: Plugin = async ({ client, directory, worktree }) => {
               "markers for tables whose lineage and monitor coverage were fetched " +
               "directly via Monte Carlo tools.";
 
+            const workflowOrderNote =
+              "If Workflow 1 (asset-health pre-fetch) has not yet run for this table " +
+              "this session, run it first via the Skill tool to gather lineage / alerts " +
+              "/ monitors as data for the impact assessment. Read W1's report as data " +
+              "and do NOT relay it to the engineer — only surface a disambiguation " +
+              "prompt (if asset-health asks which match to use) or a one-line " +
+              "stop-the-world warning (active critical alerts, severe staleness). " +
+              "Then run Workflow 2 (change impact assessment), reusing the asset-health " +
+              "data rather than re-fetching. Workflow 2 is the user-facing artifact. " +
+              "If Workflow 1 already ran for this table, skip directly to Workflow 2.";
+
             if (tableName.startsWith("macro:")) {
               const macroName = tableName.slice("macro:".length);
               throw new Error(
@@ -187,6 +199,8 @@ export const McPrevent: Plugin = async ({ client, directory, worktree }) => {
                   `models at compile time — changes here affect every model that calls it. ` +
                   `Identify which models use this macro, then run the change impact ` +
                   `assessment for the affected models before editing this file. ` +
+                  workflowOrderNote +
+                  " " +
                   hookTriggeredNote
               );
             } else {
@@ -194,6 +208,8 @@ export const McPrevent: Plugin = async ({ client, directory, worktree }) => {
                 `Monte Carlo Prevent: run the change impact assessment ` +
                   `for ${tableName} before editing this file. Present the full ` +
                   `impact report and synthesis step, then retry the edit. ` +
+                  workflowOrderNote +
+                  " " +
                   hookTriggeredNote
               );
             }
@@ -227,6 +243,9 @@ export const McPrevent: Plugin = async ({ client, directory, worktree }) => {
             message +=
               `\n\nMonitor coverage: the impact assessment found no custom monitors ` +
               `on ${gapList}. Generate monitor definitions before committing? (yes / no)`;
+            for (const t of gapTables) {
+              clearMonitorGap(sessionID, t);
+            }
           }
 
           // Inject context by throwing — the LLM will see this message and can
@@ -297,6 +316,9 @@ export const McPrevent: Plugin = async ({ client, directory, worktree }) => {
             `on ${gapList}. Would you like to generate monitor definitions?\n\n` +
             `> Yes: suggest monitors for the new or changed logic\n` +
             `> No: skip for now`;
+          for (const t of gapTables) {
+            clearMonitorGap(sessionID, t);
+          }
         }
 
         moveToPendingValidation(sessionID);

@@ -9,6 +9,7 @@ description: >
   table schema, row counts, freshness, lineage, or query history from any data warehouse or
   data source and sends it to Monte Carlo. If the user mentions any warehouse, database, or
   data platform alongside any Monte Carlo topic, this skill is almost certainly relevant.
+bucket: Setup
 ---
 
 # Monte Carlo Push Ingestion

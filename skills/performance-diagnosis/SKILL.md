@@ -6,6 +6,7 @@ description: |
   Uses a tiered investigation approach: discover problems, bridge to
   affected tables, then drill into root causes. Activates when a user
   asks about slow pipelines, expensive queries, or performance regressions.
+bucket: Optimize
 version: 1.0.0
 ---
 

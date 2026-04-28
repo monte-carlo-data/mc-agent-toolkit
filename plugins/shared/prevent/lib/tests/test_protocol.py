@@ -225,6 +225,51 @@ class TestEvaluateTurnEnd:
         assert result.action == "noop"
 
 
+class TestMonitorGapCleared:
+    def test_turn_end_clears_gap_after_prompting(self):
+        session_id = "test_clear_turnend"
+        cache.mark_impact_check_injected(session_id, "orders")
+        cache.mark_monitor_gap(session_id, "orders")
+        cache.add_edited_table(session_id, "orders")
+
+        result = evaluate_turn_end(HookInput(session_id=session_id, validate_command="/mc-validate"))
+
+        assert "monitor coverage" in result.reason.lower()
+        assert cache.has_monitor_gap(session_id, "orders") is False, \
+            "gap should be cleared after the prompt is delivered"
+
+    def test_pre_commit_clears_gap_after_prompting(self, monkeypatch):
+        import lib.protocol as protocol
+        session_id = "test_clear_precommit"
+        cache.mark_impact_check_verified(session_id, "orders")
+        cache.mark_monitor_gap(session_id, "orders")
+
+        monkeypatch.setattr(protocol, "_get_staged_model_tables", lambda cwd: ["orders"])
+
+        result = evaluate_pre_commit(HookInput(
+            session_id=session_id,
+            command="git commit -m test",
+            cwd=".",
+        ))
+
+        assert "monitor coverage" in result.context.lower()
+        assert cache.has_monitor_gap(session_id, "orders") is False, \
+            "gap should be cleared after the pre-commit prompt is delivered"
+
+    def test_turn_end_does_not_clear_when_no_gap(self):
+        session_id = "test_no_clear"
+        cache.mark_impact_check_injected(session_id, "orders")
+        cache.add_edited_table(session_id, "orders")
+
+        # No gap marked
+        result = evaluate_turn_end(HookInput(session_id=session_id, validate_command="/mc-validate"))
+
+        # Should still prompt for validation (the main turn_end behavior)
+        assert result.action == "block"
+        # And no gap was created as a side-effect
+        assert cache.has_monitor_gap(session_id, "orders") is False
+
+
 class TestEvaluateValidateCommand:
     def test_no_tables_returns_context(self):
         inp = HookInput(session_id="s1")
