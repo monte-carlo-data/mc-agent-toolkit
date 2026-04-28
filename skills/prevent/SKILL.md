@@ -197,7 +197,7 @@ Each workflow has detailed step-by-step instructions in `references/workflows.md
 ### 1. Asset health pre-fetch (silent delegation to asset-health)
 
 **When:** User expresses change intent for a table that hasn't been seen in this session.
-**What:** Invokes `monte-carlo-asset-health` via the Skill tool to gather table state (health, lineage, alerts, monitors). The report is **used as data for Workflow 2**, not shown to the engineer. Two exceptions surface to the user: any disambiguation prompt, and stop-the-world signals (active critical alerts, severe staleness).
+**What:** Invokes `monte-carlo-asset-health` via the Skill tool to gather table state (health, upstream lineage, alerts, monitors). Then makes one direct `get_asset_lineage(direction="DOWNSTREAM")` call to complete the picture (asset-health only fetches upstream). The combined data is **used as input to Workflow 2**, not shown to the engineer. Two exceptions surface to the user: any disambiguation prompt, and stop-the-world signals (active critical alerts, severe staleness).
 
 ### 2. Change impact assessment — REQUIRED before modifying a model
 

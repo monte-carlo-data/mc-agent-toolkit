@@ -8,45 +8,69 @@ executing a workflow.
 
 ## Workflow 1: Asset health pre-fetch (silent delegation)
 
-**Trigger:** The user expresses change intent for a table that hasn't been
-seen in this session. Workflow 1 only ever runs as a precursor to Workflow 2 —
-it does not run on bare file mentions or general "how is X doing" questions.
-Those go directly to `monte-carlo-asset-health` via its own activation rules.
+**Trigger:** The user expresses change intent. Workflow 1 only ever runs as a
+precursor to Workflow 2 — it does not run on bare file mentions or general
+"how is X doing" questions. Those go directly to `monte-carlo-asset-health`
+via its own activation rules.
 
 **Goal:** Gather Monte Carlo context (health, lineage, alerts, monitors) for
-the table so Workflow 2 can incorporate it into the change-focused impact
-assessment. The report itself is data for W2 — not a separate user-facing
+the table being changed so Workflow 2 can incorporate it into the change-focused
+impact assessment. The report itself is data for W2 — not a separate user-facing
 artifact.
 
 ### Sequence
 
 1. Invoke the `monte-carlo-asset-health` skill via the Skill tool. Pass the
-   table name. Wait for it to produce its full health report.
+   table name. Wait for the full health report.
 
 2. Do **not** duplicate any of the MCP calls asset-health makes
-   (`get_table`, `get_alerts`, `get_asset_lineage`, `get_monitors`). Asset-health
-   is the source of truth for health data.
+   (`get_table`, `get_alerts`, `get_asset_lineage` upstream-only, `get_monitors`).
+   Asset-health is the source of truth for those.
 
-3. Once the report returns, **read it as data and proceed to Workflow 2**.
-   Do not relay the full report to the engineer — Workflow 2's impact
-   assessment is the user-facing artifact and already cites the relevant
-   alerts / lineage / monitors. Two exceptions where you **must** surface
-   output from W1:
+3. Asset-health only fetches **upstream** lineage. To complete the picture for
+   Workflow 2's blast-radius synthesis, make one additional direct call:
 
-   - **Disambiguation prompt.** If asset-health returns multiple matches and
-     asks the engineer which one to assess, surface that question and wait
-     for the answer before continuing — the user must pick.
-   - **Stop-the-world signals.** If asset-health's report shows the table is
-     already on fire (active critical alerts firing, freshness severely
-     stale), say so in one short line before W2 begins so the engineer
-     knows the table state is degraded.
+   ```
+   get_asset_lineage(mcon="<mcon resolved by asset-health>", direction="DOWNSTREAM")
+   ```
 
-### What this workflow does NOT do
+   Use the MCON asset-health already resolved — do **not** re-call `search()`.
+   If asset-health surfaced a disambiguation prompt and the engineer hasn't
+   chosen yet, wait — do not run the downstream call until the MCON is fixed.
 
-- Does not call any MCP tools directly. All data comes from asset-health.
-- Does not run standalone. Workflow 1 only fires as part of the W1 → W2 chain.
-- Does not produce a user-facing report. The full health report stays in
-  prevent's context, not in the conversation.
+4. **Do NOT print, summarize, paraphrase, or relay asset-health's report.**
+   Asset-health returns a long Markdown report (Health Check tables, monitor
+   lists, recommendations) — that report is **internal data for prevent**,
+   not user-facing output. Treat it the same way you would treat a raw MCP
+   tool result: read it into context, then move on without echoing it.
+
+5. Two exceptions where you **must** surface W1 output to the engineer:
+   - **Disambiguation prompt.** If asset-health returns multiple matches,
+     surface that question and wait for the answer before continuing.
+   - **Stop-the-world signals.** If the table is already on fire (active
+     critical alerts firing, freshness severely stale), say so in one short
+     line before W2 begins. One line — not the full asset-health report.
+
+6. **Immediately proceed to Workflow 2.** Do not pause, do not ask the
+   engineer if they want to continue, do not summarize what W1 found. The
+   user-facing artifact is W2's impact-assessment report, not asset-health's
+   report. W1 is incomplete until W2 has been presented.
+
+### What Workflow 1 does NOT do
+
+- Does not call MCP tools other than the single `get_asset_lineage(direction="DOWNSTREAM")`
+  call in step 3. Everything else comes via asset-health.
+- Does not run standalone. W1 only fires as part of the W1 → W2 chain. **W1
+  finishing without W2 running is a workflow failure** — always continue to W2.
+- Does not produce a user-facing report. Asset-health's "Health Check"
+  Markdown is data, not output. The user-facing artifact is W2's report.
+- Does not stop and wait for the engineer to confirm before W2. The transition
+  W1 → W2 is automatic.
+- Does not handle new-model creation. Prevent's mission is preventing
+  dangerous changes to existing models. If the engineer is authoring a
+  brand-new model and wants to verify upstream health, that is a
+  `monte-carlo-asset-health` question on each upstream — not a prevent
+  workflow.
 
 ---
 
@@ -232,6 +256,8 @@ Explicitly connect each key finding to a specific recommendation:
   → Explain: "Even though this column is defined in a CTE, if it
     surfaces in the final SELECT it is a public output column —
     renaming it breaks any downstream model selecting it by name."
+
+---
 
 ---
 
