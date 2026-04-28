@@ -12,6 +12,7 @@ when_to_use: |
   - Performance or pipeline diagnosis ("why is X slow?", "investigate the query plan") — those go to monte-carlo-performance-diagnosis.
   - Edits to non-model files: seed CSVs (seeds/), analysis files (analyses/), dbt config (dbt_project.yml, profiles.yml, packages.yml).
   - Bare file opens or reads without an edit verb ("open stg_orders.sql so I can see what it does") — that's navigation, not change intent.
+bucket: Prevent
 version: 1.0.0
 ---
 

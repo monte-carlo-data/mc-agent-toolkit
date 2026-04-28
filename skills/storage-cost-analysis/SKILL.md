@@ -1,6 +1,7 @@
 ---
 name: monte-carlo-storage-cost-analysis
 description: Analyze a warehouse for stale, unused, or redundant tables via the analyze_storage_costs MCP tool. Classifies waste patterns and table categories, computes safety tiers, and handles category drill-downs and lineage follow-ups.
+bucket: Optimize
 version: 2.0.0
 ---
 

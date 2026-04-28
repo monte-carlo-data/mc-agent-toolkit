@@ -1,6 +1,7 @@
 ---
 name: tune-monitor
 description: Analyze a Monte Carlo monitor and recommend configuration changes to reduce alert noise. Supports metric, custom SQL, and validation monitors. Fetches the report, identifies patterns, and suggests tuning.
+bucket: Monitoring
 version: 1.0.0
 ---
 

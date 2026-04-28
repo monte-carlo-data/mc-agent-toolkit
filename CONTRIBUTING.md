@@ -54,6 +54,10 @@ Plugins reference skills via symlinks so that skills are authored once and share
 
 ## Adding a new skill
 
+**You should use `/toolkit-skill-author`.** Repo contributors can run `/toolkit-skill-author` in a Claude session at the repo root. It interviews you, applies the extend-or-split rules below, and walks the full registration checklist. Requires Anthropic's `skill-creator` plugin (`/plugin install skill-creator@claude-plugins-official`).
+
+Manual steps (only if `/toolkit-skill-author` is unavailable):
+
 1. Create a new directory under `skills/` with a kebab-case name (e.g., `skills/my-new-skill/`).
 2. Add a `SKILL.md` with valid YAML frontmatter (`name` and `description` are required). Follow the [Agent Skills specification](https://agentskills.io) and the [Skill authoring standards](#skill-authoring-standards) below.
 3. Optionally add supporting directories: `scripts/`, `references/`, `assets/`.
@@ -67,37 +71,11 @@ These standards exist so the toolkit stays coherent as it grows. New skill PRs s
 
 ### Extend or split?
 
-**Default: extend an existing skill.** Splitting is the exception — a new atomic skill
-is one more thing the router has to disambiguate, and one more entry in the catalog.
-Only split if one of the tests below forces it.
+**Default: extend an existing skill.** Splitting is the exception — a new atomic skill is one more thing the router has to disambiguate, and one more entry in the catalog. Only split if a rule forces it.
 
-1. **Find the nearest peer.** Search `skills/` for candidates that share any of:
-   - the same capability bucket,
-   - overlapping user phrasings in `description` or `when_to_use`,
-   - the same primary MCP surface or data input.
+The full decision algorithm — 4-step test, collision detection, budget and surface checks — lives in [`.claude/skills/toolkit-skill-author/references/decision-rules.md`](.claude/skills/toolkit-skill-author/references/decision-rules.md). That file is the source of truth. Read it before authoring a new skill, or let `/toolkit-skill-author` walk you through it.
 
-   For each candidate, try to write a realistic user prompt that *should* route
-   to your new skill but could plausibly activate the candidate instead. If you
-   can write one, that candidate is a peer — continue to step 2 with it. If no
-   candidate survives this test, there's no routing collision; create the new
-   skill and stop here.
-
-2. **Budget check.** Open the peer's `SKILL.md`. If adding a sentence to
-   `description` or a bullet to `when_to_use` would push the combined text past
-   ~1,400 characters (the 1,536 ceiling minus headroom), you must split. Routing
-   quality degrades once the frontmatter is truncated.
-
-3. **Surface check.** Does the new behavior hit a different MCP surface, produce
-   a different output artifact, or belong to a different capability bucket than
-   the peer? If yes, split. If no, extend.
-
-4. **Otherwise, extend.** Phrasing overlap, "it feels like its own thing," or
-   wanting a cleaner file on its own are not reasons to split. Add a bullet to
-   the peer's `when_to_use`, add a `references/` file if the workflow needs more
-   room, and move on.
-
-**PR requirement.** If you split, name the peer(s) you considered in the PR
-description and point to which test above forced the split. If none did, extend.
+**PR requirement.** If you split, name the peer(s) you considered in the PR description and point to which step of the decision-rules forced the split. If none did, extend.
 
 ### Capability buckets
 
@@ -124,17 +102,19 @@ Every `SKILL.md` requires the following frontmatter fields:
 
 ```yaml
 ---
-name: kebab-case-skill-name
+name: monte-carlo-kebab-case-skill-name
 description: |
   A one-paragraph description of what the skill does and when it activates.
 when_to_use: |
   Explicit activation cues and example user phrasings.
+bucket: Monitoring
 ---
 ```
 
-- `name` and `description` are required by Claude Code.
+- `name` and `description` are required by Claude Code. `name` is the canonical prefixed form (see [Naming](#naming)).
 - `when_to_use` is strongly recommended — it's a Claude-specific convention today but likely to be adopted by other editors.
-- Additional fields are allowed but ignored by Claude. Plugin versions live in the plugin manifests (`plugins/*/.*-plugin/plugin.json`) and are managed by `scripts/bump-version.sh`, not at the skill level.
+- `bucket` tracks which capability bucket the skill belongs to for the public docs. Valid values: Trust / Incident Response / Monitoring / Prevent / Optimize / Setup. Ignored by Claude at runtime — it's a catalog/docs hint.
+- A `version` field is ignored by Claude. Some existing skills carry it; new skills don't need it. Plugin versions live in the plugin manifests (`plugins/*/.*-plugin/plugin.json`) and are managed by `scripts/bump-version.sh` — those are what matter for release.
 
 ### Description hygiene
 
@@ -161,10 +141,12 @@ Example: if adding a skill that acts on alerts, explicitly call out how it diffe
 
 ### Naming
 
-- Use kebab-case (e.g., `monitoring-advisor`, not `MonitoringAdvisor`).
-- Keep names short and verb- or noun-phrase based.
+Applies to customer-facing skills under `skills/`. Dev-only skills under `.claude/skills/` (e.g., `toolkit-skill-author`) are out of scope — they aren't shipped to customers and don't need the prefix.
 
-The existing skill catalog has an inconsistency between `monte-carlo-*`-prefixed names and bare names (carried over from separate authoring contexts). Standardization will happen in a dedicated follow-up; for now, match the convention used by neighboring skills in the same bucket.
+- Directory names are kebab-case (e.g., `monitoring-advisor`, not `MonitoringAdvisor`). Keep them short and verb- or noun-phrase based.
+- The `name` field inside `SKILL.md` frontmatter is the canonical form **`monte-carlo-<directory>`** (e.g., directory `monitoring-advisor` → `name: monte-carlo-monitoring-advisor`). `lint-skill.py` enforces this; `/toolkit-skill-author` produces it automatically.
+
+A few existing skills in `skills/` (`connection-auth-rules`, `generate-validation-notebook`, `push-ingestion`, `tune-monitor`) still use bare names and are tech debt to be renamed in a follow-up.
 
 ### Orchestration registration
 

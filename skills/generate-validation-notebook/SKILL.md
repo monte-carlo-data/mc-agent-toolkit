@@ -1,6 +1,7 @@
 ---
 name: generate-validation-notebook
 description: Generate SQL validation notebooks for dbt changes. Pass a GitHub PR URL or local dbt repo path.
+bucket: Prevent
 ---
 
 > **Tip:** This skill works well with Sonnet. Run `/model sonnet` before invoking for faster generation.
