@@ -45,14 +45,17 @@ Rules:
 
 JUDGE_USER_TEMPLATE = """Skill name: {skill_name}
 Skill trigger description: {skill_description}
-
+{when_to_use_block}
 User message: {prompt}
 
 Should this skill trigger? Answer TRIGGER or NO_TRIGGER."""
 
 
-def load_skill_description(skill_dir: Path) -> tuple[str, str]:
-    """Extract the name and description from SKILL.md frontmatter."""
+def load_skill_metadata(skill_dir: Path) -> tuple[str, str, str]:
+    """Extract name, description, and when_to_use from SKILL.md frontmatter.
+
+    when_to_use is optional — returns empty string if the field is absent.
+    """
     skill_md = skill_dir / "SKILL.md"
     content = skill_md.read_text()
 
@@ -66,14 +69,37 @@ def load_skill_description(skill_dir: Path) -> tuple[str, str]:
     desc_match = re.search(r"^description:\s*[>|]\n((?:  .+\n?)+)", fm, re.MULTILINE)
     if not desc_match:
         desc_match = re.search(r"^description:\s*(.+)$", fm, re.MULTILINE)
+    # when_to_use is typically a |-block; also accept inline single-line form.
+    wtu_match = re.search(r"^when_to_use:\s*[>|]\n((?:  .+\n?)+)", fm, re.MULTILINE)
+    if not wtu_match:
+        wtu_match = re.search(r"^when_to_use:\s*(.+)$", fm, re.MULTILINE)
 
     name = name_match.group(1).strip() if name_match else "unknown"
     description = re.sub(r"\s+", " ", desc_match.group(1).strip()) if desc_match else ""
+    when_to_use = wtu_match.group(1).strip() if wtu_match else ""
+    # For when_to_use, preserve internal line breaks to keep the block readable
+    # to the judge, but strip leading indentation from the |-block.
+    if when_to_use:
+        when_to_use = "\n".join(line.strip() for line in when_to_use.splitlines() if line.strip())
+    return name, description, when_to_use
+
+
+def load_skill_description(skill_dir: Path) -> tuple[str, str]:
+    """Compat shim — use load_skill_metadata for new code."""
+    name, description, _ = load_skill_metadata(skill_dir)
     return name, description
 
 
-def judge(client: anthropic.Anthropic, model: str, skill_name: str, skill_description: str, prompt: str) -> str:
+def judge(
+    client: anthropic.Anthropic,
+    model: str,
+    skill_name: str,
+    skill_description: str,
+    when_to_use: str,
+    prompt: str,
+) -> str:
     """Ask the judge model whether the skill should trigger. Returns 'trigger' or 'no-trigger'."""
+    when_to_use_block = f"\nWhen to use guidance:\n{when_to_use}\n" if when_to_use else ""
     message = client.messages.create(
         model=model,
         max_tokens=10,
@@ -84,6 +110,7 @@ def judge(client: anthropic.Anthropic, model: str, skill_name: str, skill_descri
                 "content": JUDGE_USER_TEMPLATE.format(
                     skill_name=skill_name,
                     skill_description=skill_description,
+                    when_to_use_block=when_to_use_block,
                     prompt=prompt,
                 ),
             }
@@ -113,7 +140,7 @@ def main():
         sys.exit(1)
 
     cases = json.loads(evals_path.read_text())["cases"]
-    skill_name, skill_description = load_skill_description(skill_dir)
+    skill_name, skill_description, when_to_use = load_skill_metadata(skill_dir)
 
     print(f"Skill:     {skill_name}")
     print(f"Model:     {args.model}")
@@ -123,6 +150,8 @@ def main():
     if args.dry_run:
         print(f"\n[dry-run] Loaded {len(cases)} cases for {skill_name}")
         print(f"[dry-run] Skill description: {skill_description[:120]}...")
+        if when_to_use:
+            print(f"[dry-run] when_to_use: {when_to_use[:120]}...")
         for case in cases:
             print(f"  [{case['id']}] ({case['expected']}) {case['prompt'][:75]}{'…' if len(case['prompt']) > 75 else ''}")
         sys.exit(0)
@@ -132,7 +161,7 @@ def main():
 
     results = []
     for case in cases:
-        actual = judge(client, args.model, skill_name, skill_description, case["prompt"])
+        actual = judge(client, args.model, skill_name, skill_description, when_to_use, case["prompt"])
         passed = actual == case["expected"]
         results.append({"id": case["id"], "expected": case["expected"], "actual": actual, "passed": passed})
 

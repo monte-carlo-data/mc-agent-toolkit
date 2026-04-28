@@ -12,6 +12,7 @@ import subprocess
 from lib.cache import (
     add_edited_table,
     cleanup_stale_cache,
+    clear_monitor_gap,
     get_edited_tables,
     get_impact_check_age_seconds,
     get_impact_check_state,
@@ -185,6 +186,18 @@ def evaluate_pre_edit(inp: HookInput) -> HookOutput:
         "in their editor settings before proceeding."
     )
 
+    workflow_order_note = (
+        "If Workflow 1 (asset-health pre-fetch) has not yet run for this table "
+        "this session, run it first via the Skill tool to gather lineage / alerts "
+        "/ monitors as data for the impact assessment. Read W1's report as data "
+        "and do NOT relay it to the engineer — only surface a disambiguation "
+        "prompt (if asset-health asks which match to use) or a one-line "
+        "stop-the-world warning (active critical alerts, severe staleness). "
+        "Then run Workflow 2 (change impact assessment), reusing the asset-health "
+        "data rather than re-fetching. Workflow 2 is the user-facing artifact. "
+        "If Workflow 1 already ran for this table, skip directly to Workflow 2."
+    )
+
     if table_name.startswith("macro:"):
         macro_name = table_name.removeprefix("macro:")
         reason = (
@@ -192,14 +205,14 @@ def evaluate_pre_edit(inp: HookInput) -> HookOutput:
             f"models at compile time — changes here affect every model that calls it. "
             f"Identify which models use this macro, then run the change impact "
             f"assessment for the affected models before editing this file. "
-            f"{hook_triggered_note} {no_bypass_note}"
+            f"{workflow_order_note} {hook_triggered_note} {no_bypass_note}"
         )
     else:
         reason = (
             f"Monte Carlo Prevent: run the change impact assessment "
             f"for {table_name} before editing this file. Present the full "
             f"impact report and synthesis step, then ask the user whether to proceed before retrying the edit. "
-            f"{hook_triggered_note} {no_bypass_note}"
+            f"{workflow_order_note} {hook_triggered_note} {no_bypass_note}"
         )
 
     return HookOutput(action="deny", reason=reason)
@@ -245,6 +258,8 @@ def evaluate_pre_commit(inp: HookInput) -> HookOutput:
             f"\n\nMonitor coverage: the impact assessment found no custom monitors "
             f"on {gap_list}. Generate monitor definitions before committing? (yes / no)"
         )
+        for t in gap_tables:
+            clear_monitor_gap(inp.session_id, t)
 
     return HookOutput(action="context", context=message)
 
@@ -289,6 +304,8 @@ def evaluate_turn_end(inp: HookInput) -> HookOutput:
             f"→ Yes: I'll suggest monitors for the new or changed logic\n"
             f"→ No: Skip for now"
         )
+        for t in gap_tables:
+            clear_monitor_gap(session_id, t)
 
     move_to_pending_validation(session_id)
     return HookOutput(action="block", reason=reason)

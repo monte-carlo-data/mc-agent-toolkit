@@ -62,17 +62,26 @@ If your MCP client doesn't support HTTP transport, use `.mcp.json.example` with 
 
 ## How to use it
 
-Open your dbt project (or any data engineering codebase) in your editor. From there, you can either reference a few models or tables you plan to work on — or just prompt the editor with the change you want to make. The skill activates automatically based on what you're doing; no special commands needed.
+Open your dbt project (or any data engineering codebase) in your editor. Describe the change you want to make — or reference a model file together with an edit (`@models/orders.sql add a column`). The skill activates automatically when you express change intent; no special commands needed.
 
-**Workflow 1 — Table health check:** Opens when you reference a `.sql` file, dbt model, or table name. Surfaces freshness, row count, importance, lineage, and active alerts. Auto-escalates to a full impact assessment if the table has active alerts, key asset dependents, or high importance.
+### End-to-end flow
 
-**Workflow 2 — Monitor generation:** After you add new transformation logic (a column, filter, or business rule), suggests and deploys a validation, metric, comparison, or custom SQL monitor as code.
+```mermaid
+flowchart LR
+    A["Describe a<br/>change"] --> B["Fetch table<br/>context<br/>(silent)"]
+    B --> C["Impact<br/>assessment"]
+    C --> D{"Proceed?"}
+    D -- yes --> E["Edit<br/>applied"]
+    E --> P["Post-edit prompt:<br/>generate validation<br/>queries?<br/>add monitor?"]
+    P -- yes --> H["Generate<br/>validation queries"]
+    P -- yes --> G["Generate<br/>monitor"]
+```
 
-**Workflow 3 — Alert triage:** When you ask about data quality issues. Lists open alerts, checks table state, traces lineage to find the root cause or blast radius.
+**Impact assessment** — Before any SQL edit (including filter changes, bugfixes, reverts, and parameter tweaks), prevent surfaces the change's blast radius: downstream models, active alerts, column exposure in recent queries, and monitor coverage. You get a risk tier (High / Medium / Low) and a recommendation tied to your specific change. If the data suggests your approach is risky, Claude proposes a safer alternative.
 
-**Workflow 4 — Change impact assessment:** Fires automatically before any SQL edit — including filter changes, bugfixes, reverts, and parameter tweaks, not just schema changes. Surfaces downstream blast radius, active incidents, column exposure in recent queries, and monitor coverage. Reports a risk tier (High / Medium / Low) and translates the findings into a specific code recommendation. If the MC data suggests your planned approach is risky, Claude will recommend a safer alternative and explain why — citing the specific tables, alert counts, and read volumes it found.
+**Validation queries** — When you're ready to test a change, say "generate validation queries", "validate this change", or run `/mc-validate`. Prevent generates 3–5 targeted SQL queries based on what you actually changed — null checks, before/after row counts, distribution checks — saved to `validation/<table_name>_<timestamp>.sql` with inline comments describing a passing result.
 
-**Workflow 5 — Change validation queries:** After you've made a change and are ready to test it, say something like "generate validation queries" or "validate this change". Claude generates 3–5 targeted SQL queries based on the Workflow 4 findings and the diff — null checks, before/after row counts, distribution checks — using the exact column names, filter logic, and business rules from your change. Queries are saved to `validation/<table_name>_<timestamp>.sql` with inline comments explaining what a passing result looks like for each check. Does not activate automatically; only runs when you ask.
+**Monitor coverage** — After you finish an edit, if the impact assessment found a coverage gap, prevent prompts you to add a monitor. On yes, it hands off to `monte-carlo-monitoring-advisor` to produce a validation, metric, comparison, or custom SQL monitor as code.
 
 ### Deploying generated monitors
 

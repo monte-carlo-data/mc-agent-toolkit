@@ -48,7 +48,7 @@ def get_mcp_server_config(env: str) -> dict:
 
 
 def load_skill_content(skill_name: str, skip_missing: bool = False) -> str:
-    """Read the full SKILL.md content for appending to system prompt.
+    """Read the full SKILL.md content for a single skill.
 
     If skip_missing is True and the skill is not found, warn and return empty
     content. Useful for generating a baseline before a new skill exists.
@@ -61,3 +61,29 @@ def load_skill_content(skill_name: str, skip_missing: bool = False) -> str:
         print(f"Error: SKILL.md not found: {skill_md}")
         sys.exit(1)
     return skill_md.read_text()
+
+
+def load_combined_skill_content(
+    main_skill: str,
+    peer_skills: list[str] | None = None,
+    skip_missing: bool = False,
+) -> str:
+    """Load main skill + optional peer skills, concatenated for system prompt.
+
+    Peer skills come first so the main skill's instructions appear last in
+    context (more salient to the agent). Each skill is separated by a markdown
+    horizontal rule.
+
+    Peers that don't exist are a hard error — peer_skills is an explicit
+    declaration; a typo should fail loudly. (skip_missing applies only to
+    the main skill, for baseline runs against not-yet-written skills.)
+    """
+    parts: list[str] = []
+    for peer in peer_skills or []:
+        peer_md = SKILLS_DIR / peer / "SKILL.md"
+        if not peer_md.exists():
+            print(f"Error: peer skill SKILL.md not found: {peer_md}")
+            sys.exit(1)
+        parts.append(peer_md.read_text())
+    parts.append(load_skill_content(main_skill, skip_missing=skip_missing))
+    return "\n\n---\n\n".join(p for p in parts if p)

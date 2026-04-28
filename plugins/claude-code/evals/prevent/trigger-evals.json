@@ -1,156 +1,108 @@
 {
   "skill": "monte-carlo-prevent",
-  "description": "Trigger accuracy evals for the monte-carlo-prevent skill. Each case specifies whether the skill SHOULD or SHOULD NOT be triggered by the given prompt.",
+  "description": "Trigger accuracy evals for the monte-carlo-prevent skill. Each case specifies whether the skill SHOULD or SHOULD NOT be triggered. Post-refactor, prevent activates only on change intent — bare file mentions, health questions, and alert investigations belong to peer skills.",
   "cases": [
     {
       "id": "should-01",
-      "prompt": "I need to add a new column to the orders model in models/marts/orders.sql. Can you help?",
+      "prompt": "I need to add a new is_active column to the orders model in models/marts/orders.sql.",
       "expected": "trigger",
-      "rationale": "Direct request to modify a dbt model — requires impact assessment before editing"
+      "rationale": "File mention + add-column intent -- standard W1+W2 entry path"
     },
     {
       "id": "should-02",
-      "prompt": "What's the health status of the dim_customers table? Are there any active alerts?",
+      "prompt": "I'm refactoring the join logic in stg_payments to use a left join instead of inner join.",
       "expected": "trigger",
-      "rationale": "Asking about table health and alerts — core Workflow 1 use case"
+      "rationale": "Planned change to model logic -- impact assessment required"
     },
     {
       "id": "should-03",
-      "prompt": "I'm refactoring the join logic in our stg_payments model to use a left join instead of inner join.",
+      "prompt": "@analytics/models/clients/client_hub.sql add a column 'is_active', default to true",
       "expected": "trigger",
-      "rationale": "Planned change to a dbt model — must run impact assessment before editing"
+      "rationale": "File reference plus edit verb in same prompt -- W1 first then W2"
     },
     {
       "id": "should-04",
-      "prompt": "We got a freshness alert on the raw_events table. What's going on and what's downstream?",
+      "prompt": "Drop the legacy_email_address column from dim_customers.",
       "expected": "trigger",
-      "rationale": "Alert triage with downstream impact — Workflow 3"
+      "rationale": "Column drop -- destructive change, must run impact assessment"
     },
     {
       "id": "should-05",
-      "prompt": "Can you open models/staging/stg_orders.sql? I want to review it before making changes.",
+      "prompt": "Rename the column subscription_status to status in fct_subscriptions.",
       "expected": "trigger",
-      "rationale": "Opening a .sql file in models/ — auto-activate Workflow 1"
+      "rationale": "Column rename -- breaking change for downstream queries, gate required"
     },
     {
       "id": "should-06",
-      "prompt": "What's the blast radius if I change the date_spine macro? Which models use it?",
+      "prompt": "I want to add a filter on status = 'active' to the fct_subscriptions model.",
       "expected": "trigger",
-      "rationale": "Macro change affecting downstream models — must gate and run impact assessment"
+      "rationale": "Filter change -- silently affects output rows, requires impact assessment"
     },
     {
       "id": "should-07",
-      "prompt": "I want to add a filter on status = 'active' to the fct_subscriptions model.",
+      "prompt": "Increase the lookback_days parameter in stg_events from 7 to 30.",
       "expected": "trigger",
-      "rationale": "Adding a filter to a dbt model — requires impact assessment"
+      "rationale": "Parameter change -- looks safe but silently changes model output"
     },
     {
       "id": "should-08",
-      "prompt": "The row counts on analytics.prod.user_events have been dropping for the past week. Can you check Monte Carlo?",
+      "prompt": "Fix the bug in stg_orders.sql where order_total is missing tax.",
       "expected": "trigger",
-      "rationale": "Asking about data quality anomalies on a specific table"
+      "rationale": "Bugfix to dbt model logic -- still requires impact assessment per skill rules"
     },
     {
       "id": "should-09",
-      "prompt": "I'm updating the snapshot strategy in snapshots/scd_accounts.sql to use a different unique key.",
+      "prompt": "What's the blast radius if I change the date_spine macro? Which models use it?",
       "expected": "trigger",
-      "rationale": "Snapshot modification — sensitive change that can affect historical tracking"
-    },
-    {
-      "id": "should-10",
-      "prompt": "This model uses {{ ref('stg_customers') }} and {{ source('stripe', 'payments') }}. What do we know about those tables?",
-      "expected": "trigger",
-      "rationale": "References ref() and source() — clear dbt model context"
-    },
-    {
-      "id": "should-11",
-      "prompt": "I need to add a new metric column to dim_products and want to make sure nothing breaks downstream.",
-      "expected": "trigger",
-      "rationale": "Adding a column to a model with downstream concern — impact assessment + monitor offer"
-    },
-    {
-      "id": "should-12",
-      "prompt": "Can you check if there are any monitors on the fct_orders table? I want to know what's covered.",
-      "expected": "trigger",
-      "rationale": "Asking about monitor coverage on a specific table"
-    },
-    {
-      "id": "should-13",
-      "prompt": "We're seeing NULL values in the revenue column of our daily_metrics model. Is this a known issue in Monte Carlo?",
-      "expected": "trigger",
-      "rationale": "Data quality issue on a specific model — alert triage and investigation"
-    },
-    {
-      "id": "should-14",
-      "prompt": "I want to rename the customer_id column to cust_id in the stg_customers model. What will this affect?",
-      "expected": "trigger",
-      "rationale": "Schema change on a dbt model — requires blast radius analysis"
-    },
-    {
-      "id": "should-15",
-      "prompt": "Let me look at the lineage for the revenue_summary table before I make any changes.",
-      "expected": "trigger",
-      "rationale": "Requesting lineage context before changes — Workflow 1"
+      "rationale": "Macro change -- macros are inlined into dependent models, prevent gates these explicitly"
     },
     {
       "id": "should-not-01",
-      "prompt": "Can you help me update the dbt_project.yml to change the project name?",
+      "prompt": "How is the dim_customers table doing? Any active alerts?",
       "expected": "no-trigger",
-      "rationale": "Configuration file edit — not a model, no Monte Carlo context needed"
+      "rationale": "Plain health question -- belongs to monte-carlo-asset-health, not prevent"
     },
     {
       "id": "should-not-02",
-      "prompt": "I need to add a new row to seeds/country_codes.csv with the entry for Antarctica.",
+      "prompt": "We got a freshness alert on raw_events. What's going on?",
       "expected": "no-trigger",
-      "rationale": "Seed file edit — explicitly excluded from activation"
+      "rationale": "Alert investigation -- belongs to monte-carlo-automated-triage or monte-carlo-incident-response"
     },
     {
       "id": "should-not-03",
-      "prompt": "Can you write a quick SQL query to count duplicates in a CSV I just uploaded? It's not part of our dbt project.",
+      "prompt": "Can you open models/staging/stg_orders.sql so I can see what it does?",
       "expected": "no-trigger",
-      "rationale": "Ad-hoc SQL unrelated to a dbt project"
+      "rationale": "File open without change intent -- post-refactor, prevent only activates on edit intent"
     },
     {
       "id": "should-not-04",
-      "prompt": "Help me set up a new Monte Carlo integration for our Snowflake warehouse.",
+      "prompt": "Create a monitor for null values in the email column of users.",
       "expected": "no-trigger",
-      "rationale": "Pull-based integration setup — not prevent/observability context"
+      "rationale": "Direct monitor creation request without edit context -- belongs to monte-carlo-monitoring-advisor"
     },
     {
       "id": "should-not-05",
-      "prompt": "I need to update our profiles.yml to point to the new development database.",
+      "prompt": "Show me coverage gaps across our warehouse -- which critical tables have no monitors?",
       "expected": "no-trigger",
-      "rationale": "dbt config file — explicitly excluded"
+      "rationale": "Coverage analysis -- monitoring-advisor territory, no model edit involved"
     },
     {
       "id": "should-not-06",
-      "prompt": "Can you help me write a Python script to parse our Airflow DAG logs?",
+      "prompt": "Add a new row to seeds/country_codes.csv for South Sudan.",
       "expected": "no-trigger",
-      "rationale": "General Python scripting — no dbt/SQL/table context"
+      "rationale": "Seed file edit -- explicitly excluded from prevent's scope"
     },
     {
       "id": "should-not-07",
-      "prompt": "How do I fix this git merge conflict in my PR?",
+      "prompt": "Update the dbt_project.yml to add a new model path.",
       "expected": "no-trigger",
-      "rationale": "General git question — unrelated to data observability"
+      "rationale": "dbt config file -- not a model, explicitly excluded"
     },
     {
       "id": "should-not-08",
-      "prompt": "Can you update the analyses/quarterly_report.sql file with the new fiscal year logic?",
+      "prompt": "Why is the orders pipeline running slow? Can you investigate the query plan?",
       "expected": "no-trigger",
-      "rationale": "Analysis file — explicitly excluded from activation"
-    },
-    {
-      "id": "should-not-09",
-      "prompt": "I need to add a new schema test to our schema.yml file for the email column.",
-      "expected": "no-trigger",
-      "rationale": "Test YAML file edit — not asking about data quality, just adding test config"
-    },
-    {
-      "id": "should-not-10",
-      "prompt": "Can you help me configure Slack notifications for Monte Carlo incidents?",
-      "expected": "no-trigger",
-      "rationale": "Monte Carlo notification setup — not model/table observability context"
+      "rationale": "Performance diagnosis -- belongs to monte-carlo-performance-diagnosis, not prevent"
     }
   ]
 }

@@ -72,6 +72,24 @@ Edit `<skill>/trigger-evals.json`:
 
 ### Live evals
 
+**Peer skills.** If your skill delegates to other skills via the `Skill` tool
+(e.g. `monte-carlo-prevent` → `monte-carlo-asset-health`), declare them at
+the top of the YAML so the runner loads their SKILL.md alongside the main
+skill's content. Without this, peer skills' instructions never apply during
+evals because the eval harness only loads the target skill by default.
+
+```yaml
+peer_skills:
+  - asset-health
+  - monitoring-advisor
+cases:
+  - id: live-01-...
+```
+
+Peer skill SKILL.md files come first in the system prompt; the main skill's
+content comes last (so its instructions are most salient). A typo in a peer
+name is a hard error.
+
 Edit `<skill>/live-evals-<env>.yaml`. All cases use the `turns` format:
 
 ```yaml

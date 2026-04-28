@@ -130,6 +130,20 @@ def mark_monitor_gap(session_id: str, table_name: str) -> None:
     _write_secure(_mg_path(session_id, table_name), str(time.time()))
 
 
+def clear_monitor_gap(session_id: str, table_name: str) -> None:
+    """Remove the monitor-gap marker for a table.
+
+    Called by hooks after the coverage prompt has been delivered to the user
+    so that subsequent post-edit / pre-commit prompts don't re-nag for the
+    same gap. A fresh W2 run will re-emit MC_MONITOR_GAP if the gap persists.
+    """
+    path = _mg_path(session_id, table_name)
+    try:
+        os.remove(path)
+    except FileNotFoundError:
+        pass
+
+
 # --- Turn-level edit accumulator ---
 
 def get_edited_tables(session_id: str) -> list[str]:

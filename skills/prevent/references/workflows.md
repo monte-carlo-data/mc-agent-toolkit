@@ -6,163 +6,75 @@ executing a workflow.
 
 ---
 
-## Workflow 1: Table health check — when opening or editing a model
+## Workflow 1: Asset health pre-fetch (silent delegation)
 
-When the user opens a dbt model or mentions a table, run this sequence automatically:
+**Trigger:** The user expresses change intent. Workflow 1 only ever runs as a
+precursor to Workflow 2 — it does not run on bare file mentions or general
+"how is X doing" questions. Those go directly to `monte-carlo-asset-health`
+via its own activation rules.
 
-```
-1. search(query="<table_name>") → get the full MCON/table identifier
-2. getTable(mcon="<mcon>") → schema, freshness, row count, importance score, monitoring status
-3. getAssetLineage(mcon="<mcon>") → upstream sources, downstream dependents
-4. getAlerts(created_after="<7 days ago>", created_before="<now>", table_mcons=["<mcon>"]) → active alerts
-```
+**Goal:** Gather Monte Carlo context (health, lineage, alerts, monitors) for
+the table being changed so Workflow 2 can incorporate it into the change-focused
+impact assessment. The report itself is data for W2 — not a separate user-facing
+artifact.
 
-Summarize for the user:
-- **Health**: last updated, row count, is it monitored?
-- **Lineage**: N upstream sources, M downstream consumers (name the important ones)
-- **Alerts**: any active/unacknowledged incidents — lead with these if present
-- **Risk signals** (lite): flag if importance score is high, if key assets are downstream, or if alerts are already firing — these indicate the table warrants extra care before modification
+### Sequence
 
-Example summary to offer unprompted when a dbt model file is opened:
-> "The table `orders_status` was last updated 2 hours ago with 142K rows. It has 3 downstream dependents including `order_status_snapshot` (key asset). There are 2 active freshness alerts — this table warrants extra care before modification. Want me to run a full change impact assessment?"
+1. Invoke the `monte-carlo-asset-health` skill via the Skill tool. Pass the
+   table name. Wait for the full health report.
 
-**Auto-escalation rule — after completing steps 1–4 above:**
+2. Do **not** duplicate any of the MCP calls asset-health makes
+   (`get_table`, `get_alerts`, `get_asset_lineage` upstream-only, `get_monitors`).
+   Asset-health is the source of truth for those.
 
-First, check whether the user has expressed intent to modify the model
-in this session (e.g. mentioned a change, asked to add/edit/fix something).
+3. Asset-health only fetches **upstream** lineage. To complete the picture for
+   Workflow 2's blast-radius synthesis, make one additional direct call:
 
-IF change intent has been expressed AND any of the following are true:
-  - One or more active/unacknowledged alerts exist on the table
-  - One or more downstream dependents are key assets
-  - The table's importance score is above 0.8
-→ Ask the user before running Workflow 4:
-  "This is a high-importance table with [N active alerts / key asset
-  dependents / importance score 0.989]. Do you want me to run a full
-  change impact assessment before proceeding? (yes/no)"
-→ Wait for confirmation. If yes → run Workflow 4.
-  If no → proceed but note: "Skipping impact assessment at your request."
+   ```
+   get_asset_lineage(mcon="<mcon resolved by asset-health>", direction="DOWNSTREAM")
+   ```
 
-IF risk signals exist but NO change intent has been expressed:
-→ Surface the health summary and note the risk signals only:
-  "This is a high-importance table with key asset dependents. When
-  you're ready to make changes, say 'run impact assessment' or just
-  describe your change and I'll run it automatically."
-→ Do NOT run Workflow 4. Do NOT ask about running Workflow 4.
+   Use the MCON asset-health already resolved — do **not** re-call `search()`.
+   If asset-health surfaced a disambiguation prompt and the engineer hasn't
+   chosen yet, wait — do not run the downstream call until the MCON is fixed.
 
-### New model creation variant
+4. **Do NOT print, summarize, paraphrase, or relay asset-health's report.**
+   Asset-health returns a long Markdown report (Health Check tables, monitor
+   lists, recommendations) — that report is **internal data for prevent**,
+   not user-facing output. Treat it the same way you would treat a raw MCP
+   tool result: read it into context, then move on without echoing it.
 
-When the user is creating a new .sql dbt model file (not editing an existing one):
+5. Two exceptions where you **must** surface W1 output to the engineer:
+   - **Disambiguation prompt.** If asset-health returns multiple matches,
+     surface that question and wait for the answer before continuing.
+   - **Stop-the-world signals.** If the table is already on fire (active
+     critical alerts firing, freshness severely stale), say so in one short
+     line before W2 begins. One line — not the full asset-health report.
 
-1. Parse all {{ ref('...') }} and {{ source('...', '...') }} calls from the SQL
-2. For each referenced table, run the standard Workflow 1 health check:
-   search() → getTable() → getAlerts()
-3. Surface a consolidated upstream health summary:
-   "Your new model references N upstream tables. Here's their current health:"
-   - List each with: last updated, active alerts (if any), key asset flag
-4. Flag any upstream table with active alerts as a risk:
-   "⚠️ <table_name> has <N> active alerts — your new model will inherit this data quality issue"
+6. **Immediately proceed to Workflow 2.** Do not pause, do not ask the
+   engineer if they want to continue, do not summarize what W1 found. The
+   user-facing artifact is W2's impact-assessment report, not asset-health's
+   report. W1 is incomplete until W2 has been presented.
 
-Skip getAssetLineage for new models — they have no downstream dependents yet.
-Skip Workflow 4 for new models — there is no existing blast radius to assess.
+### What Workflow 1 does NOT do
 
----
-
-## Workflow 2: Add a monitor — when new transformation logic is added
-
-> **For detailed monitor creation guidance** — including parameter validation, field-type compatibility checks, and common error prevention — see `monitoring-advisor/references/data-monitor-creation.md`. The workflow below is a quick-path for the common "just added a column, offer a monitor" case within a prevent session.
-
-When the user adds a new column, filter, or business rule, suggest adding a monitor. First, choose the monitor type based on what the new logic does:
-
-```
-- New column with a row-level condition (null check, range, regex)
-  → createValidationMonitorMac
-
-- New aggregate metric (row count, sum, average, percentile over time)
-  → createMetricMonitorMac
-
-- Logic that should match another table or a prior time period
-  → createComparisonMonitorMac
-
-- Complex business rule that doesn't fit the above
-  → createCustomSqlMonitorMac
-```
-
-Then run the appropriate sequence:
-
-```
-1. Read the SQL file being edited to extract the specific transformation logic:
-   - Confirm the file path from conversation context (do not guess or assume)
-   - If no file path is clear, ask the engineer: "Which file contains the new logic?"
-   - Extract the specific new column definition, filter condition, or business rule
-   - Use this logic directly when constructing the monitor condition in step 3
-
-2. For validation monitors: getValidationPredicates() → show what validation types are available
-   For all types: determine the right tool from the selection guide above
-3. Call the selected create*MonitorMac tool:
-   - createValidationMonitorMac(mcon, description, condition_sql) → returns YAML
-   - createMetricMonitorMac(mcon, description, metric, operator) → returns YAML
-   - createComparisonMonitorMac(source_table, target_table, metric) → returns YAML
-   - createCustomSqlMonitorMac(mcon, description, sql) → returns YAML
-   ⚠ If createValidationMonitorMac fails (e.g. column doesn't exist yet in the live table),
-     fall back to createCustomSqlMonitorMac with an explicit SQL query instead.
-3. Save the YAML to <project>/monitors/<table_name>.yml
-4. Run: montecarlo monitors apply --dry-run (to preview)
-5. Run: montecarlo monitors apply --auto-yes (to apply)
-```
-
-**Important — YAML format for `monitors apply`:**
-All `create*MonitorMac` tools return YAML that is not directly compatible with `montecarlo monitors apply`. Reformat the output into a standalone monitor file with `montecarlo:` as the root key. The second-level key matches the monitor type: `custom_sql:`, `validation:`, `metric:`, or `comparison:`. The example below shows `custom_sql:` — substitute the appropriate key for other monitor types.
-
-```yaml
-# monitors/<table_name>.yml  ← monitor definitions only, NOT montecarlo.yml
-montecarlo:
-  custom_sql:
-    - warehouse: <warehouse_name>
-      name: <monitor_name>
-      description: <description>
-      schedule:
-        interval_minutes: 720
-        start_time: '<ISO timestamp>'
-      sql: <your validation SQL>
-      alert_conditions:
-        - operator: GT
-          threshold_value: 0.0
-```
-
-The `montecarlo.yml` project config is a **separate file** in the project root containing only:
-```yaml
-# montecarlo.yml  ← project config only, NOT monitor definitions
-version: 1
-namespace: <your-namespace>
-default_resource: <warehouse_name>
-```
-
-Do NOT put `version:`, `namespace:`, or `default_resource:` inside monitor definition files.
+- Does not call MCP tools other than the single `get_asset_lineage(direction="DOWNSTREAM")`
+  call in step 3. Everything else comes via asset-health.
+- Does not run standalone. W1 only fires as part of the W1 → W2 chain. **W1
+  finishing without W2 running is a workflow failure** — always continue to W2.
+- Does not produce a user-facing report. Asset-health's "Health Check"
+  Markdown is data, not output. The user-facing artifact is W2's report.
+- Does not stop and wait for the engineer to confirm before W2. The transition
+  W1 → W2 is automatic.
+- Does not handle new-model creation. Prevent's mission is preventing
+  dangerous changes to existing models. If the engineer is authoring a
+  brand-new model and wants to verify upstream health, that is a
+  `monte-carlo-asset-health` question on each upstream — not a prevent
+  workflow.
 
 ---
 
-## Workflow 3: Alert triage — when investigating an active incident
-
-```
-1. getAlerts(
-     created_after="<start>",
-     created_before="<end>",
-     order_by="-createdTime",
-     statuses=["NOT_ACKNOWLEDGED"]
-   ) → list open alerts
-2. getTable(mcon="<affected_table_mcon>") → check current table state
-3. getAssetLineage(mcon="<mcon>") → identify upstream cause or downstream blast radius
-4. getQueriesForTable(mcon="<mcon>") → recent queries that might explain the anomaly
-```
-
-To respond to an alert:
-- `updateAlert(alert_id="<id>", status="ACKNOWLEDGED")` — acknowledge it
-- `setAlertOwner(alert_id="<id>", owner="<email>")` — assign ownership
-- `createOrUpdateAlertComment(alert_id="<id>", comment="<text>")` — add context
-
----
-
-## Workflow 4: Change impact assessment — REQUIRED before modifying a model
+## Workflow 2: Change impact assessment — REQUIRED before modifying a model
 
 **Trigger:** Any expressed intent to add, rename, drop, or change a column, join, filter, or model logic. Run this immediately — before writing any code — even if the user hasn't asked for it.
 
@@ -182,8 +94,24 @@ Pay special attention to:
 
 When the user is about to rename or drop a column, change a join condition, alter a filter, or refactor a model's logic, run this sequence to surface the blast radius before any changes are committed:
 
+**Data sources:**
+
+If asset-health (Workflow 1) ran for this table earlier in the session, reuse
+its lineage / alerts / monitors / table metadata. Do not re-fetch via MCP —
+the data is the same. If the asset-health report is stale (older than this
+turn's edit context) or covered a different table, re-invoke asset-health
+rather than running impact assessment on partial data.
+
+If asset-health did not run (the engineer invoked impact assessment directly,
+without a prior file-open trigger), call MCP tools yourself in this order:
+
 ```
-1. search(query="<table_name>") + getTable(mcon="<mcon>")
+1. search(query="<table_name>")
+   → list of candidate MCONs across MC connections.
+   If multiple results are returned, present them in a table (full_table_id,
+   warehouse, importance, key-asset flag) and ask the engineer which one to
+   assess. Do not pick one automatically. Once they choose, call
+   getTable(mcon="<mcon>") for that single MCON.
    → importance score, query volume (reads/writes per day), key asset flag
 
 2. getAssetLineage(mcon="<mcon>")
@@ -273,8 +201,8 @@ If risk is 🔴 High:
 1. Call `getAudiences()` to retrieve configured notification audiences
 2. Include in the recommendation: "Notify: <audience names / channels>"
 3. Proactively suggest:
-   - Notifying owners of downstream key assets (`setAlertOwner` / `createOrUpdateAlertComment` on active alerts)
-   - Adding a monitor for the new logic before deploying (Workflow 2)
+   - Notifying owners of downstream key assets manually via the audience channels listed above (alert mutation is handled by `monte-carlo-incident-response`)
+   - Adding a monitor for the new logic before deploying (Workflow 6)
    - Running `montecarlo monitors apply --dry-run` after changes to verify nothing breaks
 
 ### Synthesis: translate findings into code recommendations
@@ -296,12 +224,12 @@ Explicitly connect each key finding to a specific recommendation:
 
 - Monitors on affected columns:
   → Call out that the change will affect monitor coverage
-  → Recommend updating monitors alongside the code change (offer Workflow 2)
+  → Recommend updating monitors alongside the code change (offer Workflow 6)
   → Explain: "The existing monitor on [column] will need to be updated to
      account for this change"
 
 - New output column or logic being added:
-  → Always offer Workflow 2 after the impact assessment, regardless
+  → Always offer Workflow 6 after the impact assessment, regardless
     of existing monitor coverage
   → Do not skip this step even if risk tier is 🟢 Low
   → Say explicitly: "This adds new output logic — would you like me
@@ -331,31 +259,33 @@ Explicitly connect each key finding to a specific recommendation:
 
 ---
 
-## Workflow 5: Change validation queries — after a code change is made
+---
+
+## Workflow 3: Change validation queries — after a code change is made
 
 **Trigger:** Explicit engineer intent only. Activate when the engineer says something like:
 - "generate validation queries", "validate this change", "I'm done with this change"
 - "let me test this", "write queries to check this", "ready to commit"
 
 **Required session context — do not activate without both:**
-1. Workflow 4 (change impact assessment) has run for this table in this session
+1. Workflow 2 (change impact assessment) has run for this table in this session
 2. A file edit was made to a `.sql` or dbt model file for that same table
 
-**Do NOT activate automatically after file edits. Do NOT proactively offer after Workflow 4 or file edits. The engineer asks when they are ready.**
+**Do NOT activate automatically after file edits. Do NOT proactively offer after Workflow 2 or file edits. The engineer asks when they are ready.**
 
 ---
 
 ### What this workflow does
 
-Using the context already in the session — the Workflow 4 findings, the file diff, and the `getTable` result — generate 3–5 targeted SQL validation queries that directly test whether this specific change behaved as intended.
+Using the context already in the session — the Workflow 2 findings, the file diff, and the `getTable` result — generate 3–5 targeted SQL validation queries that directly test whether this specific change behaved as intended.
 
-These are not generic templates. Use the semantic meaning of the change from Workflow 4 context: which columns changed and why, what business logic was affected, what downstream models depend on this table, and what monitors exist. A null check on a new `days_since_contract_start` column should verify it is never negative and never null for rows with a `contract_start_date` — not just check for nulls generically.
+These are not generic templates. Use the semantic meaning of the change from Workflow 2 context: which columns changed and why, what business logic was affected, what downstream models depend on this table, and what monitors exist. A null check on a new `days_since_contract_start` column should verify it is never negative and never null for rows with a `contract_start_date` — not just check for nulls generically.
 
 ---
 
 ### Step 1 — Identify the change type from session context
 
-From Workflow 4 findings and the file diff, classify the primary change. A change may span multiple types — classify the dominant one and note secondaries:
+From Workflow 2 findings and the file diff, classify the primary change. A change may span multiple types — classify the dominant one and note secondaries:
 
 - **New column** — a new output column was added to the SELECT
 - **Filter change** — a WHERE clause, IN-list, or CASE condition was modified
@@ -366,7 +296,7 @@ From Workflow 4 findings and the file diff, classify the primary change. A chang
 
 ---
 
-### Step 2 — Determine warehouse context from Workflow 4
+### Step 2 — Determine warehouse context from Workflow 2
 
 From the `getTable` result already in session context, extract:
 - **Fully qualified table name** — e.g. `analytics.prod_internal_bi.client_hub_master`
@@ -401,7 +331,7 @@ These rules are not negotiable — violating them produces queries that will fai
 
 Always include a row count comparison regardless of change type — it's the baseline signal that something unexpected happened.
 
-Then generate change-specific queries based on what needs to be validated for this change type. Use the exact conditions, column names, and business logic from the diff and Workflow 4 findings — not generic placeholders. The goal for each change type:
+Then generate change-specific queries based on what needs to be validated for this change type. Use the exact conditions, column names, and business logic from the diff and Workflow 2 findings — not generic placeholders. The goal for each change type:
 
 **New column:** Verify the column is non-null where it should be non-null (based on its business meaning), that its value range is plausible, and that its distribution makes sense given the underlying data. Query dev only.
 
@@ -409,7 +339,7 @@ Then generate change-specific queries based on what needs to be validated for th
 
 **Join change:** Verify that the join didn't introduce duplicates — a uniqueness check on the join key is essential. Also verify row count didn't change unexpectedly. Query dev for uniqueness, both databases for row count.
 
-**Column rename or drop:** Verify the old column name is absent and the new column (if renamed) is present in the dev schema. Also verify that downstream models referencing the old column name are identified — use the local ref() grep results from Workflow 4 if available.
+**Column rename or drop:** Verify the old column name is absent and the new column (if renamed) is present in the dev schema. Also verify that downstream models referencing the old column name are identified — use the local ref() grep results from Workflow 2 if available.
 
 **Parameter or threshold change:** Verify the distribution of values affected by the change — how many rows moved above or below the new threshold, and whether the count matches the engineer's expectation. Query both databases to compare before and after.
 
@@ -424,7 +354,7 @@ For every query, include a SQL comment block that explains:
 - What a healthy result looks like **for this specific change**
 - What would indicate a problem
 
-Derive this context from Workflow 4 findings. Use the business meaning of the change, not generic descriptions. For example, for adding `days_since_contract_start`:
+Derive this context from Workflow 2 findings. Use the business meaning of the change, not generic descriptions. For example, for adding `days_since_contract_start`:
 
 ```sql
 /*
@@ -453,7 +383,7 @@ Include a header at the top of the file:
 Validation queries for: <fully_qualified_table>
 Change type: <change type from Step 1>
 Generated: <timestamp>
-Workflow 4 risk tier: <tier from this session>
+Workflow 2 risk tier: <tier from this session>
 
 Instructions:
 1. Replace <YOUR_DEV_DATABASE> with your personal or branch database
@@ -475,4 +405,61 @@ Then tell the engineer:
 - Does not require warehouse MCP connection
 - Does not generate Monte Carlo notebook YAML
 - Does not trigger automatically — only on explicit engineer request
-- Does not activate if Workflow 4 has not run for this table in this session
+- Does not activate if Workflow 2 has not run for this table in this session
+
+---
+
+> **Note:** Workflow numbers 4 and 5 are reserved for the sandbox-build and
+> execute-validation steps that land when the `achen/mc-validate-run` branch
+> merges. The numbering jump from 3 to 6 is intentional, not a typo.
+
+---
+
+## Workflow 6: Add monitor (delegated, post-edit)
+
+**Trigger:** *Never auto-invoked from a file-open or table-mention trigger.*
+W6 fires only when:
+
+1. The post-edit / turn-end hook injects the monitor-coverage prompt — driven
+   by the `MC_MONITOR_GAP` marker emitted during Workflow 2 — **or**
+2. The engineer explicitly asks to add a monitor for the just-edited model
+   (e.g. "add a monitor", "create a monitor for X").
+
+**Required session context:** Workflow 2 has run for the model and identified
+a coverage gap, *or* the engineer is explicitly requesting monitor generation.
+
+### Sequence
+
+1. Ask the engineer:
+
+   > "Generate monitor definitions for the new logic? (yes/no)"
+
+2. On **no** → stop. The post-edit hook has already cleared the gap state;
+   no further action.
+
+3. On **yes** → invoke the `monte-carlo-monitoring-advisor` skill via the
+   Skill tool. Pass:
+   - The model name.
+   - The specific columns / logic that changed (from the Workflow 2
+     synthesis output).
+
+4. **Prevent's responsibility ends at the moment delegation fires.** Do not
+   wait for monitoring-advisor to finish, do not emit any completion marker,
+   do not insert any post-step. Monitor generation can take a while; prevent
+   should not block on it.
+
+### Re-edit behavior
+
+If the engineer edits the same model again, the pre-edit gate forces Workflow 2
+to re-run, which re-evaluates monitor coverage via `get_monitors`. If the
+generated monitors now cover the changed columns, Workflow 2 will not re-emit
+`MC_MONITOR_GAP` — the gap is genuinely closed. If a fresh gap exists, Workflow 2
+re-emits the marker and the post-edit hook prompts again. Self-healing — no
+explicit "already generated" tracking needed.
+
+### What this workflow does NOT do
+
+- Does not generate monitor YAML itself. All generation is done by
+  monitoring-advisor.
+- Does not modify the `monte-carlo-monitoring-advisor` skill in any way.
+- Does not emit `MC_MONITOR_GENERATED` or any other completion marker.

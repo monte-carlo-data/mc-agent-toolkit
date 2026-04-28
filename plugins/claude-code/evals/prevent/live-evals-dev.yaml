@@ -1,0 +1,84 @@
+peer_skills:
+  - asset-health
+  - monitoring-advisor
+
+cases:
+  - id: live-01-disambiguation-asks
+    turns:
+      - prompt: "I want to add an is_active column with default true to client_hub. What's the impact?"
+        criteria:
+          must_call: [search]
+          must_not_call: [Edit, Write]
+    criteria:
+      judge_rubric: |
+        The agent should:
+        1. Search Monte Carlo for client_hub.
+        2. Recognize that multiple client_hub matches exist across MC
+           connections and present them to the engineer (full_table_id,
+           warehouse, importance, key-asset flag) and ask which one to assess.
+        3. NOT silently pick one and run the assessment.
+        4. NOT produce a final risk tier yet — the assessment can't complete
+           until the engineer disambiguates.
+
+  - id: live-02-impact-assessment-with-warehouse
+    turns:
+      - prompt: "I want to add an is_active column with default true to client_hub in the MC-Snowflake-test warehouse. What's the impact?"
+        criteria:
+          must_call: [search, get_table, get_asset_lineage, get_monitors]
+          must_not_call: [Edit, Write]
+    criteria:
+      judge_rubric: |
+        The agent should produce a risk-tiered impact assessment grounded in
+        actual Monte Carlo data: downstream models / key assets, monitor
+        coverage on the affected columns, recent query volume, and any active
+        alerts. The recommendation must reference the specific change (adding
+        is_active with default true) rather than generic guidance.
+
+        The warehouse is named in the prompt, so no disambiguation question is
+        expected. The agent must not attempt an edit.
+
+  - id: live-03-validation-queries-manual
+    turns:
+      - prompt: "I'm planning to add an is_active column with default true to client_hub in MC-Snowflake-test. Run the impact assessment."
+        criteria:
+          must_call: [search, get_table, get_asset_lineage, get_monitors]
+          must_not_call: [Edit]
+      - prompt: "Looks fine. Now generate validation queries for this change."
+    criteria:
+      judge_rubric: |
+        After the impact assessment in turn 1, turn 2 should produce 3-5
+        targeted SQL validation queries for the is_active addition. Each
+        query should:
+        - Be tied to the specific change (e.g. null check on is_active,
+          before/after row count comparison, distribution check on the
+          new default value, schema-shape verification).
+        - Include an inline comment describing what a passing result looks
+          like for that check.
+
+        Generic templates ("SELECT COUNT(*) FROM table") without ties to the
+        is_active column or the engineer's intent should fail the rubric.
+
+        The agent may legitimately Write the queries to a file under
+        validation/ — that path is allowed in turn 2.
+
+  - id: live-04-monitor-delegation
+    turns:
+      - prompt: "Add an is_active column with default true to client_hub in MC-Snowflake-test. Run the impact assessment first."
+        criteria:
+          must_call: [search, get_table, get_asset_lineage, get_monitors]
+          must_not_call: [Edit, Write]
+      - prompt: "Yes generate a monitor for this new column."
+    criteria:
+      judge_rubric: |
+        Turn 1 produces a standard impact assessment. Turn 2 should hand off
+        monitor generation to the monitoring-advisor skill — not generate
+        monitor YAML inline as part of prevent. The handoff is observable
+        via the monitoring-advisor's MCP calls (one of:
+        get_validation_predicates, create_validation_monitor_mac,
+        create_metric_monitor_mac, create_comparison_monitor_mac,
+        create_custom_sql_monitor_mac) appearing in the turn 2 trace.
+
+        The output should include monitor YAML (or describe the YAML) that
+        targets the is_active column specifically — for example a validation
+        rule that the column is non-null, or a comparison check that catches
+        unexpected default-value drift.
