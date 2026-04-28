@@ -72,9 +72,9 @@ flowchart LR
     B --> C["Impact<br/>assessment"]
     C --> D{"Proceed?"}
     D -- yes --> E["Edit<br/>applied"]
-    E --> F{"Monitor<br/>gap?"}
-    F -- yes --> G["Generate<br/>monitor"]
-    E -.->|"any time<br/>(manual or<br/>post-edit)"| H["/mc-validate<br/>→ validation<br/>queries"]
+    E --> P["Post-edit prompt:<br/>generate validation<br/>queries?<br/>add monitor?"]
+    P -- yes --> H["Generate<br/>validation queries"]
+    P -- yes --> G["Generate<br/>monitor"]
 ```
 
 **Impact assessment** — Before any SQL edit (including filter changes, bugfixes, reverts, and parameter tweaks), prevent surfaces the change's blast radius: downstream models, active alerts, column exposure in recent queries, and monitor coverage. You get a risk tier (High / Medium / Low) and a recommendation tied to your specific change. If the data suggests your approach is risky, Claude proposes a safer alternative.
