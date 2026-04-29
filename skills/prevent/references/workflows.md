@@ -526,11 +526,27 @@ from. Skip automatically for YAML/docs-only diffs.
 5. **Decide whether to build** (diff-aware):
    - If the session diff is **YAML / markdown / docs only** → skip the build,
      note "no rebuild needed for YAML-only change," continue to Workflow 4.2.
-   - Otherwise → prompt:
+   - Otherwise → show the resolved target context from step 2 (and the
+     hard-coded `database:` from step 4, if any) and prompt for explicit
+     confirmation. Never proceed on assumed defaults.
 
      ```
-     Run `dbt build --select <model>` to rebuild into <database> before validating? [Y/n]
+     About to run: dbt build --select <model>
+
+     Target:    <target_name> (profile: <profile>)
+     Warehouse: <warehouse>
+     Database:  <database>   [hard-coded in model: <hardcoded_db>]
+     Schema:    <schema>
+     Role:      <role>
+     Account:   <account>
+     Classification: <personal|dev|shared-dev|prod|unknown>
+
+     Proceed? [y/N]
      ```
+
+     Default is **No**. Any answer other than an explicit `y`/`yes` aborts
+     the build. Omit fields that `parse_profiles.py` returned as null; show
+     the hard-coded-database note only when step 4 found one.
 
 6. **Hard-stop for prod classification.** If the classifier returned `prod`
    (or the hard-coded `database:` value classifies as `prod`), **refuse
@@ -689,7 +705,14 @@ Snowflake MCP, and present per-query verdicts plus a consolidated summary.
      "What to look for" comment — do not invent "healthy" from nothing.
    - For `⚠️` and `🔴`, add a follow-up hint.
 
-8. **Consolidated summary** at the end, e.g.:
+8. **Consolidated summary** at the end. Use one of the templates below
+   verbatim for the final line — they're scoped to "what these queries
+   checked," nothing more:
+
+   - **All pass:** `Overall: N of N checks pass. No issues surfaced by the validation queries.`
+   - **Mixed / failures:** `Overall: M of N checks pass. K warning(s)/failure(s) worth investigating — see the verdicts above.`
+
+   Example (mixed):
 
    ```
    ## Validation summary: <model>
@@ -700,8 +723,11 @@ Snowflake MCP, and present per-query verdicts plus a consolidated summary.
    ✅ Core segmentation counts
    ✅ Uniqueness check on account_id
 
-   Overall: 4 of 5 checks clean. 1 warning worth investigating before merging.
+   Overall: 4 of 5 checks pass. 1 warning worth investigating — see the verdicts above.
    ```
+
+   **Do not state or imply a merge verdict** — no "safe to merge", "ready to
+   ship", "looks good to ship", or similar phrases. The merge decision belongs to the engineer.
 
 9. **Emit a session marker** per model after execution:
 
