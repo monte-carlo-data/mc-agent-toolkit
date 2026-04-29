@@ -1,6 +1,6 @@
 ---
 name: tune-monitor
-description: Analyze a Monte Carlo monitor and recommend configuration changes to reduce alert noise. Supports metric, custom SQL, and validation monitors. Fetches the report, identifies patterns, and suggests tuning.
+description: Analyze a Monte Carlo monitor and recommend config changes to reduce alert noise. Supports metric, custom SQL, validation, and table monitors. Fetches the report, identifies patterns, and suggests tuning.
 bucket: Monitoring
 version: 1.0.0
 ---
@@ -19,6 +19,7 @@ them:
 - Metric monitor tuning: `references/metric-monitor.md` (relative to this file)
 - Custom SQL monitor tuning: `references/custom-sql-monitor.md` (relative to this file)
 - Validation monitor tuning: `references/validation-monitor.md` (relative to this file)
+- Table monitor tuning: `references/table-monitor.md` (relative to this file)
 
 ---
 
@@ -37,6 +38,9 @@ them:
 | `create_metric_monitor` | Update a metric monitor's configuration (used in Phase 5) |
 | `create_custom_sql_monitor` | Update a custom SQL monitor's configuration (used in Phase 5) |
 | `create_validation_monitor` | Update a validation monitor's configuration (used in Phase 5) |
+| `tune_freshness_table_monitor` | Tune freshness sensitivity/threshold for a table (used in Phase 5) |
+| `tune_volume_change_table_monitor` | Tune volume change sensitivity/threshold for a table (used in Phase 5) |
+| `tune_unchanged_size_table_monitor` | Tune unchanged size sensitivity/threshold for a table (used in Phase 5) |
 
 ---
 
@@ -84,15 +88,16 @@ From the `get_monitors` config response, determine the monitor type:
 | Monitor type is a metric monitor variant (e.g., metric, field health) | Metric | `references/metric-monitor.md` |
 | Monitor type is a custom SQL rule / custom monitor | Custom SQL | `references/custom-sql-monitor.md` |
 | Monitor type is a validation rule / validation monitor | Validation | `references/validation-monitor.md` |
+| Monitor type is a table monitor (freshness, volume, schema across tables) | Table | `references/table-monitor.md` |
 
 **Read** the appropriate reference file using the Read tool with the path relative to this skill
 file. The reference contains type-specific config fields to extract, recommendation guidance, and
 apply-changes instructions.
 
-If the monitor type is not metric, custom SQL, or validation, stop and tell the user:
+If the monitor type is not metric, custom SQL, validation, or table, stop and tell the user:
 
-> This skill supports tuning metric monitors, custom SQL monitors, and validation monitors.
-> This monitor is a {type} monitor, which is not supported.
+> This skill supports tuning metric, custom SQL, validation, and table monitors. This monitor
+> is a {type} monitor, which is not supported.
 
 ---
 
@@ -111,6 +116,7 @@ Analyze the monitor report and config together. Focus on:
 - Are any anomalies from sparse/bursty event types that naturally spike?
 - Are anomalies caused by known operational events (deployments, batch jobs, bulk user actions)?
 - For validation monitors: how many invalid rows per incident? Is the count stable or growing?
+- For table monitors: which (table, metric) pairs are firing most? Are they the same repeatedly?
 
 ### 2c. Current configuration
 Extract the current configuration. The specific fields to look for are documented in the per-type
@@ -139,9 +145,10 @@ Based on the analysis, produce a prioritized list of recommendations. For each r
 
 #### Sensitivity tuning (ML thresholds only)
 This applies to any monitor that uses ML thresholds — both metric monitors and custom SQL monitors.
-Skip this section for validation monitors (they don't use ML thresholds) and for monitors with
-explicit thresholds (for custom SQL monitors, see threshold adjustment in the per-type reference
-instead).
+Skip this section for validation monitors (they don't use ML thresholds), for table monitors
+(they have their own per-metric sensitivity — see the table monitor reference), and for monitors
+with explicit thresholds (for custom SQL monitors, see threshold adjustment in the per-type
+reference instead).
 
 - If anomalies are consistently marginal (observed value just barely above threshold) AND assessed
   as normal variation → recommend lowering sensitivity one step:
@@ -165,8 +172,8 @@ instead).
 ### Type-specific recommendations
 
 For type-specific recommendations (WHERE conditions, segment exclusion, aggregation changes,
-threshold adjustment, SQL modifications, alert condition modifications), follow the guidance in
-the per-type reference loaded in Phase 1.5.
+threshold adjustment, SQL modifications, alert condition modifications, per-table-metric
+sensitivity tuning), follow the guidance in the per-type reference loaded in Phase 1.5.
 
 ---
 
@@ -178,16 +185,17 @@ Output a structured analysis. **This is the primary output — include it in ful
 ## Monitor Tune Report: {monitor_uuid}
 
 **Monitor:** {display_name or mac_name}
-**Type:** {monitor type — metric, custom SQL, or validation}
+**Type:** {monitor type — metric, custom SQL, validation, or table}
 **Table:** {table}
-**What it monitors:** {metric and segments, SQL query summary, or validation condition summary}
+**What it monitors:** {metric and segments, SQL query summary, validation conditions, or table/metric coverage}
 **Current sensitivity:** {sensitivity or "AUTO (default)" or "N/A (explicit thresholds)"}
 **Schedule:** every {interval_minutes / 60}h
 
 ### Alert Summary (last 30 days)
 - Total alerts: {count}
 - Firing frequency: {e.g., "~twice daily", "daily", "sporadic"}
-- Most noisy segments: {top 2-3 segment values by alert count, or N/A for custom SQL and validation}
+- Most noisy segments: {top 2-3 segment values by alert count, or N/A for custom SQL/validation}
+- Most noisy (table, metric) pairs: {for table monitors: top pairs by anomaly count}
 
 ### Root Cause Pattern
 {1-3 sentence summary of what the alerts represent — operational events, bursty data, model
