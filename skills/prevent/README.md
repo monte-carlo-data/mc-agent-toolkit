@@ -90,6 +90,15 @@ flowchart LR
 
 `/mc-validate run` does **not** auto-generate. If no validation file exists for your changed model, the command aborts and tells you to run `/mc-validate` first.
 
+> ⚠️ **Heads up on prod vs. dev detection.** The build phase classifies your
+> resolved target as `personal` / `dev` / `shared-dev` / `prod` / `unknown`
+> from your `profiles.yml` and any hard-coded `{{ config(database=...) }}`,
+> and hard-stops if it lands on `prod`. This is a safety net, not a
+> guarantee — naming conventions vary across orgs and the classifier can be
+> wrong (especially on `unknown`). **You are still responsible for confirming
+> the target database before approving the build.** Read the value the skill
+> surfaces and don't approve if it doesn't match where you intend to write.
+
 **Invocation modes:**
 
 | Command | What it does |

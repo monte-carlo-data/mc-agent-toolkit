@@ -530,9 +530,10 @@ from. Skip automatically for YAML/docs-only diffs.
      ```
 
 6. **Hard-stop for prod classification.** If the classifier returned `prod`
-   (or the hard-coded `database:` value classifies as `prod`) and the engineer
-   approves the build, **refuse**: "Target resolves to shared prod. Aborting
-   the build. Please fix your profiles.yml and re-run." Do not proceed.
+   (or the hard-coded `database:` value classifies as `prod`), **refuse
+   regardless of the engineer's answer at step 5**: "Target resolves to
+   shared prod. Aborting the build. Please fix your profiles.yml and
+   re-run." Do not proceed to step 7.
 
 7. **Execute the build.** Run from the dbt project root:
 
