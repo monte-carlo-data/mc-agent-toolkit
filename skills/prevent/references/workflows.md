@@ -570,8 +570,6 @@ from. Skip automatically for YAML/docs-only diffs.
 
 ---
 
----
-
 ### Workflow 4.2: Execute validation queries
 
 **Trigger:** `/mc-validate run` (with or without `--skip-build`).
@@ -586,7 +584,7 @@ Substitute the `<YOUR_DEV_DATABASE>` placeholder in the generated queries with
 a user-confirmed value, verify each query is read-only, execute them via the
 Snowflake MCP, and present per-query verdicts plus a consolidated summary.
 
-### Sequence
+#### Sequence
 
 1. **Propose a dev-database value.** If Workflow 4.1 resolved a database from
    `profiles.yml` (step 2–4 of W4.1), reuse that value. Otherwise, the engineer
@@ -718,18 +716,18 @@ Snowflake MCP, and present per-query verdicts plus a consolidated summary.
     > revising the code."
 
     Do not auto-invoke Workflow 2. Surface the option and let the engineer
-    decide. This closes the loop between W5 (what the data says) and W2
+    decide. This closes the loop between W4.2 (what the data says) and W2
     (what to do about the change). For `⚠️`-only results, note them but
     don't suggest re-running W2 — yellow signals usually warrant
     investigation, not a re-assessment.
 
-### Multi-model behavior
+#### Multi-model behavior
 
 If Workflow 3 generated files for multiple models, run steps 3–8 per model
 with its own substituted file and its own verdicts section. Finish with a
 top-level summary listing one status line per model.
 
-### What this workflow does NOT do
+#### What this workflow does NOT do
 
 - Does not execute any statement that isn't read-only (rejected by step 4).
 - Does not guess a dev database when `profiles.yml` / `--dev-db` don't provide
