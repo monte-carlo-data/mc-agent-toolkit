@@ -67,7 +67,7 @@ Open your dbt project (or any data engineering codebase) in your editor. Describ
 ### End-to-end flow
 
 ```mermaid
-flowchart LR
+flowchart TD
     A["Describe a<br/>change"] --> B["Fetch table<br/>context<br/>(silent)"]
     B --> C["Impact<br/>assessment"]
     C --> D{"Proceed?"}
@@ -75,6 +75,8 @@ flowchart LR
     E --> P["Post-edit prompt:<br/>generate validation<br/>queries?<br/>add monitor?"]
     P -- yes --> H["Generate<br/>validation queries"]
     P -- yes --> G["Generate<br/>monitor"]
+    H --> R{"Run<br/>queries?"}
+    R -- yes --> S["Build &amp; run"]
 ```
 
 **Impact assessment** — Before any SQL edit (including filter changes, bugfixes, reverts, and parameter tweaks), prevent surfaces the change's blast radius: downstream models, active alerts, column exposure in recent queries, and monitor coverage. You get a risk tier (High / Medium / Low) and a recommendation tied to your specific change. If the data suggests your approach is risky, Claude proposes a safer alternative.
@@ -82,6 +84,40 @@ flowchart LR
 **Validation queries** — When you're ready to test a change, say "generate validation queries", "validate this change", or run `/mc-validate`. Prevent generates 3–5 targeted SQL queries based on what you actually changed — null checks, before/after row counts, distribution checks — saved to `validation/<table_name>_<timestamp>.sql` with inline comments describing a passing result.
 
 **Monitor coverage** — After you finish an edit, if the impact assessment found a coverage gap, prevent prompts you to add a monitor. On yes, it hands off to `monte-carlo-monitoring-advisor` to produce a validation, metric, comparison, or custom SQL monitor as code.
+
+**Validate in sandbox (`/mc-validate run`)** — Two-phase workflow. Run `/mc-validate` first to generate the queries, then `/mc-validate run` to execute them:
+
+- **Build** — parses your `profiles.yml`, classifies the resolved database, and runs `dbt build --select <model>` into your dev database.
+- **Execute** — substitutes `<YOUR_DEV_DATABASE>` in the generated SQL with a user-confirmed value, runs each query through the Snowflake MCP, and reports findings.
+
+> ⚠️ **Heads up on prod vs. dev detection.** The build phase classifies your
+> resolved target as `personal` / `dev` / `shared-dev` / `prod` / `unknown`
+> from your `profiles.yml` and any hard-coded `{{ config(database=...) }}`,
+> and hard-stops if it lands on `prod`. This is a safety net, not a
+> guarantee — naming conventions vary across orgs and the classifier can be
+> wrong (especially on `unknown`). **You are still responsible for confirming
+> the target database before approving the build.** Read the value the skill
+> surfaces and don't approve if it doesn't match where you intend to write.
+
+**Invocation modes:**
+
+| Command | What it does |
+|---|---|
+| `/mc-validate` | Default = generate. Runs query generation only. |
+| `/mc-validate generate` | Explicit generate. Same as above. |
+| `/mc-validate run` | Runs **Build + Execute**. Requires queries already generated. |
+| `/mc-validate run --skip-build` | Runs **Execute only** — assumes you built manually. Requires queries already generated. |
+| `/mc-validate run --dev-db <NAME>` | Same as `run`, bypasses the dev-database prompt in Execute. |
+
+#### `/mc-validate run` prerequisites
+
+The `run` subcommand only works if all three of the following are in place — otherwise the flow will fail mid-build with a confusing error. Verify before invoking:
+
+- **dbt installed** and a `dbt_project.yml` discoverable from the changed model (the workflow walks up from the model file to find it).
+- **`profiles.yml`** present (typically in `~/.dbt/profiles.yml`) with a working Snowflake target. The skill parses it to resolve your dev database.
+- **Snowflake MCP server** registered in the editor session — the skill detects this by looking for an `mcp__snowflake__*` tool. Without it, queries cannot execute and the substituted SQL is left on disk for you to run manually.
+
+The `run` subcommand performs a connection pre-flight check before kicking off the build. If any prerequisite is missing, it aborts early and tells you what to fix — rather than failing after a partial build.
 
 ### Deploying generated monitors
 

@@ -1,9 +1,9 @@
 ---
 name: monte-carlo-prevent
-description: Shift-left safety net for dbt/SQL model edits. Surfaces health context (via asset-health), runs change impact assessment before edits, generates SQL validation queries after, and offers monitor generation (via monitoring-advisor) post-edit.
+description: Shift-left safety net for dbt/SQL model edits. Runs change impact assessment before edits, generates SQL validation queries after, and executes them via `/mc-validate run`. Delegates health and monitor creation to peer skills.
 when_to_use: |
-  Invoke when the user expresses intent to change a dbt or SQL model — adding, dropping, renaming, refactoring a column or filter, fixing a bug in model logic, tweaking a parameter, or referencing a model file paired with an edit verb.
-  Example triggers: "add an is_active column to client_hub", "refactor the join logic in stg_payments", "drop the legacy_id column from dim_users", "@models/orders.sql add a filter".
+  Invoke when the user expresses intent to change a dbt or SQL model — adding, dropping, renaming, refactoring a column or filter, fixing a bug in model logic, tweaking a parameter, or referencing a model file paired with an edit verb. Also invoke when the user asks to "validate this change", "verify my edit", or runs `/mc-validate` / `/mc-validate run`.
+  Example triggers: "add an is_active column to client_hub", "refactor the join logic in stg_payments", "drop the legacy_id column from dim_users", "@models/orders.sql add a filter", "/mc-validate run".
 
   Do NOT invoke for:
   - Plain health questions about a table ("how is X doing?", "is X healthy?") — those go to monte-carlo-asset-health.
@@ -36,7 +36,7 @@ belong to `monte-carlo-asset-health` and will activate that skill on their own.
 **Do not wait to be asked.** Run the appropriate workflow automatically whenever the user:
 
 - Describes a planned change to a model (new column, join update, filter change, refactor) → **STOP — run Workflow 1 first if it has not run for this table this session, then Workflow 2, before writing any code**
-- Adds a new column, metric, or output expression to an existing model → same rule: Workflow 1 first (if not yet run for this table), then Workflow 2; the post-edit hook will offer Workflow 6 (monitor generation) afterward
+- Adds a new column, metric, or output expression to an existing model → same rule: Workflow 1 first (if not yet run for this table), then Workflow 2; the post-edit hook will offer Workflow 5 (monitor generation) afterward
 - References a model file with an edit verb in the same prompt (e.g. `@models/clients/client_hub.sql add an is_active column`) → same rule: Workflow 1 first, then Workflow 2
 
 Present the W2 impact assessment as context the engineer needs before proceeding — not as a response to a question.
@@ -92,7 +92,7 @@ These requests have their own skills — do not run prevent for them:
 - "Create a monitor for X" / "what should I monitor?" / "set up freshness on X" (without an active edit context) → `monte-carlo-monitoring-advisor`
 
 Prevent invokes asset-health and monitoring-advisor itself when its workflows
-need them (W1, W6); it does not duplicate their entry points.
+need them (W1, W5); it does not duplicate their entry points.
 
 ---
 
@@ -209,18 +209,33 @@ Each workflow has detailed step-by-step instructions in `references/workflows.md
 **When:** Explicit engineer request only (e.g. "validate this change", "ready to commit"), or via `/mc-validate run`.
 **What:** Generates 3–5 targeted SQL queries to verify the change behaved as intended. Uses Workflow 2 context — requires both impact assessment and file edit in session.
 
-### 4. *(reserved)* Sandbox build — invoked by `/mc-validate run`
+### 4. Validate change in sandbox — invoked by `/mc-validate run`
 
-Lands when `achen/mc-validate-run` merges. See that branch's design.
+**When:** Only when the engineer invokes `/mc-validate run` (in any of its forms).
 
-### 5. *(reserved)* Execute validation queries — invoked by `/mc-validate run`
+**Pre-flight:** `run` does **not** auto-generate. If no `validation/<table>_<ts>.sql` exists for the changed model(s), abort and tell the engineer to run `/mc-validate` (or `/mc-validate generate`) first.
 
-Lands when `achen/mc-validate-run` merges. See that branch's design.
+**What:** Two-phase workflow.
+- **W4.1 — Build.** Parses `profiles.yml`, classifies the active database, detects hard-coded `database:` in the model's `{{ config() }}`, then runs `dbt build --select <model>` into the engineer's dev database. Refuses to build against shared prod. Skipped automatically for YAML/docs-only diffs and for `/mc-validate run --skip-build`.
+- **W4.2 — Execute validation queries.** Substitutes `<YOUR_DEV_DATABASE>` in Workflow-3 output with a user-confirmed value (or `--dev-db <NAME>` if supplied), runs a read-only pre-check on every query, executes via the Snowflake MCP, and reports per-query verdicts plus a consolidated summary.
 
-### 6. Add monitor (delegated to monitoring-advisor, post-edit)
+**Invocation matrix:**
+
+| Invocation | W3 (generate) | W4.1 (Build) | W4.2 (Execute) |
+|---|---|---|---|
+| `/mc-validate` | yes | — | — |
+| `/mc-validate generate` | yes | — | — |
+| `/mc-validate run` | no — must already exist | yes | yes |
+| `/mc-validate run --skip-build` | no — must already exist | no | yes |
+
+`run` accepts both flags together: `/mc-validate run --skip-build --dev-db <NAME>`.
+
+### 5. Add monitor (delegated to monitoring-advisor, post-edit)
 
 **When:** Post-edit hook injects the coverage prompt (driven by `MC_MONITOR_GAP` from Workflow 2), or the engineer explicitly asks to add a monitor.
 **What:** Asks "Generate monitor definitions? (yes/no)". On yes, invokes `monte-carlo-monitoring-advisor` via the Skill tool with the model name and changed columns/logic. Prevent's responsibility ends at delegation — it does not wait for monitoring-advisor or emit a completion marker.
+
+> **Workflow numbering note:** numbers are assigned by execution order (W1 → W2 → optional W3 → optional W4 [W4.1 + W4.2] → optional W5), not by insertion order in this file. `references/workflows.md` is the source of truth.
 
 ---
 
@@ -285,3 +300,18 @@ After the prompt is delivered, the post-edit / pre-commit hook clears the gap
 state internally so it won't re-prompt for the same gap; if the engineer edits
 the model again, Workflow 2 will re-evaluate from scratch and re-emit the
 marker only if a gap still exists.
+
+### Sandbox build ran (W4.1)
+
+Emit after a successful `dbt build` in Workflow 4.1 (or after a deliberate skip
+— e.g. YAML-only diff or `--skip-build` — including the skip reason). One marker
+per model.
+
+<!-- MC_BUILD_RAN: <table_name> -->
+
+### Validation executed (W4.2)
+
+Emit after Workflow 4.2 finishes executing validation queries for a model,
+regardless of individual per-query verdicts. One marker per model.
+
+<!-- MC_VALIDATE_RAN: <table_name> -->
