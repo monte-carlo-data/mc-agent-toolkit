@@ -202,7 +202,7 @@ If risk is 🔴 High:
 2. Include in the recommendation: "Notify: <audience names / channels>"
 3. Proactively suggest:
    - Notifying owners of downstream key assets manually via the audience channels listed above (alert mutation is handled by `monte-carlo-incident-response`)
-   - Adding a monitor for the new logic before deploying (Workflow 6)
+   - Adding a monitor for the new logic before deploying (Workflow 5)
    - Running `montecarlo monitors apply --dry-run` after changes to verify nothing breaks
 
 ### Synthesis: translate findings into code recommendations
@@ -224,12 +224,12 @@ Explicitly connect each key finding to a specific recommendation:
 
 - Monitors on affected columns:
   → Call out that the change will affect monitor coverage
-  → Recommend updating monitors alongside the code change (offer Workflow 6)
+  → Recommend updating monitors alongside the code change (offer Workflow 5)
   → Explain: "The existing monitor on [column] will need to be updated to
      account for this change"
 
 - New output column or logic being added:
-  → Always offer Workflow 6 after the impact assessment, regardless
+  → Always offer Workflow 5 after the impact assessment, regardless
     of existing monitor coverage
   → Do not skip this step even if risk tier is 🟢 Low
   → Say explicitly: "This adds new output logic — would you like me
@@ -416,7 +416,7 @@ the engineer: "YAML-only diff; no SQL validation needed. `dbt test --select
 
 ---
 
-## Workflow 4: Sandbox build — invoked by `/mc-validate run`
+## Workflow 4: Validate change in sandbox — invoked by `/mc-validate run`
 
 **Trigger:** `/mc-validate run` (never automatic).
 
@@ -425,11 +425,53 @@ for at least one changed model.
 
 ### Goal
 
-Materialize the changed model(s) into the engineer's dev database with
+Build the changed model(s) into the engineer's dev database (W4.1), then
+substitute the dev-database placeholder in the generated queries, verify they
+are read-only, execute them via the Snowflake MCP, and present per-query
+verdicts plus a consolidated summary (W4.2).
+
+### Pre-flight: validation queries must already exist
+
+`/mc-validate run` does **not** generate queries. Before any other step,
+verify at least one `validation/<table>_<ts>.sql` exists for the current
+session's changed models. If none exist, abort with:
+
+> "No validation queries found for <table_name>. Run `/mc-validate` (or
+> `/mc-validate generate`) first to generate them, then re-run
+> `/mc-validate run`."
+
+This applies to both `run` and `run --skip-build`. Auto-generating from `run`
+would silently mask the missing artifact and could surprise the engineer with
+queries they haven't reviewed.
+
+### Invocation matrix
+
+| Invocation | Runs W4.1 (Build)? | Runs W4.2 (Execute)? |
+|---|---|---|
+| `/mc-validate run` | yes | yes |
+| `/mc-validate run --skip-build` | no | yes |
+| `/mc-validate run --dev-db <NAME>` | yes | yes (uses `<NAME>` directly, skips dev-db prompt) |
+
+For YAML/docs-only diffs W4.1 is automatically skipped (see W4.1 step 5);
+W4.2 still runs.
+
+---
+
+### Workflow 4.1: Build (materialize changed models into sandbox)
+
+**Trigger:** `/mc-validate run` without `--skip-build`.
+
+**Required session context:** Workflow 3 has produced a `validation/<table>_<ts>.sql`
+for at least one changed model. (Verified by the W4 pre-flight above — W4.1
+itself does not re-check.)
+
+#### Goal
+
+Build the changed model(s) into the engineer's dev database with
 `dbt build --select <model>` so validation queries have something real to read
 from. Skip automatically for YAML/docs-only diffs.
 
-### Sequence
+#### Sequence
 
 0. **Pre-flight check (prerequisites).** Before any other step, verify:
    - `dbt` is installed and a `dbt_project.yml` is discoverable from the
@@ -528,15 +570,17 @@ from. Skip automatically for YAML/docs-only diffs.
 
 ---
 
-## Workflow 5: Execute validation queries — invoked by `/mc-validate run`
+---
 
-**Trigger:** `/mc-validate run` (never automatic).
+### Workflow 4.2: Execute validation queries
+
+**Trigger:** `/mc-validate run` (with or without `--skip-build`).
 
 **Required session context:** Workflow 3 has produced a `validation/<table>_<ts>.sql`,
-and Workflow 4 has either completed (or been explicitly skipped with
-`--skip-build`, or been no-op'd for a YAML-only diff).
+and Workflow 4.1 has either completed, been explicitly skipped with `--skip-build`,
+or been no-op'd for a YAML-only diff.
 
-### Goal
+#### Goal
 
 Substitute the `<YOUR_DEV_DATABASE>` placeholder in the generated queries with
 a user-confirmed value, verify each query is read-only, execute them via the
@@ -544,8 +588,8 @@ Snowflake MCP, and present per-query verdicts plus a consolidated summary.
 
 ### Sequence
 
-1. **Propose a dev-database value.** If Workflow 4 resolved a database from
-   `profiles.yml` (step 2–4 there), reuse that value. Otherwise, the engineer
+1. **Propose a dev-database value.** If Workflow 4.1 resolved a database from
+   `profiles.yml` (step 2–4 of W4.1), reuse that value. Otherwise, the engineer
    either passed `--dev-db <NAME>` or has not provided one — in which case
    prompt for it.
 
@@ -698,7 +742,7 @@ top-level summary listing one status line per model.
 
 ---
 
-## Workflow 6: Add monitor (delegated, post-edit)
+## Workflow 5: Add monitor (delegated, post-edit)
 
 **Trigger:** *Never auto-invoked from a file-open or table-mention trigger.*
 W6 fires only when:
