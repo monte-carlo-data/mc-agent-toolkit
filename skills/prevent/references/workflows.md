@@ -499,7 +499,7 @@ from. Skip automatically for YAML/docs-only diffs.
 2. **Resolve the active target** using the sandbox script:
 
    ```bash
-   python3 ${CLAUDE_PLUGIN_ROOT}/skills/prevent/scripts/sandbox/parse_profiles.py <profiles.yml>
+   python3 scripts/sandbox/parse_profiles.py <profiles.yml>
    ```
 
    On error (missing file, unparseable YAML, unresolvable target), skip this
@@ -508,7 +508,7 @@ from. Skip automatically for YAML/docs-only diffs.
 3. **Classify the resolved database:**
 
    ```bash
-   python3 ${CLAUDE_PLUGIN_ROOT}/skills/prevent/scripts/sandbox/classify_sandbox.py <database>
+   python3 scripts/sandbox/classify_sandbox.py <database>
    ```
 
    Categories: `personal`, `dev`, `shared-dev`, `prod`, `unknown`.
@@ -516,7 +516,7 @@ from. Skip automatically for YAML/docs-only diffs.
 4. **Detect hard-coded `database:` in the model config:**
 
    ```bash
-   python3 ${CLAUDE_PLUGIN_ROOT}/skills/prevent/scripts/sandbox/detect_hardcoded_db.py <model.sql>
+   python3 scripts/sandbox/detect_hardcoded_db.py <model.sql>
    ```
 
    If a value is returned, surface it to the engineer and use it in place of
@@ -622,7 +622,7 @@ Snowflake MCP, and present per-query verdicts plus a consolidated summary.
 3. **Substitute placeholders:**
 
    ```bash
-   python3 ${CLAUDE_PLUGIN_ROOT}/skills/prevent/scripts/sandbox/substitute_placeholders.py \
+   python3 scripts/sandbox/substitute_placeholders.py \
      validation/<table>_<ts>.sql --dev-db <CONFIRMED_DEV_DB>
    ```
 
@@ -636,7 +636,7 @@ Snowflake MCP, and present per-query verdicts plus a consolidated summary.
 4. **Read-only pre-check** (mandatory):
 
    ```bash
-   python3 ${CLAUDE_PLUGIN_ROOT}/skills/prevent/scripts/sandbox/readonly_check.py \
+   python3 scripts/sandbox/readonly_check.py \
      validation/run/<table>_<ts>.run.sql
    ```
 
