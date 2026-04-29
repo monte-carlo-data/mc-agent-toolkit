@@ -522,7 +522,7 @@ from. Skip automatically for YAML/docs-only diffs.
 
 5. **Decide whether to build** (diff-aware):
    - If the session diff is **YAML / markdown / docs only** → skip the build,
-     note "no rebuild needed for YAML-only change," continue to Workflow 5.
+     note "no rebuild needed for YAML-only change," continue to Workflow 4.2.
    - Otherwise → prompt:
 
      ```
@@ -745,7 +745,7 @@ top-level summary listing one status line per model.
 ## Workflow 5: Add monitor (delegated, post-edit)
 
 **Trigger:** *Never auto-invoked from a file-open or table-mention trigger.*
-W6 fires only when:
+W5 fires only when:
 
 1. The post-edit / turn-end hook injects the monitor-coverage prompt — driven
    by the `MC_MONITOR_GAP` marker emitted during Workflow 2 — **or**
