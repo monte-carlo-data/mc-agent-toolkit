@@ -2,24 +2,34 @@
 description: Generate and run validation queries for the current change
 ---
 
-Parse `$ARGUMENTS` to decide which mode to run:
+Parse `$ARGUMENTS` to decide which mode to run. The Monte Carlo Prevent skill defines four supported invocations:
 
-- If `$ARGUMENTS` starts with `run` (optionally followed by flags): **run mode**.
-  Run Workflow 3 first to generate queries if they don't already exist in
-  `validation/` for the current session's changed models. Then run Workflow 4
-  (sandbox build) and Workflow 5 (execute validation) from the Monte Carlo
-  Prevent skill.
+| Invocation | Mode | Workflows |
+|---|---|---|
+| _(empty)_ | default generate | W3 only |
+| `generate` | explicit generate | W3 only |
+| `run` | full validate | W4.1 (Build) → W4.2 (Execute) |
+| `run --skip-build` | execute-only | W4.2 only |
 
-  Supported flags after `run`:
-  - `--skip-build` — do not prompt for `dbt build`; assume the user built manually.
-  - `--dev-db <NAME>` — bypass the dev-database confirmation prompt and use `<NAME>` directly.
+`run` also accepts `--dev-db <NAME>` to bypass the dev-database prompt in W4.2. Flags can combine: `run --skip-build --dev-db <NAME>`.
 
-- Otherwise (no `run` keyword): **generate-only mode** (existing behavior).
-  Run Workflow 3. Save queries to `validation/<table_name>_<timestamp>.sql`.
-  At the end of Workflow 3, **always offer** `/mc-validate run` as the next step:
+**`run` does not auto-generate.** If no `validation/<table>_<ts>.sql` exists for the current session's changed models, abort and tell the engineer:
+
+> "No validation queries found for <table_name>. Run `/mc-validate` (or `/mc-validate generate`) first to generate them, then re-run `/mc-validate run`."
+
+**Decision rules:**
+
+- If `$ARGUMENTS` is empty or starts with `generate`: **generate-only mode**. Run Workflow 3 from the Monte Carlo Prevent skill. Save queries to `validation/<table_name>_<timestamp>.sql`. At the end, **always offer** `/mc-validate run` as the next step:
   > "Run these against your sandbox now? (`/mc-validate run`)"
 
-Workflow definitions live in the Monte Carlo Prevent skill's
-`references/workflows.md`. Read that file before executing either mode.
+- If `$ARGUMENTS` starts with `run`: **run mode**.
+  1. Verify a `validation/<table>_<ts>.sql` exists for the current session's changed models. If none exist, abort with the message above. Do **not** run W3.
+  2. If `--skip-build` is **not** present: run **Workflow 4.1** (Build), then **Workflow 4.2** (Execute).
+  3. If `--skip-build` **is** present: skip W4.1 and run **Workflow 4.2** directly. Assume the engineer built manually.
+  4. If `--dev-db <NAME>` is present: pass `<NAME>` into W4.2 and skip its dev-database confirmation prompt.
+
+- Any other token after `run` that isn't `--skip-build` or `--dev-db <NAME>` is an error — surface it to the engineer and stop.
+
+Workflow definitions live in the Monte Carlo Prevent skill's `references/workflows.md`. Read that file before executing either mode.
 
 **Arguments:** $ARGUMENTS
