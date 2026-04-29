@@ -4,6 +4,16 @@ Detailed step-by-step instructions for each Monte Carlo Prevent workflow.
 These are referenced from the main SKILL.md — consult the relevant section when
 executing a workflow.
 
+## TodoWrite labels (applies to every workflow)
+
+When tracking progress through any workflow or sub-workflow with TodoWrite, use plain-English step labels — **not** internal workflow numbers like "W1" or "W4.2". Examples:
+
+- ✅ "Fetch asset health and downstream lineage"
+- ❌ "W1: Asset health pre-fetch"
+
+Internal numbering exists so skill authors reading this file can cross-
+reference; keep it out of user-visible UI.
+
 ---
 
 ## Workflow 1: Asset health pre-fetch (silent delegation)
