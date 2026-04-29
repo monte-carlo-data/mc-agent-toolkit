@@ -560,7 +560,7 @@ from. Skip automatically for YAML/docs-only diffs.
    <!-- MC_BUILD_RAN: <table_name> -->
    ```
 
-### What this workflow does NOT do
+#### What this workflow does NOT do
 
 - Does not run `dbt run-operation`. If the engineer asks, refuse and instruct
   them to run it manually.
