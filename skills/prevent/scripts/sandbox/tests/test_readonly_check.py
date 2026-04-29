@@ -104,7 +104,7 @@ def test_rejects_use(tmp_path):
 
 
 def test_accepts_multi_select(tmp_path):
-    """Multiple SELECT statements in one file are fine — Workflow 5 output shape."""
+    """Multiple SELECT statements in one file are fine — Workflow 4.2 output shape."""
     f = tmp_path / "q.sql"
     f.write_text(OK_MULTI_SELECT)
     code, data = _run(f)

@@ -1,4 +1,4 @@
-"""End-to-end smoke: simulate the Workflow 6/7 script chain on the happy path."""
+"""End-to-end smoke: simulate the Workflow 4.1/4.2 script chain on the happy path."""
 import json
 import subprocess
 import sys
