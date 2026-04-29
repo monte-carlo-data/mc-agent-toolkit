@@ -395,9 +395,12 @@ Instructions:
 
 Then tell the engineer:
 > "Validation queries saved to `validation/<table_name>_<timestamp>.sql`.
-> Replace `<YOUR_DEV_DATABASE>` with your dev database and run in Snowflake
-> or your preferred SQL client — or let me run them against your sandbox
-> now by saying `/mc-validate run`."
+>
+> What's next? Pick one:
+> - Say **continue** (or **yes**) — I'll run `/mc-validate run` for you (build + execute).
+> - Run `/mc-validate run` yourself — same as above.
+> - Run `/mc-validate run --skip-build` if you've already built the model and only want me to execute the queries.
+> - Run them manually: replace `<YOUR_DEV_DATABASE>` in the file and execute in Snowflake or your SQL client."
 
 **Always end Workflow 3 with the `/mc-validate run` offer**, regardless of how
 Workflow 3 was triggered (auto-activated or explicitly invoked). For YAML/docs-only
@@ -644,7 +647,7 @@ Snowflake MCP, and present per-query verdicts plus a consolidated summary.
    this check is confidence, and a silent pass doesn't build it. Output one
    short line before step 5:
 
-   > ✓ Read-only pre-check passed — N queries verified SELECT-only, no writes can reach Snowflake.
+   > ✅ Read-only pre-check passed — N queries verified SELECT-only, no writes can reach Snowflake.
 
 5. **Show the final SQL** (per query, as a fenced SQL block) to the engineer
    before sending to Snowflake MCP. This is the last point at which they can

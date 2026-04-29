@@ -19,8 +19,7 @@ Parse `$ARGUMENTS` to decide which mode to run. The Monte Carlo Prevent skill de
 
 **Decision rules:**
 
-- If `$ARGUMENTS` is empty or starts with `generate`: **generate-only mode**. Run Workflow 3 from the Monte Carlo Prevent skill. Save queries to `validation/<table_name>_<timestamp>.sql`. At the end, **always offer** `/mc-validate run` as the next step:
-  > "Run these against your sandbox now? (`/mc-validate run`)"
+- If `$ARGUMENTS` is empty or starts with `generate`: **generate-only mode**. Run Workflow 3 from the Monte Carlo Prevent skill. Save queries to `validation/<table_name>_<timestamp>.sql`. At the end, **always offer** the four next-step options described in W3 step 6 of `references/workflows.md` (say **continue** to auto-run `/mc-validate run`, run it yourself, run with `--skip-build`, or substitute `<YOUR_DEV_DATABASE>` and run manually).
 
 - If `$ARGUMENTS` starts with `run`: **run mode**.
   1. Verify a `validation/<table>_<ts>.sql` exists for the current session's changed models. If none exist, abort with the message above. Do **not** run W3.
