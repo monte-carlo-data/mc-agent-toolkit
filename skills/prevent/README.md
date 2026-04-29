@@ -83,9 +83,22 @@ flowchart LR
 
 **Monitor coverage** — After you finish an edit, if the impact assessment found a coverage gap, prevent prompts you to add a monitor. On yes, it hands off to `monte-carlo-monitoring-advisor` to produce a validation, metric, comparison, or custom SQL monitor as code.
 
-**Sandbox build (`/mc-validate run`)** — Parses your `profiles.yml`, classifies the resolved database (personal / dev / shared-dev / prod / unknown), detects hard-coded `database:` overrides in the model's `{{ config() }}`, and offers to run `dbt build --select <model>` into your dev database so the validation queries have real data to read from. Hard-stops if the resolved database is a shared prod database, and skips automatically for YAML/docs-only diffs.
+**Validate in sandbox (`/mc-validate run`)** — Two-phase workflow. Run `/mc-validate` first to generate the queries, then `/mc-validate run` to execute them:
 
-**Execute validation queries (`/mc-validate run`)** — Immediately after the sandbox build, substitutes `<YOUR_DEV_DATABASE>` in the generated SQL with a user-confirmed value, surfaces every database the queries will touch (including literal prod references for parity checks), enforces read-only before execution, runs each query through the Snowflake MCP, and reports per-query ✅/⚠️/🔴 verdicts plus a consolidated summary grounded in each query's "What to look for" comment.
+- **Build (W4.1)** — parses your `profiles.yml`, classifies the resolved database (personal / dev / shared-dev / prod / unknown), detects hard-coded `database:` overrides in the model's `{{ config() }}`, and runs `dbt build --select <model>` into your dev database. Hard-stops if the resolved database is shared prod. Skipped automatically for YAML/docs-only diffs.
+- **Execute (W4.2)** — substitutes `<YOUR_DEV_DATABASE>` in the generated SQL with a user-confirmed value, surfaces every database the queries will touch, enforces read-only before execution, runs each query through the Snowflake MCP, and reports per-query ✅/⚠️/🔴 verdicts plus a consolidated summary grounded in each query's "What to look for" comment.
+
+`/mc-validate run` does **not** auto-generate. If no validation file exists for your changed model, the command aborts and tells you to run `/mc-validate` first.
+
+**Invocation modes:**
+
+| Command | What it does |
+|---|---|
+| `/mc-validate` | Default = generate. Runs query generation only (W3). |
+| `/mc-validate generate` | Explicit generate. Same as above. |
+| `/mc-validate run` | Runs **W4.1 (Build) + W4.2 (Execute)**. Requires queries already generated. |
+| `/mc-validate run --skip-build` | Runs **W4.2 only** — assumes you built manually. Requires queries already generated. |
+| `/mc-validate run --dev-db <NAME>` | Same as `run`, bypasses the dev-database prompt in W4.2. |
 
 #### `/mc-validate run` prerequisites
 
