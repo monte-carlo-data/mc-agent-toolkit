@@ -37,7 +37,7 @@ This skill is activated by the CLAUDE.md routing table when:
 
 ## Workflow: Reactive Routing
 
-Session-start welcome is handled by the plugin's `welcome` SessionStart hook (bash-side dbt/MC workspace detection). This skill is purely reactive — it activates for ambiguous or multi-step data-related messages and routes them.
+This skill is purely reactive — it activates for ambiguous or multi-step data-related messages and routes them.
 
 Follow these steps in order.
 
