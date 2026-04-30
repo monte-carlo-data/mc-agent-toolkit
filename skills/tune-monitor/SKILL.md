@@ -66,14 +66,6 @@ Call `get_monitor_report` with:
 
 If the tool returns an error or empty result, tell the user the monitor was not found and stop.
 
-Store the full report output. Then write it to a file:
-
-```
-/tmp/monitor-report-{monitor_uuid}.md
-```
-
-Tell the user: "Report saved to `/tmp/monitor-report-{monitor_uuid}.md`"
-
 Also fetch the monitor's full config via `get_monitors` with:
 - `monitor_ids`: [`{monitor_uuid}`]
 - `include_fields`: [`config`]
