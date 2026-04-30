@@ -27,6 +27,17 @@ tool call per recommendation.
 
 ---
 
+## Correlated anomalies
+
+When multiple (table, metric) pairs fire within a short window (minutes to a few hours), they
+likely share a common cause — e.g., a delayed pipeline affects freshness across several tables,
+or a bulk load triggers volume anomalies on related tables. Before counting anomalies per pair,
+group alerts by time proximity and assess whether they stem from the same upstream event. A burst
+of correlated alerts is one noise source, not many independent ones — address the root cause
+rather than tuning each pair separately.
+
+---
+
 ## Minimum anomaly threshold
 
 Only recommend tuning a (table, metric) pair if it has **3 or more anomalies** in the report.
