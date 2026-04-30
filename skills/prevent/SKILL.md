@@ -7,7 +7,7 @@ when_to_use: |
 
   Do NOT invoke for:
   - Plain health questions about a table ("how is X doing?", "is X healthy?") — those go to monte-carlo-asset-health.
-  - Alert investigation or incident triage ("freshness alert on X", "why did X fail?") — those go to monte-carlo-automated-triage or monte-carlo-incident-response.
+  - Alert investigation or incident triage ("freshness alert on X", "why did X fail?") — those go to automated-triage or monte-carlo-incident-response.
   - Standalone monitor creation requests without an edit context ("create a monitor for X", "what should I monitor?", "show coverage gaps") — those go to monte-carlo-monitoring-advisor.
   - Performance or pipeline diagnosis ("why is X slow?", "investigate the query plan") — those go to monte-carlo-performance-diagnosis.
   - Edits to non-model files: seed CSVs (seeds/), analysis files (analyses/), dbt config (dbt_project.yml, profiles.yml, packages.yml).

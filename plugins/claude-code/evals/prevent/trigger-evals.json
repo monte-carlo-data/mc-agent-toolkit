@@ -66,7 +66,7 @@
       "id": "should-not-02",
       "prompt": "We got a freshness alert on raw_events. What's going on?",
       "expected": "no-trigger",
-      "rationale": "Alert investigation -- belongs to monte-carlo-automated-triage or monte-carlo-incident-response"
+      "rationale": "Alert investigation -- belongs to automated-triage or monte-carlo-incident-response"
     },
     {
       "id": "should-not-03",
