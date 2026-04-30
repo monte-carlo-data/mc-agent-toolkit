@@ -1,5 +1,5 @@
 ---
-name: monte-carlo-automated-triage
+name: automated-triage
 description: Triage Monte Carlo alerts interactively or build an automated workflow. Fetch, score, and troubleshoot alerts using MCP tools now, or design a reusable workflow that runs on a schedule.
 when_to_use: |
   Invoke when the user wants to triage, investigate, or bulk-process Monte Carlo alerts — whether interactively or by building an automated workflow.
