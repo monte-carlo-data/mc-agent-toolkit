@@ -1,6 +1,9 @@
 ---
 name: tune-monitor
 description: Analyze a Monte Carlo monitor and recommend config changes to reduce alert noise. Supports metric, custom SQL, validation, and table monitors. Fetches the report, identifies patterns, and suggests tuning.
+when_to_use: |
+  Invoke when the user wants to tune, reduce noise on, or adjust sensitivity for a Monte Carlo monitor.
+  Example triggers: "tune monitor <uuid>", "this monitor is too noisy", "reduce alerts on this monitor", "adjust sensitivity for <uuid>".
 bucket: Monitoring
 version: 1.0.0
 ---
