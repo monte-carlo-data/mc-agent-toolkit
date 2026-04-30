@@ -6,24 +6,51 @@ Monte Carlo's official toolkit for AI coding agents. Brings data observability �
 
 The toolkit bundles the following capabilities as a single **mc-agent-toolkit** plugin. Each feature is a [skill](skills/) that can also be used standalone.
 
-Some skills sequence other skills into guided workflows (e.g. Incident Response, Proactive Monitoring); the rest are atomic capabilities. Both are loaded the same way and available by name.
+Skills are grouped by the job they help you do. Orchestrated workflows sequence individual skills into guided multi-step flows; atomic skills can be invoked directly by name. Both are loaded the same way.
 
-| Feature | Description | Details |
+### Trust — pre-query and pre-build checks
+
+| Skill | Description | Details |
 |---|---|---|
-| **Incident Response** | Orchestrates incident response — triage alerts, investigate root causes, remediate issues, and add monitoring to prevent recurrence. | [SKILL](skills/incident-response/SKILL.md) |
-| **Asset Health** | Checks the health of a data table — surfaces last activity, alerts, monitoring coverage, importance, and upstream dependency health. | [README](skills/asset-health/README.md) |
-| **Monitoring Advisor** | Analyzes data coverage, creates monitors for warehouse tables and AI agents — covers coverage gaps, use-case analysis, data monitor creation, and agent observability. | [README](skills/monitoring-advisor/README.md) |
-| **Proactive Monitoring** | Guides users from coverage analysis to monitor creation. Sequences asset-health assessment, gap identification via monitoring-advisor, and monitor creation into a guided workflow. | [SKILL](skills/proactive-monitoring/SKILL.md) |
-| **Prevent** | Edit-lifecycle safety net for dbt/SQL: runs change impact assessment before edits, generates validation queries after, and delegates health context and monitor generation to peer skills. | [README](skills/prevent/README.md) |
-| **Generate Validation Notebook** | Generates SQL validation notebooks for dbt model changes, with targeted queries comparing baseline and development data. | [README](skills/generate-validation-notebook/README.md) |
-| **Push Ingestion** | Generates warehouse-specific collection scripts for pushing metadata, lineage, and query logs to Monte Carlo. | [README](skills/push-ingestion/README.md) |
-| **Automated Triage** | Guides AI agents through automated alert triage — scoring alerts, running deep troubleshooting on high-signal ones, classifying, and taking actions. | [SKILL](skills/automated-triage/SKILL.md) |
-| **Analyze Root Cause** | Investigates data incidents — freshness, volume, schema, ETL, query changes — with systematic root cause analysis using lineage and observability data. | [README](skills/analyze-root-cause/README.md) |
-| **Storage Cost Analysis** | Identifies storage waste patterns (unread, zombie, dead-end tables) and recommends safe cleanup with cost estimates. | [README](skills/storage-cost-analysis/README.md) |
-| **Performance Diagnosis** | Diagnoses slow pipelines and expensive queries across Airflow, dbt, and Databricks with tiered investigation. | [README](skills/performance-diagnosis/README.md) |
-| **Remediation** | Investigates and remediates data quality alerts — runs TSA root cause analysis, discovers available tools, executes fixes (or escalates), and documents the resolution. | [README](skills/remediation/README.md) |
-| **Tune Monitor** | Analyzes a Monte Carlo metric monitor's alert history and recommends configuration changes to reduce noise — sensitivity, WHERE conditions, segment exclusions, schedule, and aggregation. | [SKILL](skills/tune-monitor/SKILL.md) |
-| **Connection Auth Rules** | Build a Connection Auth Rules configuration for a Monte Carlo connection type. Fetches live connector schemas and transform steps from the apollo-agent repo. | [SKILL](skills/connection-auth-rules/SKILL.md) |
+| **Asset Health** | Single-table health report: freshness, active alerts, monitor coverage, importance, and upstream issues. Run before building on a table. | [README](skills/asset-health/README.md) |
+
+### Incident Response — triage, investigate, fix
+
+| Skill | Description | Details |
+|---|---|---|
+| **Incident Response** _(workflow)_ | Orchestrates full incident lifecycle — triage → root cause → remediation → prevent recurrence. | [SKILL](skills/incident-response/SKILL.md) |
+| **Automated Triage** | Scores and prioritizes active alerts; runs deep troubleshooting on high-signal ones. | [SKILL](skills/automated-triage/SKILL.md) |
+| **Analyze Root Cause** | Investigates incidents via lineage tracing, ETL checks, query analysis, and data profiling. | [README](skills/analyze-root-cause/README.md) |
+| **Remediation** | Proposes and executes fixes for data-quality alerts; assesses blast radius before acting, or escalates with full context. | [README](skills/remediation/README.md) |
+
+### Monitoring — coverage gaps, monitor creation, noise reduction
+
+| Skill | Description | Details |
+|---|---|---|
+| **Proactive Monitoring** _(workflow)_ | Sequences coverage analysis → gap identification → monitor creation into a guided flow. | [SKILL](skills/proactive-monitoring/SKILL.md) |
+| **Monitoring Advisor** | Identifies coverage gaps and creates monitors for warehouse tables or AI agents — validates tables and fields against your live workspace, emits monitors-as-code YAML. | [README](skills/monitoring-advisor/README.md) |
+| **Tune Monitor** | Recommends sensitivity, segment, and schedule changes to reduce alert noise on an existing metric monitor. | [SKILL](skills/tune-monitor/SKILL.md) |
+
+### Prevent — catch issues before they ship
+
+| Skill | Description | Details |
+|---|---|---|
+| **Prevent** | Edit-lifecycle safety net for dbt/SQL: surfaces blast radius and monitor gaps before edits, generates monitors-as-code for new logic. Auto-activates via hooks. | [README](skills/prevent/README.md) |
+| **Generate Validation Notebook** | Generates targeted SQL validation queries for a dbt PR or local repo change. | [README](skills/generate-validation-notebook/README.md) |
+
+### Optimize — cost and performance
+
+| Skill | Description | Details |
+|---|---|---|
+| **Storage Cost Analysis** | Identifies storage waste (unread, zombie, dead-end tables); uses lineage to verify cleanup is safe and estimates savings. | [README](skills/storage-cost-analysis/README.md) |
+| **Performance Diagnosis** | Diagnoses slow pipelines and expensive queries across Airflow, dbt, Databricks, and other platforms. | [README](skills/performance-diagnosis/README.md) |
+
+### Setup — ingestion and connections
+
+| Skill | Description | Details |
+|---|---|---|
+| **Push Ingestion** | Generates collection scripts to push metadata, lineage, or query logs to Monte Carlo from any data source. | [README](skills/push-ingestion/README.md) |
+| **Connection Auth Rules** | Builds Connection Auth Rules JSON for a Monte Carlo connection type using live connector schemas. | [SKILL](skills/connection-auth-rules/SKILL.md) |
 
 ## Installing the plugin (recommended)
 
