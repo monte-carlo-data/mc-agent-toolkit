@@ -5,6 +5,12 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Claude Code will
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.1] - 2026-04-30
+
+### Removed
+
+- SessionStart welcome hook and its `hooks/welcome/` directory. The one-line greeting that fired when a dbt project or `montecarlo.yml` was detected was reported as too noisy. The plugin's `hooks` array now only references `hooks/prevent/hooks.json`.
+
 ## [1.10.0] - 2026-04-28
 
 ### Added

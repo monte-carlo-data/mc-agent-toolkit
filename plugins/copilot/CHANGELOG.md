@@ -5,6 +5,12 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Copilot CLI will
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.1] - 2026-04-30
+
+### Changed
+
+- Version bump to stay in sync with the canonical plugin version. No functional changes for this plugin; the patch removes the SessionStart welcome hook in the claude-code plugin only.
+
 ## [1.10.0] - 2026-04-28
 
 ### Added
