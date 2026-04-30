@@ -9,7 +9,7 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- Version bump to stay in sync with the canonical plugin version. No functional changes for this plugin; the patch removes the SessionStart welcome hook in the claude-code plugin only.
+- Version sync with claude-code (welcome-hook removal). No functional changes here.
 
 ## [1.10.0] - 2026-04-28
 

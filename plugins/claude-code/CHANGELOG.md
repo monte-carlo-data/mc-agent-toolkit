@@ -9,7 +9,7 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Removed
 
-- SessionStart welcome hook and its `hooks/welcome/` directory. The one-line greeting that fired when a dbt project or `montecarlo.yml` was detected was reported as too noisy. The plugin's `hooks` array now only references `hooks/prevent/hooks.json`.
+- SessionStart welcome hook — reported as too noisy.
 
 ## [1.10.0] - 2026-04-28
 
