@@ -57,11 +57,19 @@ wait_for_log() {
   [ "$(echo "$payload" | jq -r '.skill_args_present')" = "false" ]
 }
 
+@test "skill_args_present is false when args is empty string" {
+  echo '{"tool_name":"Skill","tool_input":{"skill":"hack","args":""}}' | bash "$SCRIPT"
+  wait_for_log
+  payload="$(jq -r '.data' "$MOCK_CURL_LOG")"
+  [ "$(echo "$payload" | jq -r '.skill_args_present')" = "false" ]
+}
+
 @test "payload never contains args content" {
   echo '{"tool_name":"Skill","tool_input":{"skill":"hack","args":"SECRET-PROMPT-TEXT"}}' | bash "$SCRIPT"
   wait_for_log
-  payload="$(jq -r '.data' "$MOCK_CURL_LOG")"
-  ! echo "$payload" | grep -q "SECRET-PROMPT-TEXT"
+  # Search the raw log (covers argv, headers, body — every field mock_curl captured),
+  # not just .data, so any future leak path is caught.
+  ! grep -q "SECRET-PROMPT-TEXT" "$MOCK_CURL_LOG"
 }
 
 @test "opt-out env var suppresses beacon" {
@@ -74,6 +82,14 @@ wait_for_log() {
 
 @test "missing install_id file results in no beacon, exit 0" {
   rm "$IDS_DIR/install_id"
+  run bash -c 'echo "{\"tool_name\":\"Skill\",\"tool_input\":{\"skill\":\"x\"}}" | bash "$0"' "$SCRIPT"
+  [ "$status" -eq 0 ]
+  sleep 0.2
+  [ ! -s "$MOCK_CURL_LOG" ]
+}
+
+@test "missing session_id file results in no beacon, exit 0" {
+  rm "$IDS_DIR/session_id"
   run bash -c 'echo "{\"tool_name\":\"Skill\",\"tool_input\":{\"skill\":\"x\"}}" | bash "$0"' "$SCRIPT"
   [ "$status" -eq 0 ]
   sleep 0.2
