@@ -26,6 +26,10 @@ SKILL_NAME="$(printf '%s' "$HOOK_INPUT" | jq -r '.tool_input.skill // empty' 2>/
 
 ARGS_PRESENT="$(printf '%s' "$HOOK_INPUT" | jq -r '((.tool_input.args // "") | length) > 0' 2>/dev/null || echo false)"
 
+# Beacon URL defaults to prod; MC engineers can override to dev for verification
+# work (e.g. against mcp.dev.getmontecarlo.com before promoting an endpoint change).
+BEACON_URL="${MCD_TOOLKIT_BEACON_URL:-https://mcp.getmontecarlo.com/mcp/toolkit/beacon}"
+
 # Resolve plugin version from plugin.json relative to this script's location.
 # Script path: <plugin_root>/hooks/telemetry/scripts/skill-beacon.sh
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -46,7 +50,7 @@ PAYLOAD="$(jq -nc \
 ( curl -fsS -m 2 -X POST \
     -H 'Content-Type: application/json' \
     -d "$PAYLOAD" \
-    "https://mcp.dev.getmontecarlo.com/mcp/toolkit/beacon" \
+    "$BEACON_URL" \
     >/dev/null 2>&1 || true ) &
 disown
 

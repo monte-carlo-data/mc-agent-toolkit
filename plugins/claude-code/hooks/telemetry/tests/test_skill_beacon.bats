@@ -17,6 +17,7 @@ setup() {
 
   SCRIPT="$BATS_TEST_DIRNAME/../scripts/skill-beacon.sh"
   unset MCD_TOOLKIT_TELEMETRY_DISABLED
+  unset MCD_TOOLKIT_BEACON_URL
 }
 
 teardown() {
@@ -119,11 +120,20 @@ wait_for_log() {
   [ "$version" = "$expected" ]
 }
 
-@test "curl is called with -m 2 and the beacon URL" {
+@test "curl is called with -m 2 and the prod beacon URL by default" {
   echo '{"tool_name":"Skill","tool_input":{"skill":"x"}}' | bash "$SCRIPT"
   wait_for_log
   argv="$(jq -c '.argv' "$MOCK_CURL_LOG")"
   echo "$argv" | grep -q '"-m"'
   echo "$argv" | grep -q '"2"'
+  echo "$argv" | grep -q '"https://mcp.getmontecarlo.com/mcp/toolkit/beacon"'
+}
+
+@test "MCD_TOOLKIT_BEACON_URL overrides the default URL" {
+  export MCD_TOOLKIT_BEACON_URL="https://mcp.dev.getmontecarlo.com/mcp/toolkit/beacon"
+  echo '{"tool_name":"Skill","tool_input":{"skill":"x"}}' | bash "$SCRIPT"
+  wait_for_log
+  argv="$(jq -c '.argv' "$MOCK_CURL_LOG")"
   echo "$argv" | grep -q '"https://mcp.dev.getmontecarlo.com/mcp/toolkit/beacon"'
+  ! echo "$argv" | grep -q '"https://mcp.getmontecarlo.com/mcp/toolkit/beacon"'
 }
