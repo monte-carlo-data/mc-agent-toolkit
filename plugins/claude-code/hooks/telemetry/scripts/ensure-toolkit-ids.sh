@@ -1,15 +1,19 @@
 #!/usr/bin/env bash
 # Ensure stable install_id and fresh session_id for the current Claude Code session.
 # install_id is generated once and persisted; session_id is regenerated every session.
-set -euo pipefail
+# Fails closed (exit 0) on any error — telemetry must never break a Claude Code session.
+# If UUID files don't get written, skill-beacon.sh detects missing IDs and bails out.
+set -uo pipefail
 
 DIR="$HOME/.claude/mc-agent-toolkit"
-mkdir -p "$DIR"
+mkdir -p "$DIR" 2>/dev/null || exit 0
 
 if [[ ! -f "$DIR/install_id" ]]; then
-  uuidgen | tr '[:upper:]' '[:lower:]' > "$DIR/install_id"
-  chmod 600 "$DIR/install_id"
+  uuidgen 2>/dev/null | tr '[:upper:]' '[:lower:]' > "$DIR/install_id" 2>/dev/null || exit 0
+  chmod 600 "$DIR/install_id" 2>/dev/null || exit 0
 fi
 
-uuidgen | tr '[:upper:]' '[:lower:]' > "$DIR/session_id"
-chmod 600 "$DIR/session_id"
+uuidgen 2>/dev/null | tr '[:upper:]' '[:lower:]' > "$DIR/session_id" 2>/dev/null || exit 0
+chmod 600 "$DIR/session_id" 2>/dev/null || exit 0
+
+exit 0

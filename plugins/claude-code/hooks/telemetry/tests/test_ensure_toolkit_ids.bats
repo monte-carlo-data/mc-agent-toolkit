@@ -50,3 +50,11 @@ teardown() {
   [ "$status" -eq 0 ]
   [ -d "$TEST_HOME/.claude/mc-agent-toolkit" ]
 }
+
+@test "exits 0 even when parent directory cannot be created" {
+  # Make $HOME a regular file so mkdir -p $HOME/.claude/... must fail.
+  rm -rf "$TEST_HOME"
+  touch "$TEST_HOME"
+  run bash "$SCRIPT"
+  [ "$status" -eq 0 ]
+}
