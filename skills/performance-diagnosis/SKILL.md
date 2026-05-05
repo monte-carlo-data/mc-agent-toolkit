@@ -116,6 +116,7 @@ Now drill into root causes using the MCONs from discovery or the bridge:
 4. **Is latency degrading?** Call `get_query_latency_distribution` to see the trend:
    - Compare p50 vs p95 -- if p95 >> p50 (>5x), the problem is outlier queries
    - Look for step-changes in latency (sudden increase = regression)
+   - For step-change / regression-time-localization use cases, pass `bucket="1h"`. The default downsamples to daily on windows ≥ 3 days, which hides hour-level steps.
 
 5. **Trace impact**: Call `get_asset_lineage` with `direction="DOWNSTREAM"` to see what's affected by a slow table, or `direction="UPSTREAM"` to find what feeds it.
 
