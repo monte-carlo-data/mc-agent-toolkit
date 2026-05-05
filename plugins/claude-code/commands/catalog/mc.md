@@ -29,6 +29,7 @@ These skills don't have dedicated commands but activate automatically when you a
 |-------|------------|
 | Asset Health | "check health of table X", "how is X doing?", "status of X" |
 | Root Cause Analysis | "why is this table stale?", "investigate this alert", "debug this incident" |
+| Automated Triage | "triage my alerts", "what alerts are firing?", "score and troubleshoot my open alerts" |
 | Remediation | "fix this alert", "remediate this issue", "handle this incident" |
 | Storage Cost Analysis | "unused tables", "storage costs", "zombie tables" |
 | Performance Diagnosis | "slow pipeline", "expensive queries", "query performance" |
