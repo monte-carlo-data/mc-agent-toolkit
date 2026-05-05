@@ -38,7 +38,7 @@ If no alerts are returned, report: "No alerts in the last 3 hours." and stop.
 
 ### Step 3: Score each alert
 
-Call `alert_assessment` in parallel for every alert from step 2, in batches of up to 10 at a time. Each result includes `alert_confidence`, `alert_impact` (HIGH/MEDIUM/LOW each), and a natural-language summary — the summary is used for the triage comment in step 4 for alerts that don't go through troubleshooting.
+Call `alert_assessment` in parallel for every alert from step 2, in batches of up to 10 at a time. Each result includes `alert_confidence`, `alert_impact` (HIGH/MEDIUM/LOW each), `alert_description` (plain-language description of what happened in the incident), and `triage_summary` (the key reasoning behind the confidence and impact scores). Use `alert_description` and `triage_summary` to inform the triage comment in step 4 for alerts that don't go through troubleshooting.
 
 ### Step 4: Troubleshoot and classify high-signal alerts
 
