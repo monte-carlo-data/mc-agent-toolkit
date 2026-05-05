@@ -41,7 +41,8 @@ This stage replicates what a knowledgeable engineer does when scanning the alert
 It returns:
 - **`alert_confidence`** (HIGH/MEDIUM/LOW) — how likely the alert represents a real issue. Affected by: number of events, presence of concerning root causes (query changes, failures), how much thresholds were exceeded, and how noisy the monitor typically is.
 - **`alert_impact`** (HIGH/MEDIUM/LOW) — how significant the potential downstream impact is.  Use cases impacted.  Dashboards affected etc.
-- A natural-language summary of the alert.
+- **`alert_description`** — plain-language description of what happened in the incident.
+- **`triage_summary`** — the key reasoning behind the confidence and impact scores.
 
 **Run `alert_assessment` in parallel**, in batches of up to 10 at a time.
 
