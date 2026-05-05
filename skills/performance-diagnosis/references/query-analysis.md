@@ -19,11 +19,11 @@ When presenting runtime data to the user, always cite the exact numbers from the
 
 ### Common performance patterns
 
-**Sudden spike**: Query changed (new JOIN, removed filter, different plan). Use `get_change_timeline` to find the change.
+**Sudden spike**: Query changed (new JOIN, removed filter, different plan). Use `get_change_timeline` to find the change. When using `get_query_latency_distribution` to confirm timing, pass `bucket="1h"` to localize the step to a specific hour.
 
 **Gradual degradation**: Data volume growing or query becoming less efficient over time. Use `get_query_latency_distribution` to confirm the trend.
 
-**Intermittent slowness**: Outlier executions (p95 >> p50). Often caused by: resource contention, cold warehouse startup, large partition scans on specific date ranges.
+**Intermittent slowness**: Outlier executions (p95 >> p50). Often caused by: resource contention, cold warehouse startup, large partition scans on specific date ranges. Pass `bucket="1h"` to `get_query_latency_distribution` to identify which hours are outlier-heavy.
 
 **Failed/futile patterns**: Use `get_query_rca` to group failures by cause. Common causes:
 - **Timeout**: Query takes too long -- needs optimization or larger warehouse
