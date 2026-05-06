@@ -1,0 +1,658 @@
+#!/usr/bin/env python3
+"""
+Detect AI libraries, runtime, and existing Monte Carlo OpenTelemetry setup.
+
+Walks a target Python codebase looking at dependency manifests
+(requirements.txt, pyproject.toml, Pipfile), serverless deployment markers,
+and existing tracing imports. Outputs a JSON summary describing what AI
+instrumentors apply, whether the runtime is serverless or long-running,
+and whether the Monte Carlo OpenTelemetry SDK is already wired up.
+
+Usage:
+    python3 detect_libraries.py [TARGET_PATH]
+
+TARGET_PATH defaults to the current working directory. Output is JSON
+on stdout. Exit code is 0 on success and 1 on hard errors (missing or
+unreadable target path).
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import sys
+from pathlib import Path
+from typing import Iterable
+
+# ---------------------------------------------------------------------------
+# Constants
+# ---------------------------------------------------------------------------
+
+MAX_FILE_BYTES = 5 * 1024 * 1024  # 5 MB per-file cap
+
+SKIP_DIRS = {
+    ".venv",
+    "venv",
+    "node_modules",
+    "__pycache__",
+    ".git",
+    "dist",
+    "build",
+    "target",
+    ".tox",
+    ".pytest_cache",
+    ".mypy_cache",
+}
+
+SERVERLESS_FILES = {
+    "serverless.yml",
+    "serverless.yaml",
+    "template.yaml",
+    "template.yml",
+    "vercel.json",
+    "netlify.toml",
+    "wrangler.toml",
+    "zappa_settings.json",
+    "modal.toml",
+}
+
+SERVERLESS_DEPS = {
+    "aws-lambda-powertools",
+    "mangum",
+    "chalice",
+    "zappa",
+    "aws-cdk-lib",
+    "aws-sam-cli",
+    "modal",
+    "sst",
+}
+
+SERVERLESS_CODE_PATTERNS = [
+    re.compile(r"def\s+lambda_handler\s*\("),
+    re.compile(r"from\s+chalice\s+import\s+Chalice"),
+    re.compile(r"from\s+mangum\s+import\s+Mangum"),
+    re.compile(r"app\s*=\s*Chalice\s*\("),
+]
+
+EXISTING_SETUP_PATTERNS = [
+    "import montecarlo_opentelemetry",
+    "from montecarlo_opentelemetry",
+    "mc.setup(",
+    "montecarlo_opentelemetry as mc",
+]
+
+# Default instrumentor map — used when instrumentor_map.json is absent.
+# Keep in sync with skills/instrument-agent/scripts/instrumentor_map.json.
+DEFAULT_INSTRUMENTOR_MAP: dict = {
+    "snapshot_date": "2026-05-06",
+    "libraries": [
+        {
+            "library": "langchain",
+            "package": "opentelemetry-instrumentation-langchain",
+            "version_constraint": "<=0.53.4",
+            "covers_dependencies": [
+                "langchain",
+                "langchain-core",
+                "langchain-community",
+                "langgraph",
+            ],
+        },
+        {
+            "library": "openai",
+            "package": "opentelemetry-instrumentation-openai",
+            "version_constraint": "<=0.53.4",
+            "covers_dependencies": ["openai"],
+        },
+        {
+            "library": "anthropic",
+            "package": "opentelemetry-instrumentation-anthropic",
+            "version_constraint": "<=0.53.4",
+            "covers_dependencies": ["anthropic"],
+        },
+        {
+            "library": "crewai",
+            "package": "opentelemetry-instrumentation-crewai",
+            "version_constraint": "<=0.53.4",
+            "covers_dependencies": ["crewai"],
+        },
+        {
+            "library": "bedrock",
+            "package": "opentelemetry-instrumentation-bedrock",
+            "version_constraint": "<=0.53.4",
+            "covers_dependencies": ["boto3", "botocore", "aioboto3"],
+        },
+        {
+            "library": "sagemaker",
+            "package": "opentelemetry-instrumentation-sagemaker",
+            "version_constraint": "<=0.53.4",
+            "covers_dependencies": ["sagemaker"],
+        },
+        {
+            "library": "vertex-ai",
+            "package": "opentelemetry-instrumentation-vertexai",
+            "version_constraint": "<=0.53.4",
+            "covers_dependencies": ["google-cloud-aiplatform"],
+        },
+    ],
+}
+
+# Libraries flagged as ambiguous when matched only via a generic SDK like boto3.
+# Without a code-level signal we can't tell whether the customer is calling
+# Bedrock/SageMaker or just S3/DynamoDB, so we route them to `unsupported`.
+AMBIGUOUS_AWS_LIBRARIES = {"bedrock", "sagemaker"}
+AMBIGUOUS_AWS_DEPS = {"boto3", "botocore", "aioboto3"}
+
+
+# ---------------------------------------------------------------------------
+# TOML loader (stdlib tomllib in 3.11+, fall back to tomli, else None)
+# ---------------------------------------------------------------------------
+
+
+def _load_toml_module():
+    try:
+        import tomllib  # type: ignore[import-not-found]
+
+        return tomllib
+    except ImportError:
+        pass
+    try:
+        import tomli  # type: ignore[import-not-found]
+
+        return tomli
+    except ImportError:
+        return None
+
+
+_TOML = _load_toml_module()
+
+
+# ---------------------------------------------------------------------------
+# Filesystem helpers
+# ---------------------------------------------------------------------------
+
+
+def _is_within(path: Path, root: Path) -> bool:
+    """True if `path` (resolved) is inside `root` (resolved)."""
+    try:
+        resolved = path.resolve()
+    except OSError:
+        return False
+    try:
+        resolved.relative_to(root)
+        return True
+    except ValueError:
+        return False
+
+
+def _safe_read_text(path: Path) -> str | None:
+    """Read a file as UTF-8 text, skipping if too large or unreadable."""
+    try:
+        size = path.stat().st_size
+    except OSError as exc:
+        print(f"warning: cannot stat {path}: {exc}", file=sys.stderr)
+        return None
+    if size > MAX_FILE_BYTES:
+        print(
+            f"warning: skipping {path} ({size} bytes exceeds {MAX_FILE_BYTES})",
+            file=sys.stderr,
+        )
+        return None
+    try:
+        return path.read_text(encoding="utf-8", errors="replace")
+    except OSError as exc:
+        print(f"warning: cannot read {path}: {exc}", file=sys.stderr)
+        return None
+
+
+def _walk_files(root: Path) -> Iterable[Path]:
+    """Yield files under root, skipping noise dirs and out-of-tree symlinks."""
+    root_resolved = root.resolve()
+    for dirpath, dirnames, filenames in os.walk(root, followlinks=False):
+        # Filter directories in-place so os.walk doesn't descend into them.
+        dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
+
+        # Drop any dir that resolves outside the target tree (symlink escape).
+        kept: list[str] = []
+        for d in dirnames:
+            full = Path(dirpath) / d
+            if _is_within(full, root_resolved):
+                kept.append(d)
+        dirnames[:] = kept
+
+        for name in filenames:
+            full = Path(dirpath) / name
+            if full.is_symlink() and not _is_within(full, root_resolved):
+                continue
+            yield full
+
+
+# ---------------------------------------------------------------------------
+# Dependency parsing
+# ---------------------------------------------------------------------------
+
+# PEP 508 / requirements line — captures the project name only.
+# Allowed name characters per PEP 508: letters, digits, ., -, _
+_REQ_NAME_RE = re.compile(r"^([A-Za-z0-9][A-Za-z0-9._-]*)")
+_EGG_RE = re.compile(r"[#&]egg=([A-Za-z0-9][A-Za-z0-9._-]*)")
+
+
+def _normalize_dep(name: str) -> str:
+    return name.strip().lower()
+
+
+def _parse_requirements_line(line: str) -> str | None:
+    """Extract a package name from a single requirements.txt line, or None."""
+    raw = line.strip()
+    if not raw:
+        return None
+    # Strip inline comments — preserve URLs that contain '#egg=' first.
+    if "#egg=" not in raw and "#" in raw:
+        raw = raw.split("#", 1)[0].strip()
+    if not raw:
+        return None
+
+    lowered = raw.lower()
+
+    # Skip include directives and pip flags.
+    if (
+        lowered.startswith("-r ")
+        or lowered.startswith("--requirement ")
+        or lowered.startswith("-c ")
+        or lowered.startswith("--constraint ")
+        or lowered.startswith("--index-url")
+        or lowered.startswith("--extra-index-url")
+        or lowered.startswith("--find-links")
+        or lowered.startswith("--no-")
+        or lowered.startswith("--pre")
+        or lowered.startswith("--trusted-host")
+    ):
+        return None
+
+    # Editable / VCS / URL specs — name comes from #egg=<name>.
+    if (
+        lowered.startswith("-e ")
+        or lowered.startswith("--editable ")
+        or lowered.startswith("git+")
+        or lowered.startswith("hg+")
+        or lowered.startswith("svn+")
+        or lowered.startswith("bzr+")
+        or lowered.startswith("http://")
+        or lowered.startswith("https://")
+        or lowered.startswith("file://")
+    ):
+        m = _EGG_RE.search(raw)
+        return _normalize_dep(m.group(1)) if m else None
+
+    # Strip leading "-e " just in case it's followed by a normal name.
+    if raw.startswith("-e "):
+        raw = raw[3:].strip()
+
+    # Drop any "[extras]" segment, then match the leading package name.
+    bracket = raw.find("[")
+    if bracket > 0:
+        candidate = raw[:bracket]
+    else:
+        candidate = raw
+    m = _REQ_NAME_RE.match(candidate)
+    return _normalize_dep(m.group(1)) if m else None
+
+
+def _parse_requirements_file(path: Path) -> list[str]:
+    text = _safe_read_text(path)
+    if text is None:
+        return []
+    deps: list[str] = []
+    try:
+        for line in text.splitlines():
+            name = _parse_requirements_line(line)
+            if name:
+                deps.append(name)
+    except Exception as exc:  # noqa: BLE001 — tolerate any parse glitch
+        print(f"warning: failed to parse {path}: {exc}", file=sys.stderr)
+    return deps
+
+
+def _pep508_name(spec: str) -> str | None:
+    """Pull the project name from a PEP 508 requirement string."""
+    candidate = spec.strip()
+    if not candidate:
+        return None
+    bracket = candidate.find("[")
+    if bracket > 0:
+        candidate = candidate[:bracket]
+    m = _REQ_NAME_RE.match(candidate)
+    return _normalize_dep(m.group(1)) if m else None
+
+
+def _parse_pyproject(path: Path) -> list[str]:
+    if _TOML is None:
+        print(
+            f"warning: skipping {path} — no TOML parser available "
+            "(install tomli or use Python 3.11+)",
+            file=sys.stderr,
+        )
+        return []
+    try:
+        with path.open("rb") as fh:
+            data = _TOML.load(fh)
+    except Exception as exc:  # noqa: BLE001
+        print(f"warning: failed to parse {path}: {exc}", file=sys.stderr)
+        return []
+
+    deps: list[str] = []
+
+    # PEP 621: [project] dependencies + optional-dependencies.
+    project = data.get("project") if isinstance(data, dict) else None
+    if isinstance(project, dict):
+        for spec in project.get("dependencies", []) or []:
+            if isinstance(spec, str):
+                name = _pep508_name(spec)
+                if name:
+                    deps.append(name)
+        opt = project.get("optional-dependencies") or {}
+        if isinstance(opt, dict):
+            for group in opt.values():
+                if not isinstance(group, list):
+                    continue
+                for spec in group:
+                    if isinstance(spec, str):
+                        name = _pep508_name(spec)
+                        if name:
+                            deps.append(name)
+
+    # Poetry: [tool.poetry.dependencies] + [tool.poetry.group.<g>.dependencies]
+    tool = data.get("tool") if isinstance(data, dict) else None
+    poetry = tool.get("poetry") if isinstance(tool, dict) else None
+    if isinstance(poetry, dict):
+        poetry_deps = poetry.get("dependencies") or {}
+        if isinstance(poetry_deps, dict):
+            for name in poetry_deps.keys():
+                if isinstance(name, str) and name.lower() != "python":
+                    deps.append(_normalize_dep(name))
+        groups = poetry.get("group") or {}
+        if isinstance(groups, dict):
+            for group in groups.values():
+                if not isinstance(group, dict):
+                    continue
+                gdeps = group.get("dependencies") or {}
+                if isinstance(gdeps, dict):
+                    for name in gdeps.keys():
+                        if isinstance(name, str) and name.lower() != "python":
+                            deps.append(_normalize_dep(name))
+
+    return deps
+
+
+def _parse_pipfile(path: Path) -> list[str]:
+    if _TOML is None:
+        print(
+            f"warning: skipping {path} — no TOML parser available "
+            "(install tomli or use Python 3.11+)",
+            file=sys.stderr,
+        )
+        return []
+    try:
+        with path.open("rb") as fh:
+            data = _TOML.load(fh)
+    except Exception as exc:  # noqa: BLE001
+        print(f"warning: failed to parse {path}: {exc}", file=sys.stderr)
+        return []
+
+    deps: list[str] = []
+    for section in ("packages", "dev-packages"):
+        section_data = data.get(section) if isinstance(data, dict) else None
+        if isinstance(section_data, dict):
+            for name in section_data.keys():
+                if isinstance(name, str):
+                    deps.append(_normalize_dep(name))
+    return deps
+
+
+def _collect_dependencies(target: Path) -> set[str]:
+    """Walk target for known manifest files and collect normalized dep names."""
+    found: set[str] = set()
+    for path in _walk_files(target):
+        name = path.name
+        lower = name.lower()
+        if lower == "requirements.txt" or (
+            lower.startswith("requirements") and lower.endswith(".txt")
+        ):
+            found.update(_parse_requirements_file(path))
+        elif lower == "pyproject.toml":
+            found.update(_parse_pyproject(path))
+        elif lower == "pipfile":
+            found.update(_parse_pipfile(path))
+    return found
+
+
+# ---------------------------------------------------------------------------
+# Instrumentor mapping
+# ---------------------------------------------------------------------------
+
+
+def _load_instrumentor_map(script_dir: Path) -> dict:
+    map_path = script_dir / "instrumentor_map.json"
+    if map_path.is_file():
+        try:
+            with map_path.open("r", encoding="utf-8") as fh:
+                data = json.load(fh)
+            if isinstance(data, dict) and isinstance(data.get("libraries"), list):
+                return data
+            print(
+                f"warning: {map_path} has unexpected shape; using built-in default",
+                file=sys.stderr,
+            )
+        except Exception as exc:  # noqa: BLE001
+            print(
+                f"warning: failed to read {map_path}: {exc}; using built-in default",
+                file=sys.stderr,
+            )
+    return DEFAULT_INSTRUMENTOR_MAP
+
+
+def _match_instrumentors(
+    deps: set[str], instrumentor_map: dict
+) -> tuple[list[str], list[dict], list[dict]]:
+    """Return (detected, suggested_instrumentors, unsupported)."""
+    detected: list[str] = []
+    suggested: list[dict] = []
+    unsupported: list[dict] = []
+    seen_libraries: set[str] = set()
+
+    deps_lower = {d.lower() for d in deps}
+
+    for entry in instrumentor_map.get("libraries", []):
+        if not isinstance(entry, dict):
+            continue
+        library = entry.get("library")
+        package = entry.get("package")
+        covers = entry.get("covers_dependencies") or []
+        if not (isinstance(library, str) and isinstance(package, str)):
+            continue
+        if library in seen_libraries:
+            continue
+
+        covers_lower = {c.lower() for c in covers if isinstance(c, str)}
+        matched_via = covers_lower & deps_lower
+        if not matched_via:
+            continue
+
+        # Bedrock / SageMaker matched only via generic AWS SDKs is too noisy.
+        if library in AMBIGUOUS_AWS_LIBRARIES and matched_via.issubset(
+            AMBIGUOUS_AWS_DEPS
+        ):
+            unsupported.append(
+                {
+                    "library": library,
+                    "package": package,
+                    "reason": (
+                        f"Matched only via generic AWS SDK ({sorted(matched_via)}); "
+                        "cannot confirm Bedrock/SageMaker usage from dependencies "
+                        "alone. Manually enable this instrumentor if the agent "
+                        "actually calls Bedrock/SageMaker."
+                    ),
+                    "matched_dependencies": sorted(matched_via),
+                }
+            )
+            seen_libraries.add(library)
+            continue
+
+        detected.append(library)
+        suggested.append({"library": library, "package": package})
+        seen_libraries.add(library)
+
+    return detected, suggested, unsupported
+
+
+# ---------------------------------------------------------------------------
+# Runtime detection
+# ---------------------------------------------------------------------------
+
+
+def _detect_serverless(
+    target: Path, deps: set[str]
+) -> list[str]:
+    """Return the list of serverless signals observed."""
+    signals: list[str] = []
+
+    # File-level markers — only at the target root or anywhere in tree?
+    # Spec says "File exists at target path" → check anywhere in the walked
+    # tree; this catches monorepo subprojects too.
+    seen_files: set[str] = set()
+    for path in _walk_files(target):
+        if path.name.lower() in SERVERLESS_FILES and path.name not in seen_files:
+            signals.append(path.name)
+            seen_files.add(path.name)
+
+    # Dependency markers.
+    for dep in sorted(deps):
+        if dep in SERVERLESS_DEPS:
+            signals.append(dep)
+
+    # Code patterns — only meaningful tokens, not which file they came from.
+    code_signals: set[str] = set()
+    code_signal_labels = {
+        SERVERLESS_CODE_PATTERNS[0]: "lambda_handler",
+        SERVERLESS_CODE_PATTERNS[1]: "chalice_import",
+        SERVERLESS_CODE_PATTERNS[2]: "mangum_import",
+        SERVERLESS_CODE_PATTERNS[3]: "chalice_app",
+    }
+    for path in _walk_files(target):
+        if path.suffix.lower() != ".py":
+            continue
+        text = _safe_read_text(path)
+        if text is None:
+            continue
+        for pattern, label in code_signal_labels.items():
+            if label in code_signals:
+                continue
+            if pattern.search(text):
+                code_signals.add(label)
+        if len(code_signals) == len(code_signal_labels):
+            break
+    signals.extend(sorted(code_signals))
+
+    return signals
+
+
+# ---------------------------------------------------------------------------
+# Existing setup detection
+# ---------------------------------------------------------------------------
+
+
+def _detect_existing_setup(target: Path) -> dict:
+    files: list[str] = []
+    target_resolved = target.resolve()
+    for path in _walk_files(target):
+        if path.suffix.lower() != ".py":
+            continue
+        text = _safe_read_text(path)
+        if text is None:
+            continue
+        if any(pat in text for pat in EXISTING_SETUP_PATTERNS):
+            try:
+                rel = path.resolve().relative_to(target_resolved)
+                files.append(str(rel))
+            except ValueError:
+                files.append(str(path))
+    files.sort()
+    return {"found": bool(files), "files": files}
+
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
+
+
+def detect(target: Path) -> dict:
+    script_dir = Path(__file__).resolve().parent
+    instrumentor_map = _load_instrumentor_map(script_dir)
+
+    deps = _collect_dependencies(target)
+    detected, suggested, unsupported = _match_instrumentors(deps, instrumentor_map)
+
+    serverless_signals = _detect_serverless(target, deps)
+    if serverless_signals:
+        runtime = "serverless"
+    elif detected:
+        runtime = "long_running"
+    else:
+        runtime = "unknown"
+
+    existing_setup = _detect_existing_setup(target)
+
+    return {
+        "detected": detected,
+        "suggested_instrumentors": suggested,
+        "unsupported": unsupported,
+        "runtime": runtime,
+        "serverless_signals": serverless_signals,
+        "existing_setup": existing_setup,
+    }
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description=(
+            "Detect AI libraries, runtime style, and existing Monte Carlo "
+            "OpenTelemetry setup in a Python codebase."
+        )
+    )
+    parser.add_argument(
+        "target",
+        nargs="?",
+        default=".",
+        help="Path to the codebase to scan (defaults to the current directory).",
+    )
+    args = parser.parse_args()
+
+    target = Path(args.target)
+    if not target.exists():
+        print(
+            json.dumps({"error": f"Target path does not exist: {target}"}, indent=2)
+        )
+        sys.exit(1)
+    if not target.is_dir():
+        print(
+            json.dumps({"error": f"Target path is not a directory: {target}"}, indent=2)
+        )
+        sys.exit(1)
+    if not os.access(target, os.R_OK):
+        print(
+            json.dumps({"error": f"Target path is not readable: {target}"}, indent=2)
+        )
+        sys.exit(1)
+
+    try:
+        result = detect(target)
+    except OSError as exc:
+        print(json.dumps({"error": f"Filesystem error: {exc}"}, indent=2))
+        sys.exit(1)
+
+    print(json.dumps(result, indent=2))
+
+
+if __name__ == "__main__":
+    main()
