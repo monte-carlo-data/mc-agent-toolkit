@@ -35,14 +35,24 @@ def run_detect(fixture: str) -> dict:
 
 
 def check(label: str, condition: bool, hint: str = "") -> None:
+    """Record a single check.
+
+    Increments the global PASSED/FAILED counters and prints a PASS/FAIL line.
+    On failure, raises AssertionError so pytest catches per-test failures
+    (each `test_*` function fails on its first failed check). The standalone
+    runner in `main()` wraps each test in its own try/except so all tests
+    still run regardless of intermediate failures.
+    """
     global PASSED, FAILED
     if condition:
         PASSED += 1
         print(f"  PASS  {label}")
-    else:
-        FAILED += 1
-        suffix = f" — {hint}" if hint else ""
-        print(f"  FAIL  {label}{suffix}")
+        return
+    FAILED += 1
+    suffix = f" — {hint}" if hint else ""
+    msg = f"FAIL  {label}{suffix}"
+    print(f"  {msg}")
+    raise AssertionError(msg)
 
 
 def _suggested_libraries(out: dict) -> set[str]:
@@ -281,15 +291,28 @@ def test_boto3_only() -> None:
 
 
 def main() -> None:
-    test_requirements_txt()
-    test_poetry_pyproject()
-    test_pep621_pyproject()
-    test_pipfile()
-    test_serverless()
-    test_existing_setup()
-    test_no_deps()
-    test_mixed()
-    test_boto3_only()
+    tests = [
+        test_requirements_txt,
+        test_poetry_pyproject,
+        test_pep621_pyproject,
+        test_pipfile,
+        test_serverless,
+        test_existing_setup,
+        test_no_deps,
+        test_mixed,
+        test_boto3_only,
+    ]
+    # Run every test even when an early one fails — `check()` raises on the
+    # first failure inside a single test, but we want a complete pass/fail
+    # summary across all tests when invoked standalone. pytest invokes each
+    # `test_*` directly without going through main(), so per-test fast-fail
+    # via AssertionError is the right behavior under pytest.
+    for fn in tests:
+        try:
+            fn()
+        except AssertionError:
+            # Already logged by check(); continue so the summary covers all tests.
+            pass
     print(f"\n{'=' * 40}")
     print(f"Results: {PASSED} passed, {FAILED} failed")
     sys.exit(0 if FAILED == 0 else 1)
