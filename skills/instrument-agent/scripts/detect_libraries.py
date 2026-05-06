@@ -334,9 +334,11 @@ def _parse_pyproject(path: Path) -> list[str]:
             file=sys.stderr,
         )
         return []
+    text = _safe_read_text(path)
+    if text is None:
+        return []
     try:
-        with path.open("rb") as fh:
-            data = _TOML.load(fh)
+        data = _TOML.loads(text)
     except Exception as exc:  # noqa: BLE001
         print(f"warning: failed to parse {path}: {exc}", file=sys.stderr)
         return []
@@ -393,9 +395,11 @@ def _parse_pipfile(path: Path) -> list[str]:
             file=sys.stderr,
         )
         return []
+    text = _safe_read_text(path)
+    if text is None:
+        return []
     try:
-        with path.open("rb") as fh:
-            data = _TOML.load(fh)
+        data = _TOML.loads(text)
     except Exception as exc:  # noqa: BLE001
         print(f"warning: failed to parse {path}: {exc}", file=sys.stderr)
         return []
