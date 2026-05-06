@@ -16,7 +16,7 @@ setup() {
   export MOCK_CURL_LOG="$(mktemp)"
 
   SCRIPT="$BATS_TEST_DIRNAME/../scripts/skill-beacon.sh"
-  unset MCD_TOOLKIT_TELEMETRY_DISABLED
+  unset MC_AGENT_TOOLKIT_TELEMETRY_DISABLED
   unset MCD_TOOLKIT_BEACON_URL
 }
 
@@ -41,7 +41,7 @@ wait_for_log() {
   [ "$(echo "$payload" | jq -r '.event')" = "Toolkit Skill Invoked" ]
   [ "$(echo "$payload" | jq -r '.skill')" = "start-work" ]
   [ "$(echo "$payload" | jq -r '.install_id')" = "11111111-1111-1111-1111-111111111111" ]
-  [ "$(echo "$payload" | jq -r '.toolkit_session_id')" = "22222222-2222-2222-2222-222222222222" ]
+  [ "$(echo "$payload" | jq -r '.session_id')" = "22222222-2222-2222-2222-222222222222" ]
 }
 
 @test "skill_args_present is true when args non-empty" {
@@ -74,7 +74,7 @@ wait_for_log() {
 }
 
 @test "opt-out env var suppresses beacon" {
-  export MCD_TOOLKIT_TELEMETRY_DISABLED=1
+  export MC_AGENT_TOOLKIT_TELEMETRY_DISABLED=1
   run bash -c 'echo "{\"tool_name\":\"Skill\",\"tool_input\":{\"skill\":\"x\"}}" | bash "$0"' "$SCRIPT"
   [ "$status" -eq 0 ]
   sleep 0.2
