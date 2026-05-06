@@ -39,12 +39,12 @@ TOOLKIT_VERSION="$(jq -r '.version // "unknown"' "$PLUGIN_JSON" 2>/dev/null || e
 PAYLOAD="$(jq -nc \
   --arg event "Toolkit Skill Invoked" \
   --arg install_id "$INSTALL_ID" \
-  --arg toolkit_session_id "$TOOLKIT_SESSION_ID" \
+  --arg session_id "$TOOLKIT_SESSION_ID" \
   --arg skill "$SKILL_NAME" \
   --argjson skill_args_present "$ARGS_PRESENT" \
   --arg toolkit_version "$TOOLKIT_VERSION" \
   --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-  '{event: $event, install_id: $install_id, toolkit_session_id: $toolkit_session_id, skill: $skill, skill_args_present: $skill_args_present, toolkit_version: $toolkit_version, ts: $ts}')"
+  '{event: $event, install_id: $install_id, session_id: $session_id, skill: $skill, skill_args_present: $skill_args_present, toolkit_version: $toolkit_version, ts: $ts}')"
 
 # Fire-and-forget. 2s timeout so a slow server never delays a skill invocation.
 ( curl -fsS -m 2 -X POST \

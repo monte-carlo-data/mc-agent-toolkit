@@ -76,7 +76,7 @@ cp plugins/opencode/commands/mc-validate.md .opencode/commands/
   "mcp": {
     "monte-carlo-mcp": {
       "type": "remote",
-      "url": "https://mcp.getmontecarlo.com/mcp"
+      "url": "https://mcp.getmontecarlo.com/mcp/toolkit"
     }
   }
 }
