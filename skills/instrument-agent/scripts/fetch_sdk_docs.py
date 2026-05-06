@@ -236,10 +236,17 @@ def _fetch_pypi() -> dict:
     requires_dist = info.get("requires_dist") or []
     if not isinstance(requires_dist, list):
         requires_dist = []
+    description = info.get("description") or ""
+    if not isinstance(description, str):
+        description = ""
     return {
         "version": info.get("version") or "",
         "pypi_url": pypi_project_url,
         "requires_dist": [str(r) for r in requires_dist],
+        # README content as PyPI knows it; used as a backup source when the
+        # GitHub README fetch fails. Captured under a separate key so it is
+        # not surfaced in the final SDK metadata block.
+        "_description": description,
     }
 
 
@@ -306,12 +313,19 @@ def _build_live(
     sdk_meta: dict | None,
     instrumentors: list[dict],
     readme_text: str,
+    readme_source: str,
     warnings: list[str],
 ) -> dict:
+    # Strip the internal `_description` field from the published sdk block —
+    # it is only used as an internal README backup source.
+    public_sdk = None
+    if sdk_meta is not None:
+        public_sdk = {k: v for k, v in sdk_meta.items() if not k.startswith("_")}
     return {
         "source": "live",
+        "readme_source": readme_source,
         "fetched_at": _now_iso(),
-        "sdk": sdk_meta,
+        "sdk": public_sdk,
         "supported_instrumentors": instrumentors,
         "readme_excerpt": _readme_excerpt(readme_text),
         "warnings": warnings,
@@ -381,19 +395,19 @@ def main() -> None:
 
     warnings: list[str] = []
     readme_text: str | None = None
+    readme_source: str | None = None
     sdk_meta: dict | None = None
     instrumentors: list[dict] = []
-    live_failed = False
 
     readme_url = os.environ.get("MC_SDK_DOCS_URL") or SDK_README_URL
 
-    # ----- README ----------------------------------------------------------
+    # ----- README (GitHub) -------------------------------------------------
     if args.no_github:
         warnings.append("GitHub fetch skipped via --no-github")
-        live_failed = True
     else:
         try:
             readme_text = _fetch_readme(readme_url)
+            readme_source = "github"
         except (
             urllib.error.HTTPError,
             urllib.error.URLError,
@@ -401,12 +415,10 @@ def main() -> None:
             OSError,
         ) as exc:
             warnings.append(f"Live fetch failed: README {_describe_fetch_error(exc)}")
-            live_failed = True
 
     # ----- PyPI ------------------------------------------------------------
     if args.no_pypi:
         warnings.append("PyPI fetch skipped via --no-pypi")
-        live_failed = True
     else:
         try:
             sdk_meta = _fetch_pypi()
@@ -418,25 +430,53 @@ def main() -> None:
             json.JSONDecodeError,
         ) as exc:
             warnings.append(f"Live fetch failed: PyPI {_describe_fetch_error(exc)}")
-            live_failed = True
 
-    # ----- Parse README ---------------------------------------------------
+    # ----- Backup README source: PyPI info.description ---------------------
+    # If the GitHub README fetch failed (or was skipped) but PyPI succeeded
+    # and exposes a description, use it as the README source. The PyPI
+    # description for `montecarlo-opentelemetry` mirrors the GitHub README,
+    # so the same parser produces the same result.
+    if readme_text is None and sdk_meta is not None:
+        description = sdk_meta.get("_description") or ""
+        if description.strip():
+            readme_text = description
+            readme_source = "pypi"
+            warnings.append(
+                "Using PyPI 'info.description' as README source "
+                "(GitHub README fetch failed or skipped)."
+            )
+
+    # ----- Parse README ----------------------------------------------------
     if readme_text:
         instrumentors = _parse_supported_instrumentors(readme_text, warnings)
-        if len(instrumentors) < MIN_PARSED_INSTRUMENTORS:
-            warnings.append(
-                "README parser found fewer than "
-                f"{MIN_PARSED_INSTRUMENTORS} instrumentors — falling back to snapshot."
-            )
-            live_failed = True
+
+    parse_below_threshold = len(instrumentors) < MIN_PARSED_INSTRUMENTORS
+    if readme_text is not None and parse_below_threshold:
+        warnings.append(
+            "README parser found fewer than "
+            f"{MIN_PARSED_INSTRUMENTORS} instrumentors — falling back to snapshot."
+        )
+
+    # Live succeeds when we can produce a usable instrumentor list, regardless
+    # of which source supplied the README. Falling back only when both the
+    # GitHub README and PyPI description are unavailable, or when the parser
+    # found too few entries.
+    live_failed = readme_text is None or parse_below_threshold
 
     if not args.quiet and warnings:
         for w in warnings:
             print(w, file=sys.stderr)
 
-    # ----- Live success path ----------------------------------------------
-    if not live_failed and readme_text is not None and sdk_meta is not None:
-        result = _build_live(sdk_meta, instrumentors, readme_text, warnings)
+    # ----- Live success path -----------------------------------------------
+    if not live_failed and readme_text is not None and readme_source is not None:
+        if sdk_meta is None:
+            warnings.append(
+                "Live instrumentor list available but PyPI metadata "
+                "is missing; sdk version/requires_dist will be null."
+            )
+        result = _build_live(
+            sdk_meta, instrumentors, readme_text, readme_source, warnings
+        )
         print(json.dumps(result, indent=2))
         sys.exit(0)
 
