@@ -93,6 +93,9 @@ Latency trend over time.
 - p95 >> p50 (>5x) means outlier queries are the problem, not the average case
 - Gradual upward trend means growing data volume or inefficient queries
 
+**Key parameters:**
+- `bucket` (optional): defaults to `1d` for windows ≥ 3 days, `1h` otherwise. Pass `bucket="1h"` explicitly when localizing a step change to a specific hour, or when investigating intermittent outlier patterns that vary by time of day.
+
 ### `get_asset_lineage`
 
 Trace upstream/downstream impact.

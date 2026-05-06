@@ -5,11 +5,17 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Copilot CLI will
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.10.2] - 2026-05-04
+## [1.10.3] - 2026-05-06
 
 ### Changed
 
 - Internal tracking only: MCP route updated to `/mcp/toolkit`.
+
+## [1.10.2] - 2026-05-05
+
+### Changed
+
+- Correct `alert_assessment` output field descriptions in automated-triage skill: replace the stale "natural-language summary" reference with explicit `alert_description` (what happened) and `triage_summary` (scoring reasoning) fields, and clarify that `alert_description` is used in triage comments for untroubleshot alerts.
 
 ## [1.10.1] - 2026-04-30
 
