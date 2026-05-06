@@ -45,6 +45,25 @@ README_EXCERPT_BYTES = 2_048
 MAX_INSTRUMENTOR_MATCHES = 50
 MIN_PARSED_INSTRUMENTORS = 2
 
+# Core libraries the PRD requires the skill to support. A live parse that
+# misses any of these is treated as below-threshold and falls back to the
+# committed snapshot. Identifiers are package suffixes (the slug after
+# "opentelemetry-instrumentation-") plus "langgraph", which has no separate
+# package — it rides on opentelemetry-instrumentation-langchain and is
+# surfaced via the README's "# For Langchain/LangGraph" header.
+PRD_CORE_LIBRARIES = frozenset(
+    {
+        "langchain",
+        "langgraph",
+        "openai",
+        "anthropic",
+        "crewai",
+        "bedrock",
+        "sagemaker",
+        "vertexai",
+    }
+)
+
 # "# For Langchain/LangGraph" or "### For OpenAI"
 _HEADER_RE = re.compile(
     r"^\s*(?:#{1,6}\s+|<!--\s*)?For\s+([A-Za-z0-9_./+\- ]+?)\s*(?:-->|$)",
@@ -61,6 +80,15 @@ _PIP_INSTALL_RE = re.compile(
         )?
         ["']?""",
     re.IGNORECASE | re.VERBOSE,
+)
+# Markdown bullet listing each supported package as a PyPI link, e.g.
+#   * [opentelemetry-instrumentation-anthropic](https://pypi.org/project/opentelemetry-instrumentation-anthropic/)
+_BULLET_PACKAGE_RE = re.compile(
+    r"""^\s*[-*+]\s+
+        \[\s*opentelemetry-instrumentation-([a-z0-9][a-z0-9_\-]*)\s*\]
+        \(\s*https?://pypi\.org/project/opentelemetry-instrumentation-[a-z0-9_\-]+/?\s*\)
+    """,
+    re.MULTILINE | re.IGNORECASE | re.VERBOSE,
 )
 
 
@@ -128,6 +156,19 @@ def _parse_supported_instrumentors(
 ) -> list[dict]:
     """Extract `(library, package, version_constraint)` tuples from the README.
 
+    The README has two surfaces describing supported instrumentors:
+
+    1. Quick-start `# For <Label>` headers paired with a `pip install` line —
+       these include explicit version constraints (e.g. `<=0.53.4`).
+    2. A bullet list further down ("See a selection of available instrumentation
+       libraries below.") with one PyPI link per supported package — no version
+       constraints, but covers the long tail (Anthropic, Bedrock, CrewAI,
+       SageMaker, Vertex AI, …).
+
+    We parse both, deduplicate by `(library, package)`, and return the union.
+    Header-derived entries take precedence so any version_constraint they
+    surface is preserved.
+
     We do NOT exec/eval/compile/import any fetched bytes — this is plain
     regex over text. Bounded to MAX_INSTRUMENTOR_MATCHES to avoid pathological
     inputs.
@@ -136,12 +177,8 @@ def _parse_supported_instrumentors(
     seen: set[tuple[str, str]] = set()
     parse_warned = False
 
+    # ----- Pass 1: header + pip install pairs (with version_constraint) -----
     headers = list(_HEADER_RE.finditer(readme_text))
-    if not headers:
-        return instrumentors
-
-    # Map each header to the next ~20 lines of body text and look for a pip
-    # install line within that window.
     for idx, header in enumerate(headers):
         if len(instrumentors) >= MAX_INSTRUMENTOR_MATCHES:
             break
@@ -182,7 +219,35 @@ def _parse_supported_instrumentors(
             if len(instrumentors) >= MAX_INSTRUMENTOR_MATCHES:
                 break
 
+    # ----- Pass 2: PyPI-link bullet list (no version_constraint) ------------
+    for match in _BULLET_PACKAGE_RE.finditer(readme_text):
+        if len(instrumentors) >= MAX_INSTRUMENTOR_MATCHES:
+            break
+        suffix = match.group(1).lower()
+        # The library identifier is the package suffix (post
+        # "opentelemetry-instrumentation-"). It already lines up with PRD
+        # canonical IDs for the core PRD libraries (anthropic, bedrock,
+        # crewai, sagemaker, vertexai, …).
+        library = suffix
+        package = f"opentelemetry-instrumentation-{suffix}"
+        key = (library, package)
+        if key in seen:
+            continue
+        seen.add(key)
+        instrumentors.append({"library": library, "package": package})
+
     return instrumentors
+
+
+def _missing_prd_core(instrumentors: list[dict]) -> set[str]:
+    """Return the set of PRD core libraries not represented in `instrumentors`.
+
+    A non-empty result means the live parse is below threshold and the caller
+    should fall back to the snapshot — even if the raw count met
+    MIN_PARSED_INSTRUMENTORS.
+    """
+    found = {entry.get("library") for entry in instrumentors if isinstance(entry, dict)}
+    return {lib for lib in PRD_CORE_LIBRARIES if lib not in found}
 
 
 def _readme_excerpt(readme_text: str) -> str:
@@ -466,18 +531,31 @@ def main() -> None:
     if readme_text:
         instrumentors = _parse_supported_instrumentors(readme_text, warnings)
 
-    parse_below_threshold = len(instrumentors) < MIN_PARSED_INSTRUMENTORS
-    if readme_text is not None and parse_below_threshold:
+    parse_count_below_threshold = len(instrumentors) < MIN_PARSED_INSTRUMENTORS
+    missing_core = _missing_prd_core(instrumentors) if readme_text else set()
+
+    if readme_text is not None and parse_count_below_threshold:
         warnings.append(
             "README parser found fewer than "
             f"{MIN_PARSED_INSTRUMENTORS} instrumentors — falling back to snapshot."
         )
+    if readme_text is not None and missing_core:
+        warnings.append(
+            "Live parse missing PRD core libraries: "
+            f"{sorted(missing_core)} — falling back to snapshot for completeness."
+        )
 
     # Live succeeds when we can produce a usable instrumentor list, regardless
-    # of which source supplied the README. Falling back only when both the
-    # GitHub README and PyPI description are unavailable, or when the parser
-    # found too few entries.
-    live_failed = readme_text is None or parse_below_threshold
+    # of which source supplied the README. Fall back when:
+    # (a) neither the GitHub README nor the PyPI description was available, OR
+    # (b) the parser found fewer than MIN_PARSED_INSTRUMENTORS entries, OR
+    # (c) the parser missed any PRD core library — partial coverage is worse
+    #     than the snapshot's known-complete coverage.
+    live_failed = (
+        readme_text is None
+        or parse_count_below_threshold
+        or bool(missing_core)
+    )
 
     if not args.quiet and warnings:
         for w in warnings:
