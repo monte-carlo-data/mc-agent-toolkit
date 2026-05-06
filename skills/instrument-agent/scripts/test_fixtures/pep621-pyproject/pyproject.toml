@@ -1,0 +1,14 @@
+[project]
+name = "my-agent"
+version = "0.1.0"
+description = "Sample PEP 621 project for detect_libraries fixture"
+requires-python = ">=3.10"
+dependencies = [
+    "langchain>=0.1",
+    "anthropic>=0.20",
+    "google-cloud-aiplatform>=1.40",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
