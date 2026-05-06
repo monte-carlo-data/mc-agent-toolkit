@@ -1,0 +1,83 @@
+{
+  "$schema_note": "Fallback snapshot of the Monte Carlo OpenTelemetry SDK supported-instrumentor list. The skill prefers live data from PyPI (https://pypi.org/project/montecarlo-opentelemetry/) and the SDK README; this file is consulted only when live fetch fails. Each entry's version_constraint is what the SDK README documented at snapshot_date — re-run fetch_sdk_docs.py to confirm current constraints.",
+  "snapshot_date": "2026-05-06",
+  "snapshot_source": "https://github.com/monte-carlo-data/montecarlo-opentelemetry/blob/main/README.md",
+  "stale_after_days": 180,
+  "supported_instrumentors": [
+    {
+      "library": "langchain",
+      "package": "opentelemetry-instrumentation-langchain",
+      "version_constraint": "<=0.53.4",
+      "covers_dependencies": [
+        "langchain",
+        "langchain-core",
+        "langchain-community",
+        "langchain-openai",
+        "langchain-anthropic",
+        "langgraph"
+      ]
+    },
+    {
+      "library": "langgraph",
+      "package": "opentelemetry-instrumentation-langchain",
+      "version_constraint": "<=0.53.4",
+      "covers_dependencies": [
+        "langgraph"
+      ],
+      "notes": "LangGraph traces are produced by the same opentelemetry-instrumentation-langchain package."
+    },
+    {
+      "library": "openai",
+      "package": "opentelemetry-instrumentation-openai",
+      "version_constraint": "<=0.53.4",
+      "covers_dependencies": [
+        "openai"
+      ]
+    },
+    {
+      "library": "anthropic",
+      "package": "opentelemetry-instrumentation-anthropic",
+      "version_constraint": "<=0.53.4",
+      "covers_dependencies": [
+        "anthropic"
+      ]
+    },
+    {
+      "library": "crewai",
+      "package": "opentelemetry-instrumentation-crewai",
+      "version_constraint": "<=0.53.4",
+      "covers_dependencies": [
+        "crewai"
+      ]
+    },
+    {
+      "library": "bedrock",
+      "package": "opentelemetry-instrumentation-bedrock",
+      "version_constraint": "<=0.53.4",
+      "covers_dependencies": [
+        "boto3",
+        "botocore",
+        "aioboto3"
+      ],
+      "notes": "boto3 covers many AWS services; detect_libraries.py routes boto3 matches to `unsupported` rather than `detected` since it cannot tell from deps alone whether the customer is calling Bedrock. The skill should ask the user before installing this instrumentor."
+    },
+    {
+      "library": "sagemaker",
+      "package": "opentelemetry-instrumentation-sagemaker",
+      "version_constraint": "<=0.53.4",
+      "covers_dependencies": [
+        "sagemaker"
+      ],
+      "notes": "Verify on PyPI at runtime — package availability has historically been less stable than the LangChain/OpenAI/Anthropic family."
+    },
+    {
+      "library": "vertex-ai",
+      "package": "opentelemetry-instrumentation-vertexai",
+      "version_constraint": "<=0.53.4",
+      "covers_dependencies": [
+        "google-cloud-aiplatform"
+      ],
+      "notes": "Verify on PyPI at runtime — package name and version constraint may have changed."
+    }
+  ]
+}
