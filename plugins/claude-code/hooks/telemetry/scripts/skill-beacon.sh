@@ -5,7 +5,7 @@
 set -uo pipefail
 
 # Opt-out
-if [[ "${MCD_TOOLKIT_TELEMETRY_DISABLED:-}" == "1" ]]; then
+if [[ "${MC_AGENT_TOOLKIT_TELEMETRY_DISABLED:-}" == "1" ]]; then
   exit 0
 fi
 

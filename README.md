@@ -110,7 +110,7 @@ See the [skills directory](skills/) for the full list and individual READMEs.
 
 ## Telemetry
 
-The Claude Code plugin sends anonymous skill-usage telemetry. No prompts or skill arguments are sent. To disable, set `MCD_TOOLKIT_TELEMETRY_DISABLED=1`. See [the plugin README](plugins/claude-code/README.md#telemetry) for details.
+The Claude Code plugin sends anonymous skill-usage telemetry. No prompts or skill arguments are sent. To disable, set `MC_AGENT_TOOLKIT_TELEMETRY_DISABLED=1`. See [the plugin README](plugins/claude-code/README.md#telemetry) for details.
 
 ## Contributing
 

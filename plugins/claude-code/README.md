@@ -33,9 +33,9 @@ Restart Claude Code after installing.
 
 ## Telemetry
 
-The toolkit sends anonymous skill-usage telemetry — which skills are invoked, how often. Each event includes an opaque per-install UUID and a per-session UUID, the skill name, and the toolkit version. **No prompts, no skill arguments, no file paths, and no email or account info are sent.**
+The toolkit sends anonymous skill-usage telemetry — which skills are invoked, how often. Each event includes an opaque per-install UUID and a per-session UUID, the skill name, and the toolkit version.
 
-To disable, set `MCD_TOOLKIT_TELEMETRY_DISABLED=1` in your shell environment. The toolkit will not phone home.
+To disable, set `MC_AGENT_TOOLKIT_TELEMETRY_DISABLED=1` in your shell environment. The toolkit will not phone home.
 
 The data is stored in Mixpanel and Datadog and is used only for product-development decisions about which skills to invest in.
 

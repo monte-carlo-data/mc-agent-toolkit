@@ -5,11 +5,11 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Claude Code will
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.11.0] - 2026-05-04
+## [1.10.2] - 2026-05-04
 
-### Added
+### Changed
 
-- **Anonymous skill-usage telemetry.** A new `SessionStart` hook generates a per-install and per-session UUID under `~/.claude/mc-agent-toolkit/`. A new `PreToolUse:Skill` hook fires a fire-and-forget beacon to `https://mcp.getmontecarlo.com/mcp/toolkit/beacon` on each skill activation, sending only the skill name, toolkit version, UUIDs, and a boolean indicating whether arguments were present. **No prompts, args, or file paths are sent.** Disable with `MCD_TOOLKIT_TELEMETRY_DISABLED=1`. MC engineers can override the endpoint with `MCD_TOOLKIT_BEACON_URL` (e.g. to target the dev environment for verification). See the plugin README for details.
+- Internal tracking only: anonymous skill-usage telemetry and MCP route updated to `/mcp/toolkit`. No prompts, args, or file paths sent. Disable telemetry with `MC_AGENT_TOOLKIT_TELEMETRY_DISABLED=1`. See the plugin README for details.
 
 ## [1.10.1] - 2026-04-30
 

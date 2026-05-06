@@ -5,6 +5,12 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Cursor will be d
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.2] - 2026-05-04
+
+### Changed
+
+- Internal tracking only: MCP route updated to `/mcp/toolkit`.
+
 ## [1.10.1] - 2026-04-30
 
 ### Changed
