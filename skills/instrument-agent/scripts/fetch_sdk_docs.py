@@ -68,20 +68,29 @@ _PIP_INSTALL_RE = re.compile(
 # ---------------------------------------------------------------------------
 
 
-def _headers() -> dict[str, str]:
+def _build_headers(*, with_github_auth: bool) -> dict[str, str]:
+    """Build request headers. GITHUB_TOKEN is only included when explicitly opted
+    into — never sent to non-GitHub destinations like pypi.org.
+    """
     headers = {"User-Agent": "mc-agent-toolkit/instrument-agent"}
-    token = os.environ.get("GITHUB_TOKEN")
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
+    if with_github_auth:
+        token = os.environ.get("GITHUB_TOKEN")
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
     return headers
 
 
-def _fetch_bytes(url: str) -> bytes:
+def _fetch_bytes(url: str, *, with_github_auth: bool) -> bytes:
     """Fetch up to READ_BYTES_CAP+1 bytes with an explicit timeout.
+
+    `with_github_auth` controls whether GITHUB_TOKEN (if set) is sent in the
+    Authorization header. Set True only for GitHub-owned destinations.
 
     Caller must check `len(result) > READ_BYTES_CAP` to detect overruns.
     """
-    req = urllib.request.Request(url, headers=_headers())
+    req = urllib.request.Request(
+        url, headers=_build_headers(with_github_auth=with_github_auth)
+    )
     with urllib.request.urlopen(req, timeout=TIMEOUT_SECONDS) as resp:
         # Read one extra byte so the caller can detect responses that exceed
         # the cap (rather than silently truncating).
@@ -191,16 +200,29 @@ def _readme_excerpt(readme_text: str) -> str:
 
 
 def _fetch_readme(url: str) -> str:
-    """Fetch the SDK README. Raises on overrun, HTTP, or network errors."""
-    raw = _fetch_bytes(url)
+    """Fetch the SDK README from GitHub. Raises on overrun, HTTP, or network errors.
+
+    GitHub auth is sent only when the URL points at a GitHub host — the
+    `MC_SDK_DOCS_URL` testing override may point elsewhere, in which case we
+    don't leak the token. Production `SDK_README_URL` is always GitHub.
+    """
+    is_github = (
+        "github.com" in url
+        or "githubusercontent.com" in url
+        or "api.github.com" in url
+    )
+    raw = _fetch_bytes(url, with_github_auth=is_github)
     if len(raw) > READ_BYTES_CAP:
         raise OSError(f"README exceeded {READ_BYTES_CAP} byte cap")
     return raw.decode("utf-8", errors="replace")
 
 
 def _fetch_pypi() -> dict:
-    """Fetch PyPI metadata. Raises on overrun, HTTP, or network errors."""
-    raw = _fetch_bytes(PYPI_URL)
+    """Fetch PyPI metadata. Raises on overrun, HTTP, or network errors.
+
+    GITHUB_TOKEN is never sent to pypi.org.
+    """
+    raw = _fetch_bytes(PYPI_URL, with_github_auth=False)
     if len(raw) > READ_BYTES_CAP:
         raise OSError(f"PyPI metadata exceeded {READ_BYTES_CAP} byte cap")
     payload = json.loads(raw.decode("utf-8"))
