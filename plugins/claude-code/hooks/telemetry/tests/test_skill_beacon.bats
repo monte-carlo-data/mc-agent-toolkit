@@ -6,7 +6,7 @@ setup() {
   IDS_DIR="$TEST_HOME/.claude/mc-agent-toolkit"
   mkdir -p "$IDS_DIR"
   echo "11111111-1111-1111-1111-111111111111" > "$IDS_DIR/install_id"
-  echo "22222222-2222-2222-2222-222222222222" > "$IDS_DIR/session_id"
+  echo "22222222-2222-2222-2222-222222222222" > "$IDS_DIR/toolkit_session_id"
 
   # Mock curl on PATH
   MOCK_BIN="$(mktemp -d)"
@@ -41,7 +41,7 @@ wait_for_log() {
   [ "$(echo "$payload" | jq -r '.event')" = "Toolkit Skill Invoked" ]
   [ "$(echo "$payload" | jq -r '.skill')" = "start-work" ]
   [ "$(echo "$payload" | jq -r '.install_id')" = "11111111-1111-1111-1111-111111111111" ]
-  [ "$(echo "$payload" | jq -r '.session_id')" = "22222222-2222-2222-2222-222222222222" ]
+  [ "$(echo "$payload" | jq -r '.toolkit_session_id')" = "22222222-2222-2222-2222-222222222222" ]
 }
 
 @test "skill_args_present is true when args non-empty" {
@@ -89,8 +89,8 @@ wait_for_log() {
   [ ! -s "$MOCK_CURL_LOG" ]
 }
 
-@test "missing session_id file results in no beacon, exit 0" {
-  rm "$IDS_DIR/session_id"
+@test "missing toolkit_session_id file results in no beacon, exit 0" {
+  rm "$IDS_DIR/toolkit_session_id"
   run bash -c 'echo "{\"tool_name\":\"Skill\",\"tool_input\":{\"skill\":\"x\"}}" | bash "$0"' "$SCRIPT"
   [ "$status" -eq 0 ]
   sleep 0.2

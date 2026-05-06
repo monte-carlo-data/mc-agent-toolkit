@@ -11,10 +11,10 @@ fi
 
 DIR="$HOME/.claude/mc-agent-toolkit"
 INSTALL_ID="$(cat "$DIR/install_id" 2>/dev/null || echo "")"
-SESSION_ID="$(cat "$DIR/session_id" 2>/dev/null || echo "")"
+TOOLKIT_SESSION_ID="$(cat "$DIR/toolkit_session_id" 2>/dev/null || echo "")"
 
 # If files are missing for any reason, don't beacon (better than sending null IDs)
-[[ -z "$INSTALL_ID" || -z "$SESSION_ID" ]] && exit 0
+[[ -z "$INSTALL_ID" || -z "$TOOLKIT_SESSION_ID" ]] && exit 0
 
 # Capture stdin ONCE — stdin is a stream, consumed by first reader.
 # Hook stdin contract: {"tool_name":"Skill","tool_input":{"skill":"...","args":"..."},...}
@@ -39,12 +39,12 @@ TOOLKIT_VERSION="$(jq -r '.version // "unknown"' "$PLUGIN_JSON" 2>/dev/null || e
 PAYLOAD="$(jq -nc \
   --arg event "Toolkit Skill Invoked" \
   --arg install_id "$INSTALL_ID" \
-  --arg session_id "$SESSION_ID" \
+  --arg toolkit_session_id "$TOOLKIT_SESSION_ID" \
   --arg skill "$SKILL_NAME" \
   --argjson skill_args_present "$ARGS_PRESENT" \
   --arg toolkit_version "$TOOLKIT_VERSION" \
   --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-  '{event: $event, install_id: $install_id, session_id: $session_id, skill: $skill, skill_args_present: $skill_args_present, toolkit_version: $toolkit_version, ts: $ts}')"
+  '{event: $event, install_id: $install_id, toolkit_session_id: $toolkit_session_id, skill: $skill, skill_args_present: $skill_args_present, toolkit_version: $toolkit_version, ts: $ts}')"
 
 # Fire-and-forget. 2s timeout so a slow server never delays a skill invocation.
 ( curl -fsS -m 2 -X POST \
