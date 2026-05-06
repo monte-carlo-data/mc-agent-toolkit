@@ -29,6 +29,7 @@ import os
 import re
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -199,19 +200,34 @@ def _readme_excerpt(readme_text: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _fetch_readme(url: str) -> str:
-    """Fetch the SDK README from GitHub. Raises on overrun, HTTP, or network errors.
+_GITHUB_AUTH_HOSTS = frozenset(
+    {"github.com", "raw.githubusercontent.com", "api.github.com"}
+)
 
-    GitHub auth is sent only when the URL points at a GitHub host — the
-    `MC_SDK_DOCS_URL` testing override may point elsewhere, in which case we
-    don't leak the token. Production `SDK_README_URL` is always GitHub.
+
+def _is_github_auth_host(url: str) -> bool:
+    """True only when the URL's hostname is exactly one of the trusted GitHub
+    hosts. Substring matching would let an override like
+    `https://example.com/github.com/README.md` leak GITHUB_TOKEN — parse the
+    URL and compare the hostname exactly.
     """
-    is_github = (
-        "github.com" in url
-        or "githubusercontent.com" in url
-        or "api.github.com" in url
-    )
-    raw = _fetch_bytes(url, with_github_auth=is_github)
+    try:
+        parsed = urllib.parse.urlparse(url)
+    except (ValueError, AttributeError):
+        return False
+    hostname = (parsed.hostname or "").lower()
+    return hostname in _GITHUB_AUTH_HOSTS
+
+
+def _fetch_readme(url: str) -> str:
+    """Fetch the SDK README. Raises on overrun, HTTP, or network errors.
+
+    GitHub auth is sent only when the URL's hostname is exactly one of the
+    trusted GitHub hosts. The `MC_SDK_DOCS_URL` testing override and any
+    other non-GitHub URL never receive the token. Production `SDK_README_URL`
+    points at `raw.githubusercontent.com`.
+    """
+    raw = _fetch_bytes(url, with_github_auth=_is_github_auth_host(url))
     if len(raw) > READ_BYTES_CAP:
         raise OSError(f"README exceeded {READ_BYTES_CAP} byte cap")
     return raw.decode("utf-8", errors="replace")
