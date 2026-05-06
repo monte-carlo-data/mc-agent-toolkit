@@ -87,7 +87,7 @@ EXISTING_SETUP_PATTERNS = [
 # Keep in sync with skills/instrument-agent/scripts/instrumentor_map.json.
 DEFAULT_INSTRUMENTOR_MAP: dict = {
     "snapshot_date": "2026-05-06",
-    "libraries": [
+    "supported_instrumentors": [
         {
             "library": "langchain",
             "package": "opentelemetry-instrumentation-langchain",
@@ -438,8 +438,20 @@ def _load_instrumentor_map(script_dir: Path) -> dict:
         try:
             with map_path.open("r", encoding="utf-8") as fh:
                 data = json.load(fh)
-            if isinstance(data, dict) and isinstance(data.get("libraries"), list):
+            # Canonical schema (shared with fetch_sdk_docs.py and the
+            # committed instrumentor_map.json) uses `supported_instrumentors`.
+            # Accept the legacy `libraries` key for backward compatibility
+            # with any older snapshot a user may have lying around.
+            if isinstance(data, dict) and isinstance(
+                data.get("supported_instrumentors"), list
+            ):
                 return data
+            if isinstance(data, dict) and isinstance(data.get("libraries"), list):
+                # Normalize to the canonical key so downstream consumers see
+                # one shape.
+                normalized = dict(data)
+                normalized["supported_instrumentors"] = normalized.pop("libraries")
+                return normalized
             print(
                 f"warning: {map_path} has unexpected shape; using built-in default",
                 file=sys.stderr,
@@ -463,7 +475,12 @@ def _match_instrumentors(
 
     deps_lower = {d.lower() for d in deps}
 
-    for entry in instrumentor_map.get("libraries", []):
+    entries = (
+        instrumentor_map.get("supported_instrumentors")
+        or instrumentor_map.get("libraries")
+        or []
+    )
+    for entry in entries:
         if not isinstance(entry, dict):
             continue
         library = entry.get("library")
