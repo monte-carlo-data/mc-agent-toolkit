@@ -2,7 +2,7 @@
 name: monte-carlo-instrument-agent
 description: Instrument a new AI agent in a Python codebase for Monte Carlo Agent Observability. Detects AI libraries, installs the Monte Carlo OpenTelemetry SDK, and proposes tracing setup and decorator placements as diffs. Asks before editing any file.
 when_to_use: |
-  Activates when the user wants to instrument a new AI agent in their Python codebase for Monte Carlo Agent Observability. Triggers include: "instrument my agent", "instrument my LangChain/LangGraph/CrewAI/Bedrock/OpenAI/Anthropic agent", "set up Monte Carlo tracing on a new agent", "add MC tracing to this agent", "wire up the Monte Carlo OpenTelemetry SDK", "set up agent observability for a new agent", "setting up an agent".
+  Activates when the user wants to instrument a new AI agent in their Python codebase for Monte Carlo Agent Observability. Triggers include: "instrument my agent for Monte Carlo", "instrument my LangChain/LangGraph/CrewAI/Bedrock/OpenAI/Anthropic agent for Monte Carlo", "set up Monte Carlo tracing on a new agent", "set up MC tracing", "add MC tracing to this agent", "wire up the Monte Carlo OpenTelemetry SDK", "set up agent observability for a new agent", "set up Monte Carlo Agent Observability tracing".
 
   Do NOT activate for: monitoring or alerting on an existing agent (use monitoring-advisor); investigating agent issues, alerts, or traces (use incident-response or analyze-root-cause); pushing agent metadata (use push-ingestion); creating monitors on agent traces ("monitor my agent latency", "alert on agent errors" — those go to monitoring-advisor). Boundary: this skill PRODUCES traces; monitoring-advisor consumes them.
 bucket: Setup
@@ -34,8 +34,8 @@ This guardrail mirrors PRD requirement #8 ("Never modifies code without explicit
 Activate when the user expresses intent to instrument a new AI agent:
 
 - Asks to instrument an agent for Monte Carlo, set up MC tracing, or wire up the Monte Carlo OpenTelemetry SDK
-- Asks how to add tracing to a LangChain / LangGraph / OpenAI / Anthropic / CrewAI / Bedrock / SageMaker / Vertex AI agent
-- Says things like "instrument my agent", "set up tracing", "set up Monte Carlo on my new agent", "setting up an agent"
+- Asks how to add Monte Carlo tracing to a LangChain / LangGraph / OpenAI / Anthropic / CrewAI / Bedrock / SageMaker / Vertex AI agent
+- Says things like "instrument my agent for Monte Carlo", "set up Monte Carlo tracing", "set up MC tracing", "set up agent tracing for Monte Carlo", "set up Monte Carlo on my new agent"
 - References the SDK install or `mc.setup()` (when generating; not when diagnosing)
 
 ## When NOT to activate this skill
@@ -54,7 +54,7 @@ If the user is ambiguous ("set up agent observability"), surface both options an
 
 Before walking the workflow, confirm two things:
 
-1. **Monte Carlo MCP server is configured + authenticated.** Run `testConnection`. If unavailable, point the user at the MC MCP setup docs (`https://docs.getmontecarlo.com/docs/mcp-server`) and exit cleanly. The verification step (`get_agent_metadata`) requires the MCP server.
+1. **Monte Carlo MCP server is configured + authenticated.** Run `test_connection`. If unavailable, point the user at the MC MCP setup docs (`https://docs.getmontecarlo.com/docs/mcp-server`) and exit cleanly. The verification step (`get_agent_metadata`) requires the MCP server.
 2. **Python codebase is present.** Look for `requirements.txt`, `pyproject.toml`, or `Pipfile` in the working directory. If none exist, ask the user where the agent codebase is.
 
 ## Reference files — when to load

@@ -6,11 +6,15 @@ The skill calls `get_agent_metadata` exactly **twice** per instrumentation flow 
 
 ---
 
-## 1. Pre-flight: `testConnection`
+## 1. Pre-flight: `test_connection`
 
-Before taking the BEFORE snapshot, call the Monte Carlo MCP server's `testConnection` tool. This verifies the customer has the MC MCP server configured and authenticated.
+`test_connection` is the Step 0 pre-flight check — it runs once at the very start of the workflow, before any intake questions. By the time the BEFORE snapshot (Step 4) runs, MCP connectivity is already confirmed.
 
-> **CRITICAL — bail early if `testConnection` fails.** Do not propose any code changes. The verification step at the end of the workflow won't work, and instrumenting without verification means the customer ships traces with no way to confirm they arrived. Point at https://docs.getmontecarlo.com/docs/mcp-server for setup and exit cleanly.
+This section documents what that pre-flight check does and what to do if MCP is unavailable at snapshot time (e.g. the session expired mid-workflow):
+
+> **CRITICAL — bail early if `test_connection` fails.** Do not propose any code changes. The verification step at the end of the workflow won't work, and instrumenting without verification means the customer ships traces with no way to confirm they arrived. Point at https://docs.getmontecarlo.com/docs/mcp-server for setup and exit cleanly.
+
+If MCP was confirmed in Step 0 but appears unavailable at Step 4 or Step 10, re-run `test_connection` to confirm and exit cleanly if it fails — do not continue the workflow without MCP.
 
 ---
 
@@ -101,6 +105,6 @@ After the customer's agent runs and emits OTLP spans:
 - **Calling `get_agent_metadata` only once** (after the edits). Without the BEFORE snapshot, you can't tell new from existing. Wrong.
 - **Comparing only `agentName`, not MCON.** Misses the dev/prod twin case where the same name already exists. Wrong.
 - **Polling `get_agent_metadata` in a loop while waiting.** Wasteful and unnecessary — the customer running the agent is the trigger.
-- **Skipping the `testConnection` pre-flight.** Verification fails silently if MCP is misconfigured, and the customer ships uninstrumented or unverified code.
+- **Skipping the `test_connection` pre-flight.** Verification fails silently if MCP is misconfigured, and the customer ships uninstrumented or unverified code.
 - **Concluding "instrumentation works" without running the agent and re-checking.** Premature — code changes alone prove nothing.
 - **Assuming a Lambda customer's missing trace is a credential issue.** Usually it's the `SimpleSpanProcessor` foot-gun. Check serverless first.

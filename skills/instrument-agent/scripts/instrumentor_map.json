@@ -2,7 +2,7 @@
   "$schema_note": "Fallback snapshot of the Monte Carlo OpenTelemetry SDK supported-instrumentor list. The skill prefers live data from PyPI (https://pypi.org/project/montecarlo-opentelemetry/) and the SDK README; this file is consulted only when live fetch fails. Each entry's version_constraint is what the SDK README documented at snapshot_date — re-run fetch_sdk_docs.py to confirm current constraints.",
   "snapshot_date": "2026-05-06",
   "snapshot_source": "https://github.com/monte-carlo-data/montecarlo-opentelemetry/blob/main/README.md",
-  "stale_after_days": 180,
+  "stale_after_days": 90,
   "supported_instrumentors": [
     {
       "library": "langchain",
@@ -71,7 +71,7 @@
       "notes": "Verify on PyPI at runtime — package availability has historically been less stable than the LangChain/OpenAI/Anthropic family."
     },
     {
-      "library": "vertex-ai",
+      "library": "vertexai",
       "package": "opentelemetry-instrumentation-vertexai",
       "version_constraint": "<=0.53.4",
       "covers_dependencies": [

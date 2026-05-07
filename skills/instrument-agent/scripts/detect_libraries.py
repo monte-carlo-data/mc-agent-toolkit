@@ -83,61 +83,6 @@ EXISTING_SETUP_PATTERNS = [
     "montecarlo_opentelemetry as mc",
 ]
 
-# Default instrumentor map — used when instrumentor_map.json is absent.
-# Keep in sync with skills/instrument-agent/scripts/instrumentor_map.json.
-DEFAULT_INSTRUMENTOR_MAP: dict = {
-    "snapshot_date": "2026-05-06",
-    "supported_instrumentors": [
-        {
-            "library": "langchain",
-            "package": "opentelemetry-instrumentation-langchain",
-            "version_constraint": "<=0.53.4",
-            "covers_dependencies": [
-                "langchain",
-                "langchain-core",
-                "langchain-community",
-                "langgraph",
-            ],
-        },
-        {
-            "library": "openai",
-            "package": "opentelemetry-instrumentation-openai",
-            "version_constraint": "<=0.53.4",
-            "covers_dependencies": ["openai"],
-        },
-        {
-            "library": "anthropic",
-            "package": "opentelemetry-instrumentation-anthropic",
-            "version_constraint": "<=0.53.4",
-            "covers_dependencies": ["anthropic"],
-        },
-        {
-            "library": "crewai",
-            "package": "opentelemetry-instrumentation-crewai",
-            "version_constraint": "<=0.53.4",
-            "covers_dependencies": ["crewai"],
-        },
-        {
-            "library": "bedrock",
-            "package": "opentelemetry-instrumentation-bedrock",
-            "version_constraint": "<=0.53.4",
-            "covers_dependencies": ["boto3", "botocore", "aioboto3"],
-        },
-        {
-            "library": "sagemaker",
-            "package": "opentelemetry-instrumentation-sagemaker",
-            "version_constraint": "<=0.53.4",
-            "covers_dependencies": ["sagemaker"],
-        },
-        {
-            "library": "vertex-ai",
-            "package": "opentelemetry-instrumentation-vertexai",
-            "version_constraint": "<=0.53.4",
-            "covers_dependencies": ["google-cloud-aiplatform"],
-        },
-    ],
-}
-
 # Libraries flagged as ambiguous when matched only via a generic SDK like boto3.
 # Without a code-level signal we can't tell whether the customer is calling
 # Bedrock/SageMaker or just S3/DynamoDB, so we route them to `unsupported`.
@@ -271,6 +216,7 @@ def _parse_requirements_line(line: str) -> str | None:
         return None
 
     # Editable / VCS / URL specs — name comes from #egg=<name>.
+    # Note: bare "-e ./local_pkg" without #egg= yields no package name and is skipped.
     if (
         lowered.startswith("-e ")
         or lowered.startswith("--editable ")
@@ -284,10 +230,6 @@ def _parse_requirements_line(line: str) -> str | None:
     ):
         m = _EGG_RE.search(raw)
         return _normalize_dep(m.group(1)) if m else None
-
-    # Strip leading "-e " just in case it's followed by a normal name.
-    if raw.startswith("-e "):
-        raw = raw[3:].strip()
 
     # Drop any "[extras]" segment, then match the leading package name.
     bracket = raw.find("[")
@@ -414,12 +356,60 @@ def _parse_pipfile(path: Path) -> list[str]:
     return deps
 
 
-def _collect_dependencies(target: Path) -> set[str]:
-    """Walk target for known manifest files and collect normalized dep names."""
-    found: set[str] = set()
+def _scan_tree(target: Path) -> dict:
+    """Walk *target* once and bucket files by role.
+
+    Returns a dict with:
+    - ``dep_files``: paths to dependency manifests (requirements*.txt,
+      pyproject.toml, Pipfile).
+    - ``serverless_files``: paths whose filename matches SERVERLESS_FILES.
+    - ``py_files``: paths to ``*.py`` source files.
+    - ``py_contents``: ``{path: text}`` — eagerly read content of each Python
+      file (None values are omitted; callers treat a missing key as unreadable).
+    """
+    dep_files: list[Path] = []
+    serverless_files: list[Path] = []
+    py_files: list[Path] = []
+    py_contents: dict[Path, str] = {}
+
+    serverless_names_lower = {n.lower() for n in SERVERLESS_FILES}
+
     for path in _walk_files(target):
         name = path.name
         lower = name.lower()
+        suffix = path.suffix.lower()
+
+        if lower == "requirements.txt" or (
+            lower.startswith("requirements") and lower.endswith(".txt")
+        ):
+            dep_files.append(path)
+        elif lower == "pyproject.toml":
+            dep_files.append(path)
+        elif lower == "pipfile":
+            dep_files.append(path)
+
+        if lower in serverless_names_lower:
+            serverless_files.append(path)
+
+        if suffix == ".py":
+            py_files.append(path)
+            text = _safe_read_text(path)
+            if text is not None:
+                py_contents[path] = text
+
+    return {
+        "dep_files": dep_files,
+        "serverless_files": serverless_files,
+        "py_files": py_files,
+        "py_contents": py_contents,
+    }
+
+
+def _collect_dependencies(scan: dict) -> set[str]:
+    """Collect normalized dep names from pre-scanned manifest files."""
+    found: set[str] = set()
+    for path in scan["dep_files"]:
+        lower = path.name.lower()
         if lower == "requirements.txt" or (
             lower.startswith("requirements") and lower.endswith(".txt")
         ):
@@ -438,34 +428,30 @@ def _collect_dependencies(target: Path) -> set[str]:
 
 def _load_instrumentor_map(script_dir: Path) -> dict:
     map_path = script_dir / "instrumentor_map.json"
-    if map_path.is_file():
-        try:
-            with map_path.open("r", encoding="utf-8") as fh:
-                data = json.load(fh)
-            # Canonical schema (shared with fetch_sdk_docs.py and the
-            # committed instrumentor_map.json) uses `supported_instrumentors`.
-            # Accept the legacy `libraries` key for backward compatibility
-            # with any older snapshot a user may have lying around.
-            if isinstance(data, dict) and isinstance(
-                data.get("supported_instrumentors"), list
-            ):
-                return data
-            if isinstance(data, dict) and isinstance(data.get("libraries"), list):
-                # Normalize to the canonical key so downstream consumers see
-                # one shape.
-                normalized = dict(data)
-                normalized["supported_instrumentors"] = normalized.pop("libraries")
-                return normalized
-            print(
-                f"warning: {map_path} has unexpected shape; using built-in default",
-                file=sys.stderr,
-            )
-        except Exception as exc:  # noqa: BLE001
-            print(
-                f"warning: failed to read {map_path}: {exc}; using built-in default",
-                file=sys.stderr,
-            )
-    return DEFAULT_INSTRUMENTOR_MAP
+    if not map_path.is_file():
+        raise FileNotFoundError(
+            f"instrumentor_map.json missing at {map_path} — skill is broken without it"
+        )
+    try:
+        with map_path.open("r", encoding="utf-8") as fh:
+            data = json.load(fh)
+    except Exception as exc:
+        raise RuntimeError(f"failed to read {map_path}: {exc}") from exc
+
+    # Canonical schema (shared with fetch_sdk_docs.py and the committed
+    # instrumentor_map.json) uses `supported_instrumentors`.
+    # Accept the legacy `libraries` key for backward compatibility with any
+    # older snapshot a user may have lying around.
+    if isinstance(data, dict) and isinstance(data.get("supported_instrumentors"), list):
+        return data
+    if isinstance(data, dict) and isinstance(data.get("libraries"), list):
+        # Normalize to the canonical key so downstream consumers see one shape.
+        normalized = dict(data)
+        normalized["supported_instrumentors"] = normalized.pop("libraries")
+        return normalized
+    raise ValueError(
+        f"{map_path} has unexpected shape — expected 'supported_instrumentors' list"
+    )
 
 
 def _match_instrumentors(
@@ -532,18 +518,15 @@ def _match_instrumentors(
 # ---------------------------------------------------------------------------
 
 
-def _detect_serverless(
-    target: Path, deps: set[str]
-) -> list[str]:
+def _detect_serverless(scan: dict, deps: set[str]) -> list[str]:
     """Return the list of serverless signals observed."""
     signals: list[str] = []
 
-    # File-level markers — only at the target root or anywhere in tree?
-    # Spec says "File exists at target path" → check anywhere in the walked
-    # tree; this catches monorepo subprojects too.
+    # File-level markers — check anywhere in the walked tree; this catches
+    # monorepo subprojects too.
     seen_files: set[str] = set()
-    for path in _walk_files(target):
-        if path.name.lower() in SERVERLESS_FILES and path.name not in seen_files:
+    for path in scan["serverless_files"]:
+        if path.name not in seen_files:
             signals.append(path.name)
             seen_files.add(path.name)
 
@@ -560,10 +543,9 @@ def _detect_serverless(
         SERVERLESS_CODE_PATTERNS[2]: "mangum_import",
         SERVERLESS_CODE_PATTERNS[3]: "chalice_app",
     }
-    for path in _walk_files(target):
-        if path.suffix.lower() != ".py":
-            continue
-        text = _safe_read_text(path)
+    py_contents = scan["py_contents"]
+    for path in scan["py_files"]:
+        text = py_contents.get(path)
         if text is None:
             continue
         for pattern, label in code_signal_labels.items():
@@ -583,13 +565,12 @@ def _detect_serverless(
 # ---------------------------------------------------------------------------
 
 
-def _detect_existing_setup(target: Path) -> dict:
+def _detect_existing_setup(scan: dict, target: Path) -> dict:
     files: list[str] = []
     target_resolved = target.resolve()
-    for path in _walk_files(target):
-        if path.suffix.lower() != ".py":
-            continue
-        text = _safe_read_text(path)
+    py_contents = scan["py_contents"]
+    for path in scan["py_files"]:
+        text = py_contents.get(path)
         if text is None:
             continue
         if any(pat in text for pat in EXISTING_SETUP_PATTERNS):
@@ -611,10 +592,11 @@ def detect(target: Path) -> dict:
     script_dir = Path(__file__).resolve().parent
     instrumentor_map = _load_instrumentor_map(script_dir)
 
-    deps = _collect_dependencies(target)
+    scan = _scan_tree(target)
+    deps = _collect_dependencies(scan)
     detected, suggested, unsupported = _match_instrumentors(deps, instrumentor_map)
 
-    serverless_signals = _detect_serverless(target, deps)
+    serverless_signals = _detect_serverless(scan, deps)
     if serverless_signals:
         runtime = "serverless"
     elif detected:
@@ -622,7 +604,7 @@ def detect(target: Path) -> dict:
     else:
         runtime = "unknown"
 
-    existing_setup = _detect_existing_setup(target)
+    existing_setup = _detect_existing_setup(scan, target)
 
     return {
         "detected": detected,

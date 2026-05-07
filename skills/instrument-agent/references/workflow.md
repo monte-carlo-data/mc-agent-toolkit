@@ -4,8 +4,9 @@ End-to-end procedure for instrumenting a customer's Python AI agent with Monte C
 
 > **CRITICAL — never modify any file without explicit user approval.** This skill proposes diffs; the user accepts them. That includes dependency files (`requirements.txt`, `pyproject.toml`, `Pipfile`), application source (where `mc.setup()` and decorators land), and anything else on disk. If the user says "go ahead and apply it," that's approval for that specific diff and nothing more. Ask again for the next file.
 
-The workflow has eleven steps, in order:
+The workflow has a pre-flight check followed by eleven steps, in order:
 
+0. Pre-flight — confirm MCP connectivity via `test_connection`
 1. Detect libraries, runtime, and existing setup
 2. Ask about the OTel collector (MC-hosted vs. self-hosted)
 3. Ask about sensitive data (gates redaction + `mc.setup()` template)
@@ -17,6 +18,17 @@ The workflow has eleven steps, in order:
 9. Confirm env vars (presence-only)
 10. Verify via `get_agent_metadata` (AFTER user runs the agent)
 11. On failure, branch to `troubleshooting.md`
+
+---
+
+## Step 0 — Pre-flight: confirm MCP connectivity
+
+Before beginning the workflow, confirm the Monte Carlo MCP server is configured and authenticated by calling `test_connection`.
+
+- **If `test_connection` succeeds** — proceed to Step 1. Record that MCP is available; Step 4 will use it without re-checking.
+- **If `test_connection` fails** — point the user at https://docs.getmontecarlo.com/docs/mcp-server and **exit cleanly without proposing any edits.** Without MCP, the verification step (Step 10) can't run, and shipping instrumentation that can't be verified is worse than not shipping it.
+
+Do this check once, up front, so the user discovers a MCP problem immediately — not after three turns of intake questions.
 
 ---
 
@@ -35,11 +47,15 @@ It prints a JSON object with the following fields:
 - `unsupported` — ambiguous matches that need user disambiguation (e.g. `boto3` could be Bedrock or SageMaker, or just generic AWS)
 - `runtime` — `serverless`, `long_running`, or `unknown`
 - `serverless_signals` — what triggered a serverless classification (e.g. `lambda_handler`, `serverless.yml`, `Mangum`)
-- `existing_setup` — `{ found: bool, path: str | null, snippet: str | null }` for any pre-existing `mc.setup()` call
+- `existing_setup` — `{ found: bool, files: list[str] }` for any pre-existing `mc.setup()` call. The `files` array contains repo-relative paths where `montecarlo_opentelemetry` was detected.
 
 Parse this output and branch:
 
-- **`existing_setup.found` is `true`** — do not propose a fresh `mc.setup()`. Point the reader at the existing-setup decision matrix in `setup-template.md` to decide whether to keep, reconfigure, or replace the call. Then continue with the rest of the workflow (the user may still need decorator and dependency changes).
+- **`existing_setup.found` is `true`** — do not propose a fresh `mc.setup()`. Inspect the paths listed in `existing_setup.files` to understand what already exists. Point the reader at the existing-setup decision matrix in `setup-template.md` to decide whether to keep, reconfigure, or replace the call. Then continue with the rest of the workflow (the user may still need decorator and dependency changes).
+
+### Known limitations
+
+`existing_setup` detection uses substring matching on file text — so a Python file that contains `montecarlo_opentelemetry` in a docstring, comment, or import without actually calling `mc.setup()` will still set `found: true`. When `existing_setup.found: true` but the user reports they don't have a setup, ask them to inspect the matched files listed in `existing_setup.files` and re-run the detection if the matches were docstring or comment references rather than actual `mc.setup()` calls.
 - **`runtime: "unknown"` and `detected: []`** — exit cleanly. No PRD core libraries are present, so there's nothing to instrument. Tell the user: "I didn't find any of the supported AI libraries (`langchain`, `langgraph`, `openai`, `anthropic`, `crewai`, `bedrock`, `sagemaker`, `vertexai`) in the target. Confirm the agent code is actually in this path, then re-run." Do not scaffold anything.
 - **Anything else** — continue to step 2 with the detection output in hand.
 
@@ -85,10 +101,10 @@ This is a non-optional gating decision that runs **before** any `mc.setup()` is 
 
 This must run **before** step 6, 7, or 8 propose any diffs. The snapshot is what step 10 compares against to prove the new instrumentation actually produced traces.
 
-1. Call MC MCP `testConnection` first.
-   - If it fails, point the user at https://docs.getmontecarlo.com/docs/mcp-server and **exit cleanly without proposing any edits.** Without MCP, step 10's verification can't run, and shipping instrumentation that can't be verified is worse than not shipping it.
-2. With MCP confirmed, call `get_agent_metadata`. Save the list of `(agent_name, mcon)` pairs.
-3. Hold onto the snapshot — step 10 diffs against it.
+MCP availability was confirmed in Step 0 — no need to re-check. If for any reason MCP is now unavailable (e.g. the session expired), re-run `test_connection` and exit cleanly if it fails (same guidance as Step 0).
+
+1. Call `get_agent_metadata`. Save the list of `(agent_name, mcon)` pairs.
+2. Hold onto the snapshot — step 10 diffs against it.
 
 See `verify-traces.md` for the full before/after flow and what the response looks like.
 

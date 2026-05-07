@@ -10,8 +10,10 @@ Run:
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
+from datetime import date
 from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).parent
@@ -131,8 +133,8 @@ def test_pep621_pyproject() -> None:
     check("detects langchain", "langchain" in detected)
     check("detects anthropic", "anthropic" in detected)
     check(
-        "detects vertex-ai (via google-cloud-aiplatform)",
-        "vertex-ai" in detected,
+        "detects vertexai (via google-cloud-aiplatform)",
+        "vertexai" in detected,
         hint=f"detected={detected!r}",
     )
     check(
@@ -366,6 +368,121 @@ def test_sample_serverless_agent() -> None:
     )
 
 
+_PRD_CORE_LIBRARIES = {
+    "langchain",
+    "langgraph",
+    "openai",
+    "anthropic",
+    "crewai",
+    "bedrock",
+    "sagemaker",
+    "vertexai",
+}
+
+_LIBRARY_NAME_RE = re.compile(r"^[a-z][a-z0-9_-]*$")
+
+
+def test_instrumentor_map_schema() -> None:
+    """Validate the committed instrumentor_map.json against its canonical schema."""
+    print("\n== instrumentor_map.json schema validation ==")
+    map_path = SCRIPT_DIR / "instrumentor_map.json"
+    check(
+        "instrumentor_map.json exists",
+        map_path.is_file(),
+        hint=f"expected at {map_path}",
+    )
+    with map_path.open("r", encoding="utf-8") as fh:
+        data = json.load(fh)
+
+    # snapshot_date — present and parseable as an ISO date.
+    snapshot_date = data.get("snapshot_date")
+    check(
+        "snapshot_date is present",
+        isinstance(snapshot_date, str) and bool(snapshot_date),
+        hint=f"got {snapshot_date!r}",
+    )
+    try:
+        date.fromisoformat(snapshot_date)
+        date_parseable = True
+    except (ValueError, TypeError):
+        date_parseable = False
+    check(
+        "snapshot_date is a valid ISO date string",
+        date_parseable,
+        hint=f"date.fromisoformat({snapshot_date!r}) raised ValueError",
+    )
+
+    # supported_instrumentors — non-empty list.
+    entries = data.get("supported_instrumentors")
+    check(
+        "supported_instrumentors is a non-empty list",
+        isinstance(entries, list) and len(entries) > 0,
+        hint=f"got {type(entries).__name__} with length {len(entries) if isinstance(entries, list) else 'n/a'}",
+    )
+
+    # Per-entry field shapes.
+    required_fields = {"library": str, "package": str, "version_constraint": str}
+    for i, entry in enumerate(entries or []):
+        for field, expected_type in required_fields.items():
+            check(
+                f"entry[{i}] has {field!r} ({expected_type.__name__})",
+                isinstance(entry, dict) and isinstance(entry.get(field), expected_type),
+                hint=f"entry={entry!r}",
+            )
+        covers = entry.get("covers_dependencies") if isinstance(entry, dict) else None
+        check(
+            f"entry[{i}] has covers_dependencies (list)",
+            isinstance(covers, list),
+            hint=f"covers_dependencies={covers!r}",
+        )
+
+    # library naming convention — lowercase, no special chars beyond _-.
+    libraries = [e.get("library") for e in (entries or []) if isinstance(e, dict)]
+    for lib in libraries:
+        if lib is None:
+            continue
+        check(
+            f"library {lib!r} matches naming convention (lowercase, [a-z0-9_-])",
+            bool(_LIBRARY_NAME_RE.match(lib)),
+            hint=f"got {lib!r}",
+        )
+
+    # library uniqueness.
+    seen: set[str] = set()
+    duplicates: list[str] = []
+    for lib in libraries:
+        if lib is None:
+            continue
+        if lib in seen:
+            duplicates.append(lib)
+        seen.add(lib)
+    check(
+        "library values are unique (no duplicates)",
+        len(duplicates) == 0,
+        hint=f"duplicates={duplicates!r}",
+    )
+
+    # PRD core libraries are all present.
+    library_set = set(lib for lib in libraries if lib is not None)
+    missing_core = _PRD_CORE_LIBRARIES - library_set
+    check(
+        "all PRD core libraries are present",
+        len(missing_core) == 0,
+        hint=f"missing={sorted(missing_core)!r}",
+    )
+
+    # Every package follows the opentelemetry-instrumentation- prefix.
+    packages = [e.get("package") for e in (entries or []) if isinstance(e, dict)]
+    bad_packages = [
+        p for p in packages if isinstance(p, str) and not p.startswith("opentelemetry-instrumentation-")
+    ]
+    check(
+        "all packages start with 'opentelemetry-instrumentation-'",
+        len(bad_packages) == 0,
+        hint=f"non-conforming packages={bad_packages!r}",
+    )
+
+
 def main() -> None:
     tests = [
         test_requirements_txt,
@@ -379,6 +496,7 @@ def main() -> None:
         test_boto3_only,
         test_sample_agent,
         test_sample_serverless_agent,
+        test_instrumentor_map_schema,
     ]
     # Run every test even when an early one fails — `check()` raises on the
     # first failure inside a single test, but we want a complete pass/fail

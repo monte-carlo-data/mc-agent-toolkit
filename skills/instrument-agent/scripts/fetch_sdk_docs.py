@@ -48,13 +48,12 @@ MIN_PARSED_INSTRUMENTORS = 2
 # Core libraries the PRD requires the skill to support. A live parse that
 # misses any of these is treated as below-threshold and falls back to the
 # committed snapshot. Identifiers are package suffixes (the slug after
-# "opentelemetry-instrumentation-") plus "langgraph", which has no separate
-# package — it rides on opentelemetry-instrumentation-langchain and is
-# surfaced via the README's "# For Langchain/LangGraph" header.
+# "opentelemetry-instrumentation-"). langgraph is not listed here — it rides
+# on opentelemetry-instrumentation-langchain and is not separately required
+# for live success.
 PRD_CORE_LIBRARIES = frozenset(
     {
         "langchain",
-        "langgraph",
         "openai",
         "anthropic",
         "crewai",
@@ -97,6 +96,20 @@ _BULLET_PACKAGE_RE = re.compile(
 # ---------------------------------------------------------------------------
 
 
+class _NoRedirectOnAuthHandler(urllib.request.HTTPRedirectHandler):
+    """Refuse HTTP redirects when the original request carries an Authorization
+    header. If urllib followed a redirect from a trusted host (e.g.
+    raw.githubusercontent.com) to an attacker-controlled host, the Authorization
+    header would leak to that host. Returning None from redirect_request causes
+    urllib to raise HTTPError instead of following the redirect.
+    """
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # type: ignore[override]
+        if req.has_header("Authorization"):
+            raise urllib.error.HTTPError(req.full_url, code, msg, headers, fp)
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
 def _build_headers(*, with_github_auth: bool) -> dict[str, str]:
     """Build request headers. GITHUB_TOKEN is only included when explicitly opted
     into — never sent to non-GitHub destinations like pypi.org.
@@ -120,7 +133,8 @@ def _fetch_bytes(url: str, *, with_github_auth: bool) -> bytes:
     req = urllib.request.Request(
         url, headers=_build_headers(with_github_auth=with_github_auth)
     )
-    with urllib.request.urlopen(req, timeout=TIMEOUT_SECONDS) as resp:
+    opener = urllib.request.build_opener(_NoRedirectOnAuthHandler())
+    with opener.open(req, timeout=TIMEOUT_SECONDS) as resp:
         # Read one extra byte so the caller can detect responses that exceed
         # the cap (rather than silently truncating).
         return resp.read(READ_BYTES_CAP + 1)
@@ -378,7 +392,7 @@ def _snapshot_age_days(snapshot_date: str) -> int | None:
         snap = date.fromisoformat(snapshot_date)
     except (TypeError, ValueError):
         return None
-    return (date.today() - snap).days
+    return (datetime.now(timezone.utc).date() - snap).days
 
 
 # ---------------------------------------------------------------------------
