@@ -45,11 +45,11 @@ Tasks are nested within workflows. Both labels propagate down the trace tree, so
 
 Workflow + task are used at **evaluation time** to filter and differentiate parts of the agent — e.g., *"show me all `chat` task spans inside the `customer-support` workflow."* Without these labels, the trace tree is just a span hierarchy with no semantic meaning to MC's evaluation pipeline.
 
-## 3. NEVER add `@trace_with_tags`
+## 3. Only the two decorators above
 
-> **NEVER add `@trace_with_tags` to any function.** The AO product owner is explicit: this skill must not propose `trace_with_tags`. The two decorators above (`@trace_with_workflow` and `@trace_with_task`) are sufficient for v1.
+> **CRITICAL — `@trace_with_workflow` and `@trace_with_task` are the only decorators this skill proposes.** Tasks-nested-in-workflows is the entire decorator surface for v1; that pair already provides the filtering and propagation surface MC's evaluation pipeline needs.
 
-If the customer asks about tags, point them at the SDK README on PyPI / GitHub for manual usage — but the skill itself should not scaffold the decorator. Tasks-nested-in-workflows already provides the filtering surface MC's evaluation pipeline needs.
+If the customer asks about other SDK tracing primitives, redirect them to the live SDK docs on PyPI / GitHub for manual usage — but the skill does not scaffold them.
 
 ## 4. Placement guidance
 
@@ -116,7 +116,7 @@ Wait for `yes` before applying. If the customer says "looks good, apply all of t
 
 ## Common mistakes
 
-- **Adding `@trace_with_tags`** because the SDK README mentions it — wrong. The skill never scaffolds tags in v1.
+- **Scaffolding any decorator other than `@trace_with_workflow` or `@trace_with_task`** — those are the only two in scope for v1. Other SDK tracing primitives are not part of the surface this skill proposes.
 - **Decorating every helper function** — span noise. Aim for 1 workflow + 1 task per LLM call.
 - **Using `task_name="call_llm"` or `workflow_name="main"`** — opaque. Match the customer's domain.
 - **Applying diffs without explicit per-file confirmation** — violates `SKILL.md` guardrail.

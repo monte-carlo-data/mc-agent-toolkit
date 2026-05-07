@@ -157,7 +157,7 @@ Identify two kinds of functions in the agent code:
 - **Orchestration entry points** — the function the customer calls to run the agent end-to-end. Decorate with `@trace_with_workflow`.
 - **LLM-calling task functions** — the discrete units of work the workflow calls (a single LLM call, a tool invocation, a retrieval step). Decorate each with `@trace_with_task`.
 
-> **CRITICAL — never propose `@trace_with_tags`.** Only `@trace_with_workflow` and `@trace_with_task` are part of V1. `@trace_with_tags` exists in the SDK but is not in scope; using it produces traces that `monitoring-advisor` cannot consume.
+> **CRITICAL — `@trace_with_workflow` and `@trace_with_task` are the only two decorators in scope for V1.** `monitoring-advisor` is built around the workflow/task model; other tracing primitives the SDK exposes are not part of the v1 surface.
 
 Propose each decorator addition as a separate diff. Wait for **explicit per-diff approval**. See `decorator-placement.md` for placement guidance and the canonical example.
 

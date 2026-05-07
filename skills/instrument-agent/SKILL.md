@@ -66,7 +66,7 @@ The skill is structured as a Tier 1 router (this file) → Tier 2 workflow → T
 | `references/workflow.md` | At the start of every invocation. Tier 2 — the end-to-end flow. Read first. |
 | `references/library-detection.md` | Walking step 1 of the workflow — detecting AI libraries, the runtime style (serverless vs long-running), and any existing `mc.setup()`. Documents the PRD core library list as a stable contract. |
 | `references/setup-template.md` | Walking step 5–7 of the workflow — resolving the OTLP endpoint, generating `mc.setup()`, handling the existing-`mc.setup()` decision matrix. Includes both serverless and long-running templates. |
-| `references/decorator-placement.md` | Walking step 8 of the workflow — proposing `@trace_with_workflow` and `@trace_with_task` diffs. Tier 3: only the two decorators are in scope; `@trace_with_tags` is **never** to be added. |
+| `references/decorator-placement.md` | Walking step 8 of the workflow — proposing `@trace_with_workflow` and `@trace_with_task` diffs. Tier 3: those are the only two decorators in scope for v1. |
 | `references/verify-traces.md` | Walking step 4 (BEFORE snapshot) and step 10 (AFTER verification) of the workflow — both `get_agent_metadata` calls. Documents dev/prod twin disambiguation via MCON. |
 | `references/redaction.md` | When the user answers "yes" to step 3 of the workflow ("Will any prompts/completions contain sensitive data?"). Documents the three V1 redaction pathways. |
 | `references/troubleshooting.md` | When step 10's verification doesn't show the new agent, or the user reports incomplete traces. Covers the four PRD failure modes plus the serverless `SimpleSpanProcessor` foot-gun. |
@@ -82,7 +82,7 @@ The full step-by-step flow lives in `references/workflow.md`. At a glance:
 5. **Resolve and display the final OTLP endpoint** to the user — normalize idempotently (never double-append `/v1/traces`).
 6. **Propose dependency-file edits** and wait for approval — install SDK + instrumentors at compatible versions (live-fetched from PyPI; fall back to the snapshotted `instrumentor_map.json` with a STALE warning).
 7. **Propose `mc.setup()` insertion** as a diff and wait for approval — serverless variant uses `SimpleSpanProcessor`.
-8. **Propose `@trace_with_workflow` / `@trace_with_task` decorator diffs** — wait for approval per file. Never `@trace_with_tags`.
+8. **Propose `@trace_with_workflow` / `@trace_with_task` decorator diffs** — wait for approval per file. Those are the only two decorators in scope for v1.
 9. **Confirm env vars** (only on the MC-hosted collector path) — `MCD_DEFAULT_API_ID` / `MCD_DEFAULT_API_TOKEN`. Presence-only check; never read or echo the values.
 10. **Verify** via `get_agent_metadata` (AFTER user runs the instrumented agent) — confirm new `agent_name` + new MCON appears.
 11. **On failure**, branch to `references/troubleshooting.md`.
@@ -108,4 +108,4 @@ The instrumentor list and version constraints come from PyPI live; the local sna
 - Full first-time AO setup (infra deployment, datastore registration, warehouse ingestion).
 - API-key generation.
 - Non-Python SDKs.
-- The `@trace_with_tags` decorator — explicitly excluded by the AO product owner.
+- Decorators other than `@trace_with_workflow` and `@trace_with_task`. Other tracing primitives the SDK exposes are not part of the v1 surface.
