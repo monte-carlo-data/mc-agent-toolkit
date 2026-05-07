@@ -199,6 +199,24 @@
       "prompt": "I need to add a new column to the orders model in models/marts/orders.sql.",
       "expected": "no-trigger",
       "rationale": "dbt model edit -- use prevent skill for impact assessment"
+    },
+    {
+      "id": "should-not-09",
+      "prompt": "Help me wire up mc.setup() in my LangGraph agent codebase.",
+      "expected": "no-trigger",
+      "rationale": "SDK setup / instrumentation request -- routes to monte-carlo-instrument-agent (which produces traces); monitoring-advisor consumes traces, doesn't generate the SDK boilerplate"
+    },
+    {
+      "id": "should-not-10",
+      "prompt": "Instrument my new OpenAI agent for Monte Carlo Agent Observability.",
+      "expected": "no-trigger",
+      "rationale": "Verb 'instrument' + 'new' agent + 'set up tracing' intent -- routes to monte-carlo-instrument-agent; this skill (monitoring-advisor) only creates monitors on agents that are already producing traces"
+    },
+    {
+      "id": "should-not-11",
+      "prompt": "Add the Monte Carlo OpenTelemetry SDK and decorators to my Lambda agent.",
+      "expected": "no-trigger",
+      "rationale": "SDK install + decorator scaffolding -- routes to monte-carlo-instrument-agent (which detects serverless runtime and proposes the SimpleSpanProcessor variant)"
     }
   ]
 }
