@@ -290,6 +290,82 @@ def test_boto3_only() -> None:
     )
 
 
+def test_sample_agent() -> None:
+    """Phase 3 structural smoke — long-running LangGraph fixture.
+
+    Validates that detect_libraries produces JSON the workflow's step #1 can
+    consume to drive the rest of the flow toward the long-running mc.setup()
+    template path.
+    """
+    print("\n== sample_agent (Phase 3 smoke, long-running) ==")
+    out = run_detect("sample_agent")
+    detected = out["detected"]
+    check("detects langchain", "langchain" in detected)
+    check("detects langgraph", "langgraph" in detected)
+    check("detects openai", "openai" in detected)
+    check(
+        "runtime is long_running",
+        out["runtime"] == "long_running",
+        hint=f"got {out['runtime']!r}",
+    )
+    check(
+        "no serverless signals",
+        out["serverless_signals"] == [],
+        hint=f"got {out['serverless_signals']!r}",
+    )
+    check(
+        "no false-positive existing setup",
+        out["existing_setup"]["found"] is False,
+        hint=f"existing_setup={out['existing_setup']!r}",
+    )
+    check(
+        "suggested_instrumentors covers all detected libraries",
+        _suggested_libraries(out) >= {"langchain", "langgraph", "openai"},
+        hint=f"got {_suggested_libraries(out)}",
+    )
+
+
+def test_sample_serverless_agent() -> None:
+    """Phase 3 structural smoke — Lambda-shaped LangGraph fixture.
+
+    Validates that detect_libraries flips runtime to "serverless" and
+    surfaces the framework signals the workflow needs to route toward the
+    SimpleSpanProcessor mc.setup() variant.
+    """
+    print("\n== sample_serverless_agent (Phase 3 smoke, serverless) ==")
+    out = run_detect("sample_serverless_agent")
+    detected = out["detected"]
+    check("detects langchain", "langchain" in detected)
+    check("detects langgraph", "langgraph" in detected)
+    check("detects openai", "openai" in detected)
+    check(
+        "runtime is serverless",
+        out["runtime"] == "serverless",
+        hint=f"got {out['runtime']!r}",
+    )
+    signals = out["serverless_signals"]
+    check(
+        "serverless_signals contains serverless.yml",
+        "serverless.yml" in signals,
+        hint=f"got {signals!r}",
+    )
+    check(
+        "serverless_signals contains lambda_handler",
+        "lambda_handler" in signals,
+        hint=f"got {signals!r}",
+    )
+    check(
+        "serverless_signals contains aws-lambda-powertools",
+        "aws-lambda-powertools" in signals,
+        hint=f"got {signals!r}",
+    )
+    check(
+        "no false-positive existing setup",
+        out["existing_setup"]["found"] is False,
+        hint=f"existing_setup={out['existing_setup']!r}",
+    )
+
+
 def main() -> None:
     tests = [
         test_requirements_txt,
@@ -301,6 +377,8 @@ def main() -> None:
         test_no_deps,
         test_mixed,
         test_boto3_only,
+        test_sample_agent,
+        test_sample_serverless_agent,
     ]
     # Run every test even when an early one fails — `check()` raises on the
     # first failure inside a single test, but we want a complete pass/fail
