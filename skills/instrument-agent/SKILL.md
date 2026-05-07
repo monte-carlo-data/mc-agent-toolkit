@@ -109,3 +109,10 @@ The instrumentor list and version constraints come from PyPI live; the local sna
 - API-key generation.
 - Non-Python SDKs.
 - Decorators other than `@trace_with_workflow` and `@trace_with_task`. Other tracing primitives the SDK exposes are not part of the v1 surface.
+
+## Available slash commands
+
+| Command | Purpose |
+|---|---|
+| `/instrument-agent` | Kicks off the workflow against the current Python codebase. |
+
