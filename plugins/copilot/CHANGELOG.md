@@ -5,6 +5,24 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Copilot CLI will
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.0] - 2026-05-07
+
+### Added
+
+- **`instrument-agent` skill (AO-427)** — walks an MC Agent Observability customer through instrumenting a new AI agent in their Python codebase. Detects AI libraries (LangChain/LangGraph, OpenAI, Anthropic, CrewAI, Bedrock, SageMaker, Vertex AI, plus the long tail of SDK-supported instrumentors via live PyPI fetch), classifies the runtime as serverless or long-running, and proposes the appropriate `mc.setup()` template (with `SimpleSpanProcessor` for Lambda) plus `@trace_with_workflow` / `@trace_with_task` decorator placements. Always asks before editing any file (deps, source, env). Includes:
+  - The `/instrument-agent` slash command and SKILL.md routing.
+  - Seven Tier-3 references — workflow, library detection, setup template, decorator placement, verify traces, redaction, troubleshooting.
+  - Three helper scripts — `detect_libraries.py` (parse deps, detect serverless, detect existing setup), `fetch_sdk_docs.py` (live-fetch from GitHub README + PyPI metadata, fall back to local snapshot), and `instrumentor_map.json` (snapshotted last-known-compatible pins with stale-data warnings).
+  - 21 trigger evals (11 should + 10 should-not, including 3 lifted verbatim from monitoring-advisor for bidirectional routing) and 6 live-behavior evals covering silent-edit guardrails, endpoint normalization, serverless detection, and before/after `get_agent_metadata` verification.
+  - 57 helper-script smoke tests against 11 fixtures (real LangGraph agent + Lambda variant).
+- **Bidirectional routing contract with `monitoring-advisor`** — three new should-not cases in `monitoring-advisor/trigger-evals.json` lock the boundary: `instrument-agent` PRODUCES traces, `monitoring-advisor` CONSUMES them.
+- **`Agent instrumentation` Conversation Signal** in `context-detection/references/signal-definitions.md` routes prompts like *"instrument my agent"* / *"set up Monte Carlo tracing"* / *"setting up an agent"* to the new skill.
+
+### Changed
+
+- `docs(performance-diagnosis)`: documented `bucket="1h"` override (#76).
+- `fix(catalog)`: corrected skill names in `/mc` listing (#77).
+
 ## [1.10.2] - 2026-05-05
 
 ### Changed
