@@ -31,6 +31,16 @@ Restart Claude Code after installing.
 1. **Authenticate with Monte Carlo** — run `/mcp` in Claude Code, select the Monte Carlo server, and complete the OAuth flow.
 2. **Verify** — ask Claude: "Test my Monte Carlo connection."
 
+## Telemetry
+
+The toolkit sends anonymous skill-usage telemetry — which skills are invoked, how often. Each event includes an opaque per-install UUID and a per-session UUID, the skill name, and the toolkit version.
+
+To disable, set `MC_AGENT_TOOLKIT_TELEMETRY_DISABLED=1` in your shell environment. The toolkit will not phone home.
+
+The data is stored in Mixpanel and Datadog and is used only for product-development decisions about which skills to invest in.
+
+The UUIDs are generated locally on first session and stored under `~/.claude/mc-agent-toolkit/`. Deleting that directory resets your install identity to a fresh anonymous one.
+
 ## Available Features
 
 | Feature | Description | Details |

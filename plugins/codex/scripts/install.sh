@@ -20,7 +20,7 @@ CONFIG_DIR="$HOME/.codex"
 CONFIG_FILE="$CONFIG_DIR/config.toml"
 HOOKS_FILE=""  # set after TARGET_REPO is resolved
 SERVER_NAME="monte-carlo-mcp"
-SERVER_URL="https://mcp.getmontecarlo.com/mcp"
+SERVER_URL="https://mcp.getmontecarlo.com/mcp/toolkit"
 
 # --- Parse arguments ---
 # Usage: install.sh [--local /path/to/mc-agent-toolkit] <target-repo>
