@@ -102,6 +102,29 @@ Read `references/intake-no-incident.md` for the full intake flow. In short:
 4. Check table health: `get_table_freshness`, `get_table_size_history`
 5. Narrow down the issue type and proceed to Step 2.
 
+### Step 1.5: Auto-invoke TSA (when applicable)
+
+When intake produces a Monte Carlo **incident UUID**, kick off the Troubleshooting Agent (TSA) **before** continuing to Step 2. TSA runs the same root-cause analysis the Monte Carlo UI uses; running it here in parallel with the manual investigation usually beats running either path alone.
+
+**Skip TSA when any of these is true:**
+
+1. **No incident UUID.** `run_troubleshooting_agent` requires a UUID. The no-incident intake path (`references/intake-no-incident.md`) does not feed TSA. If that path later identifies a matching alert, return to Step 1 with the alert's incident UUID — Step 1.5 then applies normally.
+2. **Narrow scoped check.** The user wants a single fact, not an investigation. Examples: "is `analytics.orders` stale right now?", "what's the row count of X?", "show me the schema of Y", "did this query run today?". Answer the question with the relevant tool and stop. TSA is overkill for these.
+3. **Explicit user opt-out.** The user says "skip TSA", "don't run TSA", "manual only", "just do it yourself", or similar. Honor the opt-out and proceed to Step 2 without invoking TSA.
+
+**Default invocation (async, parallel):**
+
+```
+run_troubleshooting_agent(incident_id="<uuid>", async_mode=True)
+```
+
+- The tool is **idempotent** by default: if a previous successful TSA run exists for this incident, it returns those results immediately. Do **not** pass `force_rerun=True` unless the user explicitly asks for a fresh analysis (each fresh run is a billable Monte Carlo credit consumption).
+- If status is `success` on the first call, you have results — fold them straight into Step 7's synthesis and continue Steps 2–6 to corroborate.
+- If status is `queued` or `running`, continue to Step 2 immediately. TSA typically completes in 4–8 minutes; you'll poll for results via `get_troubleshooting_agent_results` later in the flow (see Step 4 and Step 7).
+- If status is `failed`, note the error and continue with the manual investigation only — do not re-run automatically.
+
+Tell the user what you started: "I've kicked off the Troubleshooting Agent on this incident — it usually finishes in 4–8 minutes. While it runs, I'll continue investigating manually so we have findings either way."
+
 ### Step 2: Map the blast radius
 
 1. Call `get_asset_lineage(mcons=[table_mcon], direction="UPSTREAM")` — what feeds this table?
