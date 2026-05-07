@@ -115,4 +115,3 @@ The instrumentor list and version constraints come from PyPI live; the local sna
 | Command | Purpose |
 |---|---|
 | `/instrument-agent` | Kicks off the workflow against the current Python codebase. |
-
