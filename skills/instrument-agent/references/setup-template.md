@@ -91,10 +91,14 @@ def init_tracing():
         else f"{base_endpoint}/v1/traces"
     )
 
+    # This template assumes the MC-hosted collector with MCD_DEFAULT_API_ID
+    # and MCD_DEFAULT_API_TOKEN env vars (section 4's preferred path). For
+    # OTEL_EXPORTER_OTLP_HEADERS or self-hosted collectors, see "Variants for
+    # other auth paths" below.
+    #
     # mc.setup() only auto-injects MCD_DEFAULT_* headers when it builds the
     # default exporter. With a custom span_processor we build the exporter
-    # ourselves, so we must pass auth headers explicitly. Self-hosted
-    # collectors can omit `headers=...` — auth is handled at the collector.
+    # ourselves, so we pass auth headers explicitly here.
     mcd_headers = {
         "x-mcd-id": os.environ["MCD_DEFAULT_API_ID"],
         "x-mcd-token": os.environ["MCD_DEFAULT_API_TOKEN"],
@@ -116,6 +120,24 @@ def init_tracing():
         span_processor=simple_span_processor,
     )
 ```
+
+#### Variants for other auth paths
+
+The template above is for the MC-hosted collector with `MCD_DEFAULT_*` env vars (section 4's preferred path). The other two valid auth paths take small adjustments — propose the matching shape based on the customer's answer to workflow step #2 (collector source) and step #9 (env vars).
+
+**MC-hosted collector + `OTEL_EXPORTER_OTLP_HEADERS`** (the customer packs `x-mcd-id` / `x-mcd-token` into the standard OTel env var):
+
+- Drop the `mcd_headers` construction.
+- Build the exporter without `headers=`: `exporter = OTLPSpanExporter(endpoint=http_otel_endpoint)`.
+- `OTLPSpanExporter` reads `OTEL_EXPORTER_OTLP_HEADERS` from the environment automatically — no explicit kwarg needed.
+
+**Self-hosted collector** (auth is handled at the collector, MC does not see credentials):
+
+- Drop the `mcd_headers` construction entirely.
+- Build the exporter without `headers=`: `exporter = OTLPSpanExporter(endpoint=http_otel_endpoint)`.
+- **Do not** reference `MCD_DEFAULT_*` in the customer's code — not as a value read, not as a comment, not in a fallback. Per section 4, self-hosted is a clean skip of the `MCD_*` surface.
+
+> **CRITICAL — match the auth-path branch to the customer's actual setup before generating the snippet.** The default template references `os.environ["MCD_DEFAULT_API_ID"]`; if the customer is on `OTEL_EXPORTER_OTLP_HEADERS` or self-hosted, that line raises `KeyError` at startup and tracing never initializes. Walk the customer through which auth path they're using *before* proposing the diff.
 
 ---
 
@@ -237,4 +259,4 @@ Surface every diff. Wait for `yes` per file. Never batch-approve across files.
 - **Reading or echoing `MCD_DEFAULT_API_TOKEN` to confirm it's set.** Credential leak. Use presence-only (`bool(os.environ.get(...))`).
 - **Auto-scaffolding a duplicate `mc.setup()` when one already exists.** Confusing telemetry, two agents in MC. Walk the decision matrix instead.
 - **Editing `requirements.txt` / `pyproject.toml` / source files without explicit per-file approval.** Violates the SKILL.md guardrail. Propose every diff, wait for `yes` per file.
-- **Building `OTLPSpanExporter` for a custom `span_processor` without passing `MCD_DEFAULT_*` headers explicitly.** `mc.setup()` only auto-injects auth headers when it constructs the default exporter; with a custom `span_processor` you build the exporter, so the headers are your responsibility. Symptom: traces emit but never appear in MC because the collector rejects them as unauthenticated. Fix: pass `headers={"x-mcd-id": ..., "x-mcd-token": ...}` to `OTLPSpanExporter`, or set `OTEL_EXPORTER_OTLP_HEADERS` and let the exporter pick it up. (Self-hosted collectors handle auth at the collector and don't need this.)
+- **Forgetting that `mc.setup()` does not auto-inject auth headers when `span_processor=` is set.** With the default exporter, `mc.setup()` injects `MCD_DEFAULT_*` from env vars automatically. With a custom `span_processor` the customer constructs the `OTLPSpanExporter`, so the auth path must be made explicit at exporter-construction time. Match the customer's setup: (a) MC-hosted with `MCD_DEFAULT_*` env vars → pass `headers={"x-mcd-id": ..., "x-mcd-token": ...}` to `OTLPSpanExporter`; (b) MC-hosted with `OTEL_EXPORTER_OTLP_HEADERS` → omit `headers=` (the exporter reads the env var); (c) self-hosted collector → omit `headers=` (auth is at the collector). Symptom of getting it wrong: traces emit but never appear in MC because the collector rejects them as unauthenticated, **or** `init_tracing()` raises `KeyError` at startup because the template references `MCD_DEFAULT_*` that the customer isn't using.
