@@ -70,6 +70,11 @@ Do not activate when the user is:
 | `get_jobs_performance` | Job runtime stats, failure rates, 7-day trends |
 | `get_change_timeline` | Unified timeline: query changes + volume + ETL failures |
 | `get_current_time` | Current timestamp for relative time ranges |
+| `alert_assessment` | Optional ~2-min triage of an incident — returns HIGH/MEDIUM/LOW confidence and impact. Useful when you want a quick read before deciding to escalate to TSA. |
+| `run_troubleshooting_agent` | Starts the Troubleshooting Agent (TSA) on an incident. Async by default; idempotent (returns existing results unless `force_rerun=True`). Auto-invoked at Step 1.5 when an incident UUID is present. |
+| `get_troubleshooting_agent_results` | Polls TSA results for an incident (`status` is `not_found` / `running` / `success` / `failed`). Use to check on the async run started at Step 1.5. |
+
+> **Credits:** `alert_assessment` and `run_troubleshooting_agent` consume Monte Carlo credits the same way the Troubleshooting Agent does when launched from the Monte Carlo UI. Each fresh `run_troubleshooting_agent` call is a billable run; reuse via the built-in idempotency (don't pass `force_rerun=True` unless the user explicitly asks for a fresh analysis).
 
 ### Optional external MCP tools
 
