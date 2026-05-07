@@ -17,6 +17,12 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   - 57 helper-script smoke tests against 11 fixtures (real LangGraph agent + Lambda variant).
 - **Bidirectional routing contract with `monitoring-advisor`** — three new should-not cases in `monitoring-advisor/trigger-evals.json` lock the boundary: `instrument-agent` PRODUCES traces, `monitoring-advisor` CONSUMES them.
 - **`Agent instrumentation` Conversation Signal** in `context-detection/references/signal-definitions.md` routes prompts like *"instrument my agent"* / *"set up Monte Carlo tracing"* / *"setting up an agent"* to the new skill.
+- **Upstream `montecarlo-opentelemetry` README contributions** ([#22](https://github.com/monte-carlo-data/montecarlo-opentelemetry/pull/22), [#23](https://github.com/monte-carlo-data/montecarlo-opentelemetry/pull/23)) documenting `mc.setup(span_processor=...)` for serverless / suspendable runtimes and the `MCD_DEFAULT_*` auth-header behavior with custom span processors. The `instrument-agent` skill cites the upstream README as source of truth for the kwarg contract instead of carrying SDK knowledge in-skill.
+
+### Fixed
+
+- `instrument-agent`: dedupe shared instrumentor packages in `suggested_instrumentors` so projects with both `langchain` and `langgraph` (which share `opentelemetry-instrumentation-langchain`) don't propose the same package twice in the install set or wire the same instrumentor twice in `mc.setup()`.
+- `instrument-agent` serverless template: pass `MCD_DEFAULT_*` headers explicitly to `OTLPSpanExporter` when using a custom `span_processor`. `mc.setup()` only auto-injects those headers when it constructs the default exporter; with a custom `span_processor`, the customer builds the exporter and is responsible for headers. Surfaced by upstream README review on `montecarlo-opentelemetry#22`.
 
 ### Changed
 

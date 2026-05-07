@@ -17,7 +17,7 @@ mc.setup(
 )
 ```
 
-> **IMPORTANT — `span_processor` is real but undocumented.** The kwarg is not in the public SDK README. It is used in production by `monte-carlo-data/saas-serverless` and is required for any suspendable runtime (Lambda, Cloud Run jobs, etc.). Do not assume it is unsupported just because the README does not mention it.
+> **Source of truth for the `span_processor` kwarg contract:** [`montecarlo-opentelemetry` README — Configuring the span processor / Serverless and other suspendable runtimes](https://github.com/monte-carlo-data/montecarlo-opentelemetry/blob/main/README.md#configuring-the-span-processor). When the SDK changes the kwarg's behavior, default, or auth-header injection rules, that README is the canonical source — re-read it before regenerating templates.
 
 ---
 
@@ -66,7 +66,7 @@ if MC_OTEL_ENDPOINT:
 
 ### Serverless template (`SimpleSpanProcessor` REQUIRED)
 
-Source: [`monte-carlo-data/saas-serverless/ai-recommendations/common/tracing.py @ ec2af0c L5`](https://github.com/monte-carlo-data/saas-serverless/blob/ec2af0ceb4346fa0489e010713b91bb5c0983f5d/ai-recommendations/common/tracing.py#L5)
+Source: [`montecarlo-opentelemetry` README — Serverless and other suspendable runtimes](https://github.com/monte-carlo-data/montecarlo-opentelemetry/blob/main/README.md#serverless-and-other-suspendable-runtimes). Production usage cross-reference: [`monte-carlo-data/saas-serverless/ai-recommendations/common/tracing.py @ ec2af0c L5`](https://github.com/monte-carlo-data/saas-serverless/blob/ec2af0ceb4346fa0489e010713b91bb5c0983f5d/ai-recommendations/common/tracing.py#L5).
 
 ```python
 import os
@@ -91,9 +91,18 @@ def init_tracing():
         else f"{base_endpoint}/v1/traces"
     )
 
-    # SimpleSpanProcessor works better with Lambda — the BatchSpanProcessor would
-    # be suspended before flushing, dropping traces.
-    exporter = OTLPSpanExporter(endpoint=http_otel_endpoint)
+    # mc.setup() only auto-injects MCD_DEFAULT_* headers when it builds the
+    # default exporter. With a custom span_processor we build the exporter
+    # ourselves, so we must pass auth headers explicitly. Self-hosted
+    # collectors can omit `headers=...` — auth is handled at the collector.
+    mcd_headers = {
+        "x-mcd-id": os.environ["MCD_DEFAULT_API_ID"],
+        "x-mcd-token": os.environ["MCD_DEFAULT_API_TOKEN"],
+    }
+
+    # SimpleSpanProcessor flushes each span before the runtime can suspend the
+    # process. BatchSpanProcessor would queue spans and lose them at freeze.
+    exporter = OTLPSpanExporter(endpoint=http_otel_endpoint, headers=mcd_headers)
     simple_span_processor = SimpleSpanProcessor(exporter)
 
     # By default this template DOES NOT capture prompt/completion content. To
@@ -102,7 +111,7 @@ def init_tracing():
     # env var for your instrumentor).
     mc.setup(
         agent_name=AGENT_NAME,
-        otlp_endpoint=http_otel_endpoint,
+        otlp_endpoint=http_otel_endpoint,  # required by signature; ignored when span_processor is set
         instrumentors=[LangchainInstrumentor()],
         span_processor=simple_span_processor,
     )
@@ -228,4 +237,4 @@ Surface every diff. Wait for `yes` per file. Never batch-approve across files.
 - **Reading or echoing `MCD_DEFAULT_API_TOKEN` to confirm it's set.** Credential leak. Use presence-only (`bool(os.environ.get(...))`).
 - **Auto-scaffolding a duplicate `mc.setup()` when one already exists.** Confusing telemetry, two agents in MC. Walk the decision matrix instead.
 - **Editing `requirements.txt` / `pyproject.toml` / source files without explicit per-file approval.** Violates the SKILL.md guardrail. Propose every diff, wait for `yes` per file.
-- **Assuming `span_processor` doesn't exist because it's not in the public SDK README.** It exists, it's used in production, and serverless agents need it.
+- **Building `OTLPSpanExporter` for a custom `span_processor` without passing `MCD_DEFAULT_*` headers explicitly.** `mc.setup()` only auto-injects auth headers when it constructs the default exporter; with a custom `span_processor` you build the exporter, so the headers are your responsibility. Symptom: traces emit but never appear in MC because the collector rejects them as unauthenticated. Fix: pass `headers={"x-mcd-id": ..., "x-mcd-token": ...}` to `OTLPSpanExporter`, or set `OTEL_EXPORTER_OTLP_HEADERS` and let the exporter pick it up. (Self-hosted collectors handle auth at the collector and don't need this.)
