@@ -109,6 +109,10 @@ cp -r skills/prevent ~/.claude/skills/prevent
 
 See the [skills directory](skills/) for the full list and individual READMEs.
 
+## Telemetry
+
+The Claude Code plugin sends anonymous skill-usage telemetry. No prompts or skill arguments are sent. To disable, set `MC_AGENT_TOOLKIT_TELEMETRY_DISABLED=1`. See [the plugin README](plugins/claude-code/README.md#telemetry) for details.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on adding skills, creating plugins, and submitting pull requests. It also covers [plugin architecture](docs/plugin-architecture-guide.md) and [releasing new versions](CONTRIBUTING.md#releasing).

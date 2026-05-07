@@ -24,17 +24,17 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `instrument-agent`: dedupe shared instrumentor packages in `suggested_instrumentors` so projects with both `langchain` and `langgraph` (which share `opentelemetry-instrumentation-langchain`) don't propose the same package twice in the install set or wire the same instrumentor twice in `mc.setup()`.
 - `instrument-agent` serverless template: pass `MCD_DEFAULT_*` headers explicitly to `OTLPSpanExporter` when using a custom `span_processor`. `mc.setup()` only auto-injects those headers when it constructs the default exporter; with a custom `span_processor`, the customer builds the exporter and is responsible for headers. Surfaced by upstream README review on `montecarlo-opentelemetry#22`.
 
+## [1.10.3] - 2026-05-06
+
 ### Changed
 
-- `docs(performance-diagnosis)`: documented `bucket="1h"` override (#76).
-- `fix(catalog)`: corrected skill names in `/mc` listing (#77).
+- Internal tracking only: anonymous skill-usage telemetry and MCP route updated to `/mcp/toolkit`. No prompts, args, or file paths sent. Disable telemetry with `MC_AGENT_TOOLKIT_TELEMETRY_DISABLED=1`. See the plugin README for details.
 
 ## [1.10.2] - 2026-05-05
 
 ### Changed
 
 - Correct `alert_assessment` output field descriptions in automated-triage skill: replace the stale "natural-language summary" reference with explicit `alert_description` (what happened) and `triage_summary` (scoring reasoning) fields, and clarify that `alert_description` is used in triage comments for untroubleshot alerts.
-
 
 ## [1.10.1] - 2026-04-30
 
