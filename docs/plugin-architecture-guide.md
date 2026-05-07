@@ -65,16 +65,23 @@ This reflects the **current repository structure**.
 
 ```
 mc-agent-toolkit/
-├── skills/                              # Shared skill definitions (platform-agnostic)
+├── skills/                              # Shared skill definitions (platform-agnostic) — keep in sync with skills/ directory
 │   ├── analyze-root-cause/
+│   ├── asset-health/
 │   ├── automated-triage/
+│   ├── connection-auth-rules/
+│   ├── context-detection/
 │   ├── generate-validation-notebook/
+│   ├── incident-response/
+│   ├── instrument-agent/                # AO-427: walk through instrumenting a new AI agent in a Python codebase
 │   ├── monitoring-advisor/              # Unified: coverage + data monitors + agent monitors
 │   ├── performance-diagnosis/
 │   ├── prevent/
+│   ├── proactive-monitoring/
 │   ├── push-ingestion/
 │   ├── remediation/
-│   └── storage-cost-analysis/
+│   ├── storage-cost-analysis/
+│   └── tune-monitor/
 │
 ├── plugins/
 │   │

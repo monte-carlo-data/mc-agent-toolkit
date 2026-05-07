@@ -40,7 +40,7 @@ It prints a JSON object with the following fields:
 Parse this output and branch:
 
 - **`existing_setup.found` is `true`** — do not propose a fresh `mc.setup()`. Point the reader at the existing-setup decision matrix in `setup-template.md` to decide whether to keep, reconfigure, or replace the call. Then continue with the rest of the workflow (the user may still need decorator and dependency changes).
-- **`runtime: "unknown"` and `detected: []`** — exit cleanly. No PRD core libraries are present, so there's nothing to instrument. Tell the user: "I didn't find any of the supported AI libraries (`openai`, `anthropic`, `langchain`, `llama_index`, `bedrock`, `vertexai`, `crewai`, `dspy`) in the target. Confirm the agent code is actually in this path, then re-run." Do not scaffold anything.
+- **`runtime: "unknown"` and `detected: []`** — exit cleanly. No PRD core libraries are present, so there's nothing to instrument. Tell the user: "I didn't find any of the supported AI libraries (`langchain`, `langgraph`, `openai`, `anthropic`, `crewai`, `bedrock`, `sagemaker`, `vertexai`) in the target. Confirm the agent code is actually in this path, then re-run." Do not scaffold anything.
 - **Anything else** — continue to step 2 with the detection output in hand.
 
 If the user wants to consider libraries beyond what `detect_libraries.py` knows about, run `python3 scripts/fetch_sdk_docs.py` to pull the live `supported_instrumentors` list from PyPI (it falls back to a local snapshot if PyPI is unreachable). This is informational only — proposed installs still wait until step 6.
