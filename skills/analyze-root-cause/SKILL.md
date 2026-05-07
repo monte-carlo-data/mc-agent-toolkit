@@ -210,3 +210,5 @@ Read `references/common-root-causes.md` to match findings against known patterns
 - **Be specific about what you can't check.** If no DB connector is available, explain what additional investigation would be possible with one.
 - **Never expose MCONs, UUIDs, or internal identifiers** to the user. Use human-readable table names.
 - **Cross-platform awareness.** ETL issues can come from Airflow, dbt, or Databricks. Check all platforms that are relevant.
+- **Do not invoke TSA without an incident UUID.** `run_troubleshooting_agent` requires one. If intake is on the no-incident path, skip TSA entirely until/unless an alert is identified.
+- **Honor explicit user opt-outs.** If the user says "skip TSA", "manual only", or similar, do not call `run_troubleshooting_agent` or `alert_assessment` — proceed with the manual investigation only.
