@@ -51,6 +51,7 @@ Before doing anything else, check whether the user's message unambiguously match
 | "Create a [monitor type] on [named table]" | `../monitoring-advisor/SKILL.md` |
 | "Investigate alert on [named table]" / "why is [named table] stale/broken?" | `../incident-response/SKILL.md` |
 | "What should I monitor?" / "where are my coverage gaps?" | `../proactive-monitoring/SKILL.md` |
+| "Instrument my agent" / "set up Monte Carlo tracing on [named framework] agent" / "setting up an agent" | `../instrument-agent/SKILL.md` |
 
 Context-detection is for **ambiguous** requests only. If the request is clear, routing through this skill wastes turns and tokens.
 
@@ -65,6 +66,7 @@ Read `references/signal-definitions.md` for the full signal catalog. Determine w
 | **Specific asset** | User mentions a table name, or has a `.sql` model file open in their IDE | "what's wrong with stg_payments?", "check this table" |
 | **Active incident** | Keywords: alert, broken, stale, failing, incident, triage, wrong data | "I have alerts firing", "data looks wrong", "something broke" |
 | **Coverage/monitoring** | Keywords: monitor, coverage, gaps, unmonitored, what should I watch | "what should I monitor?", "where are my gaps?" |
+| **Agent instrumentation** | Keywords: instrument, set up tracing, set up Monte Carlo tracing, setting up an agent. Often mentions an AI framework (LangChain, LangGraph, OpenAI, Anthropic, CrewAI, Bedrock, SageMaker, Vertex AI) | "instrument my agent", "set up MC tracing on my LangGraph agent", "setting up an agent" |
 | **General/exploratory** | No clear category, broad question | "help me with data quality", "what can Monte Carlo do?" |
 
 ### Step 2: Gather scope (only if needed)
@@ -105,6 +107,7 @@ Based on the combined signals from Steps 1-3:
 | Coverage intent + data project detected | High | **Auto-activate** proactive monitoring workflow: read and follow `../proactive-monitoring/SKILL.md` |
 | User asks to create a specific monitor (type + table known) | High | **Auto-activate** monitoring-advisor: read and follow `../monitoring-advisor/SKILL.md` |
 | Table mentioned + "health" / "status" / "check" intent | High | **Auto-activate** asset-health: read and follow `../asset-health/SKILL.md` |
+| Agent instrumentation intent (instrument / set up tracing / setting up an agent) + Python codebase context | High | **Auto-activate** instrument-agent: read and follow `../instrument-agent/SKILL.md` |
 | Ambiguous or conflicting signals | Low | **Suggest** options and wait for user to choose |
 
 **High confidence = auto-activate.** Load the target skill's SKILL.md and begin executing it immediately. Do not ask for confirmation.
