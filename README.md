@@ -51,6 +51,7 @@ Skills are grouped by the job they help you do. Orchestrated workflows sequence 
 |---|---|---|
 | **Push Ingestion** | Generates collection scripts to push metadata, lineage, or query logs to Monte Carlo from any data source. | [README](skills/push-ingestion/README.md) |
 | **Connection Auth Rules** | Builds Connection Auth Rules JSON for a Monte Carlo connection type using live connector schemas. | [SKILL](skills/connection-auth-rules/SKILL.md) |
+| **Instrument Agent** | Walks an MC AO customer through instrumenting a new AI agent in their Python codebase: detects libraries, installs the Monte Carlo OpenTelemetry SDK, and proposes `mc.setup()` and decorator diffs (with `SimpleSpanProcessor` when serverless). | [SKILL](skills/instrument-agent/SKILL.md) |
 
 ## Installing the plugin (recommended)
 
