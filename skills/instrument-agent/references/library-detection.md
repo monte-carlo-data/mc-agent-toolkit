@@ -91,6 +91,8 @@ mc.setup(instrumentors=[
 ])
 ```
 
+> **IMPORTANT**: `suggested_instrumentors` deduplicates by package, so libraries that share an instrumentor (e.g. `langchain` and `langgraph` both ship via `opentelemetry-instrumentation-langchain`) appear **once** in the install set even though both still appear in `detected`. Drive dependency edits and `mc.setup(instrumentors=[...])` from the deduped list — never iterate `detected` to build the install set, or you'll wire and install the same instrumentor twice.
+
 > **IMPORTANT**: When `detected: []` AND `unsupported: []` AND `runtime: "unknown"` — there are no AI libraries to instrument. Exit cleanly. Do **not** scaffold a `mc.setup()` for nothing. See section 7.
 
 ## 4. Ambiguous-multipurpose-SDK rule (boto3, etc.)

@@ -65,6 +65,14 @@ def _suggested_libraries(out: dict) -> set[str]:
     }
 
 
+def _suggested_packages(out: dict) -> list[str]:
+    return [
+        entry.get("package")
+        for entry in out.get("suggested_instrumentors", [])
+        if isinstance(entry, dict)
+    ]
+
+
 def _unsupported_libraries(out: dict) -> set[str]:
     return {
         entry.get("library")
@@ -320,10 +328,30 @@ def test_sample_agent() -> None:
         out["existing_setup"]["found"] is False,
         hint=f"existing_setup={out['existing_setup']!r}",
     )
+    # langchain and langgraph share opentelemetry-instrumentation-langchain,
+    # so suggested_instrumentors dedupes by package — only one of the two
+    # appears, plus openai. Both libraries still appear in `detected`.
+    suggested_libs = _suggested_libraries(out)
     check(
-        "suggested_instrumentors covers all detected libraries",
-        _suggested_libraries(out) >= {"langchain", "langgraph", "openai"},
-        hint=f"got {_suggested_libraries(out)}",
+        "suggested_instrumentors includes langchain or langgraph (shared package)",
+        bool(suggested_libs & {"langchain", "langgraph"}),
+        hint=f"got {suggested_libs}",
+    )
+    check(
+        "suggested_instrumentors includes openai",
+        "openai" in suggested_libs,
+        hint=f"got {suggested_libs}",
+    )
+    suggested_packages = _suggested_packages(out)
+    check(
+        "suggested_instrumentors has no duplicate packages",
+        len(suggested_packages) == len(set(suggested_packages)),
+        hint=f"got {suggested_packages}",
+    )
+    check(
+        "shared langchain instrumentor appears exactly once",
+        suggested_packages.count("opentelemetry-instrumentation-langchain") == 1,
+        hint=f"got {suggested_packages}",
     )
 
 

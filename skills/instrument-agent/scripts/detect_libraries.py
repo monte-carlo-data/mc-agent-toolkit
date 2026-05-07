@@ -462,6 +462,10 @@ def _match_instrumentors(
     suggested: list[dict] = []
     unsupported: list[dict] = []
     seen_libraries: set[str] = set()
+    # Multiple libraries can share one instrumentor package (e.g. langchain
+    # and langgraph both ship via opentelemetry-instrumentation-langchain).
+    # Dedup on package so step 6's install set doesn't list it twice.
+    seen_packages: set[str] = set()
 
     deps_lower = {d.lower() for d in deps}
 
@@ -507,7 +511,9 @@ def _match_instrumentors(
             continue
 
         detected.append(library)
-        suggested.append({"library": library, "package": package})
+        if package not in seen_packages:
+            suggested.append({"library": library, "package": package})
+            seen_packages.add(package)
         seen_libraries.add(library)
 
     return detected, suggested, unsupported
