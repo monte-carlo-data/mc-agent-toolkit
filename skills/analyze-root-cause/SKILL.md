@@ -127,6 +127,8 @@ Tell the user what you started: "I've kicked off the Troubleshooting Agent on th
 
 ### Step 2: Map the blast radius
 
+> **TSA in parallel:** if you started TSA at Step 1.5, it is running in the background while you do this step. Do not block on it.
+
 1. Call `get_asset_lineage(mcons=[table_mcon], direction="UPSTREAM")` — what feeds this table?
 2. Call `get_asset_lineage(mcons=[table_mcon], direction="DOWNSTREAM")` — what does this table feed?
 3. If the issue involves specific fields, call `get_field_lineage` to trace which upstream fields feed the affected columns.
@@ -159,6 +161,8 @@ Data issues often originate upstream. Walk the lineage chain:
 2. Use `get_field_lineage` to trace the specific field that has bad data back to its source.
 3. Check what upstream field values correlate with the anomaly (if DB connector is available — see Step 5).
 
+**TSA poll #1.** If you started TSA at Step 1.5 and it has not yet returned `success`, call `get_troubleshooting_agent_results(incident_id=...)` once here (~30s after Step 1.5). If status is `success`, hold the result for Step 7. If still `running`, keep going — you'll poll again before Step 7. Don't block on it.
+
 ### Step 5: Profile data (if database MCP is available)
 
 If the user has a database MCP server connected (Snowflake, BigQuery, Redshift, Databricks, etc.), read `references/data-exploration.md` for SQL investigation patterns including:
@@ -179,6 +183,8 @@ Also call `get_query_changes` with the affected table MCONs to detect SQL text m
 
 ### Step 7: Synthesize and present
 
+**TSA poll #2.** If you started TSA at Step 1.5 and don't yet have results, call `get_troubleshooting_agent_results(incident_id=...)` one more time (~60–90s after poll #1). Stop on `success` or `failed`; if still `running` after this poll, present the manual findings now and tell the user TSA is still working ("TSA is still running on this incident — I'll fold its findings in once it completes if you'd like, or you can ask me to check back in a minute").
+
 Read `references/common-root-causes.md` to match findings against known patterns. Present:
 
 1. **Root cause** — what happened and when, with evidence from tools
@@ -186,6 +192,13 @@ Read `references/common-root-causes.md` to match findings against known patterns
 3. **Impact** — what downstream tables/consumers are affected (from Step 2)
 4. **Recommended fix** — specific action to resolve the issue
 5. **Prevention** — suggest monitoring to catch this earlier next time
+
+**Merging TSA findings:**
+
+- **TSA succeeded and agrees with the manual investigation** — lead with the unified root cause; cite both TSA's evidence chain and the corroborating manual findings.
+- **TSA succeeded and contradicts the manual investigation** — surface both. Show TSA's verdict, show what the manual investigation found, and explain the disagreement (e.g. "TSA blames the upstream Airflow job, but `get_table_freshness` on that table is healthy"). Ask the user which thread they want to pull on.
+- **TSA succeeded with low-signal output** (e.g. "no clear root cause") — present the manual findings as primary; cite TSA as a corroborating null result.
+- **TSA failed or timed out** — present the manual findings only; mention TSA's failure briefly so the user knows it was tried.
 
 ---
 
