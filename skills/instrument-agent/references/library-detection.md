@@ -31,15 +31,23 @@ The fallback table that drives `detected` / `suggested_instrumentors` lives in `
       "library": "langchain",
       "package": "opentelemetry-instrumentation-langchain",
       "version_constraint": "<=0.53.4",
+      "additional_pins": ["wrapt<2"],
       "covers_dependencies": ["langchain", "langchain-core", "langchain-community", "langgraph"]
     }
   ]
 }
 ```
 
+Field meanings:
+
+- `version_constraint` — pin for the instrumentor package itself (e.g. `<=0.53.4`).
+- `additional_pins` — transitive constraints required for the pinned instrumentor version to import cleanly. The OpenLLMetry instrumentors at `<=0.53.4` pass `module=` to `wrap_function_wrapper`, which `wrapt` 2.x renamed to `target=` — so `wrapt<2` is required alongside the instrumentor. The skill must include these pins in the proposed dependency diff; without them, `pip install` resolves to incompatible versions and `mc.setup()` raises `TypeError` at import.
+
 This schema is shared with `fetch_sdk_docs.py` — treat any field rename as a breaking change to both scripts.
 
 > **CRITICAL**: `version_constraint` in `instrumentor_map.json` is a **stale fallback**, not the source of truth. PyPI live results from `fetch_sdk_docs.py` always win. When the snapshot value is shown to the user, it must be labeled `STALE` so the user understands they should re-fetch.
+
+> **IMPORTANT**: `additional_pins` lives in the snapshot only. The PyPI README does not encode transitive constraints, so live-fetch results don't carry them. When using a live result, fall back to the snapshot's `additional_pins` for the same library — otherwise the proposed deps will install but fail at runtime.
 
 ## 1. PRD core library list (the contract)
 

@@ -138,6 +138,13 @@ Render the resolved final URL to the user and ask for confirmation before genera
 
 Determine the install set from `detect_libraries.py`'s `suggested_instrumentors` (or live-fetch via `fetch_sdk_docs.py` if the user wants libraries beyond the default set). Always include the MC SDK package itself.
 
+**Pinning is required, not optional.** Each `suggested_instrumentors` entry may include:
+
+- `version_constraint` — pin for the instrumentor package itself.
+- `additional_pins` — transitive constraints (e.g. `wrapt<2`) without which the pinned instrumentor fails to import.
+
+Apply both to the proposed diff. An unpinned `pip install opentelemetry-instrumentation-langchain` resolves to a version that crashes at `mc.setup()` import time against `wrapt` 2.x — that's a bug the skill is responsible for preventing. Per `library-detection.md`, prefer `fetch_sdk_docs.py`'s live `version_constraint` when available; fall back to the snapshot's value with a `STALE (snapshot_date=YYYY-MM-DD)` annotation. `additional_pins` lives in the snapshot only; carry it through even when the version constraint comes from live data.
+
 Propose the additions as a unified diff against the customer's actual dependency file — `requirements.txt`, `pyproject.toml`, or `Pipfile`. Wait for **explicit per-file approval** before any edit lands.
 
 > **CRITICAL — never edit dependency files autonomously.** Even if the change looks trivial. The user reviews and accepts each diff. See `library-detection.md` for the install rules.

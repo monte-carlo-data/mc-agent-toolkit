@@ -509,7 +509,26 @@ def main() -> None:
             TimeoutError,
             OSError,
         ) as exc:
-            warnings.append(f"Live fetch failed: README {_describe_fetch_error(exc)}")
+            err_str = _describe_fetch_error(exc)
+            # The canonical SDK repo is org-private; an anonymous 404 against
+            # raw.githubusercontent.com is the expected default. Hint that
+            # GITHUB_TOKEN unlocks the GitHub source path; PyPI fallback below
+            # works either way.
+            if (
+                isinstance(exc, urllib.error.HTTPError)
+                and exc.code == 404
+                and not os.environ.get("GITHUB_TOKEN")
+            ):
+                warnings.append(
+                    f"GitHub README fetch returned {err_str} (likely a private "
+                    "repo without GITHUB_TOKEN); will try PyPI description as "
+                    "the README source."
+                )
+            else:
+                warnings.append(
+                    f"GitHub README fetch returned {err_str}; will try PyPI "
+                    "description as the README source."
+                )
 
     # ----- PyPI ------------------------------------------------------------
     if args.no_pypi:

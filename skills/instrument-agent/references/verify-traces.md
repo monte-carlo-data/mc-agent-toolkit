@@ -98,6 +98,17 @@ After the customer's agent runs and emits OTLP spans:
 - A new `agentName` should appear in `get_agent_metadata` within seconds to a few minutes.
 - If after ~5 minutes the new agent isn't visible, something is wrong (SDK init not running, wrong endpoint, missing credentials, batch processor suspended on Lambda, etc.). Branch to `troubleshooting.md`.
 
+### Optional: local verification with a desktop OTLP receiver
+
+When the customer wants to confirm the instrumentation produces valid OTLP spans *before* pointing at MC's collector — for example, while iterating in dev — they can run a local OTLP receiver and temporarily set `MC_OTEL_ENDPOINT` to it. [`otel-desktop-viewer`](https://github.com/CtrlSpice/otel-desktop-viewer) is a single-binary receiver with a browser UI that makes the trace tree easy to inspect (the Docker image listens on `4317` for gRPC, `4318` for HTTP, and serves the UI on `8000`).
+
+This is **not** a substitute for the MC-side `get_agent_metadata` check — only the latter proves the trace reached Monte Carlo. But it is useful for:
+
+- Confirming the wiring (`@trace_with_workflow` produces a root, `@trace_with_task` nests under it, the auto-instrumentor's LLM spans land where expected).
+- Distinguishing "traces never emitted" from "traces emitted but dropped in transit" when troubleshooting Step 10 failures.
+
+Note: the published Docker image's JSON-RPC API may lag the repo's `main` branch — its method names tend to be stable across releases, but new methods may not be available yet on `latest-arm64` / `latest-amd64`.
+
 ---
 
 ## Common mistakes

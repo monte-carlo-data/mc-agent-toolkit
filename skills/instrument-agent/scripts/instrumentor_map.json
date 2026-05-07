@@ -1,5 +1,5 @@
 {
-  "$schema_note": "Fallback snapshot of the Monte Carlo OpenTelemetry SDK supported-instrumentor list. The skill prefers live data from PyPI (https://pypi.org/project/montecarlo-opentelemetry/) and the SDK README; this file is consulted only when live fetch fails. Each entry's version_constraint is what the SDK README documented at snapshot_date — re-run fetch_sdk_docs.py to confirm current constraints.",
+  "$schema_note": "Fallback snapshot of the Monte Carlo OpenTelemetry SDK supported-instrumentor list. The skill prefers live data from PyPI (https://pypi.org/project/montecarlo-opentelemetry/) and the SDK README; this file is consulted only when live fetch fails. Each entry's version_constraint is what the SDK README documented at snapshot_date — re-run fetch_sdk_docs.py to confirm current constraints. additional_pins are transitive constraints required for the pinned instrumentor version to import cleanly (e.g. wrapt<2 for OpenLLMetry instrumentors that pass module= to wrap_function_wrapper, which wrapt 2.x renamed to target=).",
   "snapshot_date": "2026-05-06",
   "snapshot_source": "https://github.com/monte-carlo-data/montecarlo-opentelemetry/blob/main/README.md",
   "stale_after_days": 90,
@@ -8,6 +8,7 @@
       "library": "langchain",
       "package": "opentelemetry-instrumentation-langchain",
       "version_constraint": "<=0.53.4",
+      "additional_pins": ["wrapt<2"],
       "covers_dependencies": [
         "langchain",
         "langchain-core",
@@ -21,6 +22,7 @@
       "library": "langgraph",
       "package": "opentelemetry-instrumentation-langchain",
       "version_constraint": "<=0.53.4",
+      "additional_pins": ["wrapt<2"],
       "covers_dependencies": [
         "langgraph"
       ],
@@ -30,6 +32,7 @@
       "library": "openai",
       "package": "opentelemetry-instrumentation-openai",
       "version_constraint": "<=0.53.4",
+      "additional_pins": ["wrapt<2"],
       "covers_dependencies": [
         "openai"
       ]
@@ -38,6 +41,7 @@
       "library": "anthropic",
       "package": "opentelemetry-instrumentation-anthropic",
       "version_constraint": "<=0.53.4",
+      "additional_pins": ["wrapt<2"],
       "covers_dependencies": [
         "anthropic"
       ]
@@ -46,6 +50,7 @@
       "library": "crewai",
       "package": "opentelemetry-instrumentation-crewai",
       "version_constraint": "<=0.53.4",
+      "additional_pins": ["wrapt<2"],
       "covers_dependencies": [
         "crewai"
       ]
@@ -54,6 +59,7 @@
       "library": "bedrock",
       "package": "opentelemetry-instrumentation-bedrock",
       "version_constraint": "<=0.53.4",
+      "additional_pins": ["wrapt<2"],
       "covers_dependencies": [
         "boto3",
         "botocore",
@@ -65,6 +71,7 @@
       "library": "sagemaker",
       "package": "opentelemetry-instrumentation-sagemaker",
       "version_constraint": "<=0.53.4",
+      "additional_pins": ["wrapt<2"],
       "covers_dependencies": [
         "sagemaker"
       ],
@@ -74,6 +81,7 @@
       "library": "vertexai",
       "package": "opentelemetry-instrumentation-vertexai",
       "version_constraint": "<=0.53.4",
+      "additional_pins": ["wrapt<2"],
       "covers_dependencies": [
         "google-cloud-aiplatform"
       ],

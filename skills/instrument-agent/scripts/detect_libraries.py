@@ -76,12 +76,18 @@ SERVERLESS_CODE_PATTERNS = [
     re.compile(r"app\s*=\s*Chalice\s*\("),
 ]
 
-EXISTING_SETUP_PATTERNS = [
+# Existing-setup detection requires BOTH an import of montecarlo_opentelemetry
+# AND an actual setup() call in the same file. Matching on imports alone
+# false-positives any file that uses the SDK's decorators (e.g. handler.py
+# importing `montecarlo_opentelemetry as mc` to use `@mc.trace_with_workflow`)
+# but doesn't actually call setup().
+EXISTING_SETUP_IMPORT_PATTERNS = [
     "import montecarlo_opentelemetry",
     "from montecarlo_opentelemetry",
-    "mc.setup(",
-    "montecarlo_opentelemetry as mc",
 ]
+EXISTING_SETUP_CALL_PATTERN = re.compile(
+    r"\b(?:mc|montecarlo_opentelemetry)\.setup\s*\("
+)
 
 # Libraries flagged as ambiguous when matched only via a generic SDK like boto3.
 # Without a code-level signal we can't tell whether the customer is calling
@@ -512,7 +518,19 @@ def _match_instrumentors(
 
         detected.append(library)
         if package not in seen_packages:
-            suggested.append({"library": library, "package": package})
+            suggestion: dict = {"library": library, "package": package}
+            # Pass through pinning hints from the snapshot so the skill's
+            # step-6 deps proposal can produce a pinned diff. Without these,
+            # `pip install opentelemetry-instrumentation-langchain` resolves
+            # to a version that needs wrapt 2.x, which the snapshot's pinned
+            # version (<=0.53.4) is incompatible with.
+            version_constraint = entry.get("version_constraint")
+            if isinstance(version_constraint, str) and version_constraint:
+                suggestion["version_constraint"] = version_constraint
+            additional_pins = entry.get("additional_pins")
+            if isinstance(additional_pins, list) and additional_pins:
+                suggestion["additional_pins"] = list(additional_pins)
+            suggested.append(suggestion)
             seen_packages.add(package)
         seen_libraries.add(library)
 
@@ -579,12 +597,16 @@ def _detect_existing_setup(scan: dict, target: Path) -> dict:
         text = py_contents.get(path)
         if text is None:
             continue
-        if any(pat in text for pat in EXISTING_SETUP_PATTERNS):
-            try:
-                rel = path.resolve().relative_to(target_resolved)
-                files.append(str(rel))
-            except ValueError:
-                files.append(str(path))
+        has_import = any(pat in text for pat in EXISTING_SETUP_IMPORT_PATTERNS)
+        if not has_import:
+            continue
+        if not EXISTING_SETUP_CALL_PATTERN.search(text):
+            continue
+        try:
+            rel = path.resolve().relative_to(target_resolved)
+            files.append(str(rel))
+        except ValueError:
+            files.append(str(path))
     files.sort()
     return {"found": bool(files), "files": files}
 
