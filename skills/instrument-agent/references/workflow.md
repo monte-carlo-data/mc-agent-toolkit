@@ -55,7 +55,7 @@ Parse this output and branch:
 
 ### Known limitations
 
-`existing_setup` detection uses substring matching on file text — so a Python file that contains `montecarlo_opentelemetry` in a docstring, comment, or import without actually calling `mc.setup()` will still set `found: true`. When `existing_setup.found: true` but the user reports they don't have a setup, ask them to inspect the matched files listed in `existing_setup.files` and re-run the detection if the matches were docstring or comment references rather than actual `mc.setup()` calls.
+`existing_setup` detection parses Python imports and setup calls. It recognizes `import montecarlo_opentelemetry`, aliases such as `import montecarlo_opentelemetry as mco`, and direct imports such as `from montecarlo_opentelemetry import setup as setup_mc`, but only when the imported module/name is actually called. Malformed Python files fall back to a narrower text check, so if the customer reports an existing setup that was missed, inspect those files manually before proposing a new `mc.setup()`.
 - **`runtime: "unknown"` and `detected: []`** — exit cleanly. No PRD core libraries are present, so there's nothing to instrument. Tell the user: "I didn't find any of the supported AI libraries (`langchain`, `langgraph`, `openai`, `anthropic`, `crewai`, `bedrock`, `sagemaker`, `vertexai`) in the target. Confirm the agent code is actually in this path, then re-run." Do not scaffold anything.
 - **Anything else** — continue to step 2 with the detection output in hand.
 

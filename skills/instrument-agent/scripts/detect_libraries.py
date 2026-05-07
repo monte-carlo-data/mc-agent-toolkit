@@ -19,6 +19,7 @@ unreadable target path).
 from __future__ import annotations
 
 import argparse
+import ast
 import json
 import os
 import re
@@ -85,7 +86,7 @@ EXISTING_SETUP_IMPORT_PATTERNS = [
     "import montecarlo_opentelemetry",
     "from montecarlo_opentelemetry",
 ]
-EXISTING_SETUP_CALL_PATTERN = re.compile(
+EXISTING_SETUP_FALLBACK_CALL_PATTERN = re.compile(
     r"\b(?:mc|montecarlo_opentelemetry)\.setup\s*\("
 )
 
@@ -589,6 +590,50 @@ def _detect_serverless(scan: dict, deps: set[str]) -> list[str]:
 # ---------------------------------------------------------------------------
 
 
+def _has_existing_setup_call(text: str) -> bool:
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        has_import = any(pat in text for pat in EXISTING_SETUP_IMPORT_PATTERNS)
+        return has_import and bool(EXISTING_SETUP_FALLBACK_CALL_PATTERN.search(text))
+
+    module_aliases: set[str] = set()
+    setup_names: set[str] = set()
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name == "montecarlo_opentelemetry":
+                    module_aliases.add(alias.asname or alias.name)
+        elif isinstance(node, ast.ImportFrom):
+            if node.module != "montecarlo_opentelemetry":
+                continue
+            for alias in node.names:
+                if alias.name == "setup":
+                    setup_names.add(alias.asname or alias.name)
+                elif alias.name == "*":
+                    setup_names.add("setup")
+
+    if not module_aliases and not setup_names:
+        return False
+
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        if (
+            isinstance(func, ast.Attribute)
+            and func.attr == "setup"
+            and isinstance(func.value, ast.Name)
+            and func.value.id in module_aliases
+        ):
+            return True
+        if isinstance(func, ast.Name) and func.id in setup_names:
+            return True
+
+    return False
+
+
 def _detect_existing_setup(scan: dict, target: Path) -> dict:
     files: list[str] = []
     target_resolved = target.resolve()
@@ -597,10 +642,7 @@ def _detect_existing_setup(scan: dict, target: Path) -> dict:
         text = py_contents.get(path)
         if text is None:
             continue
-        has_import = any(pat in text for pat in EXISTING_SETUP_IMPORT_PATTERNS)
-        if not has_import:
-            continue
-        if not EXISTING_SETUP_CALL_PATTERN.search(text):
+        if not _has_existing_setup_call(text):
             continue
         try:
             rel = path.resolve().relative_to(target_resolved)

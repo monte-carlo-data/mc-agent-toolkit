@@ -201,6 +201,22 @@ def test_existing_setup() -> None:
         any(f.replace("\\", "/") == "src/tracing.py" for f in existing["files"]),
         hint=f"got files={existing['files']!r}",
     )
+    check(
+        "existing_setup.files contains aliased module setup call",
+        any(
+            f.replace("\\", "/") == "src/tracing_alias.py"
+            for f in existing["files"]
+        ),
+        hint=f"got files={existing['files']!r}",
+    )
+    check(
+        "existing_setup.files contains direct imported setup call",
+        any(
+            f.replace("\\", "/") == "src/tracing_direct.py"
+            for f in existing["files"]
+        ),
+        hint=f"got files={existing['files']!r}",
+    )
     check("still detects langchain", "langchain" in out["detected"])
 
 
