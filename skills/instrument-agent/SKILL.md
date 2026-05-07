@@ -109,9 +109,3 @@ The instrumentor list and version constraints come from PyPI live; the local sna
 - API-key generation.
 - Non-Python SDKs.
 - The `@trace_with_tags` decorator — explicitly excluded by the AO product owner.
-
-## Available slash commands
-
-| Command | Purpose |
-|---|---|
-| `/instrument-agent` | Kicks off the workflow against the current Python codebase. |
