@@ -40,6 +40,14 @@ Source: [`monte-carlo-data/ai-agent/ai_agent/app.py @ 854235b L84`](https://gith
 ```python
 import os
 
+# Default to NOT capturing prompt/completion content. The OpenLLMetry
+# instrumentors (langchain, openai, anthropic, etc.) read TRACELOOP_TRACE_CONTENT
+# at span-emit time and default to "true" — so the template must explicitly
+# set it to "false" before any spans are produced. Customers who want capture
+# (after reviewing redaction options in references/redaction.md) can override
+# by setting TRACELOOP_TRACE_CONTENT=true in their environment.
+os.environ.setdefault("TRACELOOP_TRACE_CONTENT", "false")
+
 import montecarlo_opentelemetry as mc
 from opentelemetry.instrumentation.langchain import LangchainInstrumentor
 
@@ -53,10 +61,6 @@ if MC_OTEL_ENDPOINT:
         else f"{base_endpoint}/v1/traces"
     )
 
-    # By default this template DOES NOT capture prompt/completion content. To
-    # capture prompts (after reviewing redaction options in references/redaction.md),
-    # set OTEL_INSTRUMENTATION_LANGCHAIN_TRACE_PROMPTS=true (or the equivalent
-    # env var for your instrumentor).
     mc.setup(
         agent_name="ai-agent",
         otlp_endpoint=http_otel_endpoint,
@@ -70,6 +74,14 @@ Source: [`montecarlo-opentelemetry` README — Serverless and other suspendable 
 
 ```python
 import os
+
+# Default to NOT capturing prompt/completion content. The OpenLLMetry
+# instrumentors (langchain, openai, anthropic, etc.) read TRACELOOP_TRACE_CONTENT
+# at span-emit time and default to "true" — so the template must explicitly
+# set it to "false" before any spans are produced. Customers who want capture
+# (after reviewing redaction options in references/redaction.md) can override
+# by setting TRACELOOP_TRACE_CONTENT=true in their environment.
+os.environ.setdefault("TRACELOOP_TRACE_CONTENT", "false")
 
 import montecarlo_opentelemetry as mc
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
@@ -109,10 +121,6 @@ def init_tracing():
     exporter = OTLPSpanExporter(endpoint=http_otel_endpoint, headers=mcd_headers)
     simple_span_processor = SimpleSpanProcessor(exporter)
 
-    # By default this template DOES NOT capture prompt/completion content. To
-    # capture prompts (after reviewing redaction options in references/redaction.md),
-    # set OTEL_INSTRUMENTATION_LANGCHAIN_TRACE_PROMPTS=true (or the equivalent
-    # env var for your instrumentor).
     mc.setup(
         agent_name=AGENT_NAME,
         otlp_endpoint=http_otel_endpoint,  # required by signature; ignored when span_processor is set
@@ -177,16 +185,22 @@ The default template the skill proposes has prompt/completion capture **disabled
 
 **Why default-off:** prompts and completions can contain PII, PHI, credentials, and other sensitive data. Default-on capture means a customer who runs the happy path is sending raw inputs to MC's OTLP collector before they ever read `redaction.md`. Default-off is the safe default; opt-in is the explicit choice.
 
-The exact mechanism for disabling depends on the instrumentor — most accept env vars like `OTEL_INSTRUMENTATION_LANGCHAIN_TRACE_PROMPTS=false` or constructor arguments. Document the canonical mechanism for the customer's instrumentor as a comment in the template:
+The mechanism: the OpenLLMetry instrumentors (`opentelemetry-instrumentation-langchain`, `-openai`, `-anthropic`, and the rest) read the `TRACELOOP_TRACE_CONTENT` env var at span-emit time. **Their default is `"true"`** — content is captured unless the env var is explicitly `"false"`. This means a comment alone does **not** flip the default; the template must set the env var in code, before the instrumentors run, to deliver the privacy-default-off promise:
 
 ```python
-# By default this template DOES NOT capture prompt/completion content. To
-# capture prompts (after reviewing redaction options in references/redaction.md),
-# set OTEL_INSTRUMENTATION_LANGCHAIN_TRACE_PROMPTS=true (or the equivalent
-# env var for your instrumentor).
+import os
+
+# Default to NOT capturing prompt/completion content. Customers who want
+# capture (after reviewing redaction options in references/redaction.md)
+# can override by setting TRACELOOP_TRACE_CONTENT=true in their environment.
+os.environ.setdefault("TRACELOOP_TRACE_CONTENT", "false")
 ```
 
+`os.environ.setdefault` preserves an explicit operator override (`TRACELOOP_TRACE_CONTENT=true`) while defaulting to off when unset. Place this line at the top of the tracing module, before any `opentelemetry.instrumentation.*` import.
+
 > **CRITICAL — do not propose a prompt-capturing template when sensitive data is in scope.** If the workflow's redaction step (step 3) returned "yes — sensitive data," route the customer to `redaction.md` *before* generating the snippet. Generating an opt-in-prompts template for a customer who said they handle PHI is a privacy footgun.
+
+> **CRITICAL — a comment alone is not the privacy default.** Earlier versions of this template suggested a per-instrumentor env var (`OTEL_INSTRUMENTATION_LANGCHAIN_TRACE_PROMPTS=false`) in a comment. That env var **does not exist** in the OpenLLMetry instrumentors at `<=0.53.4`, and a comment instructing the customer to set it would not have changed the actual default. The fix is the `os.environ.setdefault(...)` line above, which makes the privacy default a code guarantee.
 
 ---
 

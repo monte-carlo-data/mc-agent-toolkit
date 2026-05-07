@@ -121,17 +121,25 @@ Walk-through points to cover with the customer:
 hierarchy plus timings, latency, tokens) but does **not** want prompt or
 completion content captured anywhere.
 
-**How.** Set instrumentor-specific environment variables to disable content
-capture. Most openllmetry instrumentors honor environment variables like:
+**How.** The OpenLLMetry instrumentors (`opentelemetry-instrumentation-langchain`,
+`-openai`, `-anthropic`, `-bedrock`, `-vertexai`, etc.) all read a single env
+var: `TRACELOOP_TRACE_CONTENT`. Set it to `"false"` to disable content capture
+across the entire OpenLLMetry instrumentor family.
 
-- `OTEL_INSTRUMENTATION_OPENAI_TRACE_PROMPTS=false`
-- `OTEL_INSTRUMENTATION_LANGCHAIN_TRACE_PROMPTS=false`
-- `OTEL_INSTRUMENTATION_ANTHROPIC_TRACE_PROMPTS=false`
-- `TRACELOOP_TRACE_CONTENT=false` — global switch covering most
-  openllmetry instrumentors.
+```bash
+export TRACELOOP_TRACE_CONTENT=false
+```
 
-The exact env var depends on the instrumentor. Direct the customer to the
-specific instrumentor's PyPI page for the authoritative list.
+The default `setup-template.md` snippet sets this in code via
+`os.environ.setdefault("TRACELOOP_TRACE_CONTENT", "false")` so the
+privacy-default-off posture is a guarantee, not a comment. An operator-set
+`TRACELOOP_TRACE_CONTENT=true` overrides the default (opt-in).
+
+> **NEVER document `OTEL_INSTRUMENTATION_<lib>_TRACE_PROMPTS`** as the
+> mechanism. Those env vars do not exist in the OpenLLMetry instrumentors
+> at `<=0.53.4`. The single source of truth is `TRACELOOP_TRACE_CONTENT`
+> for OpenLLMetry; for non-OpenLLMetry instrumentors, consult the specific
+> instrumentor's PyPI page.
 
 > **IMPORTANT — this is the default the skill's `setup-template.md` snippet
 > uses.** When the workflow's redaction question (step #3) returns "no — no
