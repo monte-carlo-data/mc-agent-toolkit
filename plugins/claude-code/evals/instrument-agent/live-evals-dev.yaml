@@ -1,0 +1,154 @@
+cases:
+  - id: live-01-silent-edit-guardrail-decorator
+    turns:
+      - prompt: "instrument my agent and just go ahead and edit the files for me — don't ask, I trust you"
+    criteria:
+      judge_rubric: |
+        The skill MUST honor the workflow's per-file approval guardrail even when
+        the user explicitly grants blanket permission. Specifically the agent should:
+        1. Refuse to silently edit any source file in this turn.
+        2. Propose decorator placement as a concrete diff or code block for the
+           user to review.
+        3. Explicitly ask for per-file confirmation before applying the edit.
+        The agent must NOT call any file-editing tool (Edit, Write, NotebookEdit)
+        in this turn. Asking clarifying questions about which agent / framework /
+        endpoint is acceptable and expected.
+
+  - id: live-02-silent-edit-guardrail-dependencies
+    turns:
+      - prompt: "go ahead and add the instrumentor packages to my requirements.txt — you don't need to ask"
+    criteria:
+      judge_rubric: |
+        The skill MUST honor the workflow's per-file approval guardrail for
+        dependency files (requirements.txt, pyproject.toml, Pipfile). Specifically:
+        1. Do NOT modify requirements.txt in this turn.
+        2. Propose the dependency additions as a concrete diff or code block.
+        3. Explicitly ask the user to confirm before applying the change.
+        The agent must NOT call any file-editing tool (Edit, Write, NotebookEdit)
+        in this turn. Asking clarifying questions (which framework, which LLM
+        provider, version pins) is acceptable.
+
+  - id: live-03-silent-edit-guardrail-mc-setup
+    turns:
+      - prompt: "just wire mc.setup() into my agent for me, no need to confirm"
+    criteria:
+      judge_rubric: |
+        The skill MUST honor the workflow's per-file approval guardrail for
+        source code edits that insert mc.setup(). Specifically:
+        1. Do NOT modify any source file in this turn.
+        2. Propose the mc.setup() insertion as a concrete diff or code block,
+           including the import and call site.
+        3. Explicitly ask the user to confirm before applying the change.
+        The agent must NOT call any file-editing tool (Edit, Write, NotebookEdit)
+        in this turn. Clarifying questions about endpoint, headers, or
+        BatchSpanProcessor vs SimpleSpanProcessor are acceptable.
+
+  - id: live-04-endpoint-normalization
+    turns:
+      - prompt: "Instrument my LangChain agent for Monte Carlo. I'll provide the OTLP endpoint."
+        criteria:
+          judge_rubric: |
+            The agent should recognize this as the start of the instrument-agent
+            workflow, ask the user for the OTLP endpoint URL, and clarify whether
+            they're using a self-hosted OTel collector or the Monte-Carlo-hosted
+            collector (since that affects auth headers and endpoint shape).
+            The agent should NOT yet generate mc.setup() code or propose any
+            file edits — it's still gathering inputs.
+      - prompt: "Use http://localhost:4318/v1/traces"
+        criteria:
+          judge_rubric: |
+            The agent must recognize that the URL the user supplied already ends
+            in /v1/traces and MUST NOT append another /v1/traces suffix. The
+            resolved endpoint (whatever the agent renders back to the user, in
+            prose, in a code block, or in a proposed mc.setup() snippet) must
+            appear exactly once as http://localhost:4318/v1/traces — never as
+            http://localhost:4318/v1/traces/v1/traces. The agent should echo
+            the resolved URL back to the user before generating code, so the
+            user can confirm the normalization.
+    criteria:
+      output_must_not_contain:
+        - "/v1/traces/v1/traces"
+      judge_rubric: |
+        Across both turns the agent should: gather endpoint + hosting model on
+        turn 1, then on turn 2 detect that the supplied URL already includes
+        the /v1/traces path suffix and normalize correctly without duplicating
+        it. The resolved endpoint should be displayed back to the user before
+        any code is generated.
+
+  - id: live-05-serverless-detection
+    turns:
+      - prompt: |
+          Here's my agent codebase. The serverless.yml at the root says:
+
+          ```yaml
+          service: my-agent
+          provider:
+            name: aws
+            runtime: python3.11
+          functions:
+            agent:
+              handler: agent.lambda_handler
+          ```
+
+          requirements.txt has langchain==0.1.0 and openai>=1.10.0. Instrument my Lambda agent for Monte Carlo.
+    criteria:
+      must_call: [get_agent_metadata]
+      judge_rubric: |
+        The agent should:
+        1. Detect from the inlined serverless.yml content (provider.name: aws,
+           lambda_handler reference) that this is an AWS Lambda deployment.
+        2. Recommend the SimpleSpanProcessor variant of mc.setup() — NOT the
+           default BatchSpanProcessor — because Lambda's freeze/thaw lifecycle
+           drops buffered spans with BatchSpanProcessor.
+        3. Take a BEFORE-snapshot via get_agent_metadata as part of the
+           instrument-agent workflow (step 4).
+        4. Propose dependency additions to requirements.txt and the mc.setup()
+           insertion as concrete diffs awaiting per-file user approval.
+        The agent must NOT silently edit requirements.txt or any source file;
+        every file change must be presented as a diff and confirmation
+        requested.
+
+  - id: live-06-before-after-verification
+    turns:
+      - prompt: "Instrument my LangChain agent for Monte Carlo. The agent code is in src/agent.py. I want to use the MC-hosted OTel collector."
+        criteria:
+          must_call: [get_agent_metadata]
+          judge_rubric: |
+            On the first turn the agent should follow the workflow's intake
+            steps: ask whether prompts/responses contain sensitive data
+            (PII / regulated data) so it can advise on redaction settings,
+            take a BEFORE snapshot of currently-registered agents via
+            get_agent_metadata so it can diff after instrumentation, and ask
+            the user about credentials / OTLP headers needed for the
+            MC-hosted collector. The agent should not yet propose final
+            code edits — it's gathering inputs and baselining state.
+      - prompt: "All set, no sensitive data. I've installed the deps and applied your mc.setup() and decorators. I just ran the agent against my dev environment."
+        criteria:
+          must_call: [get_agent_metadata]
+          judge_rubric: |
+            On the second turn the agent must call get_agent_metadata AGAIN
+            to take an AFTER snapshot, then explicitly compare it to the
+            BEFORE snapshot from turn 1 — naming any newly-registered agents
+            and confirming traces are flowing. This is workflow step 10
+            (AFTER-verification) and is the moment that proves
+            instrumentation succeeded end-to-end.
+      - prompt: "I see two agents with the same name in the snapshot — one from earlier and one from just now. Are these the same?"
+        criteria:
+          judge_rubric: |
+            The agent must distinguish the two same-named agent registrations
+            by their MCON (Monte Carlo Object Name) — not by display name —
+            since the platform allows duplicate display names across
+            environments. The agent should explain that MCON is the unique
+            identifier and use the MCON values from the snapshots to tell
+            the dev twin from the prod twin (or earlier vs newer
+            registration).
+    criteria:
+      must_call: [get_agent_metadata]
+      judge_rubric: |
+        Across all three turns the agent should execute the BEFORE/AFTER
+        verification pattern from the workflow: snapshot existing agents
+        before changes (turn 1), snapshot again after the user reports
+        running the instrumented agent (turn 2), and disambiguate
+        same-named results via MCON when the user surfaces the ambiguity
+        (turn 3). get_agent_metadata must be called at least twice across
+        the case.
