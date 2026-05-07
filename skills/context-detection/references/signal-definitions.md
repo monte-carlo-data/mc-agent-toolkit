@@ -24,6 +24,7 @@ workflow to the routing system.
 | Performance | "slow", "performance", "expensive query", "pipeline taking long" | performance-diagnosis (direct) |
 | Validation notebook | "validation notebook", "generate validation", "compare baseline" | generate-validation-notebook (direct) |
 | Push ingestion | "push ingestion", "metadata collector", "lineage collector" | push-ingestion (direct) |
+| Agent instrumentation | "instrument my agent", "instrument", "set up tracing", "set up Monte Carlo tracing", "setting up an agent", "add MC tracing" | instrument-agent (direct) |
 
 ## API Signals (detected via scoped MCP tool calls)
 
