@@ -24,6 +24,14 @@ HOOK_INPUT="$(cat || true)"
 SKILL_NAME="$(printf '%s' "$HOOK_INPUT" | jq -r '.tool_input.skill // empty' 2>/dev/null || true)"
 [[ -z "$SKILL_NAME" ]] && exit 0  # not a skill invocation we recognize; bail
 
+# Only beacon for mc-agent-toolkit skills. Skill names may arrive bare
+# (e.g. "asset-health") or plugin-namespaced (e.g. "mc-agent-toolkit:asset-health");
+# strip any "<plugin>:" prefix before checking against this plugin's skills/ dir.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SKILLS_DIR="$SCRIPT_DIR/../../../skills"
+SKILL_BASENAME="${SKILL_NAME##*:}"
+[[ -d "$SKILLS_DIR/$SKILL_BASENAME" ]] || exit 0
+
 ARGS_PRESENT="$(printf '%s' "$HOOK_INPUT" | jq -r '((.tool_input.args // "") | length) > 0' 2>/dev/null || echo false)"
 
 # Beacon URL defaults to prod; MC engineers can override to dev for verification
@@ -32,7 +40,6 @@ BEACON_URL="${MCD_TOOLKIT_BEACON_URL:-https://mcp.getmontecarlo.com/mcp/toolkit/
 
 # Resolve plugin version from plugin.json relative to this script's location.
 # Script path: <plugin_root>/hooks/telemetry/scripts/skill-beacon.sh
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PLUGIN_JSON="$SCRIPT_DIR/../../../.claude-plugin/plugin.json"
 TOOLKIT_VERSION="$(jq -r '.version // "unknown"' "$PLUGIN_JSON" 2>/dev/null || echo "unknown")"
 

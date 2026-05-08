@@ -35,38 +35,59 @@ wait_for_log() {
 }
 
 @test "fires beacon with correct skill name" {
-  echo '{"tool_name":"Skill","tool_input":{"skill":"start-work","args":""}}' | bash "$SCRIPT"
+  echo '{"tool_name":"Skill","tool_input":{"skill":"asset-health","args":""}}' | bash "$SCRIPT"
   wait_for_log
   payload="$(jq -r '.data' "$MOCK_CURL_LOG")"
   [ "$(echo "$payload" | jq -r '.event')" = "Toolkit Skill Invoked" ]
-  [ "$(echo "$payload" | jq -r '.skill')" = "start-work" ]
+  [ "$(echo "$payload" | jq -r '.skill')" = "asset-health" ]
   [ "$(echo "$payload" | jq -r '.install_id')" = "11111111-1111-1111-1111-111111111111" ]
   [ "$(echo "$payload" | jq -r '.session_id')" = "22222222-2222-2222-2222-222222222222" ]
 }
 
+@test "no beacon for skills outside mc-agent-toolkit" {
+  run bash -c 'echo "{\"tool_name\":\"Skill\",\"tool_input\":{\"skill\":\"some-other-plugin-skill\"}}" | bash "$0"' "$SCRIPT"
+  [ "$status" -eq 0 ]
+  sleep 0.2
+  [ ! -s "$MOCK_CURL_LOG" ]
+}
+
+@test "no beacon for namespaced skills from other plugins" {
+  run bash -c 'echo "{\"tool_name\":\"Skill\",\"tool_input\":{\"skill\":\"superpowers:brainstorming\"}}" | bash "$0"' "$SCRIPT"
+  [ "$status" -eq 0 ]
+  sleep 0.2
+  [ ! -s "$MOCK_CURL_LOG" ]
+}
+
+@test "fires beacon for plugin-namespaced toolkit skill" {
+  echo '{"tool_name":"Skill","tool_input":{"skill":"mc-agent-toolkit:asset-health"}}' | bash "$SCRIPT"
+  wait_for_log
+  payload="$(jq -r '.data' "$MOCK_CURL_LOG")"
+  [ "$(echo "$payload" | jq -r '.skill')" = "mc-agent-toolkit:asset-health" ]
+}
+
 @test "skill_args_present is true when args non-empty" {
-  echo '{"tool_name":"Skill","tool_input":{"skill":"hack","args":"phase 2"}}' | bash "$SCRIPT"
+  echo '{"tool_name":"Skill","tool_input":{"skill":"asset-health","args":"phase 2"}}' | bash "$SCRIPT"
   wait_for_log
   payload="$(jq -r '.data' "$MOCK_CURL_LOG")"
   [ "$(echo "$payload" | jq -r '.skill_args_present')" = "true" ]
 }
 
 @test "skill_args_present is false when args empty or missing" {
-  echo '{"tool_name":"Skill","tool_input":{"skill":"hack"}}' | bash "$SCRIPT"
+  echo '{"tool_name":"Skill","tool_input":{"skill":"asset-health"}}' | bash "$SCRIPT"
   wait_for_log
   payload="$(jq -r '.data' "$MOCK_CURL_LOG")"
   [ "$(echo "$payload" | jq -r '.skill_args_present')" = "false" ]
 }
 
 @test "skill_args_present is false when args is empty string" {
-  echo '{"tool_name":"Skill","tool_input":{"skill":"hack","args":""}}' | bash "$SCRIPT"
+  echo '{"tool_name":"Skill","tool_input":{"skill":"asset-health","args":""}}' | bash "$SCRIPT"
   wait_for_log
   payload="$(jq -r '.data' "$MOCK_CURL_LOG")"
   [ "$(echo "$payload" | jq -r '.skill_args_present')" = "false" ]
 }
 
 @test "payload never contains args content" {
-  echo '{"tool_name":"Skill","tool_input":{"skill":"hack","args":"SECRET-PROMPT-TEXT"}}' | bash "$SCRIPT"
+  echo '{"tool_name":"Skill","tool_input":{"skill":"asset-health","args":"SECRET-PROMPT-TEXT"}}' | bash "$SCRIPT"
   wait_for_log
   # Search the raw log (covers argv, headers, body — every field mock_curl captured),
   # not just .data, so any future leak path is caught.
@@ -112,7 +133,7 @@ wait_for_log() {
 }
 
 @test "payload includes toolkit_version from plugin.json" {
-  echo '{"tool_name":"Skill","tool_input":{"skill":"x"}}' | bash "$SCRIPT"
+  echo '{"tool_name":"Skill","tool_input":{"skill":"asset-health"}}' | bash "$SCRIPT"
   wait_for_log
   payload="$(jq -r '.data' "$MOCK_CURL_LOG")"
   version="$(echo "$payload" | jq -r '.toolkit_version')"
@@ -121,7 +142,7 @@ wait_for_log() {
 }
 
 @test "curl is called with -m 2 and the prod beacon URL by default" {
-  echo '{"tool_name":"Skill","tool_input":{"skill":"x"}}' | bash "$SCRIPT"
+  echo '{"tool_name":"Skill","tool_input":{"skill":"asset-health"}}' | bash "$SCRIPT"
   wait_for_log
   argv="$(jq -c '.argv' "$MOCK_CURL_LOG")"
   echo "$argv" | grep -q '"-m"'
@@ -131,7 +152,7 @@ wait_for_log() {
 
 @test "MCD_TOOLKIT_BEACON_URL overrides the default URL" {
   export MCD_TOOLKIT_BEACON_URL="https://mcp.dev.getmontecarlo.com/mcp/toolkit/beacon"
-  echo '{"tool_name":"Skill","tool_input":{"skill":"x"}}' | bash "$SCRIPT"
+  echo '{"tool_name":"Skill","tool_input":{"skill":"asset-health"}}' | bash "$SCRIPT"
   wait_for_log
   argv="$(jq -c '.argv' "$MOCK_CURL_LOG")"
   echo "$argv" | grep -q '"https://mcp.dev.getmontecarlo.com/mcp/toolkit/beacon"'
