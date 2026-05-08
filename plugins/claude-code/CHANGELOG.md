@@ -5,6 +5,12 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Claude Code will
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.4] - 2026-05-08
+
+### Fixed
+
+- Skill-usage telemetry hook now only beacons for `mc-agent-toolkit` skills. Previously it fired for every Skill tool invocation, including skills from other plugins.
+
 ## [1.10.3] - 2026-05-06
 
 ### Changed
