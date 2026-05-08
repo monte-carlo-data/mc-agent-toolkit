@@ -141,6 +141,28 @@ fi
 
 rm -f "$TMPFILE"
 
+# ── Sync shared hook lib into all editor plugins ─────────────────────────
+SHARED_LIB_DIR="$REPO_ROOT/plugins/shared/prevent/lib"
+EDITOR_PLUGINS=(claude-code cursor copilot codex)
+
+echo ""
+if [[ -d "$SHARED_LIB_DIR" ]]; then
+  for editor in "${EDITOR_PLUGINS[@]}"; do
+    target="$REPO_ROOT/plugins/$editor/hooks/prevent/lib"
+    if [[ -d "$(dirname "$target")" ]]; then
+      if [[ "$DRY_RUN" == true ]]; then
+        echo "[dry-run] Would sync shared lib → plugins/$editor/hooks/prevent/lib"
+      else
+        rm -rf "$target"
+        cp -R "$SHARED_LIB_DIR" "$target"
+        rm -rf "$target/__pycache__" "$target/tests"
+        find "$target" -name "*.pyc" -delete 2>/dev/null || true
+        echo "Synced shared lib → plugins/$editor/hooks/prevent/lib"
+      fi
+    fi
+  done
+fi
+
 # ── Update version files ───────────────────────────────────────────────────
 echo ""
 for file in "${VERSION_FILES[@]}"; do

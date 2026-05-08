@@ -46,7 +46,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/monte-carlo-data/mc-agent-to
 The toolkit plugin wraps shared skills and hook logic, with each feature namespaced independently:
 
 - **Skills** — symlinked from `skills/` at the repo root (shared across all editors)
-- **Shared hook logic** — symlinked from `plugins/shared/prevent/lib/` (platform-agnostic business logic)
+- **Shared hook logic** — copied from `plugins/shared/prevent/lib/` into each plugin's `hooks/prevent/lib/` (platform-agnostic business logic)
 - **Adapter hooks** — Cursor-specific JSON parsing and output formatting under `hooks/prevent/`
 - **MCP config** — Monte Carlo MCP server connection
 
