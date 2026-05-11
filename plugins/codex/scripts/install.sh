@@ -13,7 +13,7 @@ set -e
 PLUGIN_NAME="mc-agent-toolkit"
 REPO_URL="https://github.com/monte-carlo-data/mc-agent-toolkit.git"
 PLUGIN_SRC="plugins/codex"
-SHARED_LIB="plugins/shared/prevent/lib"
+SHARED_LIB="plugins/codex/hooks/prevent/lib"
 SHARED_SKILLS=("skills/prevent" "skills/generate-validation-notebook" "skills/push-ingestion")
 
 CONFIG_DIR="$HOME/.codex"

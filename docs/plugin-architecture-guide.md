@@ -95,7 +95,7 @@ mc-agent-toolkit/
 │   │   ├── .claude-plugin/plugin.json
 │   │   ├── .mcp.json
 │   │   ├── hooks/
-│   │   │   └── prevent/                 # Thin adapters → plugins/shared/prevent/lib/
+│   │   │   └── prevent/                 # Adapters + lib/ (copied from plugins/shared/prevent/lib/)
 │   │   ├── skills/                      # One symlink per skill → ../../../skills/<name>
 │   │   └── commands/
 │   │       ├── prevent/
