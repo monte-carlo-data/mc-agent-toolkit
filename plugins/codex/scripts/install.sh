@@ -13,7 +13,6 @@ set -e
 PLUGIN_NAME="mc-agent-toolkit"
 REPO_URL="https://github.com/monte-carlo-data/mc-agent-toolkit.git"
 PLUGIN_SRC="plugins/codex"
-SHARED_LIB="plugins/codex/hooks/prevent/lib"
 SHARED_SKILLS=("skills/prevent" "skills/generate-validation-notebook" "skills/push-ingestion")
 
 CONFIG_DIR="$HOME/.codex"
@@ -84,13 +83,15 @@ if [ -d "$TARGET" ]; then
 fi
 
 # --- Copy plugin files (excluding symlinks) ---
+# hooks/prevent/lib is a real directory and is copied by the find/cpio pass.
+# Skills are symlinks pointing outside PLUGIN_SRC, so they're filtered here
+# and materialized as real directories in the loop below.
 mkdir -p "$TARGET"
 cd "$REPO_ROOT/$PLUGIN_SRC"
 find . -not -type l -not -path './__pycache__/*' -not -path './.pytest_cache/*' \
        -not -path './tests/*' -not -name '*.pyc' | cpio -pdm "$TARGET" 2>/dev/null
 
-# --- Copy symlink targets as real directories ---
-cp -R "$REPO_ROOT/$SHARED_LIB" "$TARGET/hooks/prevent/lib"
+# --- Materialize skills (symlinks were filtered above) ---
 mkdir -p "$TARGET/skills"
 for skill in "${SHARED_SKILLS[@]}"; do
   skill_name="$(basename "$skill")"

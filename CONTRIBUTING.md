@@ -50,7 +50,7 @@ mc-agent-toolkit/
 └── SECURITY.md
 ```
 
-Plugins reference skills via symlinks so that skills are authored once and shared across all editor plugins. Shared hook logic lives in `plugins/shared/<skill>/lib/` as the canonical source and is **copied** (not symlinked) into each editor plugin's `hooks/<skill>/lib/` directory. The `bump-version.sh` script syncs these copies automatically at release time. If you edit shared hook logic, edit it in `plugins/shared/` and run `./scripts/bump-version.sh` to propagate.
+Plugins reference skills via symlinks so that skills are authored once and shared across all editor plugins. Shared hook logic lives in `plugins/shared/<skill>/lib/` as the canonical source and is **copied** (not symlinked) into each editor plugin's `hooks/<skill>/lib/` directory — symlinks under `hooks/` don't survive marketplace install, so a CI check (`.github/workflows/validate.yml`) blocks them. The `bump-version.sh` script syncs these copies automatically at release time. If you edit shared hook logic, edit it in `plugins/shared/` and run `./scripts/bump-version.sh --sync-only` to propagate without bumping the version.
 
 ## Adding a new skill
 
@@ -193,7 +193,7 @@ Setup and agent-routing skills are exempt from this rule. Setup skills are invok
 - For new skills: include example prompts that should trigger the skill.
 - For bug fixes: describe the incorrect behavior and how to reproduce.
 - Ensure skill symlinks are relative and resolve correctly (CI will verify this).
-- If you changed files in `plugins/shared/prevent/lib/`, run `./scripts/bump-version.sh` to sync copies to all editor plugins.
+- If you changed files in `plugins/shared/prevent/lib/`, run `./scripts/bump-version.sh --sync-only` to sync copies to all editor plugins without bumping the version. Symlinks under `plugins/<editor>/hooks/` are rejected by CI — see `.github/workflows/validate.yml`.
 - Run `git log --follow` on any moved files to confirm history is preserved.
 
 ## Version bumping

@@ -7,12 +7,15 @@
 #
 # Usage:
 #   ./scripts/bump-version.sh <patch|minor|major|X.Y.Z> [--dry-run]
+#   ./scripts/bump-version.sh --sync-only [--dry-run]
 #
 # Examples:
-#   ./scripts/bump-version.sh patch          # 1.0.0 → 1.0.1
-#   ./scripts/bump-version.sh minor          # 1.0.0 → 1.1.0
-#   ./scripts/bump-version.sh 2.0.0          # Set explicit version
-#   ./scripts/bump-version.sh patch --dry-run  # Preview without changes
+#   ./scripts/bump-version.sh patch              # 1.0.0 → 1.0.1
+#   ./scripts/bump-version.sh minor              # 1.0.0 → 1.1.0
+#   ./scripts/bump-version.sh 2.0.0              # Set explicit version
+#   ./scripts/bump-version.sh patch --dry-run    # Preview without changes
+#   ./scripts/bump-version.sh --sync-only        # Re-sync plugins/shared/prevent/lib/
+#                                                # into all editor plugins (no version bump)
 #
 set -euo pipefail
 
@@ -47,22 +50,62 @@ CHANGELOG_FILES=(
 # ── Defaults ────────────────────────────────────────────────────────────────
 DRY_RUN=false
 BUMP_TYPE=""
+SYNC_ONLY=false
 
 # ── Parse arguments ─────────────────────────────────────────────────────────
 usage() {
   echo "Usage: $0 <patch|minor|major|X.Y.Z> [--dry-run]"
+  echo "       $0 --sync-only [--dry-run]"
   exit 1
 }
 
 for arg in "$@"; do
   case "$arg" in
     --dry-run) DRY_RUN=true ;;
+    --sync-only) SYNC_ONLY=true ;;
     patch|minor|major) BUMP_TYPE="$arg" ;;
     [0-9]*.[0-9]*.[0-9]*)  BUMP_TYPE="explicit"; EXPLICIT_VERSION="$arg" ;;
     -h|--help) usage ;;
     *) echo "Unknown argument: $arg"; usage ;;
   esac
 done
+
+# ── Sync shared hook lib into all editor plugins ────────────────────────────
+# Run unconditionally as part of bump (after version is known) and as a
+# standalone op via --sync-only.
+sync_shared_lib() {
+  local SHARED_LIB_DIR="$REPO_ROOT/plugins/shared/prevent/lib"
+  local EDITOR_PLUGINS=(claude-code cursor copilot codex)
+  echo ""
+  if [[ ! -d "$SHARED_LIB_DIR" ]]; then
+    echo "Warning: $SHARED_LIB_DIR does not exist; skipping shared lib sync."
+    return
+  fi
+  for editor in "${EDITOR_PLUGINS[@]}"; do
+    local target="$REPO_ROOT/plugins/$editor/hooks/prevent/lib"
+    if [[ ! -d "$(dirname "$target")" ]]; then
+      continue
+    fi
+    if [[ "$DRY_RUN" == true ]]; then
+      echo "[dry-run] Would sync shared lib → plugins/$editor/hooks/prevent/lib"
+    else
+      rm -rf "$target"
+      cp -R "$SHARED_LIB_DIR" "$target"
+      rm -rf "$target/__pycache__" "$target/tests"
+      find "$target" -name "*.pyc" -delete 2>/dev/null || true
+      echo "Synced shared lib → plugins/$editor/hooks/prevent/lib"
+    fi
+  done
+}
+
+if [[ "$SYNC_ONLY" == true ]]; then
+  if [[ -n "$BUMP_TYPE" ]]; then
+    echo "Error: --sync-only is incompatible with a version bump argument."
+    exit 1
+  fi
+  sync_shared_lib
+  exit 0
+fi
 
 [[ -z "$BUMP_TYPE" ]] && usage
 
@@ -141,27 +184,7 @@ fi
 
 rm -f "$TMPFILE"
 
-# ── Sync shared hook lib into all editor plugins ─────────────────────────
-SHARED_LIB_DIR="$REPO_ROOT/plugins/shared/prevent/lib"
-EDITOR_PLUGINS=(claude-code cursor copilot codex)
-
-echo ""
-if [[ -d "$SHARED_LIB_DIR" ]]; then
-  for editor in "${EDITOR_PLUGINS[@]}"; do
-    target="$REPO_ROOT/plugins/$editor/hooks/prevent/lib"
-    if [[ -d "$(dirname "$target")" ]]; then
-      if [[ "$DRY_RUN" == true ]]; then
-        echo "[dry-run] Would sync shared lib → plugins/$editor/hooks/prevent/lib"
-      else
-        rm -rf "$target"
-        cp -R "$SHARED_LIB_DIR" "$target"
-        rm -rf "$target/__pycache__" "$target/tests"
-        find "$target" -name "*.pyc" -delete 2>/dev/null || true
-        echo "Synced shared lib → plugins/$editor/hooks/prevent/lib"
-      fi
-    fi
-  done
-fi
+sync_shared_lib
 
 # ── Update version files ───────────────────────────────────────────────────
 echo ""
