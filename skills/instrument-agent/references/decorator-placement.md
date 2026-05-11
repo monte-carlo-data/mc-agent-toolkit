@@ -65,7 +65,7 @@ Walk the customer's source files (after they've approved which files to inspect 
 
 ## 5. The canonical placement example
 
-[`saas-serverless/ai-recommendations/llm_models/graph_creation.py @ ec2af0c L162`](https://github.com/monte-carlo-data/saas-serverless/blob/ec2af0ceb4346fa0489e010713b91bb5c0983f5d/ai-recommendations/llm_models/graph_creation.py#L162) shows real-production task placement:
+A typical task placement looks like:
 
 ```python
 @mc.trace_with_task(
@@ -78,17 +78,17 @@ def call_first_model(state, config, logger: Logger):
 
 Notice:
 
-- `task_name` reflects the **purpose** (`"create_regex"`), not the function name.
+- Task name should describe the call's purpose. The function name is fine when it's meaningful and distinct (e.g. `summarize`, `extract_entities`); generic names like `call_llm` are too opaque.
 - `span_name` is fine to use the function name for.
 
-The same file (a few lines higher) shows a workflow-level decorator on the orchestration function that drives the graph. Use this pattern when proposing diffs.
+The orchestration function that drives the graph (a few levels up the call stack) gets a workflow-level decorator instead. Use this pattern when proposing diffs.
 
 ## 6. Conservative defaults — propose few, ask before more
 
 For the first pass, propose decorators on:
 
 - The single highest-level entry function → `@trace_with_workflow`.
-- The most prominent LLM-calling functions → `@trace_with_task`.
+- The most prominent LLM-calling or tool-calling functions → `@trace_with_task`.
 
 Show these as diffs. Once accepted, ask the user if they want decorators on additional helper functions or sub-orchestrators. **Don't propose 20 decorators on a first pass.**
 
@@ -122,4 +122,4 @@ Wait for `yes` before applying. If the customer says "looks good, apply all of t
 - **Applying diffs without explicit per-file confirmation** — violates `SKILL.md` guardrail.
 - **Adding `@trace_with_workflow` to a function that doesn't actually orchestrate** — wrong tier. Use task or skip.
 - **Treating "apply all" as blanket approval** — always re-confirm before bulk-applying multiple diffs.
-- **Inferring `workflow_name` / `task_name` from the function name alone** — they should reflect the *purpose* in the customer's domain, not the Python identifier.
+- **Inferring `workflow_name` / `task_name` from a generic or non-descriptive function name** — match the domain purpose, not opaque names like `main` or `agent`. A meaningful, distinct function name (`summarize`, `extract_entities`) is fine to reuse.

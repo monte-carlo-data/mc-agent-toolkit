@@ -8,13 +8,12 @@ The skill calls `get_agent_metadata` exactly **twice** per instrumentation flow 
 
 ## 1. Pre-flight: `test_connection`
 
-`test_connection` is the Step 0 pre-flight check — it runs once at the very start of the workflow, before any intake questions. By the time the BEFORE snapshot (Step 4) runs, MCP connectivity is already confirmed.
+`test_connection` is the Step 0 pre-flight check — it runs once at the very start of the workflow, before any intake questions. Its job is to record whether MCP is available so Steps 4 and 10 know which verification path to take.
 
-This section documents what that pre-flight check does and what to do if MCP is unavailable at snapshot time (e.g. the session expired mid-workflow):
+- **MCP available** — Step 4 captures a BEFORE snapshot via `get_agent_metadata` and Step 10 diffs against it. This is the canonical path.
+- **MCP unavailable** — **degrade gracefully, don't exit.** Tell the user the Monte Carlo MCP server isn't reachable, link them to https://docs.getmontecarlo.com/docs/mcp-server for setup, and continue. Step 4 skips the BEFORE snapshot. Step 10 hands the customer off to verify the new agent appears in the Monte Carlo UI manually after they run the instrumented agent. Instrumentation can still proceed; only the in-skill verification step changes.
 
-> **CRITICAL — bail early if `test_connection` fails.** Do not propose any code changes. The verification step at the end of the workflow won't work, and instrumenting without verification means the customer ships traces with no way to confirm they arrived. Point at https://docs.getmontecarlo.com/docs/mcp-server for setup and exit cleanly.
-
-If MCP was confirmed in Step 0 but appears unavailable at Step 4 or Step 10, re-run `test_connection` to confirm and exit cleanly if it fails — do not continue the workflow without MCP.
+If MCP was reported available in Step 0 but a subsequent `get_agent_metadata` call fails (e.g. the session expired mid-workflow), re-run `test_connection`; if it still fails, flip `mcp_available = false` and proceed under the manual-UI verification path.
 
 ---
 
@@ -63,9 +62,9 @@ Then **wait for the customer to confirm** they ran it. Don't loop. Let them work
 
 ## 5. Don't poll
 
-> **NEVER poll `get_agent_metadata` in a loop.** The skill calls it twice — once before edits, once after the user reports running the agent. Polling burns API quota and adds nothing. Monte Carlo's ingestion pipeline takes seconds to a few minutes for new agents to appear, and the trigger is the customer running the agent, not the passage of time.
+> **NEVER poll `get_agent_metadata` in a loop.** The skill calls it twice — once before edits, once after the user reports running the agent. Polling burns API quota and adds nothing. The trigger is the customer running the agent, not the passage of time. First-time visibility for low-traffic or dev agents can take 10 minutes or more.
 
-If the customer says "I ran it but I don't see it yet," wait a minute and ask them to retry the check. If it's still missing after ~5 minutes, branch to `troubleshooting.md`.
+If the customer says "I ran it but I don't see it yet," wait a couple of minutes and ask them to retry the check. If after ~10–15 minutes the new agent still isn't visible, branch to `troubleshooting.md`.
 
 ---
 
@@ -95,8 +94,8 @@ When the user reports they've run the instrumented agent:
 
 After the customer's agent runs and emits OTLP spans:
 
-- A new `agentName` should appear in `get_agent_metadata` within seconds to a few minutes.
-- If after ~5 minutes the new agent isn't visible, something is wrong (SDK init not running, wrong endpoint, missing credentials, batch processor suspended on Lambda, etc.). Branch to `troubleshooting.md`.
+- A new `agentName` typically appears in `get_agent_metadata` within a few minutes. First-time visibility for low-traffic dev agents, or for agents emitting a small number of spans, can take 10 minutes or more — be patient, especially on a customer's first instrumentation pass.
+- If after ~10–15 minutes the new agent still isn't visible, something is wrong (SDK init not running, wrong endpoint, missing credentials, batch processor suspended on Lambda, etc.). Branch to `troubleshooting.md`.
 
 ### Optional: local verification with a desktop OTLP receiver
 

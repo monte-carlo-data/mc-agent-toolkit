@@ -1,0 +1,1 @@
+This intentionally-empty directory is a fixture for `test_detect_libraries.py::test_no_deps`, which verifies that `detect_libraries.py` returns an empty result when neither `requirements.txt` nor `pyproject.toml` is present.

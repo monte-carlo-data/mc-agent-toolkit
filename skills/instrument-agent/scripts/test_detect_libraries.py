@@ -13,7 +13,6 @@ import json
 import re
 import subprocess
 import sys
-from datetime import date
 from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).parent
@@ -412,7 +411,11 @@ def test_sample_serverless_agent() -> None:
     )
 
 
-_PRD_CORE_LIBRARIES = {
+# Libraries the static detection map (`instrumentor_map.json`) must cover so
+# `detect_libraries.py` can recognize them in customer dependency files without
+# a network call. The SDK's actual supported set is whatever PyPI shows; this
+# list is the offline detection baseline.
+_BASELINE_DETECTION_LIBRARIES = {
     "langchain",
     "langgraph",
     "openai",
@@ -437,24 +440,6 @@ def test_instrumentor_map_schema() -> None:
     )
     with map_path.open("r", encoding="utf-8") as fh:
         data = json.load(fh)
-
-    # snapshot_date — present and parseable as an ISO date.
-    snapshot_date = data.get("snapshot_date")
-    check(
-        "snapshot_date is present",
-        isinstance(snapshot_date, str) and bool(snapshot_date),
-        hint=f"got {snapshot_date!r}",
-    )
-    try:
-        date.fromisoformat(snapshot_date)
-        date_parseable = True
-    except (ValueError, TypeError):
-        date_parseable = False
-    check(
-        "snapshot_date is a valid ISO date string",
-        date_parseable,
-        hint=f"date.fromisoformat({snapshot_date!r}) raised ValueError",
-    )
 
     # supported_instrumentors — non-empty list.
     entries = data.get("supported_instrumentors")
@@ -506,13 +491,12 @@ def test_instrumentor_map_schema() -> None:
         hint=f"duplicates={duplicates!r}",
     )
 
-    # PRD core libraries are all present.
     library_set = set(lib for lib in libraries if lib is not None)
-    missing_core = _PRD_CORE_LIBRARIES - library_set
+    missing_baseline = _BASELINE_DETECTION_LIBRARIES - library_set
     check(
-        "all PRD core libraries are present",
-        len(missing_core) == 0,
-        hint=f"missing={sorted(missing_core)!r}",
+        "all baseline detection libraries are present in the static map",
+        len(missing_baseline) == 0,
+        hint=f"missing={sorted(missing_baseline)!r}",
     )
 
     # Every package follows the opentelemetry-instrumentation- prefix.

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Tests for fetch_sdk_docs.py — unit-tests internal helpers and an end-to-end
-subprocess check for fail-closed behavior.
+subprocess check for the PyPI-fetch-failure fail-closed path.
 
 Run:
     python3 skills/instrument-agent/scripts/test_fetch_sdk_docs.py
@@ -11,24 +11,19 @@ Run:
 from __future__ import annotations
 
 import json
-import os
 import subprocess
 import sys
-from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from unittest.mock import patch
 
 SCRIPT_DIR = Path(__file__).parent
 FETCH_SCRIPT = SCRIPT_DIR / "fetch_sdk_docs.py"
 
 sys.path.insert(0, str(SCRIPT_DIR))
 from fetch_sdk_docs import (  # noqa: E402
-    PRD_CORE_LIBRARIES,
-    STALE_AFTER_DAYS,
+    _build_success,
     _canonical_libraries,
-    _is_github_auth_host,
-    _missing_prd_core,
     _parse_supported_instrumentors,
-    _snapshot_age_days,
 )
 
 PASSED = 0
@@ -54,69 +49,6 @@ def check(label: str, condition: bool, hint: str = "") -> None:
     msg = f"FAIL  {label}{suffix}"
     print(f"  {msg}")
     raise AssertionError(msg)
-
-
-# ---------------------------------------------------------------------------
-# test_is_github_auth_host
-# ---------------------------------------------------------------------------
-
-
-def test_is_github_auth_host() -> None:
-    print("\n== _is_github_auth_host ==")
-
-    # TRUE cases — exact trusted hosts
-    check(
-        "github.com is trusted",
-        _is_github_auth_host("https://github.com/foo/bar"),
-    )
-    check(
-        "api.github.com is trusted",
-        _is_github_auth_host("https://api.github.com/repos/foo/bar"),
-    )
-    check(
-        "raw.githubusercontent.com is trusted",
-        _is_github_auth_host(
-            "https://raw.githubusercontent.com/foo/bar/main/README.md"
-        ),
-    )
-
-    # FALSE cases — substring tricks, wrong hosts, malformed
-    check(
-        "github.com as a path segment is NOT trusted",
-        not _is_github_auth_host("https://example.com/github.com/README.md"),
-    )
-    check(
-        "github.com.evil.example is NOT trusted",
-        not _is_github_auth_host(
-            "https://github.com.evil.example/repos/foo/bar"
-        ),
-    )
-    check(
-        "raw.githubusercontent.com as path segment is NOT trusted",
-        not _is_github_auth_host(
-            "https://example.com/raw.githubusercontent.com/foo/bar/README.md"
-        ),
-    )
-    check(
-        "pypi.org is NOT trusted",
-        not _is_github_auth_host("https://pypi.org/project/montecarlo-opentelemetry/"),
-    )
-    check(
-        "localhost is NOT trusted",
-        not _is_github_auth_host("http://localhost:8080/README.md"),
-    )
-    check(
-        "empty string is NOT trusted",
-        not _is_github_auth_host(""),
-    )
-    check(
-        "malformed URL string is NOT trusted",
-        not _is_github_auth_host("not-a-url-at-all"),
-    )
-    check(
-        "None-like non-string value is NOT trusted",
-        not _is_github_auth_host("://"),
-    )
 
 
 # ---------------------------------------------------------------------------
@@ -261,162 +193,208 @@ def test_parse_supported_instrumentors() -> None:
 
 
 # ---------------------------------------------------------------------------
-# test_missing_prd_core
+# test_parse_failure_paths
 # ---------------------------------------------------------------------------
 
-_ALL_PRD_CORE = list(PRD_CORE_LIBRARIES)
-# PRD core as of F1 fix: langchain, openai, anthropic, crewai, bedrock, sagemaker, vertexai
-# langgraph is NOT in PRD_CORE_LIBRARIES.
-_PRD_CORE_WITHOUT_LANGGRAPH = [lib for lib in _ALL_PRD_CORE if lib != "langgraph"]
 
+def test_parse_failure_paths() -> None:
+    """Description-parse must yield an empty list (caller fails closed)."""
+    print("\n== _parse_supported_instrumentors failure paths ==")
 
-def _make_instrumentors(libraries: list[str]) -> list[dict]:
-    return [{"library": lib, "package": f"opentelemetry-instrumentation-{lib}"} for lib in libraries]
-
-
-def test_missing_prd_core() -> None:
-    print("\n== _missing_prd_core ==")
-
-    # Empty list -> all PRD core libraries are missing
-    missing = _missing_prd_core([])
+    warnings: list[str] = []
+    instrumentors = _parse_supported_instrumentors("", warnings)
     check(
-        "empty instrumentors -> full PRD core set returned as missing",
-        missing == PRD_CORE_LIBRARIES,
-        hint=f"missing={missing!r}, PRD_CORE={PRD_CORE_LIBRARIES!r}",
+        "empty description -> no instrumentors",
+        instrumentors == [],
+        hint=f"got {instrumentors!r}",
     )
 
-    # Just langchain -> everything else missing
-    missing = _missing_prd_core(_make_instrumentors(["langchain"]))
-    check(
-        "langchain-only -> other core libs still missing",
-        "langchain" not in missing,
-        hint=f"missing={missing!r}",
+    warnings = []
+    instrumentors = _parse_supported_instrumentors(
+        "# Some unrelated readme\n\nNothing to see here.\n", warnings
     )
     check(
-        "langchain-only -> openai still in missing",
-        "openai" in missing,
-        hint=f"missing={missing!r}",
-    )
-
-    # Full PRD core set (without langgraph, since langgraph is NOT in PRD_CORE_LIBRARIES after F1)
-    full_core_instrumentors = _make_instrumentors(_PRD_CORE_WITHOUT_LANGGRAPH)
-    missing = _missing_prd_core(full_core_instrumentors)
-    check(
-        "all PRD core libs present -> missing is empty set",
-        missing == set(),
-        hint=f"missing={missing!r}",
-    )
-
-    # Verify langgraph is NOT in PRD_CORE_LIBRARIES (F1 fix assurance)
-    check(
-        "langgraph is NOT in PRD_CORE_LIBRARIES (F1 fix)",
-        "langgraph" not in PRD_CORE_LIBRARIES,
-        hint=f"PRD_CORE_LIBRARIES={set(PRD_CORE_LIBRARIES)!r}",
-    )
-
-    # The 7 expected PRD core libs (no langgraph) should satisfy completeness
-    expected_core = {"langchain", "openai", "anthropic", "crewai", "bedrock", "sagemaker", "vertexai"}
-    missing = _missing_prd_core(_make_instrumentors(list(expected_core)))
-    check(
-        "7-lib set (langchain/openai/anthropic/crewai/bedrock/sagemaker/vertexai) -> no missing",
-        missing == set(),
-        hint=f"missing={missing!r}",
+        "readme without instrumentor markers -> no instrumentors",
+        instrumentors == [],
+        hint=f"got {instrumentors!r}",
     )
 
 
 # ---------------------------------------------------------------------------
-# test_snapshot_age_days
+# test_build_success_shape
 # ---------------------------------------------------------------------------
 
 
-def test_snapshot_age_days() -> None:
-    print("\n== _snapshot_age_days ==")
+def test_build_success_shape() -> None:
+    """Verify the success-path JSON shape — keys and types only."""
+    print("\n== _build_success output shape ==")
 
-    today_utc = datetime.now(timezone.utc).date()
+    sdk_meta = {
+        "version": "1.2.3",
+        "pypi_url": "https://pypi.org/project/montecarlo-opentelemetry/",
+        "requires_dist": ["opentelemetry-api>=1.0", "wrapt<2"],
+        "_description": "# README body here",
+    }
+    instrumentors = [
+        {
+            "library": "openai",
+            "package": "opentelemetry-instrumentation-openai",
+            "version_constraint": "<=0.53.4",
+        }
+    ]
+    warnings: list[str] = []
 
-    yesterday = (today_utc.replace(day=today_utc.day) - timedelta(days=1)).isoformat()
-    age = _snapshot_age_days(yesterday)
+    result = _build_success(sdk_meta, instrumentors, warnings)
+
     check(
-        "snapshot dated yesterday -> age is 1",
-        age == 1,
-        hint=f"got {age!r}",
+        "source == 'pypi'",
+        result.get("source") == "pypi",
+        hint=f"source={result.get('source')!r}",
     )
-
-    thirty_days_ago = (today_utc - timedelta(days=30)).isoformat()
-    age = _snapshot_age_days(thirty_days_ago)
     check(
-        "snapshot dated 30 days ago -> age is 30",
-        age == 30,
-        hint=f"got {age!r}",
+        "fetched_at present",
+        isinstance(result.get("fetched_at"), str) and bool(result["fetched_at"]),
+        hint=f"fetched_at={result.get('fetched_at')!r}",
     )
-
-    stale_plus_one = (today_utc - timedelta(days=STALE_AFTER_DAYS + 1)).isoformat()
-    age = _snapshot_age_days(stale_plus_one)
     check(
-        f"snapshot {STALE_AFTER_DAYS + 1} days ago -> age exceeds STALE_AFTER_DAYS",
-        age is not None and age > STALE_AFTER_DAYS,
-        hint=f"got {age!r}, STALE_AFTER_DAYS={STALE_AFTER_DAYS}",
+        "sdk block present and a dict",
+        isinstance(result.get("sdk"), dict),
+        hint=f"sdk={result.get('sdk')!r}",
     )
-
-    age = _snapshot_age_days("not-a-date")
     check(
-        "malformed snapshot_date -> returns None",
-        age is None,
-        hint=f"got {age!r}",
+        "sdk block does not leak internal _description",
+        "_description" not in (result.get("sdk") or {}),
+        hint=f"sdk keys={list((result.get('sdk') or {}).keys())}",
     )
-
-    age = _snapshot_age_days("")
     check(
-        "empty snapshot_date -> returns None",
-        age is None,
-        hint=f"got {age!r}",
+        "sdk.version preserved",
+        (result.get("sdk") or {}).get("version") == "1.2.3",
+        hint=f"sdk={result.get('sdk')!r}",
     )
-
-    age = _snapshot_age_days(None)  # type: ignore[arg-type]
     check(
-        "None snapshot_date -> returns None",
-        age is None,
-        hint=f"got {age!r}",
-    )
-
-
-# ---------------------------------------------------------------------------
-# test_e2e_fail_closed
-# ---------------------------------------------------------------------------
-
-
-def test_e2e_fail_closed() -> None:
-    """End-to-end: both fetches disabled + unreachable MC_SDK_DOCS_URL.
-
-    When --no-github and --no-pypi are passed and MC_SDK_DOCS_URL points at an
-    unreachable host, the script must either:
-      (a) exit non-zero with source="error" if the fallback snapshot is stale
-          or missing, OR
-      (b) exit 0 with source="fallback" and stale=False if the snapshot is
-          fresh enough.
-
-    We do not dictate which outcome occurs (it depends on the local snapshot
-    state), but we assert the output is valid JSON and the source field is one
-    of the expected values.
-    """
-    print("\n== end-to-end fail-closed (--no-github --no-pypi) ==")
-
-    env = {**os.environ, "MC_SDK_DOCS_URL": "https://example.invalid/notfound"}
-    result = subprocess.run(
-        [
-            sys.executable,
-            str(FETCH_SCRIPT),
-            "--no-github",
-            "--no-pypi",
-            "--quiet",
+        "sdk.requires_dist preserved",
+        (result.get("sdk") or {}).get("requires_dist") == [
+            "opentelemetry-api>=1.0",
+            "wrapt<2",
         ],
+        hint=f"sdk={result.get('sdk')!r}",
+    )
+    check(
+        "supported_instrumentors matches input",
+        result.get("supported_instrumentors") == instrumentors,
+        hint=f"supported_instrumentors={result.get('supported_instrumentors')!r}",
+    )
+    check(
+        "warnings list present",
+        isinstance(result.get("warnings"), list),
+        hint=f"warnings={result.get('warnings')!r}",
+    )
+
+
+# ---------------------------------------------------------------------------
+# test_pypi_fetch_success (mocked)
+# ---------------------------------------------------------------------------
+
+
+def _make_pypi_payload(description: str, version: str = "1.2.3") -> bytes:
+    return json.dumps(
+        {
+            "info": {
+                "version": version,
+                "description": description,
+                "project_urls": {
+                    "Homepage": "https://pypi.org/project/montecarlo-opentelemetry/",
+                },
+                "requires_dist": ["opentelemetry-api>=1.0"],
+            }
+        }
+    ).encode("utf-8")
+
+
+def test_pypi_fetch_success() -> None:
+    """Mocked PyPI success path: _fetch_pypi parses the JSON and returns metadata."""
+    print("\n== _fetch_pypi (mocked success) ==")
+
+    from fetch_sdk_docs import _fetch_pypi
+
+    payload = _make_pypi_payload(_FIXTURE_README)
+    with patch("fetch_sdk_docs._fetch_bytes", return_value=payload):
+        result = _fetch_pypi()
+
+    check(
+        "version extracted from PyPI payload",
+        result.get("version") == "1.2.3",
+        hint=f"got {result!r}",
+    )
+    check(
+        "pypi_url extracted from project_urls.Homepage",
+        result.get("pypi_url") == "https://pypi.org/project/montecarlo-opentelemetry/",
+        hint=f"got {result!r}",
+    )
+    check(
+        "requires_dist list preserved",
+        result.get("requires_dist") == ["opentelemetry-api>=1.0"],
+        hint=f"got {result!r}",
+    )
+    check(
+        "_description carries README body",
+        result.get("_description") == _FIXTURE_README,
+        hint=f"got {result.get('_description')!r}",
+    )
+
+
+def test_pypi_fetch_failure() -> None:
+    """Mocked PyPI failure path: _fetch_pypi propagates the error."""
+    print("\n== _fetch_pypi (mocked failure) ==")
+
+    import urllib.error
+
+    from fetch_sdk_docs import _fetch_pypi
+
+    with patch(
+        "fetch_sdk_docs._fetch_bytes",
+        side_effect=urllib.error.URLError("simulated network failure"),
+    ):
+        raised = False
+        try:
+            _fetch_pypi()
+        except urllib.error.URLError:
+            raised = True
+        check(
+            "URLError propagates out of _fetch_pypi",
+            raised,
+            hint="_fetch_pypi swallowed URLError instead of propagating",
+        )
+
+
+# ---------------------------------------------------------------------------
+# test_e2e_fail_closed_on_pypi_failure
+# ---------------------------------------------------------------------------
+
+
+def test_e2e_fail_closed_on_pypi_failure() -> None:
+    """End-to-end: when PyPI is unreachable, the script exits non-zero with
+    source="error" and a JSON payload that includes guidance.
+    """
+    print("\n== end-to-end fail-closed on PyPI failure ==")
+
+    # Monkey-patch the PYPI_URL via a wrapper script that imports and mutates
+    # the module, then runs main(). We use a one-off Python invocation so the
+    # subprocess shape mirrors normal usage but routes the fetch at an
+    # unreachable host.
+    runner = (
+        "import sys; sys.path.insert(0, %r);"
+        "import fetch_sdk_docs as m;"
+        "m.PYPI_URL = 'https://example.invalid/notfound';"
+        "m.main()"
+    ) % str(SCRIPT_DIR)
+    result = subprocess.run(
+        [sys.executable, "-c", runner, "--quiet"],
         capture_output=True,
         text=True,
-        env=env,
         timeout=30,
     )
 
-    # Output must be valid JSON regardless of success/failure path
     try:
         payload = json.loads(result.stdout)
     except json.JSONDecodeError as exc:
@@ -427,52 +405,28 @@ def test_e2e_fail_closed() -> None:
         )
         return
 
+    check("output is valid JSON", True)
     check(
-        "output is valid JSON",
-        True,
+        "source == 'error' on unreachable PyPI",
+        payload.get("source") == "error",
+        hint=f"source={payload.get('source')!r}",
     )
-
-    source = payload.get("source")
     check(
-        "source is one of: fallback, error",
-        source in ("fallback", "error"),
-        hint=f"got source={source!r}",
+        "exit code is non-zero on error",
+        result.returncode != 0,
+        hint=f"returncode={result.returncode}",
     )
-
-    if source == "error":
-        # Fail-closed path: exit code must be non-zero
-        check(
-            "exit code is non-zero on error source",
-            result.returncode != 0,
-            hint=f"got returncode={result.returncode}",
-        )
-        check(
-            "error payload has 'error' key",
-            "error" in payload,
-            hint=f"payload keys: {list(payload.keys())}",
-        )
-    else:
-        # Fallback path: snapshot was fresh — exit 0
-        check(
-            "exit code is 0 on fallback source",
-            result.returncode == 0,
-            hint=f"got returncode={result.returncode}",
-        )
-        check(
-            "fallback payload has 'stale' key",
-            "stale" in payload,
-            hint=f"payload keys: {list(payload.keys())}",
-        )
-        check(
-            "fallback payload stale=False (snapshot is fresh)",
-            payload.get("stale") is False,
-            hint=f"stale={payload.get('stale')!r}",
-        )
-        check(
-            "fallback payload has supported_instrumentors list",
-            isinstance(payload.get("supported_instrumentors"), list),
-            hint=f"got {type(payload.get('supported_instrumentors'))}",
-        )
+    check(
+        "error payload has 'error' key",
+        "error" in payload,
+        hint=f"payload keys={list(payload.keys())}",
+    )
+    check(
+        "error payload has 'guidance' key pointing at PyPI",
+        isinstance(payload.get("guidance"), str)
+        and "pypi.org/project/montecarlo-opentelemetry" in payload["guidance"],
+        hint=f"guidance={payload.get('guidance')!r}",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -482,12 +436,13 @@ def test_e2e_fail_closed() -> None:
 
 def main() -> None:
     tests = [
-        test_is_github_auth_host,
         test_canonical_libraries,
         test_parse_supported_instrumentors,
-        test_missing_prd_core,
-        test_snapshot_age_days,
-        test_e2e_fail_closed,
+        test_parse_failure_paths,
+        test_build_success_shape,
+        test_pypi_fetch_success,
+        test_pypi_fetch_failure,
+        test_e2e_fail_closed_on_pypi_failure,
     ]
     # Run every test even when an early one fails — `check()` raises on the
     # first failure inside a single test, but we want a complete pass/fail

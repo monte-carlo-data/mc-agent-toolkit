@@ -34,7 +34,7 @@ This guardrail mirrors PRD requirement #8 ("Never modifies code without explicit
 Activate when the user expresses intent to instrument a new AI agent:
 
 - Asks to instrument an agent for Monte Carlo, set up MC tracing, or wire up the Monte Carlo OpenTelemetry SDK
-- Asks how to add Monte Carlo tracing to a LangChain / LangGraph / OpenAI / Anthropic / CrewAI / Bedrock / SageMaker / Vertex AI agent
+- Asks how to add Monte Carlo tracing to a LangChain / LangGraph / OpenAI / Anthropic / CrewAI / Bedrock / SageMaker / Vertex AI agent (those are examples — the full supported set is whatever the Monte Carlo OpenTelemetry SDK ships on PyPI: `https://pypi.org/project/montecarlo-opentelemetry/`)
 - Says things like "instrument my agent for Monte Carlo", "set up Monte Carlo tracing", "set up MC tracing", "set up agent tracing for Monte Carlo", "set up Monte Carlo on my new agent"
 - References the SDK install or `mc.setup()` (when generating; not when diagnosing)
 
@@ -54,7 +54,7 @@ If the user is ambiguous ("set up agent observability"), surface both options an
 
 Before walking the workflow, confirm two things:
 
-1. **Monte Carlo MCP server is configured + authenticated.** Run `test_connection`. If unavailable, point the user at the MC MCP setup docs (`https://docs.getmontecarlo.com/docs/mcp-server`) and exit cleanly. The verification step (`get_agent_metadata`) requires the MCP server.
+1. **Monte Carlo MCP server is configured + authenticated.** Run `test_connection`. If it succeeds, Step 4 (BEFORE snapshot) and Step 10 (AFTER verification) will use `get_agent_metadata` directly. If `test_connection` fails, **degrade gracefully** — point the user at the MC MCP setup docs (`https://docs.getmontecarlo.com/docs/mcp-server`) as informational, then continue the workflow and tell them they'll need to verify the new agent appears in the Monte Carlo UI manually after running the instrumented agent. Record whether MCP is available so Steps 4 and 10 know which path to take.
 2. **Python codebase is present.** Look for `requirements.txt`, `pyproject.toml`, or `Pipfile` in the working directory. If none exist, ask the user where the agent codebase is.
 
 ## Reference files — when to load
@@ -64,11 +64,11 @@ The skill is structured as a Tier 1 router (this file) → Tier 2 workflow → T
 | Reference file | Load when… |
 |---|---|
 | `references/workflow.md` | At the start of every invocation. Tier 2 — the end-to-end flow. Read first. |
-| `references/library-detection.md` | Walking step 1 of the workflow — detecting AI libraries, the runtime style (serverless vs long-running), and any existing `mc.setup()`. Documents the PRD core library list as a stable contract. |
+| `references/library-detection.md` | Walking step 1 of the workflow — detecting AI libraries, the runtime style (serverless vs long-running), and any existing `mc.setup()`. Documents how `detect_libraries.py` and `fetch_sdk_docs.py` recognize supported AI libraries — the SDK's supported set is whatever PyPI shows. |
 | `references/setup-template.md` | Walking step 5–7 of the workflow — resolving the OTLP endpoint, generating `mc.setup()`, handling the existing-`mc.setup()` decision matrix. Includes both serverless and long-running templates. |
 | `references/decorator-placement.md` | Walking step 8 of the workflow — proposing `@trace_with_workflow` and `@trace_with_task` diffs. Tier 3: those are the only two decorators in scope for v1. |
 | `references/verify-traces.md` | Walking step 4 (BEFORE snapshot) and step 10 (AFTER verification) of the workflow — both `get_agent_metadata` calls. Documents dev/prod twin disambiguation via MCON. |
-| `references/redaction.md` | When the user answers "yes" to step 3 of the workflow ("Will any prompts/completions contain sensitive data?"). Documents the three V1 redaction pathways. |
+| `references/redaction.md` | When the customer has stricter privacy requirements (compliance, regulated workload, contractual PII restrictions) and asks to redact prompts or completions. Walks through the two redaction combinations: env-var disable (mandatory under redaction) and optional placeholder-substitution via `mc.create_llm_span`. |
 | `references/troubleshooting.md` | When step 10's verification doesn't show the new agent, or the user reports incomplete traces. Covers the four PRD failure modes plus the serverless `SimpleSpanProcessor` foot-gun. |
 
 ## High-level workflow (Tier 1 summary)
@@ -77,10 +77,10 @@ The full step-by-step flow lives in `references/workflow.md`. At a glance:
 
 1. **Detect** AI libraries, runtime style, and any existing `mc.setup()` via `scripts/detect_libraries.py`.
 2. **Ask** whether the customer hosts their own OTel collector or uses the MC-hosted one — gates the env-var step.
-3. **Ask** whether prompts/completions will contain sensitive data — gates the redaction routing.
+3. **Ask** whether the customer has stricter privacy requirements that warrant redacting prompts or completions — full capture is the default; redaction is opt-in.
 4. **Snapshot existing agents** via `get_agent_metadata` (BEFORE any code changes).
 5. **Resolve and display the final OTLP endpoint** to the user — normalize idempotently (never double-append `/v1/traces`).
-6. **Propose dependency-file edits** and wait for approval — install SDK + instrumentors at compatible versions (live-fetched from PyPI; fall back to the snapshotted `instrumentor_map.json` with a STALE warning).
+6. **Propose dependency-file edits** and wait for approval — install SDK + instrumentors at compatible versions (live-fetched from PyPI; fail closed and ask the user to consult `https://pypi.org/project/montecarlo-opentelemetry/` if the fetch fails).
 7. **Propose `mc.setup()` insertion** as a diff and wait for approval — serverless variant uses `SimpleSpanProcessor`.
 8. **Propose `@trace_with_workflow` / `@trace_with_task` decorator diffs** — wait for approval per file. Those are the only two decorators in scope for v1.
 9. **Confirm env vars** (only on the MC-hosted collector path) — `MCD_DEFAULT_API_ID` / `MCD_DEFAULT_API_TOKEN`. Presence-only check; never read or echo the values.
@@ -96,15 +96,15 @@ The skill ships three Python helpers under `scripts/` that the workflow invokes:
 | Script | Purpose |
 |---|---|
 | `scripts/detect_libraries.py` | Parse `requirements.txt` / `pyproject.toml` / `Pipfile`; classify runtime as serverless / long-running / unknown; detect existing `mc.setup()`. Returns JSON. |
-| `scripts/fetch_sdk_docs.py` | Live-fetch the SDK supported-instrumentor list from GitHub README + PyPI metadata. Falls back to `scripts/instrumentor_map.json` (with a STALE warning) when live fetch fails. |
-| `scripts/instrumentor_map.json` | Snapshotted last-known-compatible instrumentor list with `snapshot_date`. Source-of-truth fallback when PyPI is unreachable; canonical schema shared with `detect_libraries.py` and `fetch_sdk_docs.py`. |
+| `scripts/fetch_sdk_docs.py` | Fetch the SDK supported-instrumentor list live from PyPI. Fails closed if PyPI is unreachable. |
+| `scripts/instrumentor_map.json` | Static package-name → library-name detection map used by `detect_libraries.py` to recognize installed AI libraries in customer dependency files. Also holds `additional_pins` (transitive constraints like `wrapt<2` that PyPI doesn't expose). |
 
-The instrumentor list and version constraints come from PyPI live; the local snapshot is only consulted when the live fetch fails. Live success requires all PRD core libraries (`langchain`, `langgraph`, `openai`, `anthropic`, `crewai`, `bedrock`, `sagemaker`, `vertexai`) to be present — partial parses fall back to the snapshot for completeness.
+Version constraints for instrumentor packages come from PyPI live (`fetch_sdk_docs.py`). The static map's `additional_pins` field carries transitive constraints that PyPI metadata doesn't expose (the SDK currently pins `wrapt<2` because OpenLLMetry instrumentors at <=0.53.4 pass `module=` to `wrap_function_wrapper`, which `wrapt` 2.x renamed to `target=`).
 
 ## Out of scope (v1)
 
 - Auto-scaffolded `create_llm_span` boilerplate for libraries without a dedicated instrumentor.
-- Auto-instrumented redaction (proactive sensitive-data detection and wrapping). The skill is *conversant* in redaction — when the user asks, it walks them through the three V1 pathways in `references/redaction.md`.
+- Auto-instrumented redaction (proactive sensitive-data detection and wrapping). The skill is *conversant* in redaction — when the customer has stricter privacy requirements, it walks them through the two redaction combinations in `references/redaction.md`.
 - Full first-time AO setup (infra deployment, datastore registration, warehouse ingestion).
 - API-key generation.
 - Non-Python SDKs.

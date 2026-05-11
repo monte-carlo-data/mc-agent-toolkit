@@ -9,7 +9,7 @@ The workflow has a pre-flight check followed by eleven steps, in order:
 0. Pre-flight — confirm MCP connectivity via `test_connection`
 1. Detect libraries, runtime, and existing setup
 2. Ask about the OTel collector (MC-hosted vs. self-hosted)
-3. Ask about sensitive data (gates redaction + `mc.setup()` template)
+3. Ask whether stricter privacy requirements warrant redaction (default is full capture)
 4. Snapshot existing agents via `get_agent_metadata` (BEFORE changes)
 5. Resolve and confirm the final OTLP endpoint
 6. Propose dependency-file edits
@@ -25,8 +25,8 @@ The workflow has a pre-flight check followed by eleven steps, in order:
 
 Before beginning the workflow, confirm the Monte Carlo MCP server is configured and authenticated by calling `test_connection`.
 
-- **If `test_connection` succeeds** — proceed to Step 1. Record that MCP is available; Step 4 will use it without re-checking.
-- **If `test_connection` fails** — point the user at https://docs.getmontecarlo.com/docs/mcp-server and **exit cleanly without proposing any edits.** Without MCP, the verification step (Step 10) can't run, and shipping instrumentation that can't be verified is worse than not shipping it.
+- **If `test_connection` succeeds** — proceed to Step 1. Record that MCP is available; Steps 4 and 10 will call `get_agent_metadata` without re-checking.
+- **If `test_connection` fails** — **degrade gracefully**, don't exit. Tell the user that the Monte Carlo MCP server isn't available, point them at https://docs.getmontecarlo.com/docs/mcp-server as informational, and continue the workflow. Explain that they'll need to verify the new agent appears in the Monte Carlo UI manually after running the instrumented agent (Step 4 will skip the BEFORE snapshot and Step 10 will give them manual-UI verification instructions). Record `mcp_available = false` so Steps 4 and 10 know which path to take.
 
 Do this check once, up front, so the user discovers a MCP problem immediately — not after three turns of intake questions.
 
@@ -42,7 +42,7 @@ python3 scripts/detect_libraries.py <target_path>
 
 It prints a JSON object with the following fields:
 
-- `detected` — list of PRD core libraries found in the target tree
+- `detected` — list of supported AI libraries found in the target tree (the SDK's supported set is whatever it ships on PyPI: `https://pypi.org/project/montecarlo-opentelemetry/`)
 - `suggested_instrumentors` — the OTel instrumentor packages to install for those libraries
 - `unsupported` — ambiguous matches that need user disambiguation (e.g. `boto3` could be Bedrock or SageMaker, or just generic AWS)
 - `runtime` — `serverless`, `long_running`, or `unknown`
@@ -56,10 +56,15 @@ Parse this output and branch:
 ### Known limitations
 
 `existing_setup` detection parses Python imports and setup calls. It recognizes `import montecarlo_opentelemetry`, aliases such as `import montecarlo_opentelemetry as mco`, and direct imports such as `from montecarlo_opentelemetry import setup as setup_mc`, but only when the imported module/name is actually called. Malformed Python files fall back to a narrower text check, so if the customer reports an existing setup that was missed, inspect those files manually before proposing a new `mc.setup()`.
-- **`runtime: "unknown"` and `detected: []`** — exit cleanly. No PRD core libraries are present, so there's nothing to instrument. Tell the user: "I didn't find any of the supported AI libraries (`langchain`, `langgraph`, `openai`, `anthropic`, `crewai`, `bedrock`, `sagemaker`, `vertexai`) in the target. Confirm the agent code is actually in this path, then re-run." Do not scaffold anything.
+
+### Match in real code, not docs or comments
+
+The same principle that governs `existing_setup` detection applies to every match-scanning step in this workflow — library-import detection, decorator-candidate identification, and existing-`mc.setup()` lookup. Before treating a match as actionable, confirm it lives in executable Python code, not in a docstring, an inline comment, an example block in a Markdown file, or test fixture data. A match inside a `"""..."""` doc block or a `README.md` example is not a real usage.
+
+- **`runtime: "unknown"` and `detected: []`** — exit cleanly. None of the AI libraries the SDK supports were detected, so there's nothing to instrument. Tell the user: "I didn't find any of the AI libraries the Monte Carlo OpenTelemetry SDK supports in the target. The current supported set is on PyPI: https://pypi.org/project/montecarlo-opentelemetry/. Confirm the agent code is actually in this path, then re-run." Do not scaffold anything.
 - **Anything else** — continue to step 2 with the detection output in hand.
 
-If the user wants to consider libraries beyond what `detect_libraries.py` knows about, run `python3 scripts/fetch_sdk_docs.py` to pull the live `supported_instrumentors` list from PyPI (it falls back to a local snapshot if PyPI is unreachable). This is informational only — proposed installs still wait until step 6.
+If the user wants to consider libraries beyond what `detect_libraries.py` knows about, run `python3 scripts/fetch_sdk_docs.py` to pull the live `supported_instrumentors` list from PyPI. The script fails closed if PyPI is unreachable — if it errors, point the user at `https://pypi.org/project/montecarlo-opentelemetry/` directly. This step is informational only — proposed installs still wait until step 6.
 
 **Next:** with detection settled, ask about the collector.
 
@@ -78,20 +83,22 @@ Capture the answer — it gates step 5 (endpoint normalization) and step 9 (env-
 
 Don't try to infer the collector from anything in the codebase — just ask.
 
-**Next:** ask about sensitive data so step 3 picks the right `mc.setup()` template.
+**Next:** ask whether the customer has stricter privacy requirements that warrant redaction, so step 3 picks the right `mc.setup()` template.
 
 ---
 
-## Step 3 — Ask about sensitive data
+## Step 3 — Ask whether redaction is required
+
+The Monte Carlo OpenTelemetry SDK's value proposition is auto-instrumentation that captures prompts and completions by default. Trace content lives in the customer's environment; the MC-hosted collector is a write-back pass-through with no MC-side persistence of trace content. Full capture is therefore the canonical path, and redaction is opt-in for customers with stricter requirements.
 
 Ask the user verbatim:
 
-> "Will any prompts or completions in this agent contain sensitive data (PII, PHI, credentials, customer content)?"
+> "Do you have stricter requirements (compliance, contractual, or company policy) that would require redacting prompts or completions in traces?"
 
 This is a non-optional gating decision that runs **before** any `mc.setup()` is generated.
 
-- **Yes** — route the user to `redaction.md` and walk through the three V1 redaction pathways. Use the prompts-disabled `mc.setup()` template in step 7. Do not generate the default template in this branch.
-- **No** — use the default `mc.setup()` template in step 7. The default still leans prompts-disabled with an opt-in comment per `setup-template.md`; the customer can flip it on later if they decide content capture is safe.
+- **Yes** — route the user to `redaction.md`. Under redaction, `TRACELOOP_TRACE_CONTENT=false` is **mandatory** when an auto-instrumentor is in use (else the instrumentor emits duplicate-content spans alongside any manual redacted spans). The prompts-disabled `mc.setup()` template in step 7 sets this in code. Customers who want partial capture with placeholder substitution can layer manual `mc.create_llm_span` calls on top — that's an optional additional layer, not a replacement.
+- **No** — use the default `mc.setup()` template in step 7. The default leaves auto-instrumentor capture on; prompts and completions flow into the customer's environment with no extra wiring. This is the value proposition the PRD targets.
 
 **Next:** snapshot existing agents before any code changes land.
 
@@ -101,10 +108,12 @@ This is a non-optional gating decision that runs **before** any `mc.setup()` is 
 
 This must run **before** step 6, 7, or 8 propose any diffs. The snapshot is what step 10 compares against to prove the new instrumentation actually produced traces.
 
-MCP availability was confirmed in Step 0 — no need to re-check. If for any reason MCP is now unavailable (e.g. the session expired), re-run `test_connection` and exit cleanly if it fails (same guidance as Step 0).
+Branch on the MCP availability flag recorded in Step 0:
 
-1. Call `get_agent_metadata`. Save the list of `(agent_name, mcon)` pairs.
-2. Hold onto the snapshot — step 10 diffs against it.
+- **MCP available** — call `get_agent_metadata`. Save the list of `(agent_name, mcon)` pairs and hold onto the snapshot; step 10 diffs against it.
+- **MCP unavailable** — skip the BEFORE snapshot. Tell the customer that without MCP this skill can't capture a baseline, so step 10 will hand them off to verify the new agent in the Monte Carlo UI manually. Continue the workflow.
+
+If MCP was reported available in Step 0 but the `get_agent_metadata` call now fails (e.g. the session expired), re-run `test_connection`. If it still fails, flip `mcp_available = false` and proceed under the manual-UI verification path described above.
 
 See `verify-traces.md` for the full before/after flow and what the response looks like.
 
@@ -143,7 +152,7 @@ Determine the install set from `detect_libraries.py`'s `suggested_instrumentors`
 - `version_constraint` — pin for the instrumentor package itself.
 - `additional_pins` — transitive constraints (e.g. `wrapt<2`) without which the pinned instrumentor fails to import.
 
-Apply both to the proposed diff. An unpinned `pip install opentelemetry-instrumentation-langchain` resolves to a version that crashes at `mc.setup()` import time against `wrapt` 2.x — that's a bug the skill is responsible for preventing. Per `library-detection.md`, prefer `fetch_sdk_docs.py`'s live `version_constraint` when available; fall back to the snapshot's value with a `STALE (snapshot_date=YYYY-MM-DD)` annotation. `additional_pins` lives in the snapshot only; carry it through even when the version constraint comes from live data.
+Apply both to the proposed diff. An unpinned `pip install opentelemetry-instrumentation-langchain` resolves to a version that crashes at `mc.setup()` import time against `wrapt` 2.x — that's a bug the skill is responsible for preventing. Per `library-detection.md`, `version_constraint` comes from `fetch_sdk_docs.py`'s live PyPI fetch; if that script fails (PyPI unreachable), it exits with an error rather than substituting stale data — point the user at `https://pypi.org/project/montecarlo-opentelemetry/` to resolve pins manually. `additional_pins` comes from the static map in `instrumentor_map.json`; carry it through alongside the live `version_constraint`.
 
 Propose the additions as a unified diff against the customer's actual dependency file — `requirements.txt`, `pyproject.toml`, or `Pipfile`. Wait for **explicit per-file approval** before any edit lands.
 
@@ -159,11 +168,11 @@ If `unsupported` from step 1 is non-empty (e.g. `boto3` matched but the agent co
 
 Use the runtime classification from step 1 to pick the template:
 
-- **`runtime: "serverless"`** — use the serverless template, which uses `SimpleSpanProcessor` so spans flush before the Lambda freeze. See `setup-template.md` and the linked `saas-serverless` example. The serverless `BatchSpanProcessor` foot-gun is covered in `troubleshooting.md`.
-- **`runtime: "long_running"`** — use the default template (the linked `ai-agent` example). `BatchSpanProcessor` is appropriate here.
+- **`runtime: "serverless"`** — use the serverless template, which uses `SimpleSpanProcessor` so spans flush before the Lambda freeze. See `setup-template.md` for the canonical template. The serverless `BatchSpanProcessor` foot-gun is covered in `troubleshooting.md`.
+- **`runtime: "long_running"`** — use the default template in `setup-template.md`. `BatchSpanProcessor` is appropriate here.
 - **`runtime: "unknown"`** — by step 7 you should never be here; step 1 would have exited cleanly. If you somehow are, ask the user to classify before proposing a template.
 
-If step 3 was "yes" (sensitive data), use the prompts-disabled variant of the chosen template. If step 3 was "no", use the default (still prompts-disabled with an opt-in comment).
+If the customer opted into redaction in step 3, use the prompts-disabled variant of the chosen template — it sets `TRACELOOP_TRACE_CONTENT=false` in code, which is mandatory under redaction to prevent auto-instrumentors from emitting duplicate-content spans. If the customer did not opt into redaction, use the default template, which leaves auto-instrumentor capture on — the value proposition the PRD targets.
 
 If step 1 reported `existing_setup.found: true`, don't propose a fresh insertion — apply the decision from `setup-template.md`'s existing-setup matrix instead.
 
@@ -208,15 +217,15 @@ Branches on the answer from step 2:
 
 ## Step 10 — Verify via `get_agent_metadata` (AFTER user runs the instrumented agent)
 
-Ask the user to run the instrumented agent against their environment so it produces at least one workflow trace. Then call `get_agent_metadata` again and diff against the snapshot from step 4.
+Ask the user to run the instrumented agent against their environment so it produces at least one workflow trace. Then branch on the MCP availability flag recorded in Step 0:
 
-Expected outcomes:
+- **MCP available** — call `get_agent_metadata` again and diff against the snapshot from step 4. Expected outcomes:
+  - A new entry exists with `agent_name` matching whatever the customer passed to `mc.setup(agent_name=...)`, and a new MCON.
+  - If the same `agent_name` already existed in the snapshot (e.g. a dev/prod twin), the new MCON should still be different — confirm that.
+  - If nothing new appears after a reasonable wait (see `verify-traces.md` for timing), go to step 11.
+- **MCP unavailable** — hand off to manual UI verification. Tell the customer: "Sign in to Monte Carlo, go to Agent Observability, and confirm a new agent with the name you passed to `mc.setup(agent_name=...)` appears. First-time visibility for low-traffic dev agents can take 10–15 minutes; if it still isn't visible after that, go to step 11." Don't claim verification on the customer's behalf — they confirm.
 
-- A new entry exists with `agent_name` matching whatever the customer passed to `mc.setup(agent_name=...)`, and a new MCON.
-- If the same `agent_name` already existed in the snapshot (e.g. a dev/prod twin), the new MCON should still be different — confirm that.
-- If nothing new appears, go to step 11.
-
-See `verify-traces.md` for the full diffing logic and edge cases.
+See `verify-traces.md` for the full diffing logic, timing expectations, and edge cases.
 
 **Next:** if verification passed, the workflow is done. If not, troubleshoot.
 

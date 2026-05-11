@@ -21,16 +21,14 @@ This reference governs how the instrument-agent skill decides **which AI librari
 }
 ```
 
-The fallback table that drives `detected` / `suggested_instrumentors` lives in `scripts/instrumentor_map.json`:
+The static package-name→library detection map used by `detect_libraries.py` lives in `scripts/instrumentor_map.json`:
 
 ```json
 {
-  "snapshot_date": "2026-05-06",
   "supported_instrumentors": [
     {
       "library": "langchain",
       "package": "opentelemetry-instrumentation-langchain",
-      "version_constraint": "<=0.53.4",
       "additional_pins": ["wrapt<2"],
       "covers_dependencies": ["langchain", "langchain-core", "langchain-community", "langgraph"]
     }
@@ -40,53 +38,54 @@ The fallback table that drives `detected` / `suggested_instrumentors` lives in `
 
 Field meanings:
 
-- `version_constraint` — pin for the instrumentor package itself (e.g. `<=0.53.4`).
-- `additional_pins` — transitive constraints required for the pinned instrumentor version to import cleanly. The OpenLLMetry instrumentors at `<=0.53.4` pass `module=` to `wrap_function_wrapper`, which `wrapt` 2.x renamed to `target=` — so `wrapt<2` is required alongside the instrumentor. The skill must include these pins in the proposed dependency diff; without them, `pip install` resolves to incompatible versions and `mc.setup()` raises `TypeError` at import.
+- `library` / `package` — the canonical library name and the OpenTelemetry instrumentor package that covers it.
+- `covers_dependencies` — the customer-facing dependency names that map to this library/instrumentor. `detect_libraries.py` uses this to translate `requirements.txt` / `pyproject.toml` / `Pipfile` entries into `detected[]` and `suggested_instrumentors[]`.
+- `additional_pins` — transitive constraints required for the instrumentor to import cleanly. For example, several OpenLLMetry instrumentors pass `module=` to `wrap_function_wrapper`, which `wrapt` 2.x renamed to `target=` — so `wrapt<2` is required alongside the instrumentor. The skill must include these pins in the proposed dependency diff; without them, `pip install` resolves to incompatible versions and `mc.setup()` raises `TypeError` at import. PyPI doesn't expose transitive pins, so this field is the canonical source for them.
 
-This schema is shared with `fetch_sdk_docs.py` — treat any field rename as a breaking change to both scripts.
+Version pins for the instrumentor packages themselves come from PyPI live via `fetch_sdk_docs.py`. They are **not** encoded in `instrumentor_map.json`.
 
-> **CRITICAL**: `version_constraint` in `instrumentor_map.json` is a **stale fallback**, not the source of truth. PyPI live results from `fetch_sdk_docs.py` always win. When the snapshot value is shown to the user, it must be labeled `STALE` so the user understands they should re-fetch.
+## 1. The supported library set comes from PyPI
 
-> **IMPORTANT**: `additional_pins` lives in the snapshot only. The PyPI README does not encode transitive constraints, so live-fetch results don't carry them. When using a live result, fall back to the snapshot's `additional_pins` for the same library — otherwise the proposed deps will install but fail at runtime.
+The Monte Carlo OpenTelemetry SDK supports a set of AI libraries that is published on PyPI: https://pypi.org/project/montecarlo-opentelemetry/. That page is the source of truth for what's currently supported — full stop.
 
-## 1. PRD core library list (the contract)
+`scripts/fetch_sdk_docs.py` queries PyPI live to retrieve that set and the per-instrumentor version pins. There is no offline fallback; on PyPI failure, `fetch_sdk_docs.py` exits with an error and the skill must surface that to the user rather than guessing.
 
-The skill commits to instrumenting these eight libraries with first-class fallback templates. `detect_libraries.py`, `fetch_sdk_docs.py`, and `instrumentor_map.json` all align on this list. Treat it as a stable contract.
+A non-exhaustive subset of currently-supported libraries (examples — see PyPI for the current full list):
 
-| Library | Instrumentor package | PyPI |
-|---|---|---|
-| langchain | `opentelemetry-instrumentation-langchain` | https://pypi.org/project/opentelemetry-instrumentation-langchain/ |
-| langgraph | `opentelemetry-instrumentation-langchain` (shared) | (no separate package — langchain instrumentor covers it) |
-| openai | `opentelemetry-instrumentation-openai` | https://pypi.org/project/opentelemetry-instrumentation-openai/ |
-| anthropic | `opentelemetry-instrumentation-anthropic` | https://pypi.org/project/opentelemetry-instrumentation-anthropic/ |
-| crewai | `opentelemetry-instrumentation-crewai` | https://pypi.org/project/opentelemetry-instrumentation-crewai/ |
-| bedrock | `opentelemetry-instrumentation-bedrock` | https://pypi.org/project/opentelemetry-instrumentation-bedrock/ |
-| sagemaker | `opentelemetry-instrumentation-sagemaker` | https://pypi.org/project/opentelemetry-instrumentation-sagemaker/ |
-| vertexai | `opentelemetry-instrumentation-vertexai` | https://pypi.org/project/opentelemetry-instrumentation-vertexai/ |
+| Library | Instrumentor package |
+|---|---|
+| langchain (covers langgraph) | `opentelemetry-instrumentation-langchain` |
+| openai | `opentelemetry-instrumentation-openai` |
+| anthropic | `opentelemetry-instrumentation-anthropic` |
+| crewai | `opentelemetry-instrumentation-crewai` |
+| bedrock | `opentelemetry-instrumentation-bedrock` |
+| sagemaker | `opentelemetry-instrumentation-sagemaker` |
+| vertexai | `opentelemetry-instrumentation-vertexai` |
 
-> **CRITICAL**: Version constraints come from PyPI live (`fetch_sdk_docs.py`) — *not* from this file or the snapshot. The snapshot's `version_constraint` is a stale fallback shown with a `STALE` warning when used. Always prefer the PyPI live result.
+> **NEVER**: Hardcode a version constraint into a generated `requirements.txt` or `pyproject.toml` without first running `fetch_sdk_docs.py`. If PyPI is unreachable, surface the error to the user — don't invent a pin.
 
-> **NEVER**: Hardcode a version constraint into a generated `requirements.txt` or `pyproject.toml` from the snapshot without first attempting a PyPI live fetch. If the live fetch fails, surface the snapshot value with the explicit `STALE (snapshot_date=YYYY-MM-DD)` annotation so the user can decide whether to trust it.
+## 2. How detection works
 
-## 2. Two-tier supported library handling
+There is one supported tier: whatever the SDK currently supports per PyPI. The skill uses two complementary scripts:
 
-There are two tiers of "supported" libraries, and they take different code paths.
+### 2.1 `detect_libraries.py` — static dependency-file scan
 
-### Tier A — Core (the PRD 8)
+`detect_libraries.py` reads the customer's `requirements.txt` / `pyproject.toml` / `Pipfile` and consults `instrumentor_map.json` (a static package-name→library map) to identify libraries it recognises. This works offline and is fast.
 
-Ship with fallback templates baked into `instrumentor_map.json`. The skill can install the package and propose a decorator block **without a network call**. These are the only libraries for which the skill auto-scaffolds.
+For any matched library, the script returns it under `detected[]` with the corresponding instrumentor package under `suggested_instrumentors[]`.
 
-### Tier B — Live-fetch-required
+### 2.2 `fetch_sdk_docs.py` — live PyPI lookup
 
-Any other SDK-supported instrumentor not in the PRD 8. Examples (non-exhaustive): `agno`, `chromadb`, `cohere`, `groq`, `haystack`, `llamaindex`, `mcp`, `milvus`, `mistralai`, `ollama`, `pinecone`, `qdrant`, `together`, `transformers`, `voyageai`, `watsonx`, `weaviate`, `writer`.
+For libraries the static map doesn't know about — or to confirm the full current supported set — the user can run `fetch_sdk_docs.py`. It queries PyPI live and returns the currently-supported libraries plus their version pins. This is the authoritative source for what the SDK supports today.
 
-The skill can detect these **only via the live PyPI fetch** (`fetch_sdk_docs.py`). When detected, surface them as **"supported but no fallback template"** and instruct the user to:
+### 2.3 Install decision
 
-1. `pip install opentelemetry-instrumentation-<library>`
-2. Consult PyPI for the current version constraint.
-3. Use the manual `create_llm_span` pathway (see `redaction.md`) — this is the V1 manual route.
+For each detected library:
 
-> **IMPORTANT**: Do **not** auto-scaffold a decorator for Tier B libraries. The skill has no fallback template for them, and guessing will produce broken code. Manual `create_llm_span` is the V1 pathway.
+1. **Is there an auto-instrumentor for this library on PyPI?** If yes, install it and wire it into `mc.setup(instrumentors=[...])`.
+2. **Independently**, the customer can use `@trace_with_workflow` / `@trace_with_task` decorators on their orchestration and task functions, and can use `mc.create_llm_span` for manual LLM-call spans where useful. Decorator and manual-span availability does **not** depend on whether an auto-instrumentor exists for the underlying library — those are SDK-level affordances that work alongside (or in the absence of) any auto-instrumentor.
+
+> **IMPORTANT**: Do not present manual spans / decorators as a *substitute* for auto-instrumentation. They serve different purposes. If an auto-instrumentor exists, install it. Decorators and `mc.create_llm_span` are additionally available for orchestration spans and bespoke LLM calls regardless.
 
 ## 3. Multi-library detection rules
 
@@ -148,7 +147,17 @@ For v1, only the AWS multi-purpose SDKs (`boto3` family) trigger this branch. Th
 
 The matched signal name (file name or pattern) appears in `serverless_signals` in the JSON output. Use that list to explain the runtime classification when the user asks "why did you pick the serverless template?".
 
-> **CRITICAL**: When `runtime: "serverless"`, the skill must use the **`SimpleSpanProcessor`** template — see `setup-template.md` and the cited `saas-serverless` production example. Without it, traces are silently dropped on Lambda when the batch processor is suspended before flushing the queue. This foot-gun is also documented in `troubleshooting.md`.
+> **CRITICAL**: When `runtime: "serverless"`, the skill must use the **`SimpleSpanProcessor`** template — see `setup-template.md`. Without it, traces are silently dropped on Lambda when the batch processor is suspended before flushing the queue. This foot-gun is also documented in `troubleshooting.md`.
+
+### Ask the user when serverless signals are ambiguous
+
+Detection is intentionally broad — a single signal is enough to flip `runtime` to `serverless`. That's the right call when the project is clearly Lambda/Vercel/etc., but it's wrong for codebases where the serverless framework applies to only part of the project:
+
+- A monorepo where `template.yaml` lives under one subdirectory and the rest of the code is a long-running service.
+- A repo with `serverless.yml` for an auxiliary handler, but the AI code runs in a separate long-running worker.
+- A single weak signal (e.g., `mangum` in deps) without any handler entry point or framework config file.
+
+When the picture is borderline — one signal, or signals that don't obviously cover the code where the AI libraries are used — ask the user before committing to the serverless template. Show them `serverless_signals` and confirm whether the AI code actually runs in that serverless context. If only part of the codebase is serverless, the user may need different templates for different entry points.
 
 ### Other runtime values
 
@@ -165,25 +174,22 @@ If `existing_setup.found: true`, the customer already has Monte Carlo OpenTeleme
 
 ## 7. No-match exit
 
-If `detected: []` AND `unsupported: []`, exit cleanly with one of these responses:
+If `detected: []` AND `unsupported: []`, exit cleanly with this message:
 
-- **No hint from the user**:
+> "No supported AI libraries were detected in your dependency files. The Monte Carlo OpenTelemetry SDK supports a set of libraries that's published on PyPI: https://pypi.org/project/montecarlo-opentelemetry/. You can run `scripts/fetch_sdk_docs.py` to see the current supported set. If you'd like to share your `requirements.txt` / `pyproject.toml` / `Pipfile`, I'll re-check."
 
-  > "No supported AI libraries found. The PRD core libraries are: langchain, langgraph, openai, anthropic, crewai, bedrock, sagemaker, vertexai. If you're using one of these but `detect_libraries.py` didn't pick it up, share your `requirements.txt` / `pyproject.toml` / `Pipfile` and I'll diagnose."
-
-- **The user mentioned a non-PRD library** (e.g., LlamaIndex):
-
-  > Point at the live-fetch-required path: `pip install opentelemetry-instrumentation-<library>`, plus the manual `create_llm_span` pathway from `redaction.md`.
+If the user names a specific library that isn't in `detected[]`, run `fetch_sdk_docs.py` to confirm whether PyPI currently lists an instrumentor for it, then proceed per section 2.3.
 
 > **NEVER**: Scaffold `mc.setup()` against an empty instrumentor list. An empty setup call is worse than no setup call — it implies instrumentation is in place when it isn't.
 
 ## Common mistakes
 
 - **Installing the `bedrock` instrumentor when only `boto3` is detected.** Wrong — `boto3` is multi-purpose. That match goes to `unsupported`, and the skill must confirm with the user before installing.
-- **Hardcoding the version constraint from `instrumentor_map.json` instead of preferring PyPI live.** Wrong — the snapshot is a stale fallback. PyPI is the source of truth at runtime; the snapshot must be labeled `STALE` when used.
+- **Hardcoding a version constraint without running `fetch_sdk_docs.py`.** Wrong — PyPI live is the source of truth for instrumentor version pins. If PyPI is unreachable, surface the error rather than inventing a pin.
 - **Treating `detected` and `unsupported` as the same bucket.** Wrong — `detected` is auto-installable; `unsupported` requires explicit user confirmation before any install or dependency-file edit.
-- **Silently auto-scaffolding when `runtime: "unknown"`.** Wrong — picking the wrong span processor drops traces or wastes memory. Ask the user to disambiguate.
-- **Auto-scaffolding a decorator for a Tier B library** (e.g., `llamaindex`, `cohere`). Wrong — there is no fallback template for Tier B in v1. Direct the user to `pip install opentelemetry-instrumentation-<library>` and the manual `create_llm_span` pathway in `redaction.md`.
+- **Silently auto-scaffolding when `runtime: "unknown"` or when serverless signals are weak/partial.** Wrong — ask the user before picking a template. The wrong span processor drops traces or wastes memory.
+- **Treating decorators / `create_llm_span` as a *substitute* for an auto-instrumentor.** Wrong — they are independent. If an auto-instrumentor exists on PyPI, install it. Decorators and manual spans are additionally available for orchestration and bespoke LLM calls.
+- **Skipping `fetch_sdk_docs.py` for a library the static map doesn't know.** Wrong — `instrumentor_map.json` is a static detection convenience, not the canonical supported set. The supported set is whatever PyPI currently lists.
 - **Scaffolding a duplicate `mc.setup()` when `existing_setup.found: true`.** Wrong — duplicate setup produces duplicate spans. Route to the existing-setup decision matrix in `setup-template.md`.
 - **Scaffolding `mc.setup()` against an empty instrumentor list.** Wrong — exit cleanly with the no-match message instead.
 - **Editing `requirements.txt` / `pyproject.toml` / `Pipfile` without explicit user approval.** Wrong — always propose the diff and wait for confirmation. See SKILL.md's CRITICAL no-silent-edit guardrail.

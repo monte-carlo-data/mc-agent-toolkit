@@ -1,0 +1,35 @@
+name: Instrument Agent Skill Tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'skills/instrument-agent/**'
+      - '.github/workflows/instrument-agent-tests.yml'
+  pull_request:
+    paths:
+      - 'skills/instrument-agent/**'
+      - '.github/workflows/instrument-agent-tests.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # Both scripts use only the Python stdlib — no pip install needed.
+      # test_fetch_sdk_docs.py's e2e case monkey-patches PYPI_URL to an
+      # unreachable host on purpose, so no outbound network access is
+      # required for the suite to pass.
+      - name: Run detect_libraries tests
+        run: python3 skills/instrument-agent/scripts/test_detect_libraries.py
+
+      - name: Run fetch_sdk_docs tests
+        run: python3 skills/instrument-agent/scripts/test_fetch_sdk_docs.py

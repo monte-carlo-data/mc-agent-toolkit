@@ -1,8 +1,5 @@
 {
-  "$schema_note": "Fallback snapshot of the Monte Carlo OpenTelemetry SDK supported-instrumentor list. The skill prefers live data from PyPI (https://pypi.org/project/montecarlo-opentelemetry/) and the SDK README; this file is consulted only when live fetch fails. Each entry's version_constraint is what the SDK README documented at snapshot_date — re-run fetch_sdk_docs.py to confirm current constraints. additional_pins are transitive constraints required for the pinned instrumentor version to import cleanly (e.g. wrapt<2 for OpenLLMetry instrumentors that pass module= to wrap_function_wrapper, which wrapt 2.x renamed to target=).",
-  "snapshot_date": "2026-05-06",
-  "snapshot_source": "https://github.com/monte-carlo-data/montecarlo-opentelemetry/blob/main/README.md",
-  "stale_after_days": 90,
+  "$schema_note": "Static detection map for `detect_libraries.py`. Maps installed Python package names (covers_dependencies) to Monte Carlo OpenTelemetry instrumentor packages so the skill can recognize what to install for a given project offline. This file is NOT a fallback for `fetch_sdk_docs.py`: PyPI is the source of truth for the live supported-instrumentor list. The version_constraint here is a last-known-compatible value used to pin transitive resolution; re-run fetch_sdk_docs.py to confirm the current PyPI value. additional_pins are transitive constraints PyPI metadata does not expose (e.g. wrapt<2 for OpenLLMetry instrumentors that pass module= to wrap_function_wrapper, which wrapt 2.x renamed to target=).",
   "supported_instrumentors": [
     {
       "library": "langchain",

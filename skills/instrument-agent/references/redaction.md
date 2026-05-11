@@ -1,76 +1,172 @@
 # Redaction pathways (V1)
 
-Reference for the three V1 redaction pathways supported by the Monte Carlo
+Reference for the V1 redaction pathways supported by the Monte Carlo
 instrument-agent skill. Read this before generating any `mc.setup()` snippet
 or proposing instrumentation that touches LLM calls.
 
 ---
 
-## 1. Honest defaults — what the SDK captures and where it goes
+## 1. What the SDK captures by default — and where it lives
 
-> **CRITICAL — by default, prompt and completion content is sent to the OTLP
-> endpoint as span attributes.** Customers who handle sensitive data must opt
-> into one of the three pathways below before instrumenting. The default
-> `setup-template.md` snippet ships with prompt capture **disabled** to make
-> this an explicit opt-in rather than a surprise.
+> **CRITICAL — capture-on is the value proposition, not a footgun.** The
+> Monte Carlo OpenTelemetry SDK plus the `opentelemetry-instrumentation-*`
+> auto-instrumentors capture full LLM **prompt** and **completion** content
+> as span attributes whenever an instrumentor is loaded. This is the PRD's
+> core use case: low-lift auto-instrumentation that records what the agent
+> said and what the model said back.
 
 The four facts the customer needs to hear up front:
 
-1. **SDK default.** The Monte Carlo OpenTelemetry SDK plus the
-   `opentelemetry-instrumentation-*` packages capture full LLM **prompt** and
-   **completion** content as span attributes whenever an instrumentor is
-   loaded.
-2. **Capture destination.** That content is sent over OTLP to whatever URL
-   is configured in `mc.setup(otlp_endpoint=...)` — typically Monte Carlo's
-   collector.
-3. **Storage.** The content is stored alongside the rest of the trace in
-   MC's pipeline.
-4. **Mitigation.** Customers handling PII, PHI, credentials, or
-   customer-content under privacy contracts must pick one of the three V1
-   pathways below before any instrumentor is loaded in production.
+1. **SDK default.** When an OpenLLMetry instrumentor is loaded
+   (`opentelemetry-instrumentation-langchain`, `-openai`, `-anthropic`,
+   `-bedrock`, `-vertexai`, etc.), the auto-instrumentor wraps the LLM SDK
+   call directly and records full prompt and completion content as span
+   attributes. No decorator or manual span is required for capture.
+2. **Transport.** Spans are sent over OTLP to whatever endpoint is
+   configured in `mc.setup(otlp_endpoint=...)`. The default points at
+   Monte Carlo's hosted collector.
+3. **Data residency — traces live in the customer's environment.** The
+   MC-hosted collector is a write-back pass-through. It routes spans back
+   to the customer's storage and **does not persist trace content on
+   Monte Carlo's side.** Trace content stays in the customer's environment.
+4. **Collector choice is still a real question.** Even though residency is
+   fine, some customers prefer to run their own collector rather than
+   route through the MC-hosted one — for network-isolation reasons,
+   internal policy, or to avoid an external hop. The workflow's
+   collector-source question (Step 2) is still valid; don't conflate it
+   with a residency concern.
 
-This is fine for non-sensitive workloads. **It is a compliance footgun for
-regulated workloads** (HIPAA, FedRAMP, EU data residency, customer-content
-under privacy contracts).
+For most customers, ship with full capture. **Prompt/completion content is
+the most valuable thing the SDK records** — token counts and span shapes
+alone don't answer "why did the agent say that?"
 
 ---
 
-## 2. Pathway A — Manual `create_llm_span` with redacted `prompts_to_record`
+## 2. When customers want redaction
 
-**When to use.** The customer wants spans to record an audit trail of LLM
-calls, but wants the recorded version to be redacted (e.g., PII fields
-scrubbed, credentials removed, customer identifiers hashed).
+Most customers ship with full capture. A subset with stricter requirements
+choose to redact. Examples of stricter situations:
 
-**How.** Replace the auto-instrumentor's recording with a manual
-`mc.create_llm_span` call. Pass a redacted version of the messages to
-`prompts_to_record`. Send the un-redacted version to the LLM separately.
+- **HIPAA workloads** where prompts or completions can contain PHI, and
+  the customer's policy is that PHI never enters any tracing or
+  observability tool regardless of where it's stored.
+- **Customers whose contracts forbid PII in tracing tools** — some
+  enterprise contracts treat tracing systems as a separate data-handling
+  surface, independent of where the underlying data lives.
+- **Multi-tenant agents** where prompts contain another customer's content
+  and the operator wants to scrub before it lands in their own trace store.
+- **Credential / secret leakage risk** — agents that occasionally receive
+  API keys or tokens in user input.
 
-Real production example —
-[`monte-carlo-data/saas-serverless/ai-recommendations/llm_models/graph_creation.py @ ec2af0c L92`](https://github.com/monte-carlo-data/saas-serverless/blob/ec2af0ceb4346fa0489e010713b91bb5c0983f5d/ai-recommendations/llm_models/graph_creation.py#L92):
+Redaction is a choice for these customers, not a default privacy posture.
+The skill walks them through how to opt out of content capture (and
+optionally substitute placeholders) when they ask.
+
+---
+
+## 3. Mandatory step for any redaction: disable auto-instrumentor content capture (Pathway B)
+
+> **CRITICAL — Pathway B is a hard prerequisite for ALL redaction.** If
+> the customer keeps the auto-instrumentor with content capture on AND
+> also calls `mc.create_llm_span` with redacted prompts, they end up with
+> **duplicate spans** — one redacted (manual) and one with the full
+> content (auto). That defeats the redaction. Any redaction story starts
+> with disabling auto-capture.
+
+**How.** The OpenLLMetry instrumentors all read a single env var:
+`TRACELOOP_TRACE_CONTENT`. Set it to `"false"` to disable content capture
+across the entire OpenLLMetry instrumentor family.
+
+```bash
+export TRACELOOP_TRACE_CONTENT=false
+```
+
+Or in code, **before any instrumentor imports**:
 
 ```python
-# Redacted messages for tracing
-converted_messages = []
-redacted_messages = [{"role": "system", "content": system_prompt}]
-try:
-    converted_messages = _convert_prompt_messages(messages_for_tracing)
-    redacted_messages.extend(converted_messages)
-except ValueError as e:
-    logger.warning(f"Failed to convert messages for tracing: {e}")
+import os
+os.environ.setdefault("TRACELOOP_TRACE_CONTENT", "false")
+
+# Only AFTER the env var is set can the instrumentor imports be safe:
+import monte_carlo_observability_sdk as mc
+mc.setup(...)
+```
+
+> **NEVER document `OTEL_INSTRUMENTATION_<lib>_TRACE_PROMPTS`** as the
+> mechanism. Those env vars do not exist in the OpenLLMetry instrumentors.
+> `TRACELOOP_TRACE_CONTENT` is the single source of truth.
+
+**What is still captured under Pathway B:**
+
+- The full trace tree (workflow → task → span hierarchy).
+- Span timings and latency.
+- Token counts.
+- Model identifiers.
+- Tool call structure (which tools were called, in what order).
+
+**What is dropped:**
+
+- Prompt text.
+- Completion text.
+- Tool call argument values (depending on the instrumentor — verify
+  per-instrumentor before promising the customer this).
+
+For customers who want zero content but still want trace shape, this is
+the complete answer. For customers who want some content with sensitive
+fields scrubbed, layer Pathway A on top.
+
+---
+
+## 4. Optional additional layer: manual `mc.create_llm_span` with placeholder-substituted `prompts_to_record` (Pathway A)
+
+**When to use.** The customer has already disabled auto-capture (Pathway
+B above) and wants spans to record an audit trail of LLM calls with
+sensitive fields replaced by placeholders — instead of having no content
+at all.
+
+**How — the placeholder-substitution technique.** Keep **two sets of
+prompts** in memory:
+
+- One set with placeholder values where sensitive fields would go (e.g.,
+  `"<SSN>"`, `"<EMAIL>"`, `"<CUSTOMER_NAME>"`). This set is what gets
+  passed to `prompts_to_record`.
+- One set with the real sensitive values. This set is what gets sent to
+  the LLM.
+
+This is the technique Monte Carlo uses internally for our own agent
+observability. The structure of the recorded prompt is preserved (role,
+shape, non-sensitive context) while the sensitive fields are replaced
+with stable placeholders that are useful for debugging without leaking
+content.
+
+```python
+# Build two prompt sets: one with placeholders for tracing, one real for the LLM.
+redacted_messages = [
+    {"role": "system", "content": system_prompt},
+    {"role": "user", "content": f"Look up account for customer <CUSTOMER_NAME>"},
+]
+full_messages = [
+    {"role": "system", "content": system_prompt},
+    {"role": "user", "content": f"Look up account for customer {real_customer_name}"},
+]
 
 with mc.create_llm_span(
     span_name="anthropic.chat",
     provider="anthropic",
     model=model_name,
     operation="chat",
-    prompts_to_record=redacted_messages,  # <- redacted version recorded in span
+    prompts_to_record=redacted_messages,  # <- placeholder version recorded in span
 ) as span:
     # Send the FULL (un-redacted) version to the LLM:
     result = invoke_model(model, full_messages, logger, model_type)
 
     # Helpers populate response-side span attributes:
     mc.add_llm_response_model(span, model_config.bedrock_model)
-    mc.add_llm_completions(span, [{"role": "assistant", "content": str(result.content)}])
+    mc.add_llm_completions(
+        span,
+        # Redact the completion too if the response can contain sensitive content:
+        [{"role": "assistant", "content": redact_completion(str(result.content))}],
+    )
     mc.add_llm_tokens(
         span,
         prompt_tokens=result.usage.input_tokens,
@@ -79,132 +175,57 @@ with mc.create_llm_span(
     )
 ```
 
-The key idea: **`prompts_to_record`** is what gets stored in the span, and it
-can differ from what is actually sent to the LLM. The customer redacts before
-passing to `prompts_to_record`, then sends the un-redacted version through to
-the LLM separately.
+The key idea: **`prompts_to_record`** is what gets stored in the span, and
+it can differ from what is sent to the LLM. The customer builds the
+placeholder-substituted version and passes it to `prompts_to_record`; the
+real values go to the LLM separately.
 
 Walk-through points to cover with the customer:
 
-- `prompts_to_record` takes a list of `{"role": ..., "content": ...}` dicts.
-- The customer is responsible for the redaction logic. **The SDK does not
-  redact.**
-- Common redaction strategies:
-  - Regex-based PII scrubbing (SSN, credit card, email patterns).
-  - Structured redaction for known field names (e.g., scrub `password`,
-    `api_key`, `ssn`).
-  - Replacing entire prompt content with a hash + length (preserves "a
-    prompt of N chars happened" without the content).
-- The span context manager records request-side attributes. Helper
-  functions populate response-side attributes after the LLM call returns:
+- `prompts_to_record` takes a list of `{"role": ..., "content": ...}`
+  dicts. Shape it the same as `full_messages` so spans remain readable.
+- The customer is responsible for the substitution logic. **The SDK does
+  not redact.**
+- Pick stable placeholder tokens (e.g., `<SSN>`, `<EMAIL>`) so future
+  debuggers reading the trace can recognize the structure.
+- Response-side helpers populate span attributes after the LLM call:
   - `mc.add_llm_response_model(span, ...)` — model identifier of the
     response.
   - `mc.add_llm_completions(span, [...])` — completion content (also
-    accepts a redacted list).
+    accepts a placeholder-substituted list).
   - `mc.add_llm_tokens(span, prompt_tokens=..., completion_tokens=...,
     total_tokens=...)` — token counts (no content).
 
-> **NEVER** pass the un-redacted messages as `prompts_to_record`. The whole
-> point of this pathway is that the customer's redactor produces a separate
-> clean version for tracing. Mixing the two defeats the pathway entirely.
+> **NEVER** pass the un-substituted messages as `prompts_to_record`. The
+> whole point is that the placeholder version is what reaches the span.
+> Mixing the two defeats the pathway entirely.
 
-> **IMPORTANT** — the same redaction discipline applies to
-> `mc.add_llm_completions`. If the response can contain sensitive content
-> (e.g., a model that summarizes PII), the customer must redact before
-> passing to `add_llm_completions` too.
+> **IMPORTANT** — the same discipline applies to `mc.add_llm_completions`.
+> If the response can contain sensitive content (e.g., a model that
+> summarizes PHI), substitute placeholders in the completion before
+> passing it to `add_llm_completions` too. A scrubbed prompt with a raw
+> completion still leaks.
 
----
-
-## 3. Pathway B — Disable prompt/completion capture entirely
-
-**When to use.** The customer wants the trace tree (workflow / task / span
-hierarchy plus timings, latency, tokens) but does **not** want prompt or
-completion content captured anywhere.
-
-**How.** The OpenLLMetry instrumentors (`opentelemetry-instrumentation-langchain`,
-`-openai`, `-anthropic`, `-bedrock`, `-vertexai`, etc.) all read a single env
-var: `TRACELOOP_TRACE_CONTENT`. Set it to `"false"` to disable content capture
-across the entire OpenLLMetry instrumentor family.
-
-```bash
-export TRACELOOP_TRACE_CONTENT=false
-```
-
-The default `setup-template.md` snippet sets this in code via
-`os.environ.setdefault("TRACELOOP_TRACE_CONTENT", "false")` so the
-privacy-default-off posture is a guarantee, not a comment. An operator-set
-`TRACELOOP_TRACE_CONTENT=true` overrides the default (opt-in).
-
-> **NEVER document `OTEL_INSTRUMENTATION_<lib>_TRACE_PROMPTS`** as the
-> mechanism. Those env vars do not exist in the OpenLLMetry instrumentors
-> at `<=0.53.4`. The single source of truth is `TRACELOOP_TRACE_CONTENT`
-> for OpenLLMetry; for non-OpenLLMetry instrumentors, consult the specific
-> instrumentor's PyPI page.
-
-> **IMPORTANT — this is the default the skill's `setup-template.md` snippet
-> uses.** When the workflow's redaction question (step #3) returns "no — no
-> sensitive data," the skill **still** proposes the prompts-disabled snippet
-> with an explicit opt-in comment. Customers who want capture must edit the
-> env var consciously.
-
-What is still captured under Pathway B:
-
-- The full trace tree (workflow → task → span hierarchy).
-- Span timings and latency.
-- Token counts.
-- Model identifiers.
-- Tool call structure (which tools were called, in what order).
-
-What is dropped:
-
-- Prompt text.
-- Completion text.
-- Tool call argument values (depending on the instrumentor — verify per
-  instrumentor before promising the customer this).
+> **IMPORTANT** — decorators (e.g., `@trace_with_task`) only add
+> workflow/task metadata around a function. They do **not** gate what the
+> auto-instrumentor captures inside that function. If auto-capture is on,
+> the LLM SDK call is wrapped regardless of decorator presence. Pathway B
+> (env-var disable) is the only way to stop auto-capture.
 
 ---
 
-## 4. Pathway C — Selective manual instrumentation for sensitive sections
+## 5. Choosing pathway combinations
 
-**When to use.** Most of the agent is non-sensitive but a specific
-tool/path handles sensitive data (e.g., one tool reads from a PII database,
-the rest do not).
-
-**How.** A hybrid:
-
-- Keep the auto-instrumentor enabled with content capture turned **on** for
-  the bulk of the agent.
-- For the sensitive sections, **manually wrap** with
-  `mc.create_llm_span(prompts_to_record=...)` (Pathway A) so the customer
-  controls exactly what is recorded for those calls.
-- For non-LLM sensitive operations, skip the `@trace_with_task` decorator on
-  that function and let the auto-instrumentor's defaults apply only to the
-  surrounding code.
-
-This is the most surgical option. It requires the customer to know which
-functions are sensitive. The skill's job is to walk through the customer's
-code with them, mark the sensitive functions, and propose Pathway A for
-those — and Pathway B globally — as a hybrid.
-
-> **IMPORTANT** — Pathway C is easy to get wrong. If the customer
-> misidentifies even one sensitive function, the auto-instrumentor will
-> capture its prompts under the global default. When in doubt, default to
-> Pathway B and let the customer upgrade selectively.
-
----
-
-## 5. Choosing between pathways
-
-| Scenario | Recommended pathway |
+| Scenario | Recommended combination |
 |---|---|
-| Mostly non-sensitive, one or two sensitive tools | **C (selective)** — disable globally, manual span on sensitive paths |
-| All prompts could contain PII (e.g., customer support transcripts) | **A (redact)** — manual `create_llm_span` with a redactor function |
-| Compliance posture forbids any prompt content leaving the customer's network | **B (disable)** — keep the trace tree, drop the content |
-| Customer hasn't decided / ambiguous | **B + revisit** — start with B (no content capture); upgrade to A when they have a redactor |
+| No redaction needed — capture everything (default) | Leave auto-instrumentor alone with full content capture. No env var change, no manual spans. |
+| Want trace tree but **no** content at all | Pathway B alone — set `TRACELOOP_TRACE_CONTENT=false` before instrumentor imports. |
+| Want trace tree + selective content with placeholders | Pathway B + Pathway A — disable auto-capture, then call `mc.create_llm_span` with placeholder-substituted `prompts_to_record` (and `add_llm_completions`) at sensitive call sites. |
 
-> **IMPORTANT — default the skill's first proposal to Pathway B** unless the
-> customer explicitly opts into capturing content. "I don't think my prompts
-> are sensitive" is not an opt-in. Pathway B with a clear opt-in path is.
+> **IMPORTANT — do not propose Pathway A without Pathway B.** Without the
+> env-var disable, the auto-instrumentor and the manual span both fire,
+> producing duplicate spans (one redacted, one full-content). The
+> redaction is silently undone.
 
 ---
 
@@ -212,13 +233,15 @@ those — and Pathway B globally — as a hybrid.
 
 > **OUT OF SCOPE for v1** — The skill does **not** auto-detect sensitive
 > content (no automatic PII scanning) and does **not** scaffold redactor
-> functions for the customer. The PRD lists those as future work.
+> or placeholder-substitution functions for the customer. The PRD lists
+> those as future work.
 
-The skill is *conversant* in the three pathways above and walks the customer
-through them. **The customer writes their redactor.** If a customer asks the
-skill to "build me a redactor," the correct response is to walk them through
-Pathway A with their existing redaction utility (or to recommend they write
-one) — not to scaffold one in their codebase.
+The skill is *conversant* in the pathways above and walks the customer
+through them. **The customer writes their substitution logic.** If a
+customer asks the skill to "build me a redactor," the correct response is
+to walk them through Pathway B + A with their existing utilities (or to
+recommend they write the substitution helpers themselves) — not to
+scaffold one in their codebase.
 
 ---
 
@@ -227,40 +250,53 @@ one) — not to scaffold one in their codebase.
 When proposing a redaction pathway, the SKILL.md rule applies to every
 single code change:
 
-- **Pathway A** → propose the manual span wrap as a diff to the relevant
-  function. Wait for per-file approval. Don't auto-apply.
-- **Pathway B** → propose the env var documentation in the relevant config
-  (e.g., `.env.example` or a README note). Wait for approval.
-- **Pathway C** → walk through the customer's code, propose specific
-  function-level diffs. Wait for per-file approval.
+- **Pathway B** → propose the env var setting in the relevant config
+  (e.g., `.env.example`, deployment manifest, or the `mc.setup()` module
+  with `os.environ.setdefault(...)` before imports). Wait for per-file
+  approval.
+- **Pathway A (layered on B)** → propose the manual span wrap as a diff
+  to the relevant function. Wait for per-file approval. Don't auto-apply.
 
-> **NEVER** apply a redaction pathway in the customer's repo without their
-> explicit approval for that specific file. Redaction changes touch the
-> data plane; a wrong default here can leak PII into traces or silently
-> drop content the customer expected to see.
+> **NEVER** apply a redaction pathway in the customer's repo without
+> their explicit approval for that specific file. Redaction changes
+> touch the data plane; a wrong default here can leak sensitive content
+> into traces or silently drop content the customer expected to see.
 
 ---
 
 ## Common mistakes
 
-- **Auto-applying Pathway B as default without flagging the privacy
-  implications.** The customer needs to know what the SDK captures by
-  default, even when you're recommending the safer option. Don't bury the
-  default behavior — name it.
-- **Passing un-redacted messages to `prompts_to_record`.** Defeats the
-  entire purpose of Pathway A. Always confirm the customer's redactor runs
-  before the value reaches `prompts_to_record`.
-- **Treating "no, my prompts aren't sensitive" as a license to capture
-  everything.** Still default-disable. Customers can change their minds
-  when their use case evolves; capture content only when they explicitly
-  opt in.
-- **Auto-scaffolding a redactor function.** Out of scope for v1. Walk the
-  customer through the pathway; they write the redactor.
-- **Skipping the redaction question in the workflow.** Step #3 is
-  non-optional. Always ask before generating `mc.setup()`.
+- **Treating env-var disable as optional when redaction is wanted.**
+  Pathway B is mandatory for any redaction story. Without it, the
+  auto-instrumentor still fires alongside the manual span and produces
+  duplicate spans — one redacted, one full-content. The redaction is
+  defeated.
+- **Misstating data residency.** Trace content lives in the customer's
+  environment. The MC-hosted collector routes spans back to the customer's
+  storage without persisting content on the MC side. Don't tell customers
+  "MC stores your prompts" — that's wrong.
+- **Framing redaction as a privacy default.** Capture-on is the value
+  proposition. Redaction is a choice for stricter customers, not a
+  required privacy posture.
+- **Recommending lossy fingerprints (e.g., hashing the prompt with its
+  character count) as the primary technique.** Placeholder-substitution
+  is the recommended
+  structured technique — it preserves prompt shape and is useful for
+  debugging. Hashes throw away the structure that makes the trace
+  readable.
+- **Assuming decorators gate auto-capture.** They don't. The
+  auto-instrumentor wraps the LLM SDK call regardless of whether the
+  surrounding function is decorated. Only `TRACELOOP_TRACE_CONTENT=false`
+  stops auto-capture.
+- **Setting `TRACELOOP_TRACE_CONTENT` *after* instrumentor imports.** Too
+  late — the instrumentors read the env var at import/init time. Set it
+  before any `mc.setup()` or instrumentor import runs.
+- **Passing un-substituted messages to `prompts_to_record`.** Defeats
+  the entire purpose of Pathway A. Confirm the placeholder version is
+  what reaches `prompts_to_record`.
 - **Forgetting that completions are content too.** Pathway A applies to
-  `mc.add_llm_completions` as well. A redacted prompt with an un-redacted
-  completion still leaks.
-- **Recommending Pathway C without auditing every LLM call site.** A single
-  missed call site under a global "capture on" default leaks. When in
-  doubt, recommend B as the global default and layer A surgically.
+  `mc.add_llm_completions` as well. A placeholder-substituted prompt
+  with a raw completion still leaks.
+- **Auto-scaffolding a redactor or substitution helper.** Out of scope
+  for v1. Walk the customer through the pathway; they write the
+  substitution logic.

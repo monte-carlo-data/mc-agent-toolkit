@@ -36,7 +36,7 @@ This applies to any suspendable runtime — AWS Lambda, Google Cloud Functions, 
 
 ### Fix
 
-Propose a diff switching to the serverless template from `setup-template.md`. Cite the production reference: [`monte-carlo-data/saas-serverless/ai-recommendations/common/tracing.py @ ec2af0c L5`](https://github.com/monte-carlo-data/saas-serverless/blob/ec2af0ceb4346fa0489e010713b91bb5c0983f5d/ai-recommendations/common/tracing.py#L5). The change is two lines (import + kwarg). Wait for per-file approval before applying.
+Propose a diff switching to the serverless template from `setup-template.md`. The change is two lines (import + kwarg). Wait for per-file approval before applying.
 
 ## 4. Failure mode #2 — SDK init not running
 
@@ -68,7 +68,7 @@ Only applies if the customer is using the MC-hosted collector (`https://integrat
 - Are `MCD_DEFAULT_API_ID` and `MCD_DEFAULT_API_TOKEN` both set in the runtime env (Lambda env vars, container env, dev shell, etc.)? Use presence-only checks.
 - Or is the customer using `OTEL_EXPORTER_OTLP_HEADERS=x-mcd-id=...,x-mcd-token=...`?
 - Are the values current (not rotated)?
-- **If the customer is on the serverless template (custom `span_processor`), is the auth path made explicit at exporter-construction time?** `mc.setup()` only auto-injects auth headers when it builds the default exporter; with a custom `span_processor` the customer constructs the `OTLPSpanExporter`, so the auth path must be picked explicitly. Three valid shapes: (a) `MCD_DEFAULT_*` env vars + `OTLPSpanExporter(endpoint=..., headers={"x-mcd-id": ..., "x-mcd-token": ...})`; (b) `OTEL_EXPORTER_OTLP_HEADERS` env var + `OTLPSpanExporter(endpoint=...)` with no explicit `headers=` (the exporter reads the env var); (c) self-hosted collector + `OTLPSpanExporter(endpoint=...)` with no headers (auth at the collector). If none of those match, env vars may exist but never reach the wire — symptom looks like missing credentials but the actual bug is the exporter is unauthenticated. See the upstream README's [Auth headers note](https://github.com/monte-carlo-data/montecarlo-opentelemetry/blob/main/README.md#serverless-and-other-suspendable-runtimes).
+- **If the customer is on the serverless template (custom `span_processor`), is the auth path made explicit at exporter-construction time?** `mc.setup()` only auto-injects auth headers when it builds the default exporter; with a custom `span_processor` the customer constructs the `OTLPSpanExporter`, so the auth path must be picked explicitly. Three valid shapes: (a) `MCD_DEFAULT_*` env vars + `OTLPSpanExporter(endpoint=..., headers={"x-mcd-id": ..., "x-mcd-token": ...})`; (b) `OTEL_EXPORTER_OTLP_HEADERS` env var + `OTLPSpanExporter(endpoint=...)` with no explicit `headers=` (the exporter reads the env var); (c) self-hosted collector + `OTLPSpanExporter(endpoint=...)` with no headers (auth at the collector). If none of those match, env vars may exist but never reach the wire — symptom looks like missing credentials but the actual bug is the exporter is unauthenticated. See the SDK docs on PyPI (https://pypi.org/project/montecarlo-opentelemetry/) for the current auth-header guidance.
 
 ### Fix
 
@@ -90,7 +90,7 @@ The instrumentor package version is incompatible with the SDK version, or with t
 
 ### Fix
 
-- Re-run `pip install` with the constraint from the live PyPI snapshot.
+- Re-run `pip install` with the current constraint from PyPI (via `python3 scripts/fetch_sdk_docs.py`).
 - If the instrumentor doesn't yet support the AI library version, propose pinning the AI library to a compatible version, OR consult the instrumentor's PyPI page for upcoming compatibility.
 
 > **CRITICAL — never edit `requirements.txt` / `pyproject.toml` / `Pipfile` without explicit per-file approval.** If a version pin needs to change, propose the diff and wait. See `SKILL.md`.
