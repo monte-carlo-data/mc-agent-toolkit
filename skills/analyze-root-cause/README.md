@@ -32,6 +32,11 @@ Connect to Monte Carlo's MCP server (`integrations.getmontecarlo.com/mcp`). The 
 | `get_etl_jobs` | Find ETL jobs writing to tables (Airflow, dbt, Databricks) — pass `platform` param |
 | `get_github_prs` | Recent GitHub PRs (via MC's GitHub integration) |
 | `get_jobs_performance` | Job runtime stats, failure rates, trends |
+| `alert_assessment` | Optional ~2-min triage of an incident (HIGH/MEDIUM/LOW confidence + impact) |
+| `run_troubleshooting_agent` | Starts the Troubleshooting Agent (TSA) on an incident; auto-invoked when an incident UUID is present |
+| `get_troubleshooting_agent_results` | Polls TSA results for an incident |
+
+> **Credits:** `alert_assessment` and `run_troubleshooting_agent` consume Monte Carlo credits the same way the Troubleshooting Agent does when launched from the Monte Carlo UI.
 
 **Optional:** A database MCP server (Snowflake, BigQuery, Redshift) for direct SQL queries.
 
@@ -48,18 +53,23 @@ Connect to Monte Carlo's MCP server (`integrations.getmontecarlo.com/mcp`). The 
 ```
 Intake (alert ID or user description)
     ↓
-Map blast radius (upstream + downstream lineage)
-    ↓
-Investigate by issue type (freshness / volume / schema / ETL / query / field)
-    ↓
-Check upstream causes (walk lineage chain)
-    ↓
-Profile data (if DB connector available)
-    ↓
-Check code changes (GitHub MCP or MC query changes)
-    ↓
-Synthesize: root cause + evidence + impact + fix
+Auto-invoke TSA (if incident UUID + not opt-out + not narrow check)  ─┐
+    ↓                                                                  │
+Map blast radius (upstream + downstream lineage)                       │ TSA runs
+    ↓                                                                  │ async in
+Investigate by issue type (freshness / volume / schema / ETL / query)  │ parallel
+    ↓                                                                  │
+Check upstream causes (walk lineage chain)  ── poll TSA #1 ────────────┤
+    ↓                                                                  │
+Profile data (if DB connector available)                               │
+    ↓                                                                  │
+Check code changes (GitHub MCP or MC query changes)                    │
+    ↓                                                                  │
+Synthesize: root cause + evidence + impact + fix  ── poll TSA #2 ─────┘
+                                                    + merge findings
 ```
+
+When intake has no incident UUID, when the user explicitly opts out, or when the request is a narrow scoped check (e.g. "is X stale right now?"), TSA is skipped and the manual flow runs alone.
 
 ## Reference files
 

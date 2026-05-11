@@ -2,6 +2,8 @@
 
 Claude Code plugin that brings Monte Carlo data observability into your editor. Bundles skills, hooks, commands, and permissions for all Monte Carlo features in a single plugin.
 
+**Requires Python 3.10+.**
+
 ## Installation
 
 ### Via Marketplace (recommended)

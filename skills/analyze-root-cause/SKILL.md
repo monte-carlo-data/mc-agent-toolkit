@@ -71,6 +71,11 @@ Do not activate when the user is:
 | `get_jobs_performance` | Job runtime stats, failure rates, 7-day trends |
 | `get_change_timeline` | Unified timeline: query changes + volume + ETL failures |
 | `get_current_time` | Current timestamp for relative time ranges |
+| `alert_assessment` | Optional ~2-min triage of an incident — returns HIGH/MEDIUM/LOW confidence and impact. Useful when you want a quick read before deciding to escalate to TSA. |
+| `run_troubleshooting_agent` | Starts the Troubleshooting Agent (TSA) on an incident. Async by default; idempotent (returns existing results unless `force_rerun=True`). Auto-invoked at Step 1.5 when an incident UUID is present. |
+| `get_troubleshooting_agent_results` | Polls TSA results for an incident (`status` is `not_found` / `running` / `success` / `failed`). Use to check on the async run started at Step 1.5. |
+
+> **Credits:** `alert_assessment` and `run_troubleshooting_agent` consume Monte Carlo credits the same way the Troubleshooting Agent does when launched from the Monte Carlo UI. Each fresh `run_troubleshooting_agent` call is a billable run; reuse via the built-in idempotency (don't pass `force_rerun=True` unless the user explicitly asks for a fresh analysis).
 
 ### Optional external MCP tools
 
@@ -98,7 +103,32 @@ Read `references/intake-no-incident.md` for the full intake flow. In short:
 4. Check table health: `get_table_freshness`, `get_table_size_history`
 5. Narrow down the issue type and proceed to Step 2.
 
+### Step 1.5: Auto-invoke TSA (when applicable)
+
+When intake produces a Monte Carlo **incident UUID**, kick off the Troubleshooting Agent (TSA) **before** continuing to Step 2. TSA runs the same root-cause analysis the Monte Carlo UI uses; running it here in parallel with the manual investigation usually beats running either path alone.
+
+**Skip TSA when any of these is true:**
+
+1. **No incident UUID.** `run_troubleshooting_agent` requires a UUID. The no-incident intake path (`references/intake-no-incident.md`) does not feed TSA. If that path later identifies a matching alert, return to Step 1 with the alert's incident UUID — Step 1.5 then applies normally.
+2. **Narrow scoped check.** The user wants a single fact, not an investigation. Examples: "is `analytics.orders` stale right now?", "what's the row count of X?", "show me the schema of Y", "did this query run today?". Answer the question with the relevant tool and stop. TSA is overkill for these.
+3. **Explicit user opt-out.** The user says "skip TSA", "don't run TSA", "manual only", "just do it yourself", or similar. Honor the opt-out and proceed to Step 2 without invoking TSA.
+
+**Default invocation (async, parallel):**
+
+```
+run_troubleshooting_agent(incident_id="<uuid>", async_mode=True)
+```
+
+- The tool is **idempotent** by default: if a previous successful TSA run exists for this incident, it returns those results immediately. Do **not** pass `force_rerun=True` unless the user explicitly asks for a fresh analysis (each fresh run is a billable Monte Carlo credit consumption).
+- If status is `success` on the first call, you have results — fold them straight into Step 7's synthesis and continue Steps 2–6 to corroborate.
+- If status is `queued` or `running`, continue to Step 2 immediately. TSA typically completes in 4–8 minutes; you'll poll for results via `get_troubleshooting_agent_results` later in the flow (see Step 4 and Step 7).
+- If status is `failed`, note the error and continue with the manual investigation only — do not re-run automatically.
+
+Tell the user what you started: "I've kicked off the Troubleshooting Agent on this incident — it usually finishes in 4–8 minutes. While it runs, I'll continue investigating manually so we have findings either way."
+
 ### Step 2: Map the blast radius
+
+> **TSA in parallel:** if you started TSA at Step 1.5, it is running in the background while you do this step. Do not block on it.
 
 1. Call `get_asset_lineage(mcons=[table_mcon], direction="UPSTREAM")` — what feeds this table?
 2. Call `get_asset_lineage(mcons=[table_mcon], direction="DOWNSTREAM")` — what does this table feed?
@@ -132,6 +162,8 @@ Data issues often originate upstream. Walk the lineage chain:
 2. Use `get_field_lineage` to trace the specific field that has bad data back to its source.
 3. Check what upstream field values correlate with the anomaly (if DB connector is available — see Step 5).
 
+**TSA poll #1.** If you started TSA at Step 1.5 and it has not yet returned `success`, call `get_troubleshooting_agent_results(incident_id=...)` once here (~30s after Step 1.5). If status is `success`, hold the result for Step 7. If still `running`, keep going — you'll poll again before Step 7. Don't block on it.
+
 ### Step 5: Profile data (if database MCP is available)
 
 If the user has a database MCP server connected (Snowflake, BigQuery, Redshift, Databricks, etc.), read `references/data-exploration.md` for SQL investigation patterns including:
@@ -152,6 +184,8 @@ Also call `get_query_changes` with the affected table MCONs to detect SQL text m
 
 ### Step 7: Synthesize and present
 
+**TSA poll #2.** If you started TSA at Step 1.5 and don't yet have results, call `get_troubleshooting_agent_results(incident_id=...)` one more time (~60–90s after poll #1). Stop on `success` or `failed`; if still `running` after this poll, present the manual findings now and tell the user TSA is still working ("TSA is still running on this incident — I'll fold its findings in once it completes if you'd like, or you can ask me to check back in a minute").
+
 Read `references/common-root-causes.md` to match findings against known patterns. Present:
 
 1. **Root cause** — what happened and when, with evidence from tools
@@ -159,6 +193,13 @@ Read `references/common-root-causes.md` to match findings against known patterns
 3. **Impact** — what downstream tables/consumers are affected (from Step 2)
 4. **Recommended fix** — specific action to resolve the issue
 5. **Prevention** — suggest monitoring to catch this earlier next time
+
+**Merging TSA findings:**
+
+- **TSA succeeded and agrees with the manual investigation** — lead with the unified root cause; cite both TSA's evidence chain and the corroborating manual findings.
+- **TSA succeeded and contradicts the manual investigation** — surface both. Show TSA's verdict, show what the manual investigation found, and explain the disagreement (e.g. "TSA blames the upstream Airflow job, but `get_table_freshness` on that table is healthy"). Ask the user which thread they want to pull on.
+- **TSA succeeded with low-signal output** (e.g. "no clear root cause") — present the manual findings as primary; cite TSA as a corroborating null result.
+- **TSA failed or timed out** — present the manual findings only; mention TSA's failure briefly so the user knows it was tried.
 
 ---
 
@@ -170,3 +211,5 @@ Read `references/common-root-causes.md` to match findings against known patterns
 - **Be specific about what you can't check.** If no DB connector is available, explain what additional investigation would be possible with one.
 - **Never expose MCONs, UUIDs, or internal identifiers** to the user. Use human-readable table names.
 - **Cross-platform awareness.** ETL issues can come from Airflow, dbt, or Databricks. Check all platforms that are relevant.
+- **Do not invoke TSA without an incident UUID.** `run_troubleshooting_agent` requires one. If intake is on the no-incident path, skip TSA entirely until/unless an alert is identified.
+- **Honor explicit user opt-outs.** If the user says "skip TSA", "manual only", or similar, do not call `run_troubleshooting_agent` or `alert_assessment` — proceed with the manual investigation only.

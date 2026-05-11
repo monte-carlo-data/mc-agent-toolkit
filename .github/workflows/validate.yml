@@ -1,0 +1,30 @@
+name: Validate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  no-symlinks-under-hooks:
+    name: No symlinks under plugins/<editor>/hooks/
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Find symlinks under hooks/
+        run: |
+          set -euo pipefail
+          symlinks=$(find plugins/claude-code plugins/cursor plugins/copilot plugins/codex \
+            -path '*/hooks/*' -type l 2>/dev/null || true)
+          if [[ -n "$symlinks" ]]; then
+            echo "::error::Symlinks under plugins/<editor>/hooks/ break marketplace installation."
+            echo "::error::The plugin cache materializes <editor>/ but not sibling plugins/shared/,"
+            echo "::error::so relative symlinks pointing outside the editor's subtree become dangling."
+            echo "::error::Use real file copies; edit plugins/shared/<skill>/lib/ and run"
+            echo "::error::./scripts/bump-version.sh --sync-only to propagate."
+            echo ""
+            echo "Offending symlinks:"
+            echo "$symlinks"
+            exit 1
+          fi
+          echo "OK: no symlinks under plugins/<editor>/hooks/"

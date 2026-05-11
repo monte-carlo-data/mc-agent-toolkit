@@ -11,6 +11,13 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - **Instrument Agent skill** — walks Monte Carlo Agent Observability customers through instrumenting a new Python AI agent for Monte Carlo. Detects AI libraries in the codebase, proposes the Monte Carlo OpenTelemetry SDK install with matching instrumentors, generates tracing setup tailored to serverless or long-running runtimes, suggests where workflow and task decorators belong, and verifies traces appear in Monte Carlo. Always asks before editing any file. Trigger by asking to "instrument my agent" or "set up Monte Carlo tracing".
 
+## [1.10.5] - 2026-05-11
+
+### Changed
+
+- 1b2f114 fix(hooks): replace lib symlinks with real file copies (#82)
+- 39c4dd6 AI-256: analyze-root-cause runs TSA first when an incident UUID is present (#79)
+
 ## [1.10.3] - 2026-05-06
 
 ### Changed
