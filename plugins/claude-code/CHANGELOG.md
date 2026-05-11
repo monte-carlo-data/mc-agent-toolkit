@@ -5,6 +5,13 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Claude Code will
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.5] - 2026-05-11
+
+### Changed
+
+- 1b2f114 fix(hooks): replace lib symlinks with real file copies (#82)
+- 39c4dd6 AI-256: analyze-root-cause runs TSA first when an incident UUID is present (#79)
+
 ## [1.10.4] - 2026-05-08
 
 ### Fixed
