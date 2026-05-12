@@ -47,7 +47,7 @@ The setup code exists in the codebase but is never executed at runtime. Common b
 - Is `mc.setup()` defined in a module that's actually imported at agent startup? (Common bug: `mc.setup()` lives in `tracing.py` but `tracing.py` is never imported.)
 - Is the import path correct? `import montecarlo_opentelemetry as mc` should not raise `ModuleNotFoundError`.
 - Is `mc.setup()` called at the top level of the module (or in an `init_tracing()` function that's actually invoked)?
-- If wrapped in a guard like `if MC_OTEL_ENDPOINT:`, is the env var set? Print **presence** (NOT value) to confirm.
+- If wrapped in a guard like `if otel_endpoint:`, is `OTEL_ENDPOINT` set? Print **presence** (NOT value) to confirm.
 
 ### Fix
 

@@ -99,7 +99,7 @@ After the customer's agent runs and emits OTLP spans:
 
 ### Optional: local verification with a desktop OTLP receiver
 
-When the customer wants to confirm the instrumentation produces valid OTLP spans *before* pointing at MC's collector — for example, while iterating in dev — they can run a local OTLP receiver and temporarily set `MC_OTEL_ENDPOINT` to it. [`otel-desktop-viewer`](https://github.com/CtrlSpice/otel-desktop-viewer) is a single-binary receiver with a browser UI that makes the trace tree easy to inspect (the Docker image listens on `4317` for gRPC, `4318` for HTTP, and serves the UI on `8000`).
+When the customer wants to confirm the instrumentation produces valid OTLP spans *before* pointing at MC's collector — for example, while iterating in dev — they can run a local OTLP receiver and temporarily set `OTEL_ENDPOINT` to it. [`otel-desktop-viewer`](https://github.com/CtrlSpice/otel-desktop-viewer) is a single-binary receiver with a browser UI that makes the trace tree easy to inspect (the Docker image listens on `4317` for gRPC, `4318` for HTTP, and serves the UI on `8000`).
 
 This is **not** a substitute for the MC-side `get_agent_metadata` check — only the latter proves the trace reached Monte Carlo. But it is useful for:
 
