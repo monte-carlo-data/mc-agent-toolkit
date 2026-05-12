@@ -99,7 +99,7 @@ Edit `<skill>/live-evals-<env>.yaml`. All cases use the `turns` format:
     - prompt: "Your prompt here"
       criteria:
         must_call: [get_warehouses]
-        must_not_call: [create_table_monitor_mac]
+        must_not_call: [create_or_update_table_monitor]
         output_must_not_contain: ["MCON++"]
   criteria:
     judge_rubric: |

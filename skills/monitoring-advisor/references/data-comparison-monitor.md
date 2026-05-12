@@ -1,6 +1,6 @@
 # Comparison Monitor Reference
 
-Detailed reference for building `create_comparison_monitor_mac` tool calls.
+Detailed reference for building `create_or_update_comparison_monitor` tool calls. The tool follows the **two-call preview-then-confirm pattern** — see `data-monitor-creation.md` for the full flow.
 
 ## Critical Constraints
 
@@ -49,6 +49,16 @@ Before constructing alert conditions, you MUST verify that both tables exist and
 | `target_warehouse` | string | Warehouse name or UUID for the target table. Required if `target_table` is not an MCON. |
 | `segment_fields` | array of string | Fields to segment the comparison by. Must exist in BOTH tables with the same name. |
 | `domain_uuids` | array of string (uuid) | Domain UUIDs (use `get_domains` to list). Data monitors accept exactly one UUID in the list. |
+| `schedule_type` | string | Schedule type: `"fixed"` (default), `"dynamic"`, `"manual"`. |
+| `interval_minutes` | int | Schedule interval in minutes (only for `schedule_type="fixed"`). |
+| `audiences` | array of string | Notification audience **names** (not UUIDs) to alert when the monitor triggers. |
+| `failure_audiences` | array of string | Notification audience names to alert on query execution failures. |
+| `notes` | string | Free-text notes shown in the UI (separate from `description`). |
+| `priority` | string | Monitor priority (e.g. `"P1"`, `"P2"`). |
+| `tags` | array of `{name, value}` | Key-value tags to attach. |
+| `is_draft` | bool | When `True`, saves the monitor as a draft (not active). Default `False`. |
+| `monitor_uuid` | string (uuid) | UUID of an existing monitor to update in place. Omit to create a new monitor. Look up via `get_monitors` or use the UUID returned by a previous `dry_run=False` call. |
+| `dry_run` | bool | Default `True`. Preview mode. When omitted or `True`, returns YAML preview in `result.yaml`. When `False`, actually creates/updates the monitor and returns `result.monitor_uuid` + a deep link in `result.instructions`. See `data-monitor-creation.md`. |
 
 ---
 

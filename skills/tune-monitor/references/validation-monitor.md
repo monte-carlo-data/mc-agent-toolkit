@@ -97,16 +97,25 @@ If TSA is absent and the monitor is noisy, say so explicitly:
 
 ## Applying changes
 
-Use `create_validation_monitor` to update the monitor.
+Use `create_or_update_validation_monitor` to update the monitor in place.
 
-1. **Always pass the existing identifier** to update rather than create a new monitor.
-2. **Always preview first** — show the user the full updated `alert_condition` tree and ask
-   for confirmation before applying.
-3. **On confirmation**, apply the change.
+1. **Always pass `monitor_uuid=<uuid>`** so the tool updates the existing monitor rather than
+   creating a new one. Use the monitor UUID from Phase 1.
+2. **Always dry-run first** (`dry_run=True`, the default) — show the user the YAML preview
+   returned in `result.yaml`, including the full updated `alert_condition` tree, and ask for
+   confirmation before applying.
+3. **On confirmation**, call again with `dry_run=False` (and the same `monitor_uuid` plus the
+   same other parameters). The response carries the monitor's UUID in `result.monitor_uuid` and
+   a deep link in `result.instructions` — surface that to the user. `result.yaml` is `None` on
+   the live call by design.
+4. **Stale-uuid handling.** If the monitor was deleted between read and write, the tool raises a
+   clear error instructing you to retry without `monitor_uuid` (turning the intent from "update"
+   into "create"). Confirm with the user before recreating.
 
 ### Common mistakes
 
-- **NEVER** apply changes without showing the preview first.
+- **NEVER** omit `monitor_uuid` — this creates a duplicate monitor instead of updating.
+- **NEVER** apply changes without showing the dry-run preview first.
 - **CRITICAL:** The `alert_condition` must be a dict (JSON object), never a JSON-encoded string.
 - **IMPORTANT:** Always produce the full `alert_condition` tree, not just the changed node.
   The tool replaces the entire condition tree.

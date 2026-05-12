@@ -5,7 +5,7 @@ when_to_use: |
   Invoke when the user wants to tune, reduce noise on, or adjust sensitivity for a Monte Carlo monitor.
   Example triggers: "tune monitor <uuid>", "this monitor is too noisy", "reduce alerts on this monitor", "adjust sensitivity for <uuid>".
 bucket: Monitoring
-version: 1.0.0
+version: 1.1.0
 ---
 
 # Tune Monitor: Noise Reduction Analysis
@@ -38,12 +38,14 @@ them:
 |---|---|
 | `get_monitor_report` | Fetch a monitor's alert history, incident details, and troubleshooting summaries |
 | `get_monitors` | Fetch monitor configuration (type, thresholds, schedule, segments) |
-| `create_metric_monitor` | Update a metric monitor's configuration (used in Phase 5) |
-| `create_custom_sql_monitor` | Update a custom SQL monitor's configuration (used in Phase 5) |
-| `create_validation_monitor` | Update a validation monitor's configuration (used in Phase 5) |
+| `create_or_update_metric_monitor` | Update a metric monitor in place (pass `monitor_uuid`; used in Phase 5) |
+| `create_or_update_sql_monitor` | Update a custom SQL monitor in place (pass `monitor_uuid`; used in Phase 5) |
+| `create_or_update_validation_monitor` | Update a validation monitor in place (pass `monitor_uuid`; used in Phase 5) |
 | `tune_freshness_table_monitor` | Tune freshness sensitivity/threshold for a table (used in Phase 5) |
 | `tune_volume_change_table_monitor` | Tune volume change sensitivity/threshold for a table (used in Phase 5) |
 | `tune_unchanged_size_table_monitor` | Tune unchanged size sensitivity/threshold for a table (used in Phase 5) |
+
+All three `create_or_update_*_monitor` tools follow a **two-call preview-then-confirm pattern**: the first call (with the default `dry_run=True`) returns the rendered MaC YAML for review in `result.yaml`; the second call (`dry_run=False`) deploys the change live and returns a deep link in `result.instructions`. **Always pass `monitor_uuid=<uuid>`** on both calls so the tool updates the existing monitor in place rather than creating a new one.
 
 ---
 

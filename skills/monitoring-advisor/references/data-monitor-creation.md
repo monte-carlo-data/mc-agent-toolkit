@@ -1,8 +1,15 @@
 # Data Monitor Creation Procedure
 
-This is the data monitor creation procedure for Monte Carlo warehouse tables. Use this reference when a user wants to create monitors for their data warehouse tables -- it walks through the full workflow from understanding the request through generating monitors-as-code (MaC) YAML.
+This is the data monitor creation procedure for Monte Carlo warehouse tables. Use this reference when a user wants to create monitors for their data warehouse tables -- it walks through the full workflow from understanding the request through generating monitors-as-code (MaC) YAML and (optionally) deploying the monitor.
 
-All creation tools run in **dry-run mode** and return MaC YAML. No monitors are created directly -- the user applies the YAML via the Monte Carlo CLI or CI/CD.
+All five `create_or_update_*_monitor` tools follow a **two-call preview-then-confirm pattern**:
+
+1. **First call -- preview.** Invoke with `dry_run=True` (this is the default -- you can omit the argument). The tool returns rendered MaC YAML in `result.yaml` and a DRY RUN notice in `result.instructions`. Show the YAML to the user and confirm.
+2. **Second call -- live create/update.** After the user confirms, invoke the same tool again with `dry_run=False` and the same other parameters. The tool actually creates or updates the monitor and returns `result.monitor_uuid` plus a `result.instructions` string containing a deep link `<webapp_url>/monitors/<monitor_uuid>` to the live monitor. `result.yaml` is intentionally `None` on this call -- the monitor is already deployed.
+
+To **update an existing monitor** instead of creating a new one, pass its `monitor_uuid`. This works on both the preview and live calls. To save the monitor as a draft (not active), pass `is_draft=True`.
+
+The user may also choose to skip the live call and take the preview YAML themselves and apply it via the Monte Carlo CLI or CI/CD. Always present the YAML on the preview call regardless.
 
 ---
 
@@ -89,12 +96,15 @@ For all other monitor types, the creation tools default to a fixed schedule runn
 
 1. **Fixed interval** -- any integer for `interval_minutes` (30, 60, 90, 120, 360, 720, 1440, etc.)
 2. **Dynamic** -- MC auto-determines when to run based on table update patterns.
-3. **Loose** -- runs once per day.
+3. **Manual** -- runs only on demand.
 
-Schedule format in MaC YAML:
-- Fixed: `schedule: { type: fixed, interval_minutes: <N> }`
-- Dynamic: `schedule: { type: dynamic }`
-- Loose: `schedule: { type: loose, start_time: "00:00" }`
+Pass the user's choice to the creation tool as `schedule_type` and (for fixed schedules) `interval_minutes`. **Both the preview (`dry_run=True`) and the live (`dry_run=False`) call must use the same schedule arguments** -- the tool re-renders the schedule from these parameters when it deploys, so editing the `schedule` section of the preview YAML by hand does NOT change what the live call creates. Without explicit arguments the backend falls back to fixed/60 regardless of what the YAML displayed to the user.
+
+Valid arguments:
+
+- Fixed: `schedule_type="fixed"`, `interval_minutes=<N>` (any integer, e.g. 30, 60, 90, 360, 720, 1440)
+- Dynamic: `schedule_type="dynamic"` (omit `interval_minutes`)
+- Manual: `schedule_type="manual"` (omit `interval_minutes`)
 
 ### Step 6: Confirm with the user
 
@@ -106,35 +116,51 @@ Before calling the creation tool, present the monitor configuration in plain lan
 - What it checks / what triggers an alert
 - Domain assignment
 - Schedule
+- Whether this is a new monitor or an in-place update (i.e. is `monitor_uuid` set?)
+- Whether to save as draft (`is_draft=True`) or active
 
 Ask: "Does this look correct? I'll generate the monitor configuration."
 
 ### Step 7: Create the monitor
 
-Call the appropriate creation tool with the parameters built in previous steps. Always pass an MCON when possible. If only table name is available, also pass warehouse.
+This step is a **two-call sequence**. Do NOT skip the preview call.
+
+1. **Preview call.** Call the appropriate creation tool with the parameters built in previous steps. Omit `dry_run` (it defaults to `True`) or pass `dry_run=True` explicitly. Always pass an MCON when possible. If only a table name is available, also pass `warehouse`. The tool returns rendered YAML in `result.yaml` and a DRY RUN notice in `result.instructions`. Present the YAML per Step 8 and ask the user to confirm before proceeding.
+2. **Live call.** After the user confirms and explicitly opts in to deploying directly, call the same tool again with **the same parameters** plus `dry_run=False`. The tool actually creates (or updates) the monitor; the response carries the new `monitor_uuid` and a deep link in `result.instructions`. On this call `result.yaml` is `None` by design -- the monitor is already deployed.
+
+**Updating an existing monitor.** If the user wants to edit a monitor they (or a previous call) already created, pass `monitor_uuid=<uuid>` on both the preview and live calls. The tool will update that monitor in place rather than creating a new one. Use a previously returned `monitor_uuid`, or look one up via `get_monitors`. If the underlying monitor was deleted between read and write, the tool will raise a clear error instructing you to retry without `monitor_uuid` (turning the intent from "update" into "create").
+
+**Drafts.** Pass `is_draft=True` to save the monitor in draft state (not active). Omit it to create the monitor as active.
 
 ### Step 8: Present results
 
-**CRITICAL: Always include the YAML in your response.** The user needs copy-pasteable YAML.
+Handle both response shapes.
 
-1. If a non-default schedule was chosen, modify the schedule section in the YAML before presenting.
-2. Wrap the YAML in the full MaC structure (see MaC YAML format below).
-3. ALWAYS present the full YAML in a ```yaml code block.
-4. Explain where to put it and how to apply it (see below).
-5. ALWAYS use ISO 8601 format for datetime values.
-6. **NEVER reformat YAML values returned by creation tools.**
+**Preview response (`dry_run=True`)** -- `result.yaml` is set; `result.monitor_uuid` is `None`; `result.instructions` includes a DRY RUN notice. You MUST include the YAML in your reply -- the user needs copy-pasteable YAML in the **same** message where you ask for confirmation. Do NOT refer back to "the YAML I showed you" or give deployment instructions without the actual YAML.
+
+1. The YAML comes verbatim from `result.yaml` -- the tool has already rendered the schedule from the `schedule_type` / `interval_minutes` you passed in. Do NOT post-edit the `schedule` section to change values; if the schedule is wrong, re-call the preview with corrected arguments.
+2. ALWAYS present the full YAML in a ```yaml code block. Present ALL YAML values exactly as returned by the tool. Do NOT reformat, convert, or "humanize" any values -- especially dates, timestamps, UUIDs, and identifiers.
+3. Wrap the YAML in the standard MaC structure before presenting it (see MaC YAML Format below).
+4. ALWAYS use ISO 8601 format for any datetime values you author (e.g. `start_time: '2026-03-25T09:00:00+00:00'`).
+5. **NEVER reformat YAML values returned by creation tools.**
+6. Explain the user's two options once they confirm: (a) let you re-call the tool with `dry_run=False` to deploy it directly in Monte Carlo, or (b) take the YAML and apply it themselves via Monte Carlo CLI or CI/CD.
+
+**Live response (`dry_run=False`)** -- `result.yaml` is `None`; `result.monitor_uuid` is the new (or updated) monitor's UUID; `result.instructions` contains a deep link of the form `<webapp_url>/monitors/<monitor_uuid>`.
+
+1. Confirm to the user that the monitor was created (or updated) and surface the deep link from `result.instructions` so they can click through to it in the Monte Carlo web app.
+2. Do NOT try to re-render or invent YAML -- it is intentionally not returned for live calls.
 
 ---
 
 ## Monitor Type Selection
 
-| Type           | Creation tool                  | Use when                                                                                                                               |
-| -------------- | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
-| **Metric**     | `create_metric_monitor_mac`     | Track statistical metrics on fields (null rates, unique counts, numeric stats) or row count changes over time. Requires a timestamp field for aggregation. |
-| **Validation** | `create_validation_monitor_mac` | Row-level data quality checks with conditions (e.g. "field X is never null", "status is in allowed set"). Alerts on INVALID data.      |
-| **Custom SQL** | `create_custom_sql_monitor_mac` | Run arbitrary SQL returning a single number and alert on thresholds. Most flexible; use when other types don't fit.                    |
-| **Comparison** | `create_comparison_monitor_mac` | Compare metrics between two tables (e.g. dev vs prod, source vs target).                                                              |
-| **Table**      | `create_table_monitor_mac`      | Monitor groups of tables for freshness, schema changes, and volume. Uses asset selection at database/schema level.                     |
+| Type           | Creation tool                         | Use when                                                                                                                               |
+| -------------- | ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| **Metric**     | `create_or_update_metric_monitor`     | Track statistical metrics on fields (null rates, unique counts, numeric stats) or row count changes over time. Requires a timestamp field for aggregation. |
+| **Validation** | `create_or_update_validation_monitor` | Row-level data quality checks with conditions (e.g. "field X is never null", "status is in allowed set"). Alerts on INVALID data.      |
+| **Custom SQL** | `create_or_update_sql_monitor`        | Run arbitrary SQL returning a single number and alert on thresholds. Most flexible; use when other types don't fit.                    |
+| **Comparison** | `create_or_update_comparison_monitor` | Compare metrics between two tables (e.g. dev vs prod, source vs target).                                                              |
+| **Table**      | `create_or_update_table_monitor`      | Monitor groups of tables for freshness, schema changes, and volume. Uses asset selection at database/schema level.                     |
 
 Per-type reference files with detailed parameter guidance, constraints, and examples:
 - `data-metric-monitor.md`
@@ -147,7 +173,7 @@ Per-type reference files with detailed parameter guidance, constraints, and exam
 
 ## MaC YAML Format
 
-The YAML returned by creation tools is the monitor definition. It must be wrapped in the standard MaC structure to be applied:
+The YAML returned on the preview call (`dry_run=True`) is the monitor definition. It must be wrapped in the standard MaC structure to be applied:
 
 ```yaml
 montecarlo:
@@ -160,12 +186,12 @@ For example, a metric monitor would look like:
 ```yaml
 montecarlo:
   metric:
-    - <yaml returned by create_metric_monitor_mac>
+    - <yaml returned by create_or_update_metric_monitor>
 ```
 
 **Important:** `montecarlo.yml` (without a directory path) is a separate Monte Carlo project configuration file -- it is NOT the same as a monitor definition file. Monitor definitions go in their own `.yml` files, typically in a `monitors/` directory or alongside dbt model schema files.
 
-Tell the user:
+If the user prefers to deploy via CLI/CI rather than the live tool call:
 - Save the YAML to a `.yml` file (e.g. `monitors/<table_name>.yml` or in their dbt schema)
 - Apply via the Monte Carlo CLI: `montecarlo monitors apply --namespace <namespace>`
 - Or integrate into CI/CD for automatic deployment on merge
@@ -183,9 +209,10 @@ All tools are available via the `monte-carlo` MCP server.
 | `get_table`                     | Schema, stats, metadata, domain membership, capabilities     |
 | `get_validation_predicates`     | List available validation rule types for a warehouse         |
 | `get_domains`                   | List MC domains (only needed if table has no domain info)    |
-| `get_warehouses`                | Resolve warehouse UUIDs from names; needed when a name is the only identifier |
-| `create_metric_monitor_mac`     | Generate metric monitor YAML (dry-run)                       |
-| `create_validation_monitor_mac` | Generate validation monitor YAML (dry-run)                   |
-| `create_comparison_monitor_mac` | Generate comparison monitor YAML (dry-run)                   |
-| `create_custom_sql_monitor_mac` | Generate custom SQL monitor YAML (dry-run)                   |
-| `create_table_monitor_mac`      | Generate table monitor YAML (dry-run)                        |
+| `get_warehouses`                          | Resolve warehouse UUIDs from names; needed when a name is the only identifier |
+| `get_monitors`                            | Look up an existing monitor's UUID for in-place updates via `monitor_uuid` |
+| `create_or_update_metric_monitor`         | Create or update a metric monitor (preview on `dry_run=True`, deploy on `dry_run=False`) |
+| `create_or_update_validation_monitor`     | Create or update a validation monitor (preview on `dry_run=True`, deploy on `dry_run=False`) |
+| `create_or_update_comparison_monitor`     | Create or update a comparison monitor (preview on `dry_run=True`, deploy on `dry_run=False`) |
+| `create_or_update_sql_monitor`            | Create or update a custom SQL monitor (preview on `dry_run=True`, deploy on `dry_run=False`) |
+| `create_or_update_table_monitor`          | Create or update a table monitor (preview on `dry_run=True`, deploy on `dry_run=False`) |

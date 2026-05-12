@@ -74,9 +74,9 @@ cases:
         monitor generation to the monitoring-advisor skill — not generate
         monitor YAML inline as part of prevent. The handoff is observable
         via the monitoring-advisor's MCP calls (one of:
-        get_validation_predicates, create_validation_monitor_mac,
-        create_metric_monitor_mac, create_comparison_monitor_mac,
-        create_custom_sql_monitor_mac) appearing in the turn 2 trace.
+        get_validation_predicates, create_or_update_validation_monitor,
+        create_or_update_metric_monitor, create_or_update_comparison_monitor,
+        create_or_update_sql_monitor) appearing in the turn 2 trace.
 
         The output should include monitor YAML (or describe the YAML) that
         targets the is_active column specifically — for example a validation

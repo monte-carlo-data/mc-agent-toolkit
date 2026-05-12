@@ -1,6 +1,6 @@
 # Validation Monitor Reference
 
-Detailed reference for building `create_validation_monitor_mac` tool calls.
+Detailed reference for building `create_or_update_validation_monitor` tool calls. The tool follows the **two-call preview-then-confirm pattern** — see `data-monitor-creation.md` for the full flow.
 
 ## Critical Constraints
 
@@ -67,6 +67,16 @@ Before constructing the `alert_condition`, verify that every field name you plan
 |-----------|------|-------------|
 | `warehouse` | string | Warehouse name or UUID. Required if `table` is not an MCON. |
 | `domain_uuids` | array of string (uuid) | Domain UUIDs (use `get_domains` to list). Data monitors accept exactly one UUID in the list. |
+| `schedule_type` | string | Schedule type: `"fixed"` (default), `"dynamic"`, `"manual"`. |
+| `interval_minutes` | int | Schedule interval in minutes (only for `schedule_type="fixed"`). |
+| `audiences` | array of string | Notification audience **names** (not UUIDs) to alert when the monitor triggers. |
+| `failure_audiences` | array of string | Notification audience names to alert on query execution failures. |
+| `notes` | string | Free-text notes shown in the UI (separate from `description`). |
+| `priority` | string | Monitor priority (e.g. `"P1"`, `"P2"`). |
+| `tags` | array of `{name, value}` | Key-value tags to attach. |
+| `is_draft` | bool | When `True`, saves the monitor as a draft (not active). Default `False`. |
+| `monitor_uuid` | string (uuid) | UUID of an existing monitor to update in place. Omit to create a new monitor. Look up via `get_monitors` or use the UUID returned by a previous `dry_run=False` call. |
+| `dry_run` | bool | Default `True`. Preview mode. When omitted or `True`, returns YAML preview in `result.yaml`. When `False`, actually creates/updates the monitor and returns `result.monitor_uuid` + a deep link in `result.instructions`. See `data-monitor-creation.md`. |
 
 ---
 
@@ -410,7 +420,7 @@ Verify that `email` and `phone` exist in the table schema from `get_table` befor
 
 ## Fallback: Custom SQL Monitor
 
-If `create_validation_monitor_mac` fails -- for example because a referenced column does not exist yet in the live table, or the warehouse does not support a particular predicate -- fall back to `create_custom_sql_monitor_mac` with an explicit SQL query instead.
+If `create_or_update_validation_monitor` fails -- for example because a referenced column does not exist yet in the live table, or the warehouse does not support a particular predicate -- fall back to `create_or_update_sql_monitor` with an explicit SQL query instead.
 
 A custom SQL monitor lets you express any validation logic as a SQL query that returns rows or a count. This is always available as a backup when the structured validation condition tree cannot express what you need or encounters an API error.
 
@@ -418,5 +428,5 @@ When falling back:
 
 1. Translate the intended validation logic into a SQL query.
 2. The SQL should select rows that violate the rule (matching the same "conditions match INVALID data" principle).
-3. Use `create_custom_sql_monitor_mac` with the translated query.
+3. Use `create_or_update_sql_monitor` with the translated query.
 4. Inform the user that you used a custom SQL monitor as a fallback and explain why.
