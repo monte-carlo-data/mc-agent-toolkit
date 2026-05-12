@@ -16,7 +16,7 @@ Given the symptom "traces aren't appearing in `get_agent_metadata`," check in th
 |---|---|---|
 | 1 | Serverless `BatchSpanProcessor` foot-gun | Did `detect_libraries.py` flag `runtime: serverless`? Did the customer's `mc.setup()` use the `SimpleSpanProcessor` variant? |
 | 2 | SDK init not running | Is `mc.setup()` actually called at agent startup? Or is it defined in a module that's never imported? |
-| 3 | Missing credentials | MC-hosted collector path: are `MCD_DEFAULT_API_ID` and `MCD_DEFAULT_API_TOKEN` set in the runtime env? |
+| 3 | Missing credentials | MC-hosted collector path: are the selected auth env vars set in the runtime env (`MCD_DEFAULT_API_ID` / `MCD_DEFAULT_API_TOKEN` or `OTEL_EXPORTER_OTLP_HEADERS`)? |
 | 4 | Wrong instrumentor versions | Did `pip install` succeed without resolver complaints? Are the installed versions compatible with the SDK? |
 | 5 | Upstream pipeline not deployed | Did the customer's MC AO setup actually finish? Has anyone confirmed the collector endpoint accepts traffic? |
 
@@ -36,7 +36,7 @@ This applies to any suspendable runtime — AWS Lambda, Google Cloud Functions, 
 
 ### Fix
 
-Propose a diff switching to the serverless template from `setup-template.md`. The change is two lines (import + kwarg). Wait for per-file approval before applying.
+Propose a small diff switching to the serverless template from `setup-template.md`. Wait for per-file approval before applying.
 
 ## 4. Failure mode #2 — SDK init not running
 
@@ -65,14 +65,14 @@ Only applies if the customer is using the MC-hosted collector (`https://integrat
 
 ### Diagnostic
 
-- Are `MCD_DEFAULT_API_ID` and `MCD_DEFAULT_API_TOKEN` both set in the runtime env (Lambda env vars, container env, dev shell, etc.)? Use presence-only checks.
-- Or is the customer using `OTEL_EXPORTER_OTLP_HEADERS=x-mcd-id=...,x-mcd-token=...`?
+- Is the customer using `MCD_DEFAULT_API_ID` / `MCD_DEFAULT_API_TOKEN`, and are both set in the runtime env (Lambda env vars, container env, dev shell, etc.)? Use presence-only checks.
+- Or is the customer using `OTEL_EXPORTER_OTLP_HEADERS=x-mcd-id=...,x-mcd-token=...`, and is that env var set?
 - Are the values current (not rotated)?
 - **If the customer is on the serverless template (custom `span_processor`), is the auth path made explicit at exporter-construction time?** `mc.setup()` only auto-injects auth headers when it builds the default exporter; with a custom `span_processor` the customer constructs the `OTLPSpanExporter`, so the auth path must be picked explicitly. Three valid shapes: (a) `MCD_DEFAULT_*` env vars + `OTLPSpanExporter(endpoint=..., headers={"x-mcd-id": ..., "x-mcd-token": ...})`; (b) `OTEL_EXPORTER_OTLP_HEADERS` env var + `OTLPSpanExporter(endpoint=...)` with no explicit `headers=` (the exporter reads the env var); (c) self-hosted collector + `OTLPSpanExporter(endpoint=...)` with no headers (auth at the collector). If none of those match, env vars may exist but never reach the wire — symptom looks like missing credentials but the actual bug is the exporter is unauthenticated. See the SDK docs on PyPI (https://pypi.org/project/montecarlo-opentelemetry/) for the current auth-header guidance.
 
 ### Fix
 
-- Set the missing env vars in the runtime.
+- Set the missing auth env vars in the runtime (`MCD_DEFAULT_API_ID` / `MCD_DEFAULT_API_TOKEN`, or `OTEL_EXPORTER_OTLP_HEADERS` if the customer uses the standard OTel header path).
 - For Lambda, that's the function's environment configuration (or, better, AWS Secrets Manager if the customer has a rotation policy).
 - For containers, the deployment manifest.
 
@@ -120,7 +120,7 @@ The customer's MC AO infrastructure (collector, ingestion endpoint, workspace) i
 
 ### Diagnostic
 
-- Has the customer actually completed their MC AO setup? Per the PRD, this skill assumes "the rest of the AO pipeline already deployed" — the customer should have:
+- Has the customer actually completed their MC AO setup? The customer should have:
   - An MC AO workspace provisioned.
   - An ingestion endpoint configured (either MC-hosted or self-hosted collector reachable from the customer's runtime).
   - Outbound network access from the agent's runtime to the OTLP endpoint.

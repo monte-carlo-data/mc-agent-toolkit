@@ -73,7 +73,7 @@ mc-agent-toolkit/
 │   ├── context-detection/
 │   ├── generate-validation-notebook/
 │   ├── incident-response/
-│   ├── instrument-agent/                # AO-427: walk through instrumenting a new AI agent in a Python codebase
+│   ├── instrument-agent/                # Walk through instrumenting a new AI agent in a Python codebase
 │   ├── monitoring-advisor/              # Unified: coverage + data monitors + agent monitors
 │   ├── performance-diagnosis/
 │   ├── prevent/

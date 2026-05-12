@@ -27,7 +27,7 @@ This skill **must not** modify *any* file in the customer's codebase without exp
 
 The skill walks the user through *what* needs to change and *why*, then proposes diffs. It does not apply edits, run `pip install`, or write env files autonomously. The only exception: the user may explicitly waive approval for a specific file ("I know the risks, just edit the file") — proceed for that file only and surface that the approval was waived.
 
-This guardrail mirrors PRD requirement #8 ("Never modifies code without explicit user approval") and is reinforced in the Tier-3 references (`references/decorator-placement.md`, `references/setup-template.md`, `references/library-detection.md`).
+This guardrail is reinforced in the Tier-3 references (`references/decorator-placement.md`, `references/setup-template.md`, `references/library-detection.md`).
 
 ## When to activate this skill
 
@@ -68,8 +68,8 @@ The skill is structured as a Tier 1 router (this file) → Tier 2 workflow → T
 | `references/setup-template.md` | Walking step 5–7 of the workflow — resolving the OTLP endpoint, generating `mc.setup()`, handling the existing-`mc.setup()` decision matrix. Includes both serverless and long-running templates. |
 | `references/decorator-placement.md` | Walking step 8 of the workflow — proposing `@trace_with_workflow` and `@trace_with_task` diffs. Tier 3: those are the only two decorators in scope for v1. |
 | `references/verify-traces.md` | Walking step 4 (BEFORE snapshot) and step 10 (AFTER verification) of the workflow — both `get_agent_metadata` calls. Documents dev/prod twin disambiguation via MCON. |
-| `references/redaction.md` | When the customer has stricter privacy requirements (compliance, regulated workload, contractual PII restrictions) and asks to redact prompts or completions. Walks through the two redaction combinations: env-var disable (mandatory under redaction) and optional placeholder-substitution via `mc.create_llm_span`. |
-| `references/troubleshooting.md` | When step 10's verification doesn't show the new agent, or the user reports incomplete traces. Covers the four PRD failure modes plus the serverless `SimpleSpanProcessor` foot-gun. |
+| `references/redaction.md` | When the customer has stricter privacy requirements (compliance, regulated workload, contractual PII restrictions) and asks to redact prompts or completions. Walks through ordered redaction layers: env-var disable first, then optional placeholder-substitution via `mc.create_llm_span`. |
+| `references/troubleshooting.md` | When step 10's verification doesn't show the new agent, or the user reports incomplete traces. Covers the common trace-ingestion failure modes plus the serverless `SimpleSpanProcessor` foot-gun. |
 
 ## High-level workflow (Tier 1 summary)
 
@@ -83,7 +83,7 @@ The full step-by-step flow lives in `references/workflow.md`. At a glance:
 6. **Propose dependency-file edits** and wait for approval — install SDK + instrumentors at compatible versions (live-fetched from PyPI; fail closed and ask the user to consult `https://pypi.org/project/montecarlo-opentelemetry/` if the fetch fails).
 7. **Propose `mc.setup()` insertion** as a diff and wait for approval — serverless variant uses `SimpleSpanProcessor`.
 8. **Propose `@trace_with_workflow` / `@trace_with_task` decorator diffs** — wait for approval per file. Those are the only two decorators in scope for v1.
-9. **Confirm env vars** (only on the MC-hosted collector path) — `MCD_DEFAULT_API_ID` / `MCD_DEFAULT_API_TOKEN`. Presence-only check; never read or echo the values.
+9. **Confirm auth env vars** (only on the MC-hosted collector path) — either `MCD_DEFAULT_API_ID` / `MCD_DEFAULT_API_TOKEN` or `OTEL_EXPORTER_OTLP_HEADERS`, depending on the setup template. Presence-only check; never read or echo the values.
 10. **Verify** via `get_agent_metadata` (AFTER user runs the instrumented agent) — confirm new `agent_name` + new MCON appears.
 11. **On failure**, branch to `references/troubleshooting.md`.
 
@@ -103,7 +103,7 @@ Version constraints for instrumentor packages come from PyPI live (`fetch_sdk_do
 ## Out of scope (v1)
 
 - Auto-scaffolded `create_llm_span` boilerplate for libraries without a dedicated instrumentor.
-- Auto-instrumented redaction (proactive sensitive-data detection and wrapping). The skill is *conversant* in redaction — when the customer has stricter privacy requirements, it walks them through the two redaction combinations in `references/redaction.md`.
+- Auto-instrumented redaction (proactive sensitive-data detection and wrapping). The skill is *conversant* in redaction — when the customer has stricter privacy requirements, it walks them through the ordered redaction layers in `references/redaction.md`.
 - Full first-time AO setup (infra deployment, datastore registration, warehouse ingestion).
 - API-key generation.
 - Non-Python SDKs.

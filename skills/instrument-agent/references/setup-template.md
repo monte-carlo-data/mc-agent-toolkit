@@ -236,7 +236,7 @@ Rules:
 
 ## 3. Prompt/completion capture — default on, opt-out for stricter customers
 
-The default template the skill proposes **captures** prompt and completion content. That is the PRD's core value proposition: low-lift auto-instrumentation that records what the agent said and what the model said back. The OpenLLMetry instrumentors (`opentelemetry-instrumentation-langchain`, `-openai`, `-anthropic`, etc.) wrap the LLM SDK call and record full content as span attributes by default — no extra wiring needed.
+The default template the skill proposes **captures** prompt and completion content. That is the core value proposition: low-lift auto-instrumentation that records what the agent said and what the model said back. The OpenLLMetry instrumentors (`opentelemetry-instrumentation-langchain`, `-openai`, `-anthropic`, etc.) wrap the LLM SDK call and record full content as span attributes by default — no extra wiring needed.
 
 **Data residency.** Whether the customer routes through the MC-hosted collector or a self-hosted one, trace content lives in the **customer's environment**. The MC-hosted collector is a write-back pass-through; it does not persist content on Monte Carlo's side. The decision about capturing content is a question of the customer's own risk tolerance and compliance posture, not about data leaving their network. See `redaction.md` for the full framing.
 
@@ -244,7 +244,7 @@ For most customers, ship the default templates in Section 1 unchanged.
 
 ### Prompts-disabled variant (opt-in for stricter customers)
 
-A subset of customers (HIPAA workloads, regulated industries, internal policy) prefer to suppress prompt/completion capture and rely on the structural value of traces (span shapes, latency, token counts, error rates) rather than the content itself.
+A subset of customers (HIPAA workloads, regulated industries, company policy) prefer to suppress prompt/completion capture and rely on the structural value of traces (span shapes, latency, token counts, error rates) rather than the content itself.
 
 When the workflow's redaction step (Step 3) returned "yes, redact," use this variant of whichever Section 1 template the runtime/collector branch picked. The only differences:
 

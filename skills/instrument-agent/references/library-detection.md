@@ -164,7 +164,7 @@ If after matching `dependencies` against `fetch_sdk_docs.py`'s `supported_instru
 
 If the user names a specific library that isn't in `dependencies`, run `fetch_sdk_docs.py` to confirm whether PyPI currently lists an instrumentor for it, then proceed per section 2.
 
-> **NEVER**: Scaffold `mc.setup()` against an empty instrumentor list. An empty setup call is worse than no setup call — it implies instrumentation is in place when it isn't.
+> **NEVER**: Scaffold `mc.setup()` against an empty instrumentor list unless the customer is manually reporting every LLM call with `mc.create_llm_span`. An empty setup call without manual spans is worse than no setup call — it implies instrumentation is in place when it isn't.
 
 ## 8. Version pinning
 
@@ -181,6 +181,6 @@ Some instrumentor versions have transitive compatibility constraints that aren't
 - **Treating decorators / `create_llm_span` as a *substitute* for an auto-instrumentor.** Wrong — they are independent. If an auto-instrumentor exists on PyPI, install it. Decorators and manual spans are additionally available for orchestration and bespoke LLM calls.
 - **Trusting a stale memory of the supported set instead of `fetch_sdk_docs.py`.** Wrong — the supported set is whatever PyPI currently lists. Re-fetch.
 - **Scaffolding a duplicate `mc.setup()` when `existing_setup.found: true`.** Wrong — duplicate setup produces duplicate spans. Route to the existing-setup decision matrix in `setup-template.md`.
-- **Scaffolding `mc.setup()` against an empty instrumentor list.** Wrong — exit cleanly with the no-match message instead.
+- **Scaffolding `mc.setup()` against an empty instrumentor list with no manual reporting.** Wrong — empty `instrumentors=[]` is only useful when every LLM call is manually reported with `mc.create_llm_span`. Otherwise exit cleanly with the no-match message.
 - **Editing `requirements.txt` / `pyproject.toml` / `Pipfile` without explicit user approval.** Wrong — always propose the diff and wait for confirmation. See SKILL.md's CRITICAL no-silent-edit guardrail.
 - **Forgetting the `wrapt<2` pin and getting a `TypeError` at `mc.setup()` import.** Surface the symptom path in `troubleshooting.md` if the customer hits it — the fix is to pin `wrapt<2` alongside the OpenLLMetry instrumentors.

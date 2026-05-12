@@ -117,7 +117,7 @@ cases:
       - prompt: "Instrument my LangChain agent for Monte Carlo. The agent code is in src/agent.py. I want to use the MC-hosted OTel collector."
         criteria:
           must_call: [get_agent_metadata]
-      - prompt: "All set, no sensitive data. I've installed the deps and applied your mc.setup() and decorators. I just ran the agent against my dev environment."
+      - prompt: "All set, no stricter privacy requirements. I've installed the deps and applied your mc.setup() and decorators. I just ran the agent against my dev environment."
         criteria:
           must_call: [get_agent_metadata]
       - prompt: "I see two agents with the same name in the snapshot — one from earlier and one from just now. Are these the same?"
@@ -128,10 +128,11 @@ cases:
         pattern with same-name disambiguation.
 
         Turn 1 — BEFORE snapshot + intake. The agent should follow the
-        workflow's intake steps: ask whether prompts/responses contain
-        sensitive data (PII / regulated data) so it can advise on redaction
-        settings, take a BEFORE snapshot of currently-registered agents via
-        get_agent_metadata so it can diff after instrumentation, and ask
+        workflow's intake steps: ask whether the customer has stricter privacy,
+        compliance, contractual, or company-policy requirements that warrant
+        redacting prompts or completions; take a BEFORE snapshot of
+        currently-registered agents via get_agent_metadata so it can diff after
+        instrumentation; and ask
         about credentials / OTLP headers needed for the MC-hosted collector.
         The agent should not yet propose final code edits — it's gathering
         inputs and baselining state.

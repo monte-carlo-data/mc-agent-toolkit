@@ -62,7 +62,7 @@ Parse this output and branch:
 The same principle that governs `existing_setup` detection applies to every match-scanning step in this workflow — library-import detection, decorator-candidate identification, and existing-`mc.setup()` lookup. Before treating a match as actionable, confirm it lives in executable Python code, not in a docstring, an inline comment, an example block in a Markdown file, or test fixture data. A match inside a `"""..."""` doc block or a `README.md` example is not a real usage.
 
 - **`runtime: "unknown"` and `dependencies: []`** — exit cleanly. No dependency manifest was found in the target tree, so there's nothing to scan. Tell the user: "I didn't find a `requirements.txt`, `pyproject.toml`, or `Pipfile` in the target. Confirm the agent code is actually in this path, then re-run." Do not scaffold anything.
-- **`dependencies` non-empty but no PyPI-supported AI library matches** — exit cleanly per `library-detection.md` section 7. Don't scaffold an `mc.setup()` against an empty instrumentor list.
+- **`dependencies` non-empty but no PyPI-supported AI library matches** — exit cleanly per `library-detection.md` section 7. Don't scaffold an `mc.setup()` against an empty instrumentor list unless the customer is manually reporting every LLM call with `mc.create_llm_span`.
 - **Anything else** — continue to step 2 with the detection output in hand.
 
 Always run `python3 scripts/fetch_sdk_docs.py` alongside `detect_libraries.py`. It pulls the live `supported_instrumentors` list from PyPI — that's the canonical source for which AI libraries the SDK currently supports. The script fails closed if PyPI is unreachable; if it errors, point the user at `https://pypi.org/project/montecarlo-opentelemetry/` directly and ask them to share the current supported list manually. Match the customer's `dependencies` against `supported_instrumentors` to decide which instrumentors to install.
@@ -79,7 +79,7 @@ Ask the user verbatim:
 
 Capture the answer — it gates step 5 (endpoint normalization) and step 9 (env-var checks).
 
-- **MC-hosted** — base URL is `https://integrations.getmontecarlo.com/otel`. Step 9 will require `MCD_DEFAULT_API_ID` and `MCD_DEFAULT_API_TOKEN` to be present in the runtime environment.
+- **MC-hosted** — base URL is `https://integrations.getmontecarlo.com/otel`. Step 9 will require either `MCD_DEFAULT_API_ID` / `MCD_DEFAULT_API_TOKEN` or `OTEL_EXPORTER_OTLP_HEADERS`, depending on the setup template.
 - **Self-hosted** — ask: "What's the base URL for your collector?" Capture it as the customer's collector base URL. Step 9 will skip MC credential checks because auth happens at the customer's collector.
 
 Don't try to infer the collector from anything in the codebase — just ask.
@@ -99,7 +99,7 @@ Ask the user verbatim:
 This is a non-optional gating decision that runs **before** any `mc.setup()` is generated.
 
 - **Yes** — route the user to `redaction.md`. Under redaction, `TRACELOOP_TRACE_CONTENT=false` is **mandatory** when an auto-instrumentor is in use (else the instrumentor emits duplicate-content spans alongside any manual redacted spans). The prompts-disabled `mc.setup()` template in step 7 sets this in code. Customers who want partial capture with placeholder substitution can layer manual `mc.create_llm_span` calls on top — that's an optional additional layer, not a replacement.
-- **No** — use the default `mc.setup()` template in step 7. The default leaves auto-instrumentor capture on; prompts and completions flow into the customer's environment with no extra wiring. This is the value proposition the PRD targets.
+- **No** — use the default `mc.setup()` template in step 7. The default leaves auto-instrumentor capture on; prompts and completions flow into the customer's environment with no extra wiring.
 
 **Next:** snapshot existing agents before any code changes land.
 
@@ -136,7 +136,7 @@ Examples:
 | -------------------------------------------------- | -------------------------------------------------------------- |
 | `https://integrations.getmontecarlo.com/otel`      | `https://integrations.getmontecarlo.com/otel/v1/traces`        |
 | `https://integrations.getmontecarlo.com/otel/v1/traces` | `https://integrations.getmontecarlo.com/otel/v1/traces`    |
-| `https://collector.acme.internal:4318`             | `https://collector.acme.internal:4318/v1/traces`               |
+| `https://collector.example.com:4318`               | `https://collector.example.com:4318/v1/traces`                 |
 
 Render the resolved final URL to the user and ask for confirmation before generating any code. See `setup-template.md` for the full normalization rules.
 
@@ -170,7 +170,7 @@ Use the runtime classification from step 1 to pick the template:
 - **`runtime: "long_running"`** — use the default template in `setup-template.md`. `BatchSpanProcessor` is appropriate here.
 - **`runtime: "unknown"`** — by step 7 you should never be here; step 1 would have exited cleanly. If you somehow are, ask the user to classify before proposing a template.
 
-If the customer opted into redaction in step 3, use the prompts-disabled variant of the chosen template — it sets `TRACELOOP_TRACE_CONTENT=false` in code, which is mandatory under redaction to prevent auto-instrumentors from emitting duplicate-content spans. If the customer did not opt into redaction, use the default template, which leaves auto-instrumentor capture on — the value proposition the PRD targets.
+If the customer opted into redaction in step 3, use the prompts-disabled variant of the chosen template — it sets `TRACELOOP_TRACE_CONTENT=false` in code, which is mandatory under redaction to prevent auto-instrumentors from emitting duplicate-content spans. If the customer did not opt into redaction, use the default template, which leaves auto-instrumentor capture on.
 
 If step 1 reported `existing_setup.found: true`, don't propose a fresh insertion — apply the decision from `setup-template.md`'s existing-setup matrix instead.
 
@@ -199,10 +199,12 @@ Propose each decorator addition as a separate diff. Wait for **explicit per-diff
 
 Branches on the answer from step 2:
 
-- **MC-hosted collector** — confirm `MCD_DEFAULT_API_ID` and `MCD_DEFAULT_API_TOKEN` are set in the customer's runtime environment. Use **presence-only checks**, e.g.:
+- **MC-hosted collector** — confirm the auth env vars for the chosen setup template are present in the customer's runtime environment. Use **presence-only checks**, e.g.:
 
   ```python
-  bool(os.environ.get("MCD_DEFAULT_API_TOKEN"))
+  bool(os.environ.get("MCD_DEFAULT_API_ID")) and bool(os.environ.get("MCD_DEFAULT_API_TOKEN"))
+  # or, for the standard OTel header path:
+  bool(os.environ.get("OTEL_EXPORTER_OTLP_HEADERS"))
   ```
 
   > **CRITICAL — never read or echo the credential value.** Presence (`bool(...)`) only. If a check needs to land in a logging or diagnostic file, mask everything but `True`/`False`. See `setup-template.md` on credential safety.
@@ -231,11 +233,11 @@ See `verify-traces.md` for the full diffing logic, timing expectations, and edge
 
 ## Step 11 — On failure, branch to `troubleshooting.md`
 
-The four PRD failure modes, in roughly the order to check:
+The four common failure modes, in roughly the order to check:
 
 1. **SDK init not running** — `mc.setup()` is in the file but the import path or entry point isn't actually loading it at runtime.
 2. **Wrong instrumentor versions** — the installed OTel instrumentors are incompatible with the SDK or with each other.
-3. **Missing credentials** — `MCD_DEFAULT_API_ID` / `MCD_DEFAULT_API_TOKEN` not present in the runtime (MC-hosted branch only).
+3. **Missing credentials** — the selected MC-hosted auth env vars are not present in the runtime (`MCD_DEFAULT_API_ID` / `MCD_DEFAULT_API_TOKEN` or `OTEL_EXPORTER_OTLP_HEADERS`).
 4. **Upstream pipeline not actually deployed** — the agent code with `mc.setup()` exists in the repo but the deployed runtime is still the old build.
 
 `troubleshooting.md` also covers the **serverless `SimpleSpanProcessor` foot-gun** — Lambda freezing the process before `BatchSpanProcessor` flushes, producing partial or missing traces. If the runtime is serverless and traces look incomplete (rather than absent), that's the first thing to check.

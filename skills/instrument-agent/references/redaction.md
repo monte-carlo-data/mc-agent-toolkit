@@ -1,8 +1,8 @@
-# Redaction pathways (V1)
+# Redaction guidance (V1)
 
-Reference for the V1 redaction pathways supported by the Monte Carlo
-instrument-agent skill. Read this before generating any `mc.setup()` snippet
-or proposing instrumentation that touches LLM calls.
+Reference for the V1 redaction guidance supported by the Monte Carlo
+instrument-agent skill. Read this before generating any `mc.setup()` snippet or
+proposing instrumentation that touches LLM calls.
 
 ---
 
@@ -11,11 +11,11 @@ or proposing instrumentation that touches LLM calls.
 > **CRITICAL — capture-on is the value proposition, not a footgun.** The
 > Monte Carlo OpenTelemetry SDK plus the `opentelemetry-instrumentation-*`
 > auto-instrumentors capture full LLM **prompt** and **completion** content
-> as span attributes whenever an instrumentor is loaded. This is the PRD's
-> core use case: low-lift auto-instrumentation that records what the agent
-> said and what the model said back.
+> as span attributes whenever an instrumentor is loaded. This is the core use
+> case: low-lift auto-instrumentation that records what the agent said and what
+> the model said back.
 
-The four facts the customer needs to hear up front:
+The facts the customer needs to hear up front:
 
 1. **SDK default.** When an OpenLLMetry instrumentor is loaded
    (`opentelemetry-instrumentation-langchain`, `-openai`, `-anthropic`,
@@ -26,18 +26,13 @@ The four facts the customer needs to hear up front:
    passed to `mc.setup(otlp_endpoint=...)`. The customer always supplies
    the endpoint explicitly — the SDK has no built-in default. The
    templates in `setup-template.md` resolve it from an env var
-   (`OTEL_ENDPOINT`) so the customer can switch between the MC-hosted
-   collector and a self-hosted one without code changes.
+   (`OTEL_ENDPOINT`). The MC-hosted collector also requires credentials
+   or OTLP headers as shown in `setup-template.md`; a self-hosted
+   collector handles auth at the collector.
 3. **Data residency — traces live in the customer's environment.** The
    MC-hosted collector is a write-back pass-through. It routes spans back
    to the customer's storage and **does not persist trace content on
    Monte Carlo's side.** Trace content stays in the customer's environment.
-4. **Collector choice is still a real question.** Even though residency is
-   fine, some customers prefer to run their own collector rather than
-   route through the MC-hosted one — for network-isolation reasons,
-   internal policy, or to avoid an external hop. The workflow's
-   collector-source question (Step 2) is still valid; don't conflate it
-   with a residency concern.
 
 For most customers, ship with full capture. **Prompt/completion content is
 the most valuable thing the SDK records** — token counts and span shapes
@@ -67,9 +62,9 @@ optionally substitute placeholders) when they ask.
 
 ---
 
-## 3. Mandatory step for any redaction: disable auto-instrumentor content capture (Pathway B)
+## 3. Layer 1 for redaction: disable auto-instrumentor content capture
 
-> **CRITICAL — Pathway B is a hard prerequisite for ALL redaction.** If
+> **CRITICAL — disabling auto-capture is a hard prerequisite for ALL redaction.** If
 > the customer keeps the auto-instrumentor with content capture on AND
 > also calls `mc.create_llm_span` with redacted prompts, they end up with
 > **duplicate spans** — one redacted (manual) and one with the full
@@ -99,7 +94,7 @@ mc.setup(...)
 > mechanism. Those env vars do not exist in the OpenLLMetry instrumentors.
 > `TRACELOOP_TRACE_CONTENT` is the single source of truth.
 
-**What is still captured under Pathway B:**
+**What is still captured with content capture disabled:**
 
 - The full trace tree (workflow → task → span hierarchy).
 - Span timings and latency.
@@ -116,16 +111,15 @@ mc.setup(...)
 
 For customers who want zero content but still want trace shape, this is
 the complete answer. For customers who want some content with sensitive
-fields scrubbed, layer Pathway A on top.
+fields scrubbed, layer manual redacted spans on top.
 
 ---
 
-## 4. Optional additional layer: manual `mc.create_llm_span` with placeholder-substituted `prompts_to_record` (Pathway A)
+## 4. Layer 2 for selective content: manual `mc.create_llm_span` with placeholder-substituted `prompts_to_record`
 
-**When to use.** The customer has already disabled auto-capture (Pathway
-B above) and wants spans to record an audit trail of LLM calls with
-sensitive fields replaced by placeholders — instead of having no content
-at all.
+**When to use.** The customer has already disabled auto-capture and wants
+spans to record an audit trail of LLM calls with sensitive fields replaced
+by placeholders — instead of having no content at all.
 
 **How — the placeholder-substitution technique.** Keep **two sets of
 prompts** in memory:
@@ -136,11 +130,9 @@ prompts** in memory:
 - One set with the real sensitive values. This set is what gets sent to
   the LLM.
 
-This is the technique Monte Carlo uses internally for our own agent
-observability. The structure of the recorded prompt is preserved (role,
-shape, non-sensitive context) while the sensitive fields are replaced
-with stable placeholders that are useful for debugging without leaking
-content.
+The structure of the recorded prompt is preserved (role, shape,
+non-sensitive context) while the sensitive fields are replaced with stable
+placeholders that are useful for debugging without leaking content.
 
 ```python
 # Build two prompt sets: one with placeholders for tracing, one real for the LLM.
@@ -201,31 +193,39 @@ Walk-through points to cover with the customer:
 
 > **NEVER** pass the un-substituted messages as `prompts_to_record`. The
 > whole point is that the placeholder version is what reaches the span.
-> Mixing the two defeats the pathway entirely.
+> Mixing the two defeats redaction entirely.
 
 > **IMPORTANT** — the same discipline applies to `mc.add_llm_completions`.
 > If the response can contain sensitive content (e.g., a model that
 > summarizes PHI), substitute placeholders in the completion before
 > passing it to `add_llm_completions` too. A scrubbed prompt with a raw
 > completion still leaks.
+>
+> Completion redaction is often harder than prompt redaction because model
+> output is nondeterministic. Ask the customer what the expected output is
+> and whether it can contain sensitive data. If the completion is
+> unstructured or there is no reliable way to know which part is sensitive,
+> redact the whole completion or omit completion content rather than
+> recording a partial scrub that may leak.
 
 > **IMPORTANT** — decorators (e.g., `@trace_with_task`) only add
 > workflow/task metadata around a function. They do **not** gate what the
 > auto-instrumentor captures inside that function. If auto-capture is on,
-> the LLM SDK call is wrapped regardless of decorator presence. Pathway B
-> (env-var disable) is the only way to stop auto-capture.
+> the LLM SDK call is wrapped regardless of decorator presence. The
+> `TRACELOOP_TRACE_CONTENT=false` env-var disable is the only way to stop
+> auto-capture.
 
 ---
 
-## 5. Choosing pathway combinations
+## 5. Choosing redaction configurations
 
-| Scenario | Recommended combination |
+| Scenario | Required setup |
 |---|---|
 | No redaction needed — capture everything (default) | Leave auto-instrumentor alone with full content capture. No env var change, no manual spans. |
-| Want trace tree but **no** content at all | Pathway B alone — set `TRACELOOP_TRACE_CONTENT=false` before instrumentor imports. |
-| Want trace tree + selective content with placeholders | Pathway B + Pathway A — disable auto-capture, then call `mc.create_llm_span` with placeholder-substituted `prompts_to_record` (and `add_llm_completions`) at sensitive call sites. |
+| Want trace tree but **no** content at all | Disable auto-capture only — set `TRACELOOP_TRACE_CONTENT=false` before instrumentor imports. |
+| Want trace tree + selective content with placeholders | Disable auto-capture, then call `mc.create_llm_span` with placeholder-substituted `prompts_to_record` (and `add_llm_completions`) at sensitive call sites. |
 
-> **IMPORTANT — do not propose Pathway A without Pathway B.** Without the
+> **IMPORTANT — do not propose manual redacted spans without disabling auto-capture.** Without the
 > env-var disable, the auto-instrumentor and the manual span both fire,
 > producing duplicate spans (one redacted, one full-content). The
 > redaction is silently undone.
@@ -236,31 +236,31 @@ Walk-through points to cover with the customer:
 
 > **OUT OF SCOPE for v1** — The skill does **not** auto-detect sensitive
 > content (no automatic PII scanning) and does **not** scaffold redactor
-> or placeholder-substitution functions for the customer. The PRD lists
-> those as future work.
+> or placeholder-substitution functions for the customer.
 
-The skill is *conversant* in the pathways above and walks the customer
+The skill is *conversant* in the options above and walks the customer
 through them. **The customer writes their substitution logic.** If a
 customer asks the skill to "build me a redactor," the correct response is
-to walk them through Pathway B + A with their existing utilities (or to
-recommend they write the substitution helpers themselves) — not to
+to walk them through disabling auto-capture plus optional manual redacted
+spans with their existing utilities (or to recommend they write the
+substitution helpers themselves) — not to
 scaffold one in their codebase.
 
 ---
 
 ## 7. NEVER edit any file without explicit user approval
 
-When proposing a redaction pathway, the SKILL.md rule applies to every
+When proposing a redaction change, the SKILL.md rule applies to every
 single code change:
 
-- **Pathway B** → propose the env var setting in the relevant config
+- **Disable auto-capture** → propose the env var setting in the relevant config
   (e.g., `.env.example`, deployment manifest, or the `mc.setup()` module
   with `os.environ.setdefault(...)` before imports). Wait for per-file
   approval.
-- **Pathway A (layered on B)** → propose the manual span wrap as a diff
+- **Optional manual redacted spans** → propose the manual span wrap as a diff
   to the relevant function. Wait for per-file approval. Don't auto-apply.
 
-> **NEVER** apply a redaction pathway in the customer's repo without
+> **NEVER** apply a redaction change in the customer's repo without
 > their explicit approval for that specific file. Redaction changes
 > touch the data plane; a wrong default here can leak sensitive content
 > into traces or silently drop content the customer expected to see.
@@ -270,10 +270,9 @@ single code change:
 ## Common mistakes
 
 - **Treating env-var disable as optional when redaction is wanted.**
-  Pathway B is mandatory for any redaction story. Without it, the
-  auto-instrumentor still fires alongside the manual span and produces
-  duplicate spans — one redacted, one full-content. The redaction is
-  defeated.
+  Disabling auto-capture is mandatory for any redaction story. Without it,
+  the auto-instrumentor still fires alongside the manual span and produces
+  duplicate spans — one redacted, one full-content. The redaction is defeated.
 - **Misstating data residency.** Trace content lives in the customer's
   environment. The MC-hosted collector routes spans back to the customer's
   storage without persisting content on the MC side. Don't tell customers
@@ -295,11 +294,12 @@ single code change:
   late — the instrumentors read the env var at import/init time. Set it
   before any `mc.setup()` or instrumentor import runs.
 - **Passing un-substituted messages to `prompts_to_record`.** Defeats
-  the entire purpose of Pathway A. Confirm the placeholder version is
-  what reaches `prompts_to_record`.
-- **Forgetting that completions are content too.** Pathway A applies to
-  `mc.add_llm_completions` as well. A placeholder-substituted prompt
-  with a raw completion still leaks.
+  the entire purpose of manual redacted spans. Confirm the placeholder
+  version is what reaches `prompts_to_record`.
+- **Forgetting that completions are content too.** Manual redacted spans apply to
+  `mc.add_llm_completions` as well. A placeholder-substituted prompt with a
+  raw completion still leaks. If the completion can contain sensitive data
+  and cannot be scrubbed reliably, redact or omit the whole completion.
 - **Auto-scaffolding a redactor or substitution helper.** Out of scope
-  for v1. Walk the customer through the pathway; they write the
+  for v1. Walk the customer through the redaction options; they write the
   substitution logic.
