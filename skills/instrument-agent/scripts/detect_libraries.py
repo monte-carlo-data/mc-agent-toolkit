@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """
-Detect AI libraries, runtime, and existing Monte Carlo OpenTelemetry setup.
+Detect runtime classification, dependency surface, and any existing Monte
+Carlo OpenTelemetry setup in a Python codebase.
 
-Walks a target Python codebase looking at dependency manifests
-(requirements.txt, pyproject.toml, Pipfile), serverless deployment markers,
-and existing tracing imports. Outputs a JSON summary describing what AI
-instrumentors apply, whether the runtime is serverless or long-running,
-and whether the Monte Carlo OpenTelemetry SDK is already wired up.
+The script is intentionally a thin discovery layer. It walks dependency
+manifests (requirements.txt, pyproject.toml, Pipfile), serverless deployment
+markers, and existing `mc.setup()` calls — then emits a JSON document the
+skill consumes. The script does **not** classify AI libraries or pick
+instrumentor packages; that is the LLM's job, working from `dependencies[]`
+plus the live PyPI list from `fetch_sdk_docs.py`.
 
 Usage:
     python3 detect_libraries.py [TARGET_PATH]
@@ -89,12 +91,6 @@ EXISTING_SETUP_IMPORT_PATTERNS = [
 EXISTING_SETUP_FALLBACK_CALL_PATTERN = re.compile(
     r"\b(?:mc|montecarlo_opentelemetry)\.setup\s*\("
 )
-
-# Libraries flagged as ambiguous when matched only via a generic SDK like boto3.
-# Without a code-level signal we can't tell whether the customer is calling
-# Bedrock/SageMaker or just S3/DynamoDB, so we route them to `unsupported`.
-AMBIGUOUS_AWS_LIBRARIES = {"bedrock", "sagemaker"}
-AMBIGUOUS_AWS_DEPS = {"boto3", "botocore", "aioboto3"}
 
 
 # ---------------------------------------------------------------------------
@@ -429,116 +425,6 @@ def _collect_dependencies(scan: dict) -> set[str]:
 
 
 # ---------------------------------------------------------------------------
-# Instrumentor mapping
-# ---------------------------------------------------------------------------
-
-
-def _load_instrumentor_map(script_dir: Path) -> dict:
-    map_path = script_dir / "instrumentor_map.json"
-    if not map_path.is_file():
-        raise FileNotFoundError(
-            f"instrumentor_map.json missing at {map_path} — skill is broken without it"
-        )
-    try:
-        with map_path.open("r", encoding="utf-8") as fh:
-            data = json.load(fh)
-    except Exception as exc:
-        raise RuntimeError(f"failed to read {map_path}: {exc}") from exc
-
-    # Canonical schema (shared with fetch_sdk_docs.py and the committed
-    # instrumentor_map.json) uses `supported_instrumentors`.
-    # Accept the legacy `libraries` key for backward compatibility with any
-    # older snapshot a user may have lying around.
-    if isinstance(data, dict) and isinstance(data.get("supported_instrumentors"), list):
-        return data
-    if isinstance(data, dict) and isinstance(data.get("libraries"), list):
-        # Normalize to the canonical key so downstream consumers see one shape.
-        normalized = dict(data)
-        normalized["supported_instrumentors"] = normalized.pop("libraries")
-        return normalized
-    raise ValueError(
-        f"{map_path} has unexpected shape — expected 'supported_instrumentors' list"
-    )
-
-
-def _match_instrumentors(
-    deps: set[str], instrumentor_map: dict
-) -> tuple[list[str], list[dict], list[dict]]:
-    """Return (detected, suggested_instrumentors, unsupported)."""
-    detected: list[str] = []
-    suggested: list[dict] = []
-    unsupported: list[dict] = []
-    seen_libraries: set[str] = set()
-    # Multiple libraries can share one instrumentor package (e.g. langchain
-    # and langgraph both ship via opentelemetry-instrumentation-langchain).
-    # Dedup on package so step 6's install set doesn't list it twice.
-    seen_packages: set[str] = set()
-
-    deps_lower = {d.lower() for d in deps}
-
-    entries = (
-        instrumentor_map.get("supported_instrumentors")
-        or instrumentor_map.get("libraries")
-        or []
-    )
-    for entry in entries:
-        if not isinstance(entry, dict):
-            continue
-        library = entry.get("library")
-        package = entry.get("package")
-        covers = entry.get("covers_dependencies") or []
-        if not (isinstance(library, str) and isinstance(package, str)):
-            continue
-        if library in seen_libraries:
-            continue
-
-        covers_lower = {c.lower() for c in covers if isinstance(c, str)}
-        matched_via = covers_lower & deps_lower
-        if not matched_via:
-            continue
-
-        # Bedrock / SageMaker matched only via generic AWS SDKs is too noisy.
-        if library in AMBIGUOUS_AWS_LIBRARIES and matched_via.issubset(
-            AMBIGUOUS_AWS_DEPS
-        ):
-            unsupported.append(
-                {
-                    "library": library,
-                    "package": package,
-                    "reason": (
-                        f"Matched only via generic AWS SDK ({sorted(matched_via)}); "
-                        "cannot confirm Bedrock/SageMaker usage from dependencies "
-                        "alone. Manually enable this instrumentor if the agent "
-                        "actually calls Bedrock/SageMaker."
-                    ),
-                    "matched_dependencies": sorted(matched_via),
-                }
-            )
-            seen_libraries.add(library)
-            continue
-
-        detected.append(library)
-        if package not in seen_packages:
-            suggestion: dict = {"library": library, "package": package}
-            # Pass through pinning hints from the snapshot so the skill's
-            # step-6 deps proposal can produce a pinned diff. Without these,
-            # `pip install opentelemetry-instrumentation-langchain` resolves
-            # to a version that needs wrapt 2.x, which the snapshot's pinned
-            # version (<=0.53.4) is incompatible with.
-            version_constraint = entry.get("version_constraint")
-            if isinstance(version_constraint, str) and version_constraint:
-                suggestion["version_constraint"] = version_constraint
-            additional_pins = entry.get("additional_pins")
-            if isinstance(additional_pins, list) and additional_pins:
-                suggestion["additional_pins"] = list(additional_pins)
-            suggested.append(suggestion)
-            seen_packages.add(package)
-        seen_libraries.add(library)
-
-    return detected, suggested, unsupported
-
-
-# ---------------------------------------------------------------------------
 # Runtime detection
 # ---------------------------------------------------------------------------
 
@@ -659,17 +545,13 @@ def _detect_existing_setup(scan: dict, target: Path) -> dict:
 
 
 def detect(target: Path) -> dict:
-    script_dir = Path(__file__).resolve().parent
-    instrumentor_map = _load_instrumentor_map(script_dir)
-
     scan = _scan_tree(target)
     deps = _collect_dependencies(scan)
-    detected, suggested, unsupported = _match_instrumentors(deps, instrumentor_map)
 
     serverless_signals = _detect_serverless(scan, deps)
     if serverless_signals:
         runtime = "serverless"
-    elif detected:
+    elif scan["dep_files"]:
         runtime = "long_running"
     else:
         runtime = "unknown"
@@ -677,9 +559,7 @@ def detect(target: Path) -> dict:
     existing_setup = _detect_existing_setup(scan, target)
 
     return {
-        "detected": detected,
-        "suggested_instrumentors": suggested,
-        "unsupported": unsupported,
+        "dependencies": sorted(deps),
         "runtime": runtime,
         "serverless_signals": serverless_signals,
         "existing_setup": existing_setup,
@@ -689,8 +569,10 @@ def detect(target: Path) -> dict:
 def main() -> None:
     parser = argparse.ArgumentParser(
         description=(
-            "Detect AI libraries, runtime style, and existing Monte Carlo "
-            "OpenTelemetry setup in a Python codebase."
+            "Detect runtime style, Python dependencies, and any existing "
+            "Monte Carlo OpenTelemetry setup in a codebase. AI-library "
+            "matching is the LLM's job; this script just emits the raw "
+            "discovery surface."
         )
     )
     parser.add_argument(

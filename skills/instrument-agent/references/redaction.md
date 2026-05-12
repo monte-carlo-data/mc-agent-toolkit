@@ -23,8 +23,11 @@ The four facts the customer needs to hear up front:
    call directly and records full prompt and completion content as span
    attributes. No decorator or manual span is required for capture.
 2. **Transport.** Spans are sent over OTLP to whatever endpoint is
-   configured in `mc.setup(otlp_endpoint=...)`. The default points at
-   Monte Carlo's hosted collector.
+   passed to `mc.setup(otlp_endpoint=...)`. The customer always supplies
+   the endpoint explicitly — the SDK has no built-in default. The
+   templates in `setup-template.md` resolve it from an env var
+   (`OTEL_ENDPOINT`) so the customer can switch between the MC-hosted
+   collector and a self-hosted one without code changes.
 3. **Data residency — traces live in the customer's environment.** The
    MC-hosted collector is a write-back pass-through. It routes spans back
    to the customer's storage and **does not persist trace content on

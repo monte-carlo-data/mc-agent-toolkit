@@ -4,8 +4,8 @@ Tests for fetch_sdk_docs.py — unit-tests internal helpers and an end-to-end
 subprocess check for the PyPI-fetch-failure fail-closed path.
 
 Run:
-    python3 skills/instrument-agent/scripts/test_fetch_sdk_docs.py
-    pytest skills/instrument-agent/scripts/test_fetch_sdk_docs.py -q
+    python3 skills/instrument-agent/tests/test_fetch_sdk_docs.py
+    pytest skills/instrument-agent/tests/test_fetch_sdk_docs.py -q
 """
 
 from __future__ import annotations
@@ -16,7 +16,9 @@ import sys
 from pathlib import Path
 from unittest.mock import patch
 
-SCRIPT_DIR = Path(__file__).parent
+TESTS_DIR = Path(__file__).parent
+SKILL_ROOT = TESTS_DIR.parent
+SCRIPT_DIR = SKILL_ROOT / "scripts"
 FETCH_SCRIPT = SCRIPT_DIR / "fetch_sdk_docs.py"
 
 sys.path.insert(0, str(SCRIPT_DIR))

@@ -91,15 +91,14 @@ Each step's full Tier 3 details live in the reference files above.
 
 ## Helper scripts
 
-The skill ships three Python helpers under `scripts/` that the workflow invokes:
+The skill ships two Python helpers under `scripts/` that the workflow invokes:
 
 | Script | Purpose |
 |---|---|
-| `scripts/detect_libraries.py` | Parse `requirements.txt` / `pyproject.toml` / `Pipfile`; classify runtime as serverless / long-running / unknown; detect existing `mc.setup()`. Returns JSON. |
-| `scripts/fetch_sdk_docs.py` | Fetch the SDK supported-instrumentor list live from PyPI. Fails closed if PyPI is unreachable. |
-| `scripts/instrumentor_map.json` | Static package-name → library-name detection map used by `detect_libraries.py` to recognize installed AI libraries in customer dependency files. Also holds `additional_pins` (transitive constraints like `wrapt<2` that PyPI doesn't expose). |
+| `scripts/detect_libraries.py` | Parse `requirements.txt` / `pyproject.toml` / `Pipfile` into a sorted `dependencies` list; classify runtime as serverless / long-running / unknown; detect existing `mc.setup()`. Returns JSON. Raw discovery surface — does **not** match AI libraries to instrumentors; that's the LLM's job using `fetch_sdk_docs.py` output. |
+| `scripts/fetch_sdk_docs.py` | Fetch the SDK supported-instrumentor list live from PyPI, including version constraints. Fails closed if PyPI is unreachable. |
 
-Version constraints for instrumentor packages come from PyPI live (`fetch_sdk_docs.py`). The static map's `additional_pins` field carries transitive constraints that PyPI metadata doesn't expose (the SDK currently pins `wrapt<2` because OpenLLMetry instrumentors at <=0.53.4 pass `module=` to `wrap_function_wrapper`, which `wrapt` 2.x renamed to `target=`).
+Version constraints for instrumentor packages come from PyPI live (`fetch_sdk_docs.py`). Transitive constraints PyPI doesn't expose (e.g. `wrapt<2` for OpenLLMetry instrumentors at `<=0.53.4`) are documented as symptom-driven fixes in `references/troubleshooting.md` — the skill surfaces them when the customer hits the symptom rather than baking them into every install diff.
 
 ## Out of scope (v1)
 

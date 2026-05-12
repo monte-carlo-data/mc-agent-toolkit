@@ -48,9 +48,9 @@ import montecarlo_opentelemetry as mc
 from opentelemetry.instrumentation.langchain import LangchainInstrumentor
 
 # Resolve endpoint from env. If unset, skip setup so the agent runs uninstrumented.
-MC_OTEL_ENDPOINT = os.getenv("MC_OTEL_ENDPOINT")
-if MC_OTEL_ENDPOINT:
-    base_endpoint = MC_OTEL_ENDPOINT.rstrip("/")
+otel_endpoint = os.getenv("OTEL_ENDPOINT")
+if otel_endpoint:
+    base_endpoint = otel_endpoint.rstrip("/")
     http_otel_endpoint = (
         base_endpoint
         if base_endpoint.endswith("/v1/traces")
@@ -73,6 +73,7 @@ The customer runs on Lambda (or another suspendable runtime), sends traces to Mo
 `mc.setup()` only auto-injects `MCD_DEFAULT_*` headers when it builds the default exporter. With a custom `span_processor` we build the exporter ourselves, so we pass the auth headers explicitly.
 
 ```python
+import logging
 import os
 
 import montecarlo_opentelemetry as mc
@@ -88,6 +89,18 @@ def init_tracing():
     if not otel_endpoint:
         return  # tracing disabled
 
+    # Use .get() (not os.environ[...]) so a partial-config window — endpoint set
+    # but credentials missing — skips tracing instead of crashing the Lambda at
+    # cold start with a KeyError.
+    api_id = os.environ.get("MCD_DEFAULT_API_ID")
+    api_token = os.environ.get("MCD_DEFAULT_API_TOKEN")
+    if not api_id or not api_token:
+        logging.warning(
+            "Monte Carlo tracing disabled: OTEL_ENDPOINT is set but "
+            "MCD_DEFAULT_API_ID / MCD_DEFAULT_API_TOKEN are missing."
+        )
+        return
+
     base_endpoint = otel_endpoint.rstrip("/")
     http_otel_endpoint = (
         base_endpoint
@@ -95,10 +108,7 @@ def init_tracing():
         else f"{base_endpoint}/v1/traces"
     )
 
-    mcd_headers = {
-        "x-mcd-id": os.environ["MCD_DEFAULT_API_ID"],
-        "x-mcd-token": os.environ["MCD_DEFAULT_API_TOKEN"],
-    }
+    mcd_headers = {"x-mcd-id": api_id, "x-mcd-token": api_token}
 
     # SimpleSpanProcessor flushes each span before the runtime can suspend the
     # process. BatchSpanProcessor would queue spans and lose them at freeze.
@@ -254,9 +264,9 @@ os.environ.setdefault("TRACELOOP_TRACE_CONTENT", "false")
 import montecarlo_opentelemetry as mc
 from opentelemetry.instrumentation.langchain import LangchainInstrumentor
 
-MC_OTEL_ENDPOINT = os.getenv("MC_OTEL_ENDPOINT")
-if MC_OTEL_ENDPOINT:
-    base_endpoint = MC_OTEL_ENDPOINT.rstrip("/")
+otel_endpoint = os.getenv("OTEL_ENDPOINT")
+if otel_endpoint:
+    base_endpoint = otel_endpoint.rstrip("/")
     http_otel_endpoint = (
         base_endpoint
         if base_endpoint.endswith("/v1/traces")
@@ -270,7 +280,38 @@ if MC_OTEL_ENDPOINT:
     )
 ```
 
-`os.environ.setdefault` preserves an explicit operator override (`TRACELOOP_TRACE_CONTENT=true`) while defaulting to off when unset. For serverless runtimes, apply the same one-line addition at the top of the chosen Section 1 template.
+`os.environ.setdefault` preserves an explicit operator override (`TRACELOOP_TRACE_CONTENT=true`) while defaulting to off when unset.
+
+> **CRITICAL — set `TRACELOOP_TRACE_CONTENT` at module scope, NOT inside `init_tracing()`.** The OpenLLMetry instrumentors read this env var when their package is *imported* (the `from opentelemetry.instrumentation.langchain import LangchainInstrumentor` line at the top of every serverless template). By the time `init_tracing()` runs the import has already happened and a `setdefault` call inside the function is a no-op. The splice point is **between `import os` and any `opentelemetry.instrumentation.*` import**.
+
+#### Serverless splice — concrete example
+
+For any of the Section 1 serverless templates (2, 3, or 4 — they share the same import layout), the patch is a single block inserted between `import os` and the first instrumentation import. Below is Template 2 with the splice applied; Templates 3 and 4 follow the same shape.
+
+```python
+import logging
+import os
+
+# Stricter-customer variant: suppress prompt/completion content capture in the
+# auto-instrumentors. Must be set before any opentelemetry.instrumentation.*
+# import — the instrumentors read TRACELOOP_TRACE_CONTENT at import time, so
+# setting it inside init_tracing() below would be a no-op.
+os.environ.setdefault("TRACELOOP_TRACE_CONTENT", "false")
+
+import montecarlo_opentelemetry as mc
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.instrumentation.langchain import LangchainInstrumentor
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+
+AGENT_NAME = "monitoring-agent"
+
+
+def init_tracing():
+    # ... unchanged from Template 2 ...
+    pass
+```
+
+The body of `init_tracing()` is identical to the unredacted Template 2 — the only difference is the three-line splice above the instrumentation imports.
 
 > **IMPORTANT — `TRACELOOP_TRACE_CONTENT=false` is a prerequisite for any redaction under auto-instrumentation.** Manual `mc.create_llm_span` calls do not unwire the auto-instrumentor; if content capture is still on, the raw prompt/completion will be emitted alongside the redacted version. Set `TRACELOOP_TRACE_CONTENT=false` first, then layer manual spans on top if needed.
 

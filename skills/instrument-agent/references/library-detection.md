@@ -1,6 +1,6 @@
 # Library detection and runtime classification
 
-This reference governs how the instrument-agent skill decides **which AI libraries to instrument** and **what runtime template to use**. It is the contract between `scripts/detect_libraries.py`, `scripts/fetch_sdk_docs.py`, and `scripts/instrumentor_map.json`. Read this file when adjudicating any decision involving detected libraries, unsupported candidates, or serverless classification.
+This reference governs how the instrument-agent skill decides **which AI libraries to instrument** and **what runtime template to use**. The contract has two pieces: `scripts/detect_libraries.py` (a thin discovery layer over the customer's repo) and `scripts/fetch_sdk_docs.py` (the live PyPI lookup that names the SDK's currently-supported instrumentors). The matching between the two is the LLM's job — there is no static map in the skill.
 
 ## Inputs the skill works from
 
@@ -8,41 +8,35 @@ This reference governs how the instrument-agent skill decides **which AI librari
 
 ```json
 {
-  "detected": ["langchain", "openai"],
-  "suggested_instrumentors": [
-    {"library": "langchain", "package": "opentelemetry-instrumentation-langchain"}
-  ],
-  "unsupported": [
-    {"library": "bedrock", "matched_dependencies": ["boto3"], "reason": "..."}
-  ],
+  "dependencies": ["anthropic", "boto3", "fastapi", "langchain", "langgraph", "openai"],
   "runtime": "serverless",
   "serverless_signals": ["serverless.yml", "lambda_handler"],
   "existing_setup": {"found": true, "files": ["src/tracing.py"]}
 }
 ```
 
-The static package-name→library detection map used by `detect_libraries.py` lives in `scripts/instrumentor_map.json`:
+Field meanings:
+
+- `dependencies` — sorted list of normalized pip package names parsed from `requirements.txt` / `pyproject.toml` / `Pipfile`. Raw surface; the script does not classify which entries are AI-relevant. Everything the customer declared is here, lowercased.
+- `runtime` — `serverless`, `long_running`, or `unknown`. `serverless` if any serverless signal is found. `long_running` if a dep manifest was found but no serverless signals. `unknown` when no dep manifest exists at all (so we can't reason about it).
+- `serverless_signals` — what triggered the serverless classification (e.g. `lambda_handler`, `serverless.yml`, `mangum`).
+- `existing_setup` — `{ found: bool, files: list[str] }` for any pre-existing `mc.setup()` call. `files` contains repo-relative paths.
+
+`scripts/fetch_sdk_docs.py` returns the SDK's live supported-instrumentor list from PyPI:
 
 ```json
 {
+  "source": "pypi",
+  "sdk": {"version": "...", "pypi_url": "https://pypi.org/project/montecarlo-opentelemetry/"},
   "supported_instrumentors": [
-    {
-      "library": "langchain",
-      "package": "opentelemetry-instrumentation-langchain",
-      "additional_pins": ["wrapt<2"],
-      "covers_dependencies": ["langchain", "langchain-core", "langchain-community", "langgraph"]
-    }
+    {"library": "langchain", "package": "opentelemetry-instrumentation-langchain", "version_constraint": "<=0.53.4"},
+    {"library": "openai", "package": "opentelemetry-instrumentation-openai", "version_constraint": "<=0.53.4"},
+    {"library": "anthropic", "package": "opentelemetry-instrumentation-anthropic"}
   ]
 }
 ```
 
-Field meanings:
-
-- `library` / `package` — the canonical library name and the OpenTelemetry instrumentor package that covers it.
-- `covers_dependencies` — the customer-facing dependency names that map to this library/instrumentor. `detect_libraries.py` uses this to translate `requirements.txt` / `pyproject.toml` / `Pipfile` entries into `detected[]` and `suggested_instrumentors[]`.
-- `additional_pins` — transitive constraints required for the instrumentor to import cleanly. For example, several OpenLLMetry instrumentors pass `module=` to `wrap_function_wrapper`, which `wrapt` 2.x renamed to `target=` — so `wrapt<2` is required alongside the instrumentor. The skill must include these pins in the proposed dependency diff; without them, `pip install` resolves to incompatible versions and `mc.setup()` raises `TypeError` at import. PyPI doesn't expose transitive pins, so this field is the canonical source for them.
-
-Version pins for the instrumentor packages themselves come from PyPI live via `fetch_sdk_docs.py`. They are **not** encoded in `instrumentor_map.json`.
+That payload is the source of truth for what to install. If PyPI is unreachable, the script exits with `source: "error"` and a `guidance` field pointing at the PyPI page — surface that to the user rather than guessing.
 
 ## 1. The supported library set comes from PyPI
 
@@ -64,32 +58,26 @@ A non-exhaustive subset of currently-supported libraries (examples — see PyPI 
 
 > **NEVER**: Hardcode a version constraint into a generated `requirements.txt` or `pyproject.toml` without first running `fetch_sdk_docs.py`. If PyPI is unreachable, surface the error to the user — don't invent a pin.
 
-## 2. How detection works
+## 2. How matching works (LLM-driven)
 
-There is one supported tier: whatever the SDK currently supports per PyPI. The skill uses two complementary scripts:
+There is one supported tier: whatever the SDK currently supports per PyPI. The matching flow:
 
-### 2.1 `detect_libraries.py` — static dependency-file scan
+1. Run `detect_libraries.py` against the target. It returns the raw `dependencies` list (every pip package the customer declared) plus `runtime`, `serverless_signals`, and `existing_setup`.
+2. Run `fetch_sdk_docs.py` to get the SDK's `supported_instrumentors` list from PyPI.
+3. **Match `dependencies` against `supported_instrumentors`.** The LLM does this — there's no static map. Walk the customer's deps and for each one decide whether an instrumentor covers it. Use the `library` slug in `supported_instrumentors` plus your knowledge of which pip packages each instrumentor wraps (e.g. `langchain-core` and `langchain-community` are part of the `langchain` instrumentor's surface; `langgraph` is also covered by `opentelemetry-instrumentation-langchain`).
+4. **Ask the customer when a dep is ambiguous.** Some pip packages don't map cleanly to one instrumentor — see section 4. Always disambiguate explicitly rather than guessing.
+5. **Use PyPI as the tiebreaker.** If you're unsure whether a particular dep maps to an instrumentor, the PyPI README (which `fetch_sdk_docs.py` parses) is canonical. If it doesn't appear there, there's no auto-instrumentor for it.
 
-`detect_libraries.py` reads the customer's `requirements.txt` / `pyproject.toml` / `Pipfile` and consults `instrumentor_map.json` (a static package-name→library map) to identify libraries it recognises. This works offline and is fast.
+### Decorators and manual spans are independent of auto-instrumentors
 
-For any matched library, the script returns it under `detected[]` with the corresponding instrumentor package under `suggested_instrumentors[]`.
+`@trace_with_workflow`, `@trace_with_task`, and `mc.create_llm_span` are SDK-level affordances that work regardless of whether an auto-instrumentor exists for the underlying library. Do not present them as a *substitute* for auto-instrumentation — they serve different purposes:
 
-### 2.2 `fetch_sdk_docs.py` — live PyPI lookup
-
-For libraries the static map doesn't know about — or to confirm the full current supported set — the user can run `fetch_sdk_docs.py`. It queries PyPI live and returns the currently-supported libraries plus their version pins. This is the authoritative source for what the SDK supports today.
-
-### 2.3 Install decision
-
-For each detected library:
-
-1. **Is there an auto-instrumentor for this library on PyPI?** If yes, install it and wire it into `mc.setup(instrumentors=[...])`.
-2. **Independently**, the customer can use `@trace_with_workflow` / `@trace_with_task` decorators on their orchestration and task functions, and can use `mc.create_llm_span` for manual LLM-call spans where useful. Decorator and manual-span availability does **not** depend on whether an auto-instrumentor exists for the underlying library — those are SDK-level affordances that work alongside (or in the absence of) any auto-instrumentor.
-
-> **IMPORTANT**: Do not present manual spans / decorators as a *substitute* for auto-instrumentation. They serve different purposes. If an auto-instrumentor exists, install it. Decorators and `mc.create_llm_span` are additionally available for orchestration spans and bespoke LLM calls regardless.
+- If an auto-instrumentor exists on PyPI for a customer's AI library, install it.
+- Decorators and `mc.create_llm_span` are *additionally* available for orchestration spans and bespoke LLM calls.
 
 ## 3. Multi-library detection rules
 
-`detect_libraries.py` returns multiple entries in `detected` when multiple libraries are present. Treat them as **additive** — install all matched instrumentors. A single `mc.setup()` call lists all of them:
+When multiple AI libraries appear in `dependencies`, treat them as **additive** — install all matched instrumentors. A single `mc.setup()` call lists all of them:
 
 ```python
 mc.setup(instrumentors=[
@@ -98,25 +86,21 @@ mc.setup(instrumentors=[
 ])
 ```
 
-> **IMPORTANT**: `suggested_instrumentors` deduplicates by package, so libraries that share an instrumentor (e.g. `langchain` and `langgraph` both ship via `opentelemetry-instrumentation-langchain`) appear **once** in the install set even though both still appear in `detected`. Drive dependency edits and `mc.setup(instrumentors=[...])` from the deduped list — never iterate `detected` to build the install set, or you'll wire and install the same instrumentor twice.
+> **IMPORTANT**: Multiple libraries can share one instrumentor package (e.g. `langchain` and `langgraph` both ship via `opentelemetry-instrumentation-langchain`). Deduplicate by package when building the install set and the `instrumentors=[...]` list — installing or instantiating the same instrumentor twice is a bug.
 
-> **IMPORTANT**: When `detected: []` AND `unsupported: []` AND `runtime: "unknown"` — there are no AI libraries to instrument. Exit cleanly. Do **not** scaffold a `mc.setup()` for nothing. See section 7.
+> **IMPORTANT**: When `dependencies` contains no AI libraries from the PyPI supported list AND `runtime: "unknown"` — there are no AI libraries to instrument. Exit cleanly. Do **not** scaffold a `mc.setup()` for nothing. See section 7.
 
 ## 4. Ambiguous-multipurpose-SDK rule (boto3, etc.)
 
-`boto3`, `botocore`, and `aioboto3` cover the entire AWS surface — they don't tell us whether the customer is calling Bedrock, SageMaker, S3, DynamoDB, or anything else. `detect_libraries.py` routes those matches to **`unsupported`**, never `detected`, with:
+Some pip packages cover a broad surface and don't tell us which AI service (if any) the customer is using:
 
-- `matched_dependencies`: the exact AWS SDK packages that triggered the match.
-- `reason`: a string asking the user to confirm which AWS AI service (if any) they actually use.
+- `boto3`, `botocore`, `aioboto3` — cover the entire AWS surface. Could mean Bedrock, SageMaker, or just S3 / DynamoDB / SQS / anything else.
+- `google-cloud-aiplatform` — could be Vertex AI inference or Vertex AI Search.
+- `azure-ai-*` — covers many distinct Azure AI products.
 
-> **NEVER**: Silently install `opentelemetry-instrumentation-bedrock` (or `-sagemaker`) just because `boto3` is in the dependency list. Always surface the candidate to the user and confirm "are you using Bedrock?" / "are you using SageMaker?" before adding the instrumentor or editing dependency files.
+`detect_libraries.py` doesn't single these out — they appear in `dependencies` like any other package. **The LLM handles the disambiguation by asking the customer.** When `boto3` is present, ask "are you calling Bedrock or SageMaker through boto3, or is it just generic AWS work?". Don't install `opentelemetry-instrumentation-bedrock` until the customer confirms Bedrock usage.
 
-This pattern generalizes — any library that piggybacks on a multi-purpose SDK should follow the same ambiguous-bucket rule:
-
-- `google-cloud-aiplatform` could be Vertex AI inference *or* Vertex AI Search.
-- `azure-ai-*` covers many distinct Azure AI products.
-
-For v1, only the AWS multi-purpose SDKs (`boto3` family) trigger this branch. The rule exists in this reference so future expansion follows the same shape.
+> **NEVER**: Silently install `opentelemetry-instrumentation-bedrock` (or `-sagemaker`) just because `boto3` is in the dependency list. Always ask first.
 
 ## 5. Serverless framework detection
 
@@ -161,8 +145,8 @@ When the picture is borderline — one signal, or signals that don't obviously c
 
 ### Other runtime values
 
-- `runtime: "long_running"` — the default for any AI-library codebase without serverless signals. Use the standard batch-processor template.
-- `runtime: "unknown"` — no clear signal either way. The skill must ask the user before scaffolding anything.
+- `runtime: "long_running"` — at least one dependency manifest exists and no serverless signal was observed. Use the standard batch-processor template.
+- `runtime: "unknown"` — no dependency manifest found in the target. Ask the user where the agent code lives before scaffolding anything.
 
 > **NEVER**: Auto-scaffold `mc.setup()` when `runtime: "unknown"`. Choosing the wrong span processor will silently drop traces (serverless) or add unnecessary memory pressure (long-running). Ask.
 
@@ -174,22 +158,29 @@ If `existing_setup.found: true`, the customer already has Monte Carlo OpenTeleme
 
 ## 7. No-match exit
 
-If `detected: []` AND `unsupported: []`, exit cleanly with this message:
+If after matching `dependencies` against `fetch_sdk_docs.py`'s `supported_instrumentors` you find no AI library that the SDK supports, exit cleanly with this message:
 
 > "No supported AI libraries were detected in your dependency files. The Monte Carlo OpenTelemetry SDK supports a set of libraries that's published on PyPI: https://pypi.org/project/montecarlo-opentelemetry/. You can run `scripts/fetch_sdk_docs.py` to see the current supported set. If you'd like to share your `requirements.txt` / `pyproject.toml` / `Pipfile`, I'll re-check."
 
-If the user names a specific library that isn't in `detected[]`, run `fetch_sdk_docs.py` to confirm whether PyPI currently lists an instrumentor for it, then proceed per section 2.3.
+If the user names a specific library that isn't in `dependencies`, run `fetch_sdk_docs.py` to confirm whether PyPI currently lists an instrumentor for it, then proceed per section 2.
 
 > **NEVER**: Scaffold `mc.setup()` against an empty instrumentor list. An empty setup call is worse than no setup call — it implies instrumentation is in place when it isn't.
 
+## 8. Version pinning
+
+For each instrumentor you propose installing, take the `version_constraint` from `fetch_sdk_docs.py`'s `supported_instrumentors[*]` entry. That value is parsed live from the PyPI README's `pip install` lines (e.g. `<=0.53.4`). Apply it directly in the customer's dependency-file diff — never strip it.
+
+Some instrumentor versions have transitive compatibility constraints that aren't expressed in PyPI metadata. The most common one in the current SDK release is the `wrapt<2` requirement for OpenLLMetry instrumentors (they pass `module=` to `wrap_function_wrapper`, which `wrapt` 2.x renamed to `target=`). The skill surfaces these as **symptom-driven fixes** in `troubleshooting.md` rather than baking them into every install diff — if a customer hits the symptom, the troubleshooting reference names the pin.
+
 ## Common mistakes
 
-- **Installing the `bedrock` instrumentor when only `boto3` is detected.** Wrong — `boto3` is multi-purpose. That match goes to `unsupported`, and the skill must confirm with the user before installing.
+- **Installing the `bedrock` instrumentor when only `boto3` is detected.** Wrong — `boto3` is multi-purpose. Always ask the customer whether they're actually using Bedrock before installing.
 - **Hardcoding a version constraint without running `fetch_sdk_docs.py`.** Wrong — PyPI live is the source of truth for instrumentor version pins. If PyPI is unreachable, surface the error rather than inventing a pin.
-- **Treating `detected` and `unsupported` as the same bucket.** Wrong — `detected` is auto-installable; `unsupported` requires explicit user confirmation before any install or dependency-file edit.
+- **Skipping the disambiguation prompt for ambiguous deps.** Wrong — `boto3`, `google-cloud-aiplatform`, `azure-ai-*` all need explicit user confirmation before installing any instrumentor.
 - **Silently auto-scaffolding when `runtime: "unknown"` or when serverless signals are weak/partial.** Wrong — ask the user before picking a template. The wrong span processor drops traces or wastes memory.
 - **Treating decorators / `create_llm_span` as a *substitute* for an auto-instrumentor.** Wrong — they are independent. If an auto-instrumentor exists on PyPI, install it. Decorators and manual spans are additionally available for orchestration and bespoke LLM calls.
-- **Skipping `fetch_sdk_docs.py` for a library the static map doesn't know.** Wrong — `instrumentor_map.json` is a static detection convenience, not the canonical supported set. The supported set is whatever PyPI currently lists.
+- **Trusting a stale memory of the supported set instead of `fetch_sdk_docs.py`.** Wrong — the supported set is whatever PyPI currently lists. Re-fetch.
 - **Scaffolding a duplicate `mc.setup()` when `existing_setup.found: true`.** Wrong — duplicate setup produces duplicate spans. Route to the existing-setup decision matrix in `setup-template.md`.
 - **Scaffolding `mc.setup()` against an empty instrumentor list.** Wrong — exit cleanly with the no-match message instead.
 - **Editing `requirements.txt` / `pyproject.toml` / `Pipfile` without explicit user approval.** Wrong — always propose the diff and wait for confirmation. See SKILL.md's CRITICAL no-silent-edit guardrail.
+- **Forgetting the `wrapt<2` pin and getting a `TypeError` at `mc.setup()` import.** Surface the symptom path in `troubleshooting.md` if the customer hits it — the fix is to pin `wrapt<2` alongside the OpenLLMetry instrumentors.

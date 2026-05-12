@@ -29,7 +29,7 @@ jobs:
       # unreachable host on purpose, so no outbound network access is
       # required for the suite to pass.
       - name: Run detect_libraries tests
-        run: python3 skills/instrument-agent/scripts/test_detect_libraries.py
+        run: python3 skills/instrument-agent/tests/test_detect_libraries.py
 
       - name: Run fetch_sdk_docs tests
-        run: python3 skills/instrument-agent/scripts/test_fetch_sdk_docs.py
+        run: python3 skills/instrument-agent/tests/test_fetch_sdk_docs.py

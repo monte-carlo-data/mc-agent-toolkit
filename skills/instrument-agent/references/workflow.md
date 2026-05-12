@@ -42,12 +42,12 @@ python3 scripts/detect_libraries.py <target_path>
 
 It prints a JSON object with the following fields:
 
-- `detected` — list of supported AI libraries found in the target tree (the SDK's supported set is whatever it ships on PyPI: `https://pypi.org/project/montecarlo-opentelemetry/`)
-- `suggested_instrumentors` — the OTel instrumentor packages to install for those libraries
-- `unsupported` — ambiguous matches that need user disambiguation (e.g. `boto3` could be Bedrock or SageMaker, or just generic AWS)
-- `runtime` — `serverless`, `long_running`, or `unknown`
-- `serverless_signals` — what triggered a serverless classification (e.g. `lambda_handler`, `serverless.yml`, `Mangum`)
+- `dependencies` — sorted list of normalized pip package names parsed from `requirements.txt` / `pyproject.toml` / `Pipfile`. Raw surface; the script does not single out AI libraries. The LLM matches these against `fetch_sdk_docs.py`'s `supported_instrumentors` list (see below).
+- `runtime` — `serverless`, `long_running`, or `unknown`. `serverless` if any serverless signal is found; `long_running` if a dep manifest was found but no serverless signals; `unknown` when no dep manifest exists at all.
+- `serverless_signals` — what triggered a serverless classification (e.g. `lambda_handler`, `serverless.yml`, `mangum`)
 - `existing_setup` — `{ found: bool, files: list[str] }` for any pre-existing `mc.setup()` call. The `files` array contains repo-relative paths where `montecarlo_opentelemetry` was detected.
+
+Match `dependencies` against the live PyPI supported-instrumentor list to figure out which instrumentors to install. See `library-detection.md` for the matching rules — including the ambiguous-multipurpose-SDK case (`boto3`, `google-cloud-aiplatform`, etc.) where the LLM must ask the customer before installing.
 
 Parse this output and branch:
 
@@ -61,10 +61,11 @@ Parse this output and branch:
 
 The same principle that governs `existing_setup` detection applies to every match-scanning step in this workflow — library-import detection, decorator-candidate identification, and existing-`mc.setup()` lookup. Before treating a match as actionable, confirm it lives in executable Python code, not in a docstring, an inline comment, an example block in a Markdown file, or test fixture data. A match inside a `"""..."""` doc block or a `README.md` example is not a real usage.
 
-- **`runtime: "unknown"` and `detected: []`** — exit cleanly. None of the AI libraries the SDK supports were detected, so there's nothing to instrument. Tell the user: "I didn't find any of the AI libraries the Monte Carlo OpenTelemetry SDK supports in the target. The current supported set is on PyPI: https://pypi.org/project/montecarlo-opentelemetry/. Confirm the agent code is actually in this path, then re-run." Do not scaffold anything.
+- **`runtime: "unknown"` and `dependencies: []`** — exit cleanly. No dependency manifest was found in the target tree, so there's nothing to scan. Tell the user: "I didn't find a `requirements.txt`, `pyproject.toml`, or `Pipfile` in the target. Confirm the agent code is actually in this path, then re-run." Do not scaffold anything.
+- **`dependencies` non-empty but no PyPI-supported AI library matches** — exit cleanly per `library-detection.md` section 7. Don't scaffold an `mc.setup()` against an empty instrumentor list.
 - **Anything else** — continue to step 2 with the detection output in hand.
 
-If the user wants to consider libraries beyond what `detect_libraries.py` knows about, run `python3 scripts/fetch_sdk_docs.py` to pull the live `supported_instrumentors` list from PyPI. The script fails closed if PyPI is unreachable — if it errors, point the user at `https://pypi.org/project/montecarlo-opentelemetry/` directly. This step is informational only — proposed installs still wait until step 6.
+Always run `python3 scripts/fetch_sdk_docs.py` alongside `detect_libraries.py`. It pulls the live `supported_instrumentors` list from PyPI — that's the canonical source for which AI libraries the SDK currently supports. The script fails closed if PyPI is unreachable; if it errors, point the user at `https://pypi.org/project/montecarlo-opentelemetry/` directly and ask them to share the current supported list manually. Match the customer's `dependencies` against `supported_instrumentors` to decide which instrumentors to install.
 
 **Next:** with detection settled, ask about the collector.
 
@@ -145,20 +146,17 @@ Render the resolved final URL to the user and ask for confirmation before genera
 
 ## Step 6 — Propose dependency-file edits
 
-Determine the install set from `detect_libraries.py`'s `suggested_instrumentors` (or live-fetch via `fetch_sdk_docs.py` if the user wants libraries beyond the default set). Always include the MC SDK package itself.
+Determine the install set by matching `detect_libraries.py`'s `dependencies` against `fetch_sdk_docs.py`'s `supported_instrumentors` per `library-detection.md`. Always include the MC SDK package itself.
 
-**Pinning is required, not optional.** Each `suggested_instrumentors` entry may include:
+**Pinning is required, not optional.** Each `supported_instrumentors` entry from `fetch_sdk_docs.py` may include a `version_constraint` (e.g. `<=0.53.4`) parsed from the PyPI README's `pip install` line. Apply that constraint directly in the proposed diff — never strip it. If `fetch_sdk_docs.py` failed (PyPI unreachable) it exits with an error rather than substituting stale data; point the user at `https://pypi.org/project/montecarlo-opentelemetry/` to resolve pins manually.
 
-- `version_constraint` — pin for the instrumentor package itself.
-- `additional_pins` — transitive constraints (e.g. `wrapt<2`) without which the pinned instrumentor fails to import.
-
-Apply both to the proposed diff. An unpinned `pip install opentelemetry-instrumentation-langchain` resolves to a version that crashes at `mc.setup()` import time against `wrapt` 2.x — that's a bug the skill is responsible for preventing. Per `library-detection.md`, `version_constraint` comes from `fetch_sdk_docs.py`'s live PyPI fetch; if that script fails (PyPI unreachable), it exits with an error rather than substituting stale data — point the user at `https://pypi.org/project/montecarlo-opentelemetry/` to resolve pins manually. `additional_pins` comes from the static map in `instrumentor_map.json`; carry it through alongside the live `version_constraint`.
+Some instrumentors have transitive constraints PyPI doesn't expose. The most common today is `wrapt<2`, required alongside the OpenLLMetry instrumentors. The skill **does not** preemptively bake that pin into every install diff — it's surfaced as a symptom-driven fix in `troubleshooting.md` (the customer hits a `TypeError: wrap_function_wrapper() got an unexpected keyword argument 'module'` and the troubleshooting reference names the pin). If the customer reports that error after installing, route them to that section.
 
 Propose the additions as a unified diff against the customer's actual dependency file — `requirements.txt`, `pyproject.toml`, or `Pipfile`. Wait for **explicit per-file approval** before any edit lands.
 
 > **CRITICAL — never edit dependency files autonomously.** Even if the change looks trivial. The user reviews and accepts each diff. See `library-detection.md` for the install rules.
 
-If `unsupported` from step 1 is non-empty (e.g. `boto3` matched but the agent could be using Bedrock, SageMaker, or just S3), surface the candidates and ask the user before deciding what to install. Don't guess.
+If any of the customer's `dependencies` is ambiguous (e.g. `boto3` could mean Bedrock, SageMaker, or generic AWS; `google-cloud-aiplatform` could be Vertex inference or Vertex Search), surface the candidates and ask the user before deciding what to install. Don't guess. See `library-detection.md` section 4.
 
 **Next:** propose the `mc.setup()` insertion.
 

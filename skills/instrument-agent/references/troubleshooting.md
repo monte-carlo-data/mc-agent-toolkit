@@ -95,6 +95,19 @@ The instrumentor package version is incompatible with the SDK version, or with t
 
 > **CRITICAL — never edit `requirements.txt` / `pyproject.toml` / `Pipfile` without explicit per-file approval.** If a version pin needs to change, propose the diff and wait. See `SKILL.md`.
 
+### Symptom: `TypeError: wrap_function_wrapper() got an unexpected keyword argument 'module'` at `mc.setup()` import
+
+This is a transitive-dep collision between the OpenLLMetry instrumentors (langchain, openai, anthropic, bedrock, crewai, sagemaker, vertexai at `<=0.53.4`) and `wrapt` 2.x. The instrumentors call `wrap_function_wrapper(module=...)`; `wrapt` 2.x renamed that argument to `target=`. PyPI doesn't expose this transitive constraint, so a fresh `pip install opentelemetry-instrumentation-langchain` can resolve `wrapt` to 2.x and crash on first import.
+
+**Fix:** pin `wrapt<2` alongside the OpenLLMetry instrumentor(s) in the customer's dependency file, then reinstall. For example:
+
+```diff
+ opentelemetry-instrumentation-langchain<=0.53.4
++wrapt<2
+```
+
+Then `pip install -r requirements.txt` (or the pyproject/Pipfile equivalent). The skill must propose this as a diff and wait for per-file approval — never edit dependency files autonomously.
+
 ## 7. Failure mode #5 — Upstream pipeline not deployed
 
 The customer's MC AO infrastructure (collector, ingestion endpoint, workspace) isn't online or hasn't been provisioned. The agent code is correct but there's nothing on the other end.
