@@ -2,7 +2,7 @@
 name: monte-carlo-monitoring-advisor
 description: Analyze data coverage, create monitors for warehouse tables and AI agents. Covers coverage gaps, use-case analysis, data monitor creation, and agent observability.
 bucket: Monitoring
-version: 2.1.0
+version: 2.1.1
 ---
 
 # Monte Carlo Monitoring Advisor Skill

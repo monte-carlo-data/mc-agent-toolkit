@@ -5,7 +5,7 @@ when_to_use: |
   Invoke when the user wants to tune, reduce noise on, or adjust sensitivity for a Monte Carlo monitor.
   Example triggers: "tune monitor <uuid>", "this monitor is too noisy", "reduce alerts on this monitor", "adjust sensitivity for <uuid>".
 bucket: Monitoring
-version: 1.1.0
+version: 1.1.1
 ---
 
 # Tune Monitor: Noise Reduction Analysis

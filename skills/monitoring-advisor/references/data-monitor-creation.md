@@ -7,7 +7,7 @@ All five `create_or_update_*_monitor` tools follow a **two-call preview-then-con
 1. **First call -- preview.** Invoke with `dry_run=True` (this is the default -- you can omit the argument). The tool returns rendered MaC YAML in `result.yaml` and a DRY RUN notice in `result.instructions`. Show the YAML to the user and confirm.
 2. **Second call -- live create/update.** After the user confirms, invoke the same tool again with `dry_run=False` and the same other parameters. The tool actually creates or updates the monitor and returns `result.monitor_uuid` plus a `result.instructions` string containing a deep link `<webapp_url>/monitors/<monitor_uuid>` to the live monitor. `result.yaml` is intentionally `None` on this call -- the monitor is already deployed.
 
-To **update an existing monitor** instead of creating a new one, pass its `monitor_uuid`. This works on both the preview and live calls. To save the monitor as a draft (not active), pass `is_draft=True`.
+To **update an existing monitor** instead of creating a new one, pass its `monitor_uuid`. This works on both the preview and live calls. **Important:** `create_or_update_*_monitor` with `monitor_uuid` has **PUT semantics** -- the call fully replaces the monitor's configuration. Fields you omit revert to the tool's defaults; they are NOT left untouched. See Step 7 ("Updating an existing monitor") for the safe-edit workflow. To save the monitor as a draft (not active), pass `is_draft=True`.
 
 The user may also choose to skip the live call and take the preview YAML themselves and apply it via the Monte Carlo CLI or CI/CD. Always present the YAML on the preview call regardless.
 
@@ -129,6 +129,12 @@ This step is a **two-call sequence**. Do NOT skip the preview call.
 2. **Live call.** After the user confirms and explicitly opts in to deploying directly, call the same tool again with **the same parameters** plus `dry_run=False`. The tool actually creates (or updates) the monitor; the response carries the new `monitor_uuid` and a deep link in `result.instructions`. On this call `result.yaml` is `None` by design -- the monitor is already deployed.
 
 **Updating an existing monitor.** If the user wants to edit a monitor they (or a previous call) already created, pass `monitor_uuid=<uuid>` on both the preview and live calls. The tool will update that monitor in place rather than creating a new one. Use a previously returned `monitor_uuid`, or look one up via `get_monitors`. If the underlying monitor was deleted between read and write, the tool will raise a clear error instructing you to retry without `monitor_uuid` (turning the intent from "update" into "create").
+
+**PUT semantics -- do not skip this step.** `create_or_update_*_monitor` with `monitor_uuid` replaces the monitor configuration in full. Every parameter you omit reverts to the tool's default (e.g. schedule resets to fixed/60 minutes); it is NOT left untouched. To edit safely:
+
+1. **Read the current config first.** Call `get_monitors(monitor_ids=[<uuid>], include_fields=["config"])` to get the full monitor configuration. `config` is excluded by default for performance -- you must request it explicitly.
+2. **Carry over every value you want to keep**, in addition to the ones you're changing. Do not pass only the changed fields -- anything you leave out is overwritten with the tool default.
+3. **Preview with `dry_run=True` and diff** the rendered YAML against the original config. If anything you meant to preserve is missing or changed, fix the call before running `dry_run=False`.
 
 **Drafts.** Pass `is_draft=True` to save the monitor in draft state (not active). Omit it to create the monitor as active.
 

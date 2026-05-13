@@ -116,6 +116,15 @@ Use `create_or_update_validation_monitor` to update the monitor in place.
 
 - **NEVER** omit `monitor_uuid` — this creates a duplicate monitor instead of updating.
 - **NEVER** apply changes without showing the dry-run preview first.
+- **CRITICAL: PUT semantics.** `create_or_update_validation_monitor` with `monitor_uuid` fully
+  replaces the monitor's configuration — fields you omit revert to tool defaults, they are NOT
+  left untouched. The full config from Phase 1's `get_monitors(monitor_ids=[<uuid>],
+  include_fields=["config"])` call is your source of truth: re-pass every field you want to
+  keep (the full alert_condition tree, schedule, table, audiences, notes, priority, tags, etc.)
+  alongside the ones you're changing.
+- **Diff the preview against the original.** Before running `dry_run=False`, compare the
+  rendered YAML returned in `result.yaml` against the original config — if anything you meant to
+  preserve is missing or changed, fix the call before committing.
 - **CRITICAL:** The `alert_condition` must be a dict (JSON object), never a JSON-encoded string.
 - **IMPORTANT:** Always produce the full `alert_condition` tree, not just the changed node.
   The tool replaces the entire condition tree.

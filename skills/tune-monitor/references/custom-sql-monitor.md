@@ -99,7 +99,14 @@ Use `create_or_update_sql_monitor` to update the monitor in place.
 
 - **NEVER** omit `monitor_uuid` — this creates a duplicate monitor instead of updating.
 - **NEVER** apply changes without showing the dry-run preview first.
+- **CRITICAL: PUT semantics.** `create_or_update_sql_monitor` with `monitor_uuid` fully replaces
+  the monitor's configuration — fields you omit revert to tool defaults, they are NOT left
+  untouched. The full config from Phase 1's `get_monitors(monitor_ids=[<uuid>],
+  include_fields=["config"])` call is your source of truth: re-pass every field you want to
+  keep (sql, all alert_conditions, schedule, warehouse, audiences, notes, priority, tags, etc.)
+  alongside the ones you're changing.
+- **Diff the preview against the original.** Before running `dry_run=False`, compare the
+  rendered YAML returned in `result.yaml` against the original config — if anything you meant to
+  preserve is missing or changed, fix the call before committing.
 - **CRITICAL:** When modifying the SQL query, ensure the query still returns a single numeric
   value. A query that returns multiple rows or non-numeric data will break the monitor.
-- **IMPORTANT:** If the monitor has multiple alert conditions, ensure all conditions are included
-  in the update — the tool replaces the full config, not individual conditions.
