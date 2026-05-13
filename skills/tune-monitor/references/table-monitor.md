@@ -94,7 +94,7 @@ switch to explicit thresholds if:
 
 ## Applying changes
 
-Table monitor tuning uses per-metric tools — **not** `create_table_monitor`:
+Table monitor tuning uses per-metric tools — **not** `create_or_update_table_monitor`:
 
 | Metric | Tool |
 |---|---|

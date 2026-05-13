@@ -89,18 +89,30 @@ Recommend reviewing whether the metric and field combination is the right approa
 
 ## Applying changes
 
-Use `create_metric_monitor` to update the monitor.
+Use `create_or_update_metric_monitor` to update the monitor in place.
 
-1. **Always pass the existing `uuid`** to update rather than create a new monitor.
-2. **Always dry-run first** (`dry_run=True`, the default) — show the user the YAML preview and
-   ask for confirmation before applying.
-3. **On confirmation**, call again with `dry_run=False`.
-4. **Check the returned UUID** — if it differs from the one you passed, tell the user the old
-   monitor was replaced with a new one.
+1. **Always pass `monitor_uuid=<uuid>`** so the tool updates the existing monitor rather than
+   creating a new one. Use the monitor UUID from Phase 1.
+2. **Always dry-run first** (`dry_run=True`, the default) — show the user the YAML preview
+   returned in `result.yaml` and ask for confirmation before applying.
+3. **On confirmation**, call again with `dry_run=False` (and the same `monitor_uuid` plus the
+   same other parameters). The response carries the monitor's UUID in `result.monitor_uuid` and
+   a deep link in `result.instructions` — surface that to the user. `result.yaml` is `None` on
+   the live call by design.
+4. **Stale-uuid handling.** If the monitor was deleted between read and write, the tool raises a
+   clear error instructing you to retry without `monitor_uuid` (turning the intent from "update"
+   into "create"). Confirm with the user before recreating.
 
 ### Common mistakes
 
-- **NEVER** omit the `uuid` field — this creates a duplicate monitor instead of updating.
+- **NEVER** omit `monitor_uuid` — this creates a duplicate monitor instead of updating.
 - **NEVER** apply changes without showing the dry-run preview first.
-- **IMPORTANT:** When updating a single field (e.g., `where_condition`), you must still pass all
-  required parameters. The tool replaces the full config, not individual fields.
+- **CRITICAL: PUT semantics.** `create_or_update_metric_monitor` with `monitor_uuid` fully
+  replaces the monitor's configuration — fields you omit revert to tool defaults, they are NOT
+  left untouched. The full config from Phase 1's `get_monitors(monitor_ids=[<uuid>],
+  include_fields=["config"])` call is your source of truth: re-pass every field you want to
+  keep (schedule, audiences, segment_fields, where_condition, sensitivity, collection_lag_hours,
+  notes, priority, tags, etc.) alongside the ones you're changing.
+- **Diff the preview against the original.** Before running `dry_run=False`, compare the
+  rendered YAML returned in `result.yaml` against the original config — if anything you meant to
+  preserve is missing or changed, fix the call before committing.

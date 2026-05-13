@@ -1,6 +1,6 @@
 # Custom SQL Monitor Reference
 
-Detailed reference for building `create_custom_sql_monitor_mac` tool calls.
+Detailed reference for building `create_or_update_sql_monitor` tool calls. The tool follows the **two-call preview-then-confirm pattern** — see `data-monitor-creation.md` for the full flow.
 
 ## Critical Constraints
 
@@ -48,6 +48,19 @@ If you find yourself contorting another monitor type to fit the user's intent, s
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `domain_uuids` | array of string (uuid) | Domain UUIDs (use `get_domains` to list). Data monitors accept exactly one UUID in the list. |
+| `query_result_type` | string | What the SQL query returns — see the tool's enum for accepted values (single numeric is the most common). |
+| `custom_sampling_sql` | string | Optional SQL used to sample rows that contributed to the result (shown in alert detail). |
+| `variable_definitions` | object | Named variables that can be referenced in `sql` / `custom_sampling_sql`. |
+| `schedule_type` | string | Schedule type: `"fixed"` (default), `"dynamic"`, `"manual"`. |
+| `interval_minutes` | int | Schedule interval in minutes (only for `schedule_type="fixed"`). |
+| `audiences` | array of string | Notification audience **names** (not UUIDs) to alert when the monitor triggers. |
+| `failure_audiences` | array of string | Notification audience names to alert on query execution failures. |
+| `notes` | string | Free-text notes shown in the UI (separate from `description`). |
+| `priority` | string | Monitor priority (e.g. `"P1"`, `"P2"`). |
+| `tags` | array of `{name, value}` | Key-value tags to attach. |
+| `is_draft` | bool | When `True`, saves the monitor as a draft (not active). Default `False`. |
+| `monitor_uuid` | string (uuid) | UUID of an existing monitor to update in place. Omit to create a new monitor. **PUT semantics:** the call fully replaces the monitor's configuration — fields you omit revert to tool defaults, they are NOT left untouched. Before editing, read the current config with `get_monitors(monitor_ids=[<uuid>], include_fields=["config"])` and re-pass every field you want to keep. See `data-monitor-creation.md` (Step 7) for the safe-edit workflow. |
+| `dry_run` | bool | Default `True`. Preview mode. When omitted or `True`, returns YAML preview in `result.yaml`. When `False`, actually creates/updates the monitor and returns `result.monitor_uuid` + a deep link in `result.instructions`. See `data-monitor-creation.md`. |
 
 ---
 

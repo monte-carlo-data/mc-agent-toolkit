@@ -1,6 +1,6 @@
 # Table Monitor Reference
 
-Detailed reference for building `create_table_monitor_mac` tool calls.
+Detailed reference for building `create_or_update_table_monitor` tool calls. The tool follows the **two-call preview-then-confirm pattern** — see `data-monitor-creation.md` for the full flow.
 
 ## Critical Constraints
 
@@ -42,6 +42,14 @@ Use a table monitor when the user wants to:
 |-----------|------|---------|-------------|
 | `alert_conditions` | array of strings | `["last_updated_on", "schema", "total_row_count", "total_row_count_last_changed_on"]` | Metric names to monitor (see Alert Conditions below). |
 | `domain_uuids` | array of string (uuid) | none | Domain UUIDs (use `get_domains` to list). Data monitors accept exactly one UUID in the list. |
+| `audiences` | array of string | none | Notification audience **names** (not UUIDs) to alert when the monitor triggers. |
+| `failure_audiences` | array of string | none | Notification audience names to alert on query execution failures. |
+| `notes` | string | none | Free-text notes shown in the UI (separate from `description`). |
+| `priority` | string | none | Monitor priority (e.g. `"P1"`, `"P2"`). |
+| `tags` | array of `{name, value}` | none | Key-value tags to attach. |
+| `is_draft` | bool | `False` | When `True`, saves the monitor as a draft (not active). |
+| `monitor_uuid` | string (uuid) | none | UUID of an existing monitor to update in place. Omit to create a new monitor. **PUT semantics:** the call fully replaces the monitor's configuration — fields you omit revert to tool defaults, they are NOT left untouched. Before editing, read the current config with `get_monitors(monitor_ids=[<uuid>], include_fields=["config"])` and re-pass every field you want to keep. See `data-monitor-creation.md` (Step 7) for the safe-edit workflow. |
+| `dry_run` | bool | `True` | Preview mode. When omitted or `True`, returns YAML preview in `result.yaml`. When `False`, actually creates/updates the monitor and returns `result.monitor_uuid` + a deep link in `result.instructions`. See `data-monitor-creation.md`. |
 
 ---
 

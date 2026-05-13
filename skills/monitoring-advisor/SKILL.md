@@ -2,7 +2,7 @@
 name: monte-carlo-monitoring-advisor
 description: Analyze data coverage, create monitors for warehouse tables and AI agents. Covers coverage gaps, use-case analysis, data monitor creation, and agent observability.
 bucket: Monitoring
-version: 2.0.0
+version: 2.1.1
 ---
 
 # Monte Carlo Monitoring Advisor Skill
@@ -82,13 +82,15 @@ All tools are available via the `monte-carlo` MCP server.
 
 ### Data monitor creation tools
 
+All five tools follow a **two-call preview-then-confirm pattern**: the first call (with the default `dry_run=True`) returns rendered MaC YAML for review; the second call (`dry_run=False`) deploys the monitor live and returns a deep link to it. Pass `monitor_uuid` on either call to update an existing monitor in place instead of creating a new one. See `references/data-monitor-creation.md` for the full flow.
+
 | Tool | Purpose |
 | --- | --- |
-| `create_table_monitor_mac` | Generate table monitor YAML (dry-run) |
-| `create_metric_monitor_mac` | Generate metric monitor YAML (dry-run) |
-| `create_validation_monitor_mac` | Generate validation monitor YAML (dry-run) |
-| `create_custom_sql_monitor_mac` | Generate custom SQL monitor YAML (dry-run) |
-| `create_comparison_monitor_mac` | Generate comparison monitor YAML (dry-run) |
+| `create_or_update_table_monitor` | Create or update a table monitor (preview YAML on `dry_run=True`, deploy on `dry_run=False`) |
+| `create_or_update_metric_monitor` | Create or update a metric monitor (preview YAML on `dry_run=True`, deploy on `dry_run=False`) |
+| `create_or_update_validation_monitor` | Create or update a validation monitor (preview YAML on `dry_run=True`, deploy on `dry_run=False`) |
+| `create_or_update_sql_monitor` | Create or update a custom SQL monitor (preview YAML on `dry_run=True`, deploy on `dry_run=False`) |
+| `create_or_update_comparison_monitor` | Create or update a comparison monitor (preview YAML on `dry_run=True`, deploy on `dry_run=False`) |
 
 ### Agent monitoring tools
 
@@ -210,7 +212,7 @@ When coverage analysis leads to monitor creation, gather this context before rea
 
 ### Use-case tag monitors
 
-The most common output of coverage analysis is a **table monitor scoped by use-case tags** via `create_table_monitor_mac`. The `asset_selection` parameter uses this structure:
+The most common output of coverage analysis is a **table monitor scoped by use-case tags** via `create_or_update_table_monitor`. The `asset_selection` parameter uses this structure:
 
 ```json
 {
