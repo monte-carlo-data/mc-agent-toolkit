@@ -1,0 +1,132 @@
+{
+  "skill": "monte-carlo-instrument-agent",
+  "description": "Trigger accuracy evals for the monte-carlo-instrument-agent skill. Each case tests whether a single prompt should activate the skill.",
+  "cases": [
+    {
+      "id": "should-01",
+      "prompt": "I have a long-running LangChain agent in Python — can you instrument it for Monte Carlo Agent Observability?",
+      "expected": "trigger",
+      "rationale": "Direct request to instrument a LangChain agent for MC — core skill use case"
+    },
+    {
+      "id": "should-02",
+      "prompt": "Set up Monte Carlo tracing on my LangGraph workflow.",
+      "expected": "trigger",
+      "rationale": "Direct instrument request for a supported library (LangGraph)"
+    },
+    {
+      "id": "should-03",
+      "prompt": "We're using the OpenAI SDK for our chat agent. How do I add Monte Carlo instrumentation?",
+      "expected": "trigger",
+      "rationale": "Direct instrument request for OpenAI SDK calls"
+    },
+    {
+      "id": "should-04",
+      "prompt": "Instrument my Anthropic-based agent with the Monte Carlo OpenTelemetry SDK.",
+      "expected": "trigger",
+      "rationale": "Direct instrument request for an Anthropic SDK agent"
+    },
+    {
+      "id": "should-05",
+      "prompt": "Can you add MC tracing to our CrewAI multi-agent system?",
+      "expected": "trigger",
+      "rationale": "Direct instrument request for CrewAI"
+    },
+    {
+      "id": "should-06",
+      "prompt": "I need to wire up Monte Carlo Agent Observability for an Amazon Bedrock agent.",
+      "expected": "trigger",
+      "rationale": "Direct instrument request for Bedrock"
+    },
+    {
+      "id": "should-07",
+      "prompt": "Help me instrument a SageMaker-hosted agent so its traces show up in Monte Carlo.",
+      "expected": "trigger",
+      "rationale": "Direct instrument request for SageMaker"
+    },
+    {
+      "id": "should-08",
+      "prompt": "Add Monte Carlo tracing to my Vertex AI agent code.",
+      "expected": "trigger",
+      "rationale": "Direct instrument request for Vertex AI"
+    },
+    {
+      "id": "should-09",
+      "prompt": "Instrument my Lambda agent for Monte Carlo — it runs as a serverless function.",
+      "expected": "trigger",
+      "rationale": "Lambda/serverless instrument request — skill detects serverless and switches to SimpleSpanProcessor"
+    },
+    {
+      "id": "should-10",
+      "prompt": "Set up MC tracing on this agent.",
+      "expected": "trigger",
+      "rationale": "Generic agent tracing setup request — verb \"set up tracing\" routes to instrument-agent"
+    },
+    {
+      "id": "should-11",
+      "prompt": "Set up agent observability.",
+      "expected": "trigger",
+      "rationale": "Bare \"agent observability\" phrase is intentionally ambiguous; per design decision (Bayard) this routes to instrument-agent because producing traces is the prerequisite to monitoring them"
+    },
+    {
+      "id": "should-not-01",
+      "prompt": "Help me set up monitoring for my AI agents — I want to track latency and token usage.",
+      "expected": "no-trigger",
+      "rationale": "Verb is \"monitor/track\" not \"instrument\" — route to monte-carlo-monitoring-advisor (consumes traces, doesn't produce them)"
+    },
+    {
+      "id": "should-not-02",
+      "prompt": "Which of our AI agents have the worst latency? I want to create alerts for them.",
+      "expected": "no-trigger",
+      "rationale": "Alert creation on agent metrics — route to monte-carlo-monitoring-advisor"
+    },
+    {
+      "id": "should-not-03",
+      "prompt": "I want to monitor my agent's response quality and catch runaway tool call loops.",
+      "expected": "no-trigger",
+      "rationale": "Agent quality monitoring and trajectory alerting — route to monte-carlo-monitoring-advisor"
+    },
+    {
+      "id": "should-not-04",
+      "prompt": "We got a freshness alert on raw_events. What happened and what's downstream?",
+      "expected": "no-trigger",
+      "rationale": "Active alert triage — route to incident-response skill"
+    },
+    {
+      "id": "should-not-05",
+      "prompt": "Why did this agent latency alert fire last night? Help me investigate the incident.",
+      "expected": "no-trigger",
+      "rationale": "Incident investigation on a fired alert — route to incident-response skill"
+    },
+    {
+      "id": "should-not-06",
+      "prompt": "I need to push table metadata from our Snowflake warehouse to Monte Carlo. Where do I start?",
+      "expected": "no-trigger",
+      "rationale": "Push metadata ingestion — route to montecarlo-push-ingestion skill"
+    },
+    {
+      "id": "should-not-07",
+      "prompt": "Build me a metadata collector for Snowflake that pushes to Monte Carlo.",
+      "expected": "no-trigger",
+      "rationale": "Metadata collector script generation — route to montecarlo-push-ingestion skill"
+    },
+    {
+      "id": "should-not-08",
+      "prompt": "Build me a Connection Auth Rules config for our Snowflake connection.",
+      "expected": "no-trigger",
+      "rationale": "Connection Auth Rules config generation — route to connection-auth-rules skill"
+    },
+    {
+      "id": "should-not-09",
+      "prompt": "I want to evaluate my chat agent's answer relevance and alert if it drops below a threshold.",
+      "expected": "no-trigger",
+      "rationale": "Agent evaluation monitor creation — route to monte-carlo-monitoring-advisor (verb is \"evaluate/alert\", not \"instrument\")"
+    },
+    {
+      "id": "should-not-10",
+      "prompt": "How do I push query logs from Databricks to Monte Carlo?",
+      "expected": "no-trigger",
+      "rationale": "Push query log ingestion — route to montecarlo-push-ingestion skill"
+    }
+  ]
+}

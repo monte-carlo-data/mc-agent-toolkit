@@ -5,6 +5,12 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Codex will be do
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.0] - 2026-05-07
+
+### Added
+
+- **Instrument Agent skill** — walks Monte Carlo Agent Observability customers through instrumenting a new Python AI agent for Monte Carlo. Detects AI libraries in the codebase, proposes the Monte Carlo OpenTelemetry SDK install with matching instrumentors, generates tracing setup tailored to serverless or long-running runtimes, suggests where workflow and task decorators belong, and verifies traces appear in Monte Carlo. Always asks before editing any file. Trigger by asking to "instrument my agent" or "set up Monte Carlo tracing".
+
 ## [1.10.5] - 2026-05-11
 
 ### Changed
