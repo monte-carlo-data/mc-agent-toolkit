@@ -35,13 +35,11 @@ Restart Claude Code after installing.
 
 ## Telemetry
 
-The toolkit sends anonymous skill-usage telemetry — which skills are invoked, how often. Each event includes an opaque per-install UUID and a per-session UUID, the skill name, and the toolkit version.
+The toolkit sends anonymous skill-usage telemetry by default — which skills are invoked, how often. Each event includes an opaque per-install UUID, a per-session UUID, the skill name, and the toolkit version. No prompts, arguments, or code are ever sent.
 
-To disable, set `MC_AGENT_TOOLKIT_TELEMETRY_DISABLED=1` in your shell environment. The toolkit will not phone home.
+To opt out, set `MC_AGENT_TOOLKIT_TELEMETRY_DISABLED=1` in your shell environment before starting Claude Code. The toolkit will not phone home.
 
-The data is stored in Mixpanel and Datadog and is used only for product-development decisions about which skills to invest in.
-
-The UUIDs are generated locally on first session and stored under `~/.claude/mc-agent-toolkit/`. Deleting that directory resets your install identity to a fresh anonymous one.
+The data is stored in Mixpanel and Datadog and is used only for product-development decisions about which skills to invest in. The UUIDs are generated locally on first session and stored under `~/.claude/mc-agent-toolkit/`. Deleting that directory resets your install identity to a fresh anonymous one.
 
 ## Available Features
 
@@ -53,7 +51,11 @@ The UUIDs are generated locally on first session and stored under `~/.claude/mc-
 | **Push Ingestion** | Generates warehouse-specific collection scripts for pushing metadata, lineage, and query logs to Monte Carlo. Includes 10 `/mc-*` slash commands. | [Skill README](../../skills/push-ingestion/README.md) |
 | **Automated Triage** | Guides you through automated alert triage — scoring, deep troubleshooting, classification, and actions. Requires extended MCP toolset. | [SKILL](../../skills/automated-triage/SKILL.md) |
 
-The Prevent feature includes hooks that enforce the impact-assessment-first workflow. See the [Prevent Hook Behavior](../README.md#prevent-hook-behavior) section in the plugins README for details.
+The Prevent feature includes **PreToolUse hooks that can block edits to dbt SQL files** until an impact assessment runs. The hooks only fire on `.sql` files inside dbt model, macro, or snapshot directories — they do not affect non-dbt files.
+
+**To disable the Prevent hooks**, set `MC_PREVENT_HOOKS_DISABLED=1` in your environment (e.g. in your `.zshrc` or `.bashrc`, or via `.claude/settings.json` under `env`). The hooks will exit immediately without blocking any edits.
+
+See the [Prevent Hook Behavior](../README.md#prevent-hook-behavior) section in the plugins README for full details on scope and configuration.
 
 ## Updating
 

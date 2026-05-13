@@ -9,7 +9,8 @@
         {
             "name": "mc-agent-toolkit",
             "source": "./plugins/claude-code",
-            "description": "Monte Carlo Agent Toolkit — data observability skills and enforcement hooks for AI coding agents."
+            "description": "Monte Carlo Agent Toolkit — data observability skills and enforcement hooks for AI coding agents.",
+            "category": "monitoring"
         }
     ]
 }
