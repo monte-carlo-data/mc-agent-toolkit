@@ -5,6 +5,18 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Claude Code will
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.1] - 2026-05-13
+
+### Added
+
+- Add `MC_PREVENT_HOOKS_DISABLED=1` env var to disable prevent hooks (block-edit, pre-commit, turn-end) for users who want the skills without the gating behavior.
+
+### Changed
+
+- Clarify telemetry disclosure in plugin README: explicit opt-out instructions and confirmation that no prompts/arguments/code are sent.
+- Polish `plugin.json` metadata for Anthropic plugin directory submission (expanded description, `author.email`, `homepage`).
+- Add `"category": "monitoring"` to the marketplace.json entry.
+
 ## [1.11.0] - 2026-05-07
 
 ### Added

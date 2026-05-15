@@ -118,12 +118,18 @@ def _get_staged_model_tables(cwd: str) -> list[str]:
 
 # --- Decision functions ---
 
+def _prevent_hooks_disabled() -> bool:
+    return os.environ.get("MC_PREVENT_HOOKS_DISABLED", "").strip() == "1"
+
+
 def evaluate_pre_edit(inp: HookInput) -> HookOutput:
     """Gate logic: should this file edit be allowed?
 
     Returns deny if impact assessment hasn't run for this table,
     noop if the edit should proceed.
     """
+    if _prevent_hooks_disabled():
+        return HookOutput()
     cleanup_stale_cache()
 
     file_path = inp.file_path or ""
@@ -231,6 +237,8 @@ def evaluate_post_edit(inp: HookInput) -> HookOutput:
 
 def evaluate_pre_commit(inp: HookInput) -> HookOutput:
     """Commit checkpoint: prompt for validation if dbt models are staged."""
+    if _prevent_hooks_disabled():
+        return HookOutput()
     command = inp.command or ""
     if "git commit" not in command:
         return HookOutput()
@@ -266,6 +274,8 @@ def evaluate_pre_commit(inp: HookInput) -> HookOutput:
 
 def evaluate_turn_end(inp: HookInput) -> HookOutput:
     """End of turn: prompt for validation queries if dbt models were edited."""
+    if _prevent_hooks_disabled():
+        return HookOutput()
     if inp.stop_hook_active:
         return HookOutput()
 
