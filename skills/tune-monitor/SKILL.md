@@ -234,6 +234,7 @@ Phase 1.5. Each reference specifies the correct tool and constraints for that mo
 General rules for all types:
 1. **Always preview first** — show the user what will change before applying.
 2. **Get explicit confirmation** before applying any change.
+3. **Validate the preview YAML against the schema** — before presenting the preview YAML to the user, check it against `../../schemas/mac-schema.json` (relative to this file). If any field in the YAML does not appear in the schema for the given monitor type, flag it and correct it.
 
 ---
 
@@ -245,3 +246,4 @@ General rules for all types:
 - **Cite evidence.** Reference specific incident dates, segment values, and counts from the report.
 - **Degrade gracefully.** If troubleshooting runs are missing, note the limited context and
   reason from alert patterns alone.
+- **Add `$schema` when saving YAML to a file.** If the user asks to save the MaC YAML to a file, add `# yaml-language-server: $schema: https://docs.getmontecarlo.com/mac/schema.json` as the first line of that file.

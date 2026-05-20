@@ -204,6 +204,20 @@ If the user prefers to deploy via CLI/CI rather than the live tool call:
 
 ---
 
+## Schema Validation
+
+Always add the following comment as the **first line** of any MaC YAML file you create or edit:
+
+```yaml
+# yaml-language-server: $schema: https://docs.getmontecarlo.com/mac/schema.json
+```
+
+A local copy of the schema is available at `../../schemas/mac-schema.json` (relative to skill files). Use the Read tool to inspect it if you're uncertain whether a field name or value is valid for a given monitor type.
+
+Generated YAML must not include fields that don't appear in the schema for that monitor type. Unknown fields are silently ignored by the CLI but indicate a misconfiguration and may break future validation.
+
+---
+
 ## Available MCP Tools
 
 All tools are available via the `monte-carlo` MCP server.
