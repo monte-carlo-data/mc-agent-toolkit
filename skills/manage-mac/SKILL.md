@@ -6,7 +6,8 @@ when_to_use: |
   want to export live monitors into a MaC YAML file.
   Example triggers: "create a monitors YAML for this table", "add a metric monitor to my MaC file",
   "validate my monitors.yaml before I apply it", "what's wrong with my MaC file",
-  "export my existing monitors to YAML", "get my monitors into a file so I can commit them".
+  "export my existing monitors to YAML", "get my monitors into a file so I can commit them",
+  "import my live monitors to YAML", "get a MaC file from my existing monitors".
   Do NOT invoke when the user wants to discover what to monitor or generate monitors from scratch
   via table exploration — use monitoring-advisor for that.
 bucket: Monitoring
