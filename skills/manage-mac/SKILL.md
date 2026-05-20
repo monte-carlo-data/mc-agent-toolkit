@@ -34,6 +34,7 @@ Determine which workflow applies based on the user's request:
 | No existing file; wants monitors for a table or use case | **Create** |
 | Has an existing file; wants to add, modify, or remove monitors | **Edit** |
 | Has an existing file; wants to check it before applying | **Validate** |
+| Wants to export live monitors into a MaC YAML file | **Import** |
 
 If the intent is ambiguous, ask: "Do you have an existing MaC YAML file, or should I create a new one?"
 
@@ -62,8 +63,38 @@ The top-level structure under `montecarlo:` contains these monitor type keys:
 - `custom_sql`, `validation`, `comparison`, `query_performance`
 - `freshness`, `volume`, `field_quality`, `table`, `bulk_monitor`
 
-Each key maps to an array of monitor objects. The schema's `items` for each key defines what fields
-are valid, which are required, and what enum values are accepted.
+The `notifications:` key is also valid under `montecarlo:` — it is the Notifications-as-Code (NaC)
+block and is handled by a separate pipeline. Do not validate or modify its contents.
+
+Each monitor type key maps to an array of monitor objects. The schema's `items` for each key
+defines what fields are valid, which are required, and what enum values are accepted.
+
+**Type-specific notes:**
+
+`metric` monitors use a nested `data_source` object — there is no flat `table` field at the top
+level. The schema shows `data_source.table` (and optionally `data_source.schema`,
+`data_source.dataset`). `alert_conditions` is always required on `metric` monitors.
+
+`validation` monitors have an `alert_condition` field whose internal structure is a predicate
+tree not further described by the schema. The minimal valid structure is:
+
+```yaml
+alert_condition:
+  type: GROUP
+  operator: AND
+  conditions:
+    - type: BINARY
+      predicate:
+        name: not_null
+        negated: false
+      left:
+        - type: FIELD
+          field: column_name
+```
+
+Common predicate names: `not_null`, `is_not_empty`, `starts_with`, `ends_with`, `contains`,
+`in_set`, `regex_match`, `greater_than`, `less_than`, `greater_than_or_equal`,
+`less_than_or_equal`. For the full catalog, use the `get_validation_predicates` MCP tool.
 
 ---
 
@@ -96,6 +127,13 @@ Generate a well-formed YAML file:
 4. For each monitor object, include all required fields from the schema and only optional fields
    that the user has specified or that materially improve the monitor
 5. Use exact field names from the schema — no invented names, no camelCase variants
+
+> **Auto threshold:** To use ML-based auto thresholds, set `operator: AUTO`, `AUTO_HIGH`, or
+> `AUTO_LOW` inside an `alert_conditions` item. Do not omit `alert_conditions` to imply
+> auto — the field is required on `metric` monitors and must always be present.
+
+> **`sensitivity` enum:** The `sensitivity` field accepts lowercase values only: `high`,
+> `medium`, `low`. Values like `HIGH` or `Medium` are invalid.
 
 ### Step 3: Tell the user how to apply
 
@@ -149,9 +187,11 @@ For each monitor in the file, validate:
 
 1. **Required fields present:** every field marked `required` in the schema items is present
 2. **No unknown fields:** no field names that don't appear in the schema for that monitor type
-3. **Enum values valid:** any field with an `enum` constraint uses one of the listed values
+3. **Enum values valid:** any field with an `enum` constraint uses one of the listed values.
+   Note that string enums in MaC are case-sensitive and typically lowercase — for example,
+   `sensitivity` accepts `high`/`medium`/`low`, not `HIGH`/`MEDIUM`/`LOW`.
 4. **Type correctness:** string fields are strings, integer fields are integers, etc.
-5. **Top-level structure:** root key is `montecarlo:`, monitor type keys are one of the 14 valid types
+5. **Top-level structure:** `montecarlo:` key must be present; its sub-keys must be one of the 14 valid monitor types or `notifications:`. MaC files may be co-located inside dbt `schema.yml` alongside `version:`, `models:`, etc. — extra top-level keys are allowed and must not be flagged as errors.
 
 **Schema scope disclaimer:** The schema validates field names, types, and enum values only. Cross-field semantic constraints (e.g. required field combinations, mutually exclusive options, fields that are only valid together with another field) are NOT checked here — they are enforced by the Monte Carlo backend at apply time. A file that passes schema validation may still be rejected by `montecarlo monitors apply`.
 
@@ -193,6 +233,43 @@ Validation issues found:
 ```
 
 Do not stop at the first error — report all issues found in a single pass.
+
+---
+
+## Import workflow
+
+Use this when the user wants to export live monitors (created via the UI or API) into a MaC YAML file.
+
+### Step 1: Identify the source
+
+Ask what to import:
+- A specific table: "Which table? Provide the full name (database.schema.table)"
+- A namespace or group: "Any filters? (table name pattern, monitor type, namespace)"
+
+### Step 2: Fetch monitors using MCP
+
+Call `get_monitors` with `config_format="yaml"` — this returns monitors already formatted as MaC YAML blocks:
+
+```
+get_monitors(full_table_id="database.schema.table", config_format="yaml")
+```
+
+For broader imports, call without `full_table_id` and filter by other criteria.
+
+### Step 3: Assemble the YAML file
+
+1. Group returned monitors by type under a single `montecarlo:` block
+2. Add the yaml-language-server header comment as the first line
+3. Prompt the user for the `namespace` to use with `montecarlo monitors apply`
+4. If the same monitor appears under multiple names, deduplicate
+
+### Step 4: Present and save
+
+Show the assembled file and offer to save it. Remind the user:
+
+> These monitors are now defined in your repo. Once you run `montecarlo monitors apply`,
+> Monte Carlo will manage them as MaC resources and they will be identified by their `name` field.
+> Any future edits to these monitors should be made in this file, not in the UI.
 
 ---
 

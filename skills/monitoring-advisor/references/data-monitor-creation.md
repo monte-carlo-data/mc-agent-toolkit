@@ -121,6 +121,17 @@ Before calling the creation tool, present the monitor configuration in plain lan
 
 Ask: "Does this look correct? I'll generate the monitor configuration."
 
+Also ask how the user wants to deploy it:
+
+> **Deployment preference:** Deploy live now (via MCP), or save as a Monitors-as-Code YAML file to apply through your repo?
+>
+> - **Live (MCP):** I'll call the creation tool and the monitor will be active immediately.
+> - **MaC YAML:** I'll generate the YAML definition so you can commit it to your repo and apply it with `montecarlo monitors apply`. Use `/monte-carlo-manage-mac` if you want to validate or edit the file first.
+
+If the user chooses MaC YAML: generate the preview YAML (dry_run=True) as usual, present it wrapped in the standard MaC structure (see MaC YAML Format), and stop -- do not call with `dry_run=False`. The user takes the YAML from there.
+
+If the user chooses live or does not express a preference, proceed with the standard two-call sequence in Step 7.
+
 ### Step 7: Create the monitor
 
 This step is a **two-call sequence**. Do NOT skip the preview call.

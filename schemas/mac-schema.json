@@ -10552,6 +10552,9 @@
               "schedule"
             ]
           }
+        },
+        "notifications": {
+          "description": "Notifications-as-Code (NaC) configuration block. Structure is not validated by this schema \u2014 it is handled separately by the NaC pipeline."
         }
       },
       "additionalProperties": false
