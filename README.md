@@ -2,6 +2,8 @@
 
 Monte Carlo's official toolkit for AI coding agents. Brings data observability — lineage, monitoring, validation, alerting, and metadata ingestion — directly into your development workflow. The toolkit bundles multiple skills into a single plugin that works across supported editors.
 
+> Using Claude.ai (web or desktop) instead of a coding agent? Install Monte Carlo as a [verified connector from the Claude directory](https://claude.ai/directory/connectors/monte-carlo).
+
 ## Features
 
 The toolkit bundles the following capabilities as a single **mc-agent-toolkit** plugin. Each feature is a [skill](skills/) that can also be used standalone.
