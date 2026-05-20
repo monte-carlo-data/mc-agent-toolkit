@@ -5,6 +5,14 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Claude Code will
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.0] - 2026-05-20
+
+### Added
+
+- New `/manage-mac` skill: author, edit, and validate Monitors-as-Code YAML files using the published JSON Schema — ensures field correctness across all 14 monitor types
+- Published MaC JSON Schema (`schemas/mac-schema.json`) bundled locally for offline agent use
+- Schema validation gates injected into `monitoring-advisor` and `tune-monitor` — agents now validate generated YAML against the schema before presenting it to the user
+
 ## [1.11.1] - 2026-05-13
 
 ### Added
