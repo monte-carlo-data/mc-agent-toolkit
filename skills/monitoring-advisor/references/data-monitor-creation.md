@@ -216,6 +216,8 @@ A local copy of the schema is available at `../../schemas/mac-schema.json` (rela
 
 Generated YAML must not include fields that don't appear in the schema for that monitor type. Unknown fields are silently ignored by the CLI but indicate a misconfiguration and may break future validation.
 
+**Schema scope:** The schema validates field names, types, and enum values only. Cross-field semantic constraints (e.g. required field combinations, mutually exclusive options, conditional required fields) are NOT checked by the schema — they are enforced by the Monte Carlo backend at apply time. A file that passes schema validation may still fail on `montecarlo monitors apply`.
+
 ---
 
 ## Available MCP Tools

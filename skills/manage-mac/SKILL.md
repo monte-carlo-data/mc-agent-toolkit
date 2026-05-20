@@ -153,6 +153,8 @@ For each monitor in the file, validate:
 4. **Type correctness:** string fields are strings, integer fields are integers, etc.
 5. **Top-level structure:** root key is `montecarlo:`, monitor type keys are one of the 14 valid types
 
+**Schema scope disclaimer:** The schema validates field names, types, and enum values only. Cross-field semantic constraints (e.g. required field combinations, mutually exclusive options, fields that are only valid together with another field) are NOT checked here — they are enforced by the Monte Carlo backend at apply time. A file that passes schema validation may still be rejected by `montecarlo monitors apply`.
+
 ### Step 3: Report findings
 
 If the file is valid:
