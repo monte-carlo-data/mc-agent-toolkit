@@ -36,7 +36,8 @@ Determine which workflow applies based on the user's request:
 | Has an existing file; wants to check it before applying | **Validate** |
 | Wants to export live monitors into a MaC YAML file | **Import** |
 
-If the intent is ambiguous, ask: "Do you have an existing MaC YAML file, or should I create a new one?"
+If the intent is ambiguous, ask:
+> "Do you have an existing MaC YAML file, or should I create a new one? Or do you want to export your live monitors into a MaC file?"
 
 ---
 
@@ -78,6 +79,14 @@ top level. The schema shows `data_source.table` (and optionally `data_source.sch
 
 `sensitivity` is a field only on `metric` monitors. It is not a valid field on `custom_sql`,
 `field_health`, or any other monitor type.
+
+`query_performance` monitors do NOT have a `table` field. Asset targeting uses a `selection`
+array of filter objects, not a direct table reference. Do not add `table:` to a
+`query_performance` monitor.
+
+The `table` monitor type (key: `table`) does NOT have a flat `table` field either — assets are
+targeted via the `asset_selection` object (`databases`, `filters`, `exclusions`). The name
+coincidence is a common confusion point.
 
 Per-monitor audience wiring uses the `audiences` field (array of strings) directly on the
 monitor object. This is distinct from the top-level `notifications:` NaC block — do not
@@ -142,9 +151,11 @@ Generate a well-formed YAML file:
    that the user has specified or that materially improve the monitor
 5. Use exact field names from the schema — no invented names, no camelCase variants
 
-> **Auto threshold:** To use ML-based auto thresholds, set `operator: AUTO`, `AUTO_HIGH`, or
-> `AUTO_LOW` inside an `alert_conditions` item. Do not omit `alert_conditions` to imply
-> auto — the field is required on `metric` monitors and must always be present.
+> **Auto threshold (`metric` only):** To use ML-based auto thresholds on `metric` monitors,
+> set `operator: AUTO`, `AUTO_HIGH`, or `AUTO_LOW` inside an `alert_conditions` item. Do not
+> omit `alert_conditions` to imply auto — the field is required and must always be present.
+> `custom_sql`, `field_quality`, and other monitor types do NOT support `AUTO` operators —
+> use `GT`, `LT`, `GTE`, `LTE`, `EQ`, or `NEQ` for those types.
 
 > **`sensitivity` enum:** The `sensitivity` field accepts lowercase values only: `high`,
 > `medium`, `low`. Values like `HIGH` or `Medium` are invalid.
@@ -182,6 +193,10 @@ Identify what the user wants to do:
 
 For additions and modifications, cross-reference the schema to confirm field names and values
 are valid.
+
+While reading the file, also check for deprecated field names (marked `deprecated: true` in
+the schema). If found, follow the deprecated field handling procedure in the Validate section
+before applying changes.
 
 ### Step 3: Apply the change and present the diff
 
@@ -281,7 +296,7 @@ For broader imports, call without `full_table_id` and filter by other criteria.
 
 1. Group returned monitors by type under a single `montecarlo:` block
 2. Add the yaml-language-server header comment as the first line
-3. Prompt the user for the `namespace` to use with `montecarlo monitors apply`
+3. If the user has not provided a namespace, prompt them for one to use with `montecarlo monitors apply`
 4. If the same monitor appears under multiple names, deduplicate
 
 ### Step 4: Present and save
