@@ -246,4 +246,4 @@ General rules for all types:
 - **Cite evidence.** Reference specific incident dates, segment values, and counts from the report.
 - **Degrade gracefully.** If troubleshooting runs are missing, note the limited context and
   reason from alert patterns alone.
-- **Add `$schema` when saving YAML to a file.** If the user asks to save the MaC YAML to a file, add `# yaml-language-server: $schema: https://docs.getmontecarlo.com/mac/schema.json` as the first line of that file.
+- **Add `$schema` when saving YAML to a file.** If the user asks to save the MaC YAML to a file, add `# yaml-language-server: $schema=https://docs.getmontecarlo.com/mac/schema.json` as the first line of that file.

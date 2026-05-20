@@ -1,5 +1,5 @@
 ---
-name: manage-mac
+name: monte-carlo-manage-mac
 description: Author, edit, and validate Monitors-as-Code YAML files. Reads the MaC schema to ensure correctness. Handles create, edit, and validate entry points for any of the 14 monitor types.
 when_to_use: |
   Invoke when the user has a MaC YAML file they want to create, edit, or validate.

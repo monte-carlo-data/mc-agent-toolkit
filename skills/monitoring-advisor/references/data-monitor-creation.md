@@ -209,7 +209,7 @@ If the user prefers to deploy via CLI/CI rather than the live tool call:
 Always add the following comment as the **first line** of any MaC YAML file you create or edit:
 
 ```yaml
-# yaml-language-server: $schema: https://docs.getmontecarlo.com/mac/schema.json
+# yaml-language-server: $schema=https://docs.getmontecarlo.com/mac/schema.json
 ```
 
 A local copy of the schema is available at `../../schemas/mac-schema.json` (relative to skill files). Use the Read tool to inspect it if you're uncertain whether a field name or value is valid for a given monitor type.
