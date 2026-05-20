@@ -71,25 +71,39 @@ defines what fields are valid, which are required, and what enum values are acce
 
 **Type-specific notes:**
 
-`metric` monitors use a nested `data_source` object — there is no flat `table` field at the top
-level. The schema shows `data_source.table` (and optionally `data_source.schema`,
-`data_source.dataset`). `alert_conditions` is always required on `metric` monitors.
+`metric` monitors use a nested `data_source` object — there is no flat `table` field at the
+top level. The schema shows `data_source.table` (and optionally `data_source.schema`,
+`data_source.dataset`). Required fields: `name`, `description`, `data_source`,
+`alert_conditions`.
 
-`validation` monitors have an `alert_condition` field whose internal structure is a predicate
-tree not further described by the schema. The minimal valid structure is:
+`sensitivity` is a field only on `metric` monitors. It is not a valid field on `custom_sql`,
+`field_health`, or any other monitor type.
+
+Per-monitor audience wiring uses the `audiences` field (array of strings) directly on the
+monitor object. This is distinct from the top-level `notifications:` NaC block — do not
+confuse them.
+
+`validation` monitors have an `alert_condition` field (singular — not `alert_conditions`)
+whose internal structure is a predicate tree not described further by the schema. The minimal
+valid structure including all required fields is:
 
 ```yaml
-alert_condition:
-  type: GROUP
-  operator: AND
-  conditions:
-    - type: BINARY
-      predicate:
-        name: not_null
-        negated: false
-      left:
-        - type: FIELD
-          field: column_name
+- name: email_not_null
+  data_source:
+    table: db.schema.table
+  schedule:
+    type: fixed
+  alert_condition:
+    type: GROUP
+    operator: AND
+    conditions:
+      - type: BINARY
+        predicate:
+          name: not_null
+          negated: false
+        left:
+          - type: FIELD
+            field: email
 ```
 
 Common predicate names: `not_null`, `is_not_empty`, `starts_with`, `ends_with`, `contains`,
@@ -159,12 +173,15 @@ Use the Read tool to load the user's file. If no path is provided, ask for it.
 
 Identify what the user wants to do:
 
-- **Add** a monitor: determine the type, gather required fields, append to the correct type list
+- **Add** a monitor: determine the type, then follow the same field-gathering and authoring
+  steps as the Create workflow (Step 1 and Step 2) — ask for required fields not already
+  provided, derive them from the schema, then append the new block to the correct type list
 - **Modify** a monitor: locate the target monitor by name or table, apply the specified changes
-- **Remove** a monitor: locate and delete the target monitor object
+- **Remove** a monitor: locate and delete the target monitor object. If it is the only item in
+  its type list, remove the entire type key as well — do not leave an empty list
 
-For additions and modifications, cross-reference the schema to confirm field names and values are
-valid.
+For additions and modifications, cross-reference the schema to confirm field names and values
+are valid.
 
 ### Step 3: Apply the change and present the diff
 
@@ -218,15 +235,19 @@ Example report format:
 ```
 Validation issues found:
 
-1. metric[0] ("orders_freshness_check")
-   - Missing required field: `full_table_id`
-   - Fix: add `full_table_id: "database.schema.orders"`
+1. metric[0] ("orders_row_count")
+   - Missing required field: `description`
+   - Fix: add `description: "Row count for orders table"`
 
-2. custom_sql[1] (unnamed)
+2. metric[1] ("null_rate_check")
    - Unknown field: `sensivity` (did you mean `sensitivity`?)
    - Fix: rename to `sensitivity`
 
-3. validation[0] ("null_check")
+3. custom_sql[0] ("status_check")
+   - Unknown field: `sensitivity`
+   - Fix: remove this field — `sensitivity` is only valid on `metric` monitors
+
+4. validation[0] ("null_check")
    - Invalid enum value for `condition_operator`: "EQUALS"
    - Valid values: [see schema for the full list]
    - Fix: use one of the valid enum values
