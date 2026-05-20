@@ -157,7 +157,7 @@ For each monitor in the file, validate:
 
 ### Step 3: Report findings
 
-If the file is valid:
+If the file is valid with no deprecated fields:
 
 > The file is valid. All monitors conform to the MaC schema.
 > Apply with: `montecarlo monitors apply --namespace <namespace>`
@@ -166,6 +166,12 @@ If the file has issues, report each one with:
 - The monitor type and monitor name/index where the issue appears
 - The specific problem (missing field, unknown field, invalid enum value, wrong type)
 - The fix
+
+**Deprecated field handling:** The schema marks legacy field names with `deprecated: true` and a `description` of the form `"Deprecated: use \`<canonical>\` instead."` The corresponding canonical field carries `"description": "Use this field. Replaces the deprecated \`<old_name>\`."` When you encounter deprecated fields during validation or editing, proactively offer to migrate them:
+
+> Found deprecated field(s): `comparisons` → should be `alert_conditions`. The file will still deploy successfully (the backend accepts both names), but migrating now avoids future breakage. Want me to update the file?
+
+Always apply the migration only after explicit user confirmation. List all deprecated fields found before asking, not one at a time.
 
 Example report format:
 

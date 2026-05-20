@@ -33,7 +33,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Use this field. Replaces the deprecated `resource`."
               },
               "name": {
                 "oneOf": [
@@ -559,7 +560,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Use this field. Replaces the deprecated `notify_rule_run_failure`."
               },
               "severity": {
                 "oneOf": [
@@ -681,7 +683,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Use this field. Replaces the deprecated `domain_uuids`."
               },
               "is_draft": {
                 "oneOf": [
@@ -981,7 +984,8 @@
                     }
                   },
                   "additionalProperties": false
-                }
+                },
+                "description": "Use this field. Replaces the deprecated `comparisons`."
               },
               "min_segment_size": {
                 "oneOf": [
@@ -1300,7 +1304,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Use this field. Replaces the deprecated `resource`."
               },
               "name": {
                 "oneOf": [
@@ -1819,7 +1824,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Use this field. Replaces the deprecated `notify_rule_run_failure`."
               },
               "severity": {
                 "oneOf": [
@@ -1941,7 +1947,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Use this field. Replaces the deprecated `domain_uuids`."
               },
               "is_draft": {
                 "oneOf": [
@@ -2039,7 +2046,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Use this field. Replaces the deprecated `resource`."
               },
               "name": {
                 "oneOf": [
@@ -2558,7 +2566,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Use this field. Replaces the deprecated `notify_rule_run_failure`."
               },
               "severity": {
                 "oneOf": [
@@ -2680,7 +2689,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Use this field. Replaces the deprecated `domain_uuids`."
               },
               "is_draft": {
                 "oneOf": [
@@ -2775,7 +2785,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Use this field. Replaces the deprecated `resource`."
               },
               "name": {
                 "type": "string"
@@ -3545,7 +3556,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Use this field. Replaces the deprecated `notify_rule_run_failure`."
               },
               "audiences": {
                 "type": "array",
@@ -3637,7 +3649,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Use this field. Replaces the deprecated `domain_uuids`."
               },
               "is_draft": {
                 "oneOf": [
@@ -3752,7 +3765,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Use this field. Replaces the deprecated `resource`."
               },
               "name": {
                 "type": "string"
@@ -4623,7 +4637,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Use this field. Replaces the deprecated `notify_rule_run_failure`."
               },
               "audiences": {
                 "type": "array",
@@ -4715,7 +4730,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Use this field. Replaces the deprecated `domain_uuids`."
               },
               "is_draft": {
                 "oneOf": [
@@ -4806,7 +4822,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Use this field. Replaces the deprecated `resource`."
               },
               "name": {
                 "oneOf": [
@@ -4909,7 +4926,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Use this field. Replaces the deprecated `notify_rule_run_failure`."
               },
               "event_rollup_count": {
                 "oneOf": [
@@ -4996,7 +5014,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Use this field. Replaces the deprecated `domain_uuids`."
               },
               "is_draft": {
                 "oneOf": [
@@ -5388,7 +5407,8 @@
                   },
                   "additionalProperties": false
                 },
-                "maxItems": 1
+                "maxItems": 1,
+                "description": "Use this field. Replaces the deprecated `comparisons`."
               },
               "query_result_type": {
                 "oneOf": [
@@ -5691,8 +5711,7 @@
             "additionalProperties": false,
             "required": [
               "schedule",
-              "sql",
-              "alert_conditions"
+              "sql"
             ]
           }
         },
@@ -5719,7 +5738,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Use this field. Replaces the deprecated `resource`."
               },
               "name": {
                 "oneOf": [
@@ -5822,7 +5842,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Use this field. Replaces the deprecated `notify_rule_run_failure`."
               },
               "event_rollup_count": {
                 "oneOf": [
@@ -5909,7 +5930,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Use this field. Replaces the deprecated `domain_uuids`."
               },
               "is_draft": {
                 "oneOf": [
@@ -6439,7 +6461,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Use this field. Replaces the deprecated `resource`."
               },
               "name": {
                 "oneOf": [
@@ -6542,7 +6565,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Use this field. Replaces the deprecated `notify_rule_run_failure`."
               },
               "event_rollup_count": {
                 "oneOf": [
@@ -6629,7 +6653,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Use this field. Replaces the deprecated `domain_uuids`."
               },
               "is_draft": {
                 "oneOf": [
@@ -6978,7 +7003,8 @@
                   },
                   "additionalProperties": false
                 },
-                "maxItems": 1
+                "maxItems": 1,
+                "description": "Use this field. Replaces the deprecated `comparisons`."
               },
               "source_connection_name": {
                 "oneOf": [
@@ -7216,8 +7242,7 @@
               "source_resource",
               "target_resource",
               "source_sql",
-              "target_sql",
-              "alert_conditions"
+              "target_sql"
             ]
           }
         },
@@ -7244,7 +7269,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Use this field. Replaces the deprecated `resource`."
               },
               "name": {
                 "oneOf": [
@@ -7367,7 +7393,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Use this field. Replaces the deprecated `domain_uuids`."
               },
               "selection": {
                 "oneOf": [
@@ -7495,7 +7522,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Use this field. Replaces the deprecated `resource`."
               },
               "name": {
                 "oneOf": [
@@ -7598,7 +7626,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Use this field. Replaces the deprecated `notify_rule_run_failure`."
               },
               "event_rollup_count": {
                 "oneOf": [
@@ -7685,7 +7714,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Use this field. Replaces the deprecated `domain_uuids`."
               },
               "is_draft": {
                 "oneOf": [
@@ -7980,7 +8010,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Use this field. Replaces the deprecated `resource`."
               },
               "name": {
                 "oneOf": [
@@ -8083,7 +8114,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Use this field. Replaces the deprecated `notify_rule_run_failure`."
               },
               "event_rollup_count": {
                 "oneOf": [
@@ -8170,7 +8202,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Use this field. Replaces the deprecated `domain_uuids`."
               },
               "is_draft": {
                 "oneOf": [
@@ -8576,7 +8609,8 @@
                     "type"
                   ]
                 },
-                "maxItems": 1
+                "maxItems": 1,
+                "description": "Use this field. Replaces the deprecated `comparisons`."
               },
               "volume_metric": {
                 "type": "string",
@@ -8853,10 +8887,7 @@
                 "description": "Deprecated: use `alert_conditions` instead."
               }
             },
-            "additionalProperties": false,
-            "required": [
-              "alert_conditions"
-            ]
+            "additionalProperties": false
           }
         },
         "field_quality": {
@@ -8882,7 +8913,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Use this field. Replaces the deprecated `resource`."
               },
               "name": {
                 "oneOf": [
@@ -8985,7 +9017,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Use this field. Replaces the deprecated `notify_rule_run_failure`."
               },
               "event_rollup_count": {
                 "oneOf": [
@@ -9072,7 +9105,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Use this field. Replaces the deprecated `domain_uuids`."
               },
               "is_draft": {
                 "oneOf": [
@@ -9434,7 +9468,8 @@
                     "threshold_value"
                   ]
                 },
-                "maxItems": 1
+                "maxItems": 1,
+                "description": "Use this field. Replaces the deprecated `comparisons`."
               },
               "filters": {
                 "type": "array",
@@ -9555,8 +9590,7 @@
             "additionalProperties": false,
             "required": [
               "schedule",
-              "metric_type",
-              "alert_conditions"
+              "metric_type"
             ]
           }
         },
@@ -9583,7 +9617,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Use this field. Replaces the deprecated `resource`."
               },
               "name": {
                 "oneOf": [
@@ -9708,7 +9743,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Use this field. Replaces the deprecated `domain`."
               },
               "alert_conditions": {
                 "type": "array",
@@ -9856,7 +9892,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Use this field. Replaces the deprecated `resource`."
               },
               "name": {
                 "oneOf": [
@@ -10363,7 +10400,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "Use this field. Replaces the deprecated `domain`."
               },
               "domain_restrictions": {
                 "type": "array",
