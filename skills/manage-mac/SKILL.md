@@ -72,9 +72,12 @@ required fields. Never guess field names — always derive them from the schema.
 
 The top-level structure under `montecarlo:` contains these monitor type keys:
 
-- `field_health`, `dimension_tracking`, `json_schema`, `metric`, `metric_comparison`
-- `custom_sql`, `validation`, `comparison`, `query_performance`
-- `freshness`, `volume`, `field_quality`, `table`, `bulk_monitor`
+- `metric`, `metric_comparison`, `custom_sql`, `validation`
+- `json_schema`, `query_performance`, `table`, `bulk_monitor`
+
+Do not author new monitors of types `field_health`, `dimension_tracking`, `field_quality`,
+`comparison`, `freshness`, or `volume` — these are deprecated or discouraged. If a user
+asks to edit or validate a file that contains them, handle it but do not add new ones.
 
 The `notifications:` key is also valid under `montecarlo:` — it is the Notifications-as-Code (NaC)
 block and is handled by a separate pipeline. Do not validate or modify its contents.
@@ -89,8 +92,7 @@ top level. The schema shows `data_source.table` (and optionally `data_source.sch
 `data_source.dataset`). Required fields: `name`, `description`, `data_source`,
 `alert_conditions`.
 
-`sensitivity` is a field only on `metric` monitors. It is not a valid field on `custom_sql`,
-`field_health`, or any other monitor type.
+`sensitivity` is a field only on `metric` monitors. It is not valid on any other monitor type.
 
 `query_performance` monitors do NOT have a `table` field. Asset targeting uses a `selection`
 array of filter objects, not a direct table reference. Do not add `table:` to a
@@ -127,9 +129,10 @@ valid structure including all required fields is:
             field: email
 ```
 
-Common predicate names: `not_null`, `is_not_empty`, `starts_with`, `ends_with`, `contains`,
-`in_set`, `regex_match`, `greater_than`, `less_than`, `greater_than_or_equal`,
-`less_than_or_equal`. For the full catalog, use the `get_validation_predicates` MCP tool.
+**Always call `get_validation_predicates` for the full predicate catalog** — do not rely on
+a hardcoded list. The list below is a quick reference only; the tool is authoritative:
+`not_null`, `is_not_empty`, `starts_with`, `ends_with`, `contains`, `in_set`, `regex_match`,
+`greater_than`, `less_than`, `greater_than_or_equal`, `less_than_or_equal`.
 
 **Binary predicates require a `right` value node.** Predicates that compare a field against a
 literal (`starts_with`, `ends_with`, `contains`, `in_set`, `regex_match`, `greater_than`, etc.)
@@ -156,12 +159,19 @@ Use this when the user has no existing file and wants monitors for a table or us
 Ask for any information not already provided:
 
 1. **Table(s):** fully qualified names (database.schema.table or equivalent)
-2. **Monitor type(s):** what kind of monitoring — metric, freshness, validation, custom SQL, etc.
+2. **Monitor type(s):** what kind of monitoring — metric, validation, custom SQL, etc.
    If the user is unsure, suggest the most common types for their use case.
+   Do not suggest deprecated types (`field_health`, `dimension_tracking`, `field_quality`,
+   `comparison`, `freshness`, `volume`).
 3. **Namespace:** the MaC namespace to use with `montecarlo monitors apply --namespace <namespace>`
 4. **Notification audiences:** optional; ask only if the user mentions alerting
 
 Do not ask about fields that the schema marks as optional unless the user brings them up.
+
+**Table and field validation:** If the user provides a table name, follow steps 1–3 from
+`../monitoring-advisor/references/data-monitor-creation.md` (relative to this file) to resolve
+the MCON, verify column names, and resolve domain and warehouse UUIDs before authoring the YAML.
+Never guess or hallucinate column names, warehouse UUIDs, or domain UUIDs.
 
 ### Step 2: Author the YAML
 
@@ -178,12 +188,9 @@ Generate a well-formed YAML file:
 5. Use exact field names from the schema — no invented names, no camelCase variants
 
 > **Auto threshold:** To use ML-based auto thresholds, set `operator: AUTO`, `AUTO_HIGH`, or
-> `AUTO_LOW` inside an `alert_conditions` item. This is valid on `metric`, `custom_sql`,
-> `volume`, and other types that include `AUTO` in their operator enum — always verify in the
-> schema for the specific monitor type. Do not omit `alert_conditions` to imply auto — on
-> `metric` monitors the field is required and must always be present.
-> `field_quality` does NOT support `AUTO` operators — use `GT`, `LT`, `GTE`, `LTE`, `EQ`,
-> or `NEQ` for that type.
+> `AUTO_LOW` inside an `alert_conditions` item. Always verify the operator enum in the schema
+> for the specific monitor type — not all types support `AUTO`. Do not omit `alert_conditions`
+> to imply auto — on `metric` monitors the field is required and must always be present.
 
 > **`sensitivity` enum:** The `sensitivity` field accepts lowercase values only: `high`,
 > `medium`, `low`. Values like `HIGH` or `Medium` are invalid.
