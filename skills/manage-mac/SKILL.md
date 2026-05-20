@@ -1,6 +1,6 @@
 ---
 name: monte-carlo-manage-mac
-description: Author, edit, and validate Monitors-as-Code YAML files. Reads the MaC schema to ensure correctness. Handles create, edit, and validate entry points for any of the 14 monitor types.
+description: Create, edit, validate, and import Monitors-as-Code YAML files. Fetches the published MaC JSON Schema to ensure correctness across all 14 monitor types.
 when_to_use: |
   Invoke when the user has a MaC YAML file they want to create, edit, or validate, or when they
   want to export live monitors into a MaC YAML file.
@@ -22,9 +22,8 @@ schema — not from table discovery.
 
 **Arguments:** $ARGUMENTS
 
-The MaC schema lives next to this skill file. **Use the Read tool** to access it:
-
-- Schema: `../../schemas/mac-schema.json` (relative to this file)
+The MaC schema is published at `https://docs.getmontecarlo.com/mac/schema.json`. **Use WebFetch**
+to retrieve it in Phase 0.
 
 ---
 
@@ -50,8 +49,9 @@ If the intent is ambiguous, ask:
 
 ## Prerequisites
 
-No MCP tools are required for file-only operations (create, edit, validate). The schema file is
-the sole source of truth for field names, types, enums, and required fields.
+No MCP tools are required for file-only operations (create, edit, validate). The published JSON
+Schema (fetched via WebFetch in Phase 0) is the sole source of truth for field names, types,
+enums, and required fields.
 
 Monte Carlo MCP tools (`create_or_update_*_monitor` with `dry_run=True`) are available as an
 optional cross-reference when the user wants to preview what the API would generate for a monitor
@@ -61,7 +61,12 @@ before deciding between file-based and live deployment. Use them only if explici
 
 ## Phase 0: Read the schema
 
-Before authoring or validating any YAML, read `../../schemas/mac-schema.json` using the Read tool.
+Before authoring or validating any YAML, fetch the published MaC JSON Schema using the WebFetch tool:
+
+```
+https://docs.getmontecarlo.com/mac/schema.json
+```
+
 The schema is JSON Schema Draft 7 and describes all valid monitor types, fields, types, enums, and
 required fields. Never guess field names — always derive them from the schema.
 
@@ -343,9 +348,10 @@ Show the assembled file and offer to save it. Remind the user:
 
 ## Graceful degradation
 
-If the schema file cannot be read, stop and tell the user:
+If the schema cannot be fetched from `https://docs.getmontecarlo.com/mac/schema.json`, stop and
+tell the user:
 
-> Cannot read the MaC schema at `../../schemas/mac-schema.json`. Please verify the file exists
-> and try again.
+> Cannot fetch the MaC schema from `https://docs.getmontecarlo.com/mac/schema.json`. Please check
+> your network connection and try again.
 
 Do not attempt to author or validate YAML without the schema.

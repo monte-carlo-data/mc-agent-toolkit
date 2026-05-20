@@ -234,7 +234,8 @@ Phase 1.5. Each reference specifies the correct tool and constraints for that mo
 General rules for all types:
 1. **Always preview first** — show the user what will change before applying.
 2. **Get explicit confirmation** before applying any change.
-3. **Validate the preview YAML against the schema** — before presenting the preview YAML to the user, check it against `../../schemas/mac-schema.json` (relative to this file). If any field in the YAML does not appear in the schema for the given monitor type, flag it and correct it. Note: the schema validates field names, types, and enum values only — cross-field semantic constraints are enforced by the backend at apply time, not by the schema.
+3. **Validate the preview YAML against the schema** — before presenting the preview YAML to the user, fetch the published MaC JSON Schema from `https://docs.getmontecarlo.com/mac/schema.json` (WebFetch) and check the preview YAML against it. If any field in the YAML does not appear in the schema for the given monitor type, flag it and correct it. Note: the schema validates field names, types, and enum values only — cross-field semantic constraints are enforced by the backend at apply time, not by the schema.
+4. **MaC-managed monitors** — if `get_monitors` returns a `mac_name` or the user mentions the monitor is managed via a MaC YAML file, note this before applying: changes made via the API will be overwritten the next time `montecarlo monitors apply` runs. Offer to hand off to `/manage-mac` (edit workflow) instead so the YAML file stays the source of truth.
 
 ---
 
