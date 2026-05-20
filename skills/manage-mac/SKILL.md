@@ -2,11 +2,13 @@
 name: monte-carlo-manage-mac
 description: Author, edit, and validate Monitors-as-Code YAML files. Reads the MaC schema to ensure correctness. Handles create, edit, and validate entry points for any of the 14 monitor types.
 when_to_use: |
-  Invoke when the user has a MaC YAML file they want to create, edit, or validate.
+  Invoke when the user has a MaC YAML file they want to create, edit, or validate, or when they
+  want to export live monitors into a MaC YAML file.
   Example triggers: "create a monitors YAML for this table", "add a metric monitor to my MaC file",
-  "validate my monitors.yaml before I apply it", "what's wrong with my MaC file".
+  "validate my monitors.yaml before I apply it", "what's wrong with my MaC file",
+  "export my existing monitors to YAML", "get my monitors into a file so I can commit them".
   Do NOT invoke when the user wants to discover what to monitor or generate monitors from scratch
-  via table exploration — use monitoring-advisor for that. The entry point here is always the file.
+  via table exploration — use monitoring-advisor for that.
 bucket: Monitoring
 version: 1.0.0
 ---
@@ -37,7 +39,11 @@ Determine which workflow applies based on the user's request:
 | Wants to export live monitors into a MaC YAML file | **Import** |
 
 If the intent is ambiguous, ask:
-> "Do you have an existing MaC YAML file, or should I create a new one? Or do you want to export your live monitors into a MaC file?"
+> "Which workflow do you need?
+> 1. **Create** — no existing file; generate a new monitors YAML from scratch
+> 2. **Edit** — you have a file and want to add, modify, or remove monitors
+> 3. **Validate** — you have a file and want to check it before applying
+> 4. **Import** — export live monitors from Monte Carlo into a new YAML file"
 
 ---
 
@@ -119,6 +125,20 @@ Common predicate names: `not_null`, `is_not_empty`, `starts_with`, `ends_with`, 
 `in_set`, `regex_match`, `greater_than`, `less_than`, `greater_than_or_equal`,
 `less_than_or_equal`. For the full catalog, use the `get_validation_predicates` MCP tool.
 
+**Binary predicates require a `right` value node.** Predicates that compare a field against a
+literal (`starts_with`, `ends_with`, `contains`, `in_set`, `regex_match`, `greater_than`, etc.)
+need both a `left` (the field) and a `right` (the comparison value). Unary predicates
+(`not_null`, `is_not_empty`) take only `left`. Example with `starts_with`:
+
+```yaml
+        left:
+          - type: FIELD
+            field: email
+        right:
+          - type: VALUE
+            value: "user@"
+```
+
 ---
 
 ## Create workflow
@@ -151,11 +171,13 @@ Generate a well-formed YAML file:
    that the user has specified or that materially improve the monitor
 5. Use exact field names from the schema — no invented names, no camelCase variants
 
-> **Auto threshold (`metric` only):** To use ML-based auto thresholds on `metric` monitors,
-> set `operator: AUTO`, `AUTO_HIGH`, or `AUTO_LOW` inside an `alert_conditions` item. Do not
-> omit `alert_conditions` to imply auto — the field is required and must always be present.
-> `custom_sql`, `field_quality`, and other monitor types do NOT support `AUTO` operators —
-> use `GT`, `LT`, `GTE`, `LTE`, `EQ`, or `NEQ` for those types.
+> **Auto threshold:** To use ML-based auto thresholds, set `operator: AUTO`, `AUTO_HIGH`, or
+> `AUTO_LOW` inside an `alert_conditions` item. This is valid on `metric`, `custom_sql`,
+> `volume`, and other types that include `AUTO` in their operator enum — always verify in the
+> schema for the specific monitor type. Do not omit `alert_conditions` to imply auto — on
+> `metric` monitors the field is required and must always be present.
+> `field_quality` does NOT support `AUTO` operators — use `GT`, `LT`, `GTE`, `LTE`, `EQ`,
+> or `NEQ` for that type.
 
 > **`sensitivity` enum:** The `sensitivity` field accepts lowercase values only: `high`,
 > `medium`, `low`. Values like `HIGH` or `Medium` are invalid.
