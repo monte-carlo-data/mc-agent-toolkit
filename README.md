@@ -29,7 +29,7 @@ Skills are grouped by the job they help you do. Orchestrated workflows sequence 
 |---|---|---|
 | **Proactive Monitoring** _(workflow)_ | Sequences coverage analysis → gap identification → monitor creation into a guided flow. | [SKILL](skills/proactive-monitoring/SKILL.md) |
 | **Monitoring Advisor** | Identifies coverage gaps and creates monitors for warehouse tables or AI agents — validates tables and fields against your live workspace, emits monitors-as-code YAML. | [README](skills/monitoring-advisor/README.md) |
-| **Manage MaC** | Author, edit, and validate Monitors-as-Code YAML files. Reads the published schema to ensure field correctness across all 14 monitor types. | [SKILL](skills/manage-mac/SKILL.md) |
+| **Manage MaC** | Create, edit, validate, and import Monitors-as-Code YAML files — authors new monitors from scratch, modifies existing files, validates against the published JSON Schema, and exports live monitors to YAML. | [SKILL](skills/manage-mac/SKILL.md) |
 | **Tune Monitor** | Recommends sensitivity, segment, and schedule changes to reduce alert noise on an existing metric monitor. | [SKILL](skills/tune-monitor/SKILL.md) |
 
 ### Prevent — catch issues before they ship
