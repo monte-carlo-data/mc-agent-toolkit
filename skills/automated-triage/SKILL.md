@@ -47,7 +47,7 @@ All tools are available via the `monte-carlo` MCP server.
 | Tool                             | Toolset  | Purpose                                                         |
 | -------------------------------- | -------- | --------------------------------------------------------------- |
 | `get_alerts`                          | default  | Fetch recent alerts for a time window                                                                             |
-| `alert_assessment`                    | default  | Score an alert by incident likelihood and impact (HIGH/MEDIUM/LOW each)                                           |
+| `alert_assessment`                    | default  | Score an alert by incident likelihood and potential impact (HIGH/MEDIUM/LOW each)                                 |
 | `run_troubleshooting_agent`           | default  | Run the Monte Carlo Troubleshooting Agent on a single alert; async by default — returns immediately, reuses existing results when available |
 | `get_troubleshooting_agent_results`   | default  | Poll an async troubleshooting run by `incident_id`; returns status (`not_found`/`running`/`success`/`failed`) and results when complete |
 | `update_alert`                        | default  | Update an alert's status and/or declare an incident by setting severity                                           |
@@ -62,7 +62,7 @@ All tools are available via the `monte-carlo` MCP server.
 Read `references/triage-stages.md` for a full description of each stage and how to customise it. The high-level flow is:
 
 1. **Fetch alerts** — decide which alerts to triage and over what time window
-2. **Initial investigation** — score every alert by incident likelihood and impact using `alert_assessment`
+2. **Initial investigation** — score every alert by incident likelihood and potential impact using `alert_assessment`
 3. **Deep troubleshooting** — run `run_troubleshooting_agent` on high-signal alerts to get root cause analysis
 4. **Classify** — use the troubleshooting output to classify each alert
 5. **Take actions** — post comments, update statuses, message Slack, create tickets
@@ -105,7 +105,7 @@ The user wants to look at specific alerts now. Use the triage tools directly to 
 
 1. Clarify the scope (Ask about the time window and whether the user is interested in a specific domain, audience or alert type).
 2. Fetch alerts with `get_alerts` (applying any domain or audience filter from step 1), run `alert_assessment` in parallel on all of them, and report the results clearly.
-3. For any alert where both incident likelihood and impact are MEDIUM or higher, offer to run `run_troubleshooting_agent` for a deeper root cause analysis. Wait for confirmation before running it.
+3. For any alert where both incident likelihood and potential impact are MEDIUM or higher, offer to run `run_troubleshooting_agent` for a deeper root cause analysis. Wait for confirmation before running it.
 4. Summarise findings. Do not prompt to save a workflow file or set up automation unless the user brings it up.
 
 **Write tools in interactive triage:** After findings are clear, proactively offer relevant actions — updating status, declaring a severity, assigning an owner, posting a comment, or marking events as normal (for alerts that are natural data variation). Ask before executing.

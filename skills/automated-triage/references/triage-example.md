@@ -13,7 +13,7 @@ Run in recommendation mode first. Once the classifications and recommendations m
 
 1. Asks whether to run in recommendation or action mode
 2. Fetches all alerts from the last 3 hours
-3. Scores every alert by incident likelihood and impact (in parallel)
+3. Scores every alert by incident likelihood and potential impact (in parallel)
 4. Fires deep troubleshooting on all high-signal alerts simultaneously, classifying each as results arrive
 5. In **action mode**: posts a triage comment on every alert and updates statuses
    In **recommendation mode**: outputs what it would comment and what status it would set — no writes
@@ -38,7 +38,7 @@ If no alerts are returned, report: "No alerts in the last 3 hours." and stop.
 
 ### Step 3: Score each alert
 
-Call `alert_assessment` in parallel for every alert from step 2, in batches of up to 10 at a time. Each result includes `incident_likelihood`, `alert_impact` (HIGH/MEDIUM/LOW each), `alert_description` (plain-language description of what happened in the incident), and `triage_summary` (the key reasoning behind the incident likelihood and impact scores). Use `alert_description` and `triage_summary` to inform the triage comment in step 4 for alerts that don't go through troubleshooting.
+Call `alert_assessment` in parallel for every alert from step 2, in batches of up to 10 at a time. Each result includes `incident_likelihood`, `alert_impact` (HIGH/MEDIUM/LOW each), `alert_description` (plain-language description of what happened in the incident), and `triage_summary` (the key reasoning behind the incident likelihood and potential impact scores). Use `alert_description` and `triage_summary` to inform the triage comment in step 4 for alerts that don't go through troubleshooting.
 
 ### Step 4: Troubleshoot and classify high-signal alerts
 
@@ -66,7 +66,7 @@ Alerts that did not go through troubleshooting are left unclassified.
 **Action mode:**
 
 Call `create_or_update_alert_comment` for each alert:
-- **Untroubleshot alerts**: one sentence describing the anomaly and the incident likelihood/impact scores. Do not explain why it wasn't troubleshot. No recommendations.
+- **Untroubleshot alerts**: one sentence describing the anomaly and the incident likelihood/potential impact scores. Do not explain why it wasn't troubleshot. No recommendations.
 - **Troubleshot alerts**: 2–4 sentences covering classification, reasoning from the troubleshooting output, any action taken, and a recommendation.
 
 Then call `update_alert` for each classified alert:
@@ -97,8 +97,8 @@ Do not call any write tools. Instead, for each alert output:
 
 After completing all steps, produce a summary table:
 
-| Alert ID | Type | Incident Likelihood | Impact | Classification | Action Taken |
-|----------|------|---------------------|--------|----------------|--------------|
+| Alert ID | Type | Incident Likelihood | Potential Impact | Classification | Action Taken |
+|----------|------|---------------------|------------------|----------------|--------------|
 
 Include every alert from step 1. For untroubleshot alerts, leave Classification blank and set Action Taken to "Comment only".
 

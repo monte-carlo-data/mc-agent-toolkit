@@ -42,7 +42,7 @@ It returns:
 - **`incident_likelihood`** (HIGH/MEDIUM/LOW) — how likely the alert represents a real issue. Affected by: number of events, presence of concerning root causes (query changes, failures), how much thresholds were exceeded, and how noisy the monitor typically is.
 - **`alert_impact`** (HIGH/MEDIUM/LOW) — how significant the potential downstream impact is.  Use cases impacted.  Dashboards affected etc.
 - **`alert_description`** — plain-language description of what happened in the incident.
-- **`triage_summary`** — the key reasoning behind the incident likelihood and impact scores.
+- **`triage_summary`** — the key reasoning behind the incident likelihood and potential impact scores.
 
 **Run `alert_assessment` in parallel**, in batches of up to 10 at a time.
 
@@ -103,7 +103,7 @@ What you do after triage depends on your integrations, your team's workflow, and
 `create_or_update_alert_comment` — always a good starting point. Comments provide a record of what the agent found and recommended, without taking any irreversible action. Useful at every stage, regardless of whether you automate anything else.
 
 Suggested comment content:
-- **Scored but not troubleshot**: one sentence describing the anomaly and the incident likelihood/impact scores. Do not explain why it wasn't troubleshot. No recommendations.
+- **Scored but not troubleshot**: one sentence describing the anomaly and the incident likelihood/potential impact scores. Do not explain why it wasn't troubleshot. No recommendations.
 - **Troubleshot alerts**: 2–4 sentences — classification, reasoning, action taken or recommended
 
 ### Updating alert status
