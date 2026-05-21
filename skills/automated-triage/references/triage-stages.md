@@ -39,10 +39,10 @@ Take care to avoid triaging too many alerts in one batch — where required, spl
 This stage replicates what a knowledgeable engineer does when scanning the alert feed — quickly assessing what's fired and how serious it looks. `alert_assessment` is lightweight enough to run on every alert.
 
 It returns:
-- **`alert_confidence`** (HIGH/MEDIUM/LOW) — how likely the alert represents a real issue. Affected by: number of events, presence of concerning root causes (query changes, failures), how much thresholds were exceeded, and how noisy the monitor typically is.
+- **`incident_likelihood`** (HIGH/MEDIUM/LOW) — how likely the alert represents a real issue. Affected by: number of events, presence of concerning root causes (query changes, failures), how much thresholds were exceeded, and how noisy the monitor typically is.
 - **`alert_impact`** (HIGH/MEDIUM/LOW) — how significant the potential downstream impact is.  Use cases impacted.  Dashboards affected etc.
 - **`alert_description`** — plain-language description of what happened in the incident.
-- **`triage_summary`** — the key reasoning behind the confidence and impact scores.
+- **`triage_summary`** — the key reasoning behind the incident likelihood and impact scores.
 
 **Run `alert_assessment` in parallel**, in batches of up to 10 at a time.
 
@@ -64,7 +64,7 @@ Start with the defaults and tune `user_instructions` once you've seen real outpu
 
 `run_troubleshooting_agent` runs the Monte Carlo Troubleshooting Agent on a single alert. This is substantially more expensive than `alert_assessment` — it tracks the issue upstream through lineage, analyses all queries involved, examines relevant PRs, and samples affected tables to identify root cause.
 
-**Only run `run_troubleshooting_agent` on alerts that warrant it.** A common filter: run troubleshooting only when BOTH `alert_confidence` AND `alert_impact` are MEDIUM or HIGH. Skip any alert where either is LOW.
+**Only run `run_troubleshooting_agent` on alerts that warrant it.** A common filter: run troubleshooting only when BOTH `incident_likelihood` AND `alert_impact` are MEDIUM or HIGH. Skip any alert where either is LOW.
 
 You can adjust this threshold based on your environment — for example, also running troubleshooting when either score is HIGH (even if the other is LOW), while still requiring MEDIUM/MEDIUM as the baseline.
 
@@ -103,7 +103,7 @@ What you do after triage depends on your integrations, your team's workflow, and
 `create_or_update_alert_comment` — always a good starting point. Comments provide a record of what the agent found and recommended, without taking any irreversible action. Useful at every stage, regardless of whether you automate anything else.
 
 Suggested comment content:
-- **Scored but not troubleshot**: one sentence describing the anomaly and the confidence/impact scores. Do not explain why it wasn't troubleshot. No recommendations.
+- **Scored but not troubleshot**: one sentence describing the anomaly and the incident likelihood/impact scores. Do not explain why it wasn't troubleshot. No recommendations.
 - **Troubleshot alerts**: 2–4 sentences — classification, reasoning, action taken or recommended
 
 ### Updating alert status
