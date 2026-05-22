@@ -9,7 +9,7 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- New `/manage-mac` skill: create, edit, validate, and import Monitors-as-Code YAML files — authors new monitors from scratch, modifies existing files, validates against the published JSON Schema, and exports live monitors to YAML
+- New `/manage-mac` skill: create, edit, validate, and import Monitors-as-Code YAML files — CLI-first: uses `montecarlo monitors compile` to validate and `apply` to deploy; falls back to MC MCP tools then manual validation
 - Schema validation gates injected into `monitoring-advisor` and `tune-monitor` — agents now validate generated YAML against the published schema before presenting it to the user
 
 ## [1.11.1] - 2026-05-13
