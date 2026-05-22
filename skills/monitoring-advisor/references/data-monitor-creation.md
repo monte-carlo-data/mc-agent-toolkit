@@ -121,6 +121,17 @@ Before calling the creation tool, present the monitor configuration in plain lan
 
 Ask: "Does this look correct? I'll generate the monitor configuration."
 
+Also ask how the user wants to deploy it:
+
+> **Deployment preference:** Deploy live now (via MCP), or save as a Monitors-as-Code YAML file to apply through your repo?
+>
+> - **Live (MCP):** I'll call the creation tool and the monitor will be active immediately.
+> - **MaC YAML:** I'll generate the YAML definition so you can commit it to your repo and apply it with `montecarlo monitors apply`. Use `/monte-carlo-manage-mac` if you want to validate or edit the file first.
+
+If the user chooses MaC YAML: generate the preview YAML (dry_run=True) as usual, present it wrapped in the standard MaC structure (see MaC YAML Format), and stop -- do not call with `dry_run=False`. The user takes the YAML from there.
+
+If the user chooses live or does not express a preference, proceed with the standard two-call sequence in Step 7.
+
 ### Step 7: Create the monitor
 
 This step is a **two-call sequence**. Do NOT skip the preview call.
@@ -201,6 +212,22 @@ If the user prefers to deploy via CLI/CI rather than the live tool call:
 - Save the YAML to a `.yml` file (e.g. `monitors/<table_name>.yml` or in their dbt schema)
 - Apply via the Monte Carlo CLI: `montecarlo monitors apply --namespace <namespace>`
 - Or integrate into CI/CD for automatic deployment on merge
+
+---
+
+## Schema Validation
+
+Always add the following comment as the **first line** of any MaC YAML file you create or edit:
+
+```yaml
+# yaml-language-server: $schema=https://clidocs.getmontecarlo.com/mac/schema.json
+```
+
+The published schema is available at `https://clidocs.getmontecarlo.com/mac/schema.json`. Use WebFetch to inspect it if you're uncertain whether a field name or value is valid for a given monitor type.
+
+Generated YAML must not include fields that don't appear in the schema for that monitor type. Unknown fields are silently ignored by the CLI but indicate a misconfiguration and may break future validation.
+
+**Schema scope:** The schema validates field names, types, and enum values only. Cross-field semantic constraints (e.g. required field combinations, mutually exclusive options, conditional required fields) are NOT checked by the schema — they are enforced by the Monte Carlo backend at apply time. A file that passes schema validation may still fail on `montecarlo monitors apply`.
 
 ---
 

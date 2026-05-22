@@ -5,6 +5,13 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Claude Code will
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.0] - 2026-05-20
+
+### Added
+
+- New `/manage-mac` skill: create, edit, validate, and import Monitors-as-Code YAML files — CLI-first: uses `montecarlo monitors compile` to validate and `apply` to deploy; falls back to MC MCP tools then manual validation
+- Schema validation gates injected into `monitoring-advisor` and `tune-monitor` — agents now validate generated YAML against the published schema before presenting it to the user
+
 ## [1.11.1] - 2026-05-13
 
 ### Added
