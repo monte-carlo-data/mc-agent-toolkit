@@ -65,6 +65,7 @@ If the command fails or is not found, inform the user:
 > Configure: `montecarlo configure` (requires a Monte Carlo API key — Settings → API keys → Add  → Personal)
 > Would you like to set it up, or continue without it?"
 
+If the user accepts, give the full install and configure steps, then resume the workflow once setup is complete.
 If the user declines, proceed using Tier 2 (MCP) and Tier 3 (Manual) only.
 
 ---
@@ -77,6 +78,7 @@ If the user declines, proceed using Tier 2 (MCP) and Tier 3 (Manual) only.
 | Has an existing file; wants to add, modify, or remove monitors | **Edit** |
 | Has an existing file; wants to check it before applying | **Validate** |
 | Wants to export live monitors into a MaC YAML file | **Import** |
+| Wants to discover what to monitor or explore a table | Redirect to `monitoring-advisor` — do not proceed |
 
 If ambiguous, ask which workflow is needed.
 
@@ -121,6 +123,9 @@ Ask for any information not already provided:
    `field_quality` → `validation` monitor; `comparison` → `metric_comparison`; `field_health` → `metric`).
    Note: `comparison` (deprecated) and `metric_comparison` (current) are distinct — never
    decline a request for a `metric_comparison` monitor.
+   Common phrases → monitor type: "null rate / percent null / zero rate / column distribution" → `metric`;
+   "validate email format / check values in set / regex match" → `validation`;
+   "query taking too long / slow queries" → `query_performance`.
 3. **Namespace:** used with `montecarlo monitors apply --namespace <namespace>`
 4. **Notification audiences:** optional — ask only if the user mentions alerting
 5. **Type-specific required inputs:**
@@ -147,8 +152,9 @@ For each monitor, call the appropriate `create_or_update_*_monitor` with `dry_ru
 parameters the user specified. The backend returns a canonical YAML block — use that output as
 the YAML for the file rather than authoring it by hand.
 
-Call the tool once per monitor. If an MCP tool returns an error, stop and surface the error
-message to the user. Do not proceed with a partial result.
+Call the tool once per monitor. Complete all dry_run calls before assembling the file. If an
+MCP tool returns an error, stop and surface the error message to the user. Do not proceed with
+a partial result.
 
 ### Step 4: Assemble the YAML file
 
@@ -162,6 +168,8 @@ message to the user. Do not proceed with a partial result.
    directly on each monitor object
 
 ### Step 5: Validate and apply
+
+Prompt for namespace if not already provided.
 
 **Tier 1 — CLI (preferred):**
 ```bash
@@ -192,13 +200,15 @@ with the updated parameters, preserving the existing `name` value. Use the retur
 to replace the existing monitor entry. Do not look up or pass a UUID — in the MaC realm,
 identity is the `name` field plus namespace.
 
-**Removing a monitor:** Delete the monitor object. If it is the only item under its type key,
-remove the entire type key — do not leave an empty list.
+**Removing a monitor:** Delete the monitor object and preserve all other monitors in the type
+list. If it is the only item under its type key, remove the entire type key — do not leave
+an empty list.
 
 **Deprecated field names:** While reading the file, check for fields marked `deprecated: true`
 in the schema. Scope this scan to the `montecarlo:` block only. If found, list all occurrences
 and offer to migrate them in a single operation before applying other changes. Apply only after
-explicit user confirmation. The schema's `description` encodes the canonical replacement name
+explicit user confirmation. If the user declines, proceed with the requested edit without
+migrating. The schema's `description` encodes the canonical replacement name
 (e.g. "Deprecated. Use `warehouse` instead.") — never guess. If both the deprecated field and
 its replacement are present with different values, flag the conflict and ask the user which to keep.
 
@@ -207,7 +217,9 @@ its replacement are present with different values, flag the conflict and ask the
 via the Create workflow, then delete the deprecated block.
 
 **YAML-level fields** (not part of the monitor definition sent to the backend): add or modify
-these directly in the YAML without calling the MCP tool. Refer to the schema to identify them.
+these directly in the YAML without calling the MCP tool. Common examples: `is_paused`, `labels`,
+`tags`, `priority`, `audiences`, `data_quality_dimension`, `domains`. Refer to the schema to
+confirm others.
 
 ### Step 3: Write and validate
 
@@ -240,7 +252,7 @@ montecarlo monitors compile --namespace <namespace>
 
 If this succeeds, report the output to the user and stop — no further LLM validation needed.
 
-### Step 2: Manual validation fallback (Tier 3)
+### Step 2: Manual validation fallback (Tier 3 — no external tools)
 
 Use this path only if CLI is unavailable.
 
@@ -321,8 +333,8 @@ Validation issues found:
    - Fix: remove — `sensitivity` is only valid on `metric` monitors
 ```
 
-**Deprecated field migration:** List all deprecated fields found and offer to migrate them.
-Apply only after explicit user confirmation.
+**Deprecated field migration:** List all occurrences of deprecated fields found (every instance,
+not just unique field names) and offer to migrate them. Apply only after explicit user confirmation.
 
 ---
 
