@@ -80,7 +80,7 @@ Ask for any information not already provided:
    `comparison`, `freshness`, or `volume`. If the user explicitly requests one of these,
    decline: inform them it is no longer supported, and suggest the closest valid alternative
    (e.g. `freshness` or `volume` → `metric` monitor tracking recency or row count;
-   `field_health` → `validation` monitor; `comparison` → `metric_comparison`).
+   `field_quality` → `validation` monitor; `comparison` → `metric_comparison`; `field_health` → `metric`).
    Note: `comparison` (deprecated) and `metric_comparison` (current) are distinct — never
    decline a request for a `metric_comparison` monitor.
 3. **Namespace:** used with `montecarlo monitors apply --namespace <namespace>`
@@ -114,10 +114,6 @@ each one.
 
 If an MCP tool returns an error, stop and surface the error message to the user. Do not proceed
 to assemble the file with a partial result.
-
-After receiving the dry_run output, check it for deprecated field names (e.g. `resource`,
-`notify_rule_run_failure`, `domain_uuids`, `comparisons`). If any are present, replace them with
-their canonical equivalents before assembling the file.
 
 ### Step 4: Assemble the YAML file
 
@@ -161,15 +157,10 @@ curl -s https://clidocs.getmontecarlo.com/mac/schema.json
 **Adding a monitor:** Follow the Create workflow (Steps 1–4) to generate the new monitor block
 via `dry_run=True`, then append it to the correct type list in the file.
 
-**Modifying a monitor:**
-- If the monitor has been deployed and has a UUID: if the UUID is already known (e.g. present
-  in the file or supplied by the user), use it directly. Otherwise resolve it via
-  `get_monitors(full_table_id=..., config_format="yaml")`. Then call
-  `create_or_update_*_monitor(dry_run=True, monitor_uuid=<uuid>, ...)` with the updated
-  parameters. Use the returned YAML block to replace the existing monitor entry.
-- If the monitor has not yet been deployed (no UUID): call
-  `create_or_update_*_monitor(dry_run=True, ...)` without a UUID, using the current parameters
-  plus the requested changes. Replace the existing block with the returned YAML.
+**Modifying a monitor:** Call `create_or_update_*_monitor(dry_run=True, name=<current_name>, ...)`
+with the updated parameters, preserving the existing `name` value. Use the returned YAML block
+to replace the existing monitor entry. Do not look up or pass a UUID — in the MaC realm,
+identity is the `name` field plus namespace.
 
 **Removing a monitor:** Delete the monitor object. If it is the only item under its type key,
 remove the entire type key — do not leave an empty list.
@@ -191,11 +182,10 @@ Also check for deprecated monitor type keys (`field_health`, `dimension_tracking
 they require re-authoring with a supported type. Offer to create a replacement monitor via the
 Create workflow, then delete the deprecated type block.
 
-Some fields are YAML-level only and do not require a `dry_run` MCP call: `audiences`,
-`is_paused`, `labels`, `tags`, `priority`, `data_quality_dimension`, `domains`. For these,
-add or modify the field directly in the YAML without calling the MCP tool. Note: `is_paused`
-is accepted by the backend at apply time but is not present in the JSON Schema — if a schema
-scan flags it as unknown, ignore that warning.
+Some fields are YAML-level only and do not require a `dry_run` MCP call. These fields are
+not part of the monitor definition sent to the backend — add or modify them directly in the
+YAML without calling the MCP tool. Refer to the schema to identify which fields fall into
+this category.
 
 ### Step 3: Apply and show the diff
 
