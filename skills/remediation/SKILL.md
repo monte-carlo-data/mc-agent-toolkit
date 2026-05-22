@@ -93,10 +93,10 @@ alert_assessment(
 )
 ```
 
-This returns `triage_confidence` (HIGH/MEDIUM/LOW), `alert_impact` (HIGH/MEDIUM/LOW), and a summary. Use this to decide urgency:
+This returns `incident_likelihood` (HIGH/MEDIUM/LOW), `alert_impact` (HIGH/MEDIUM/LOW), and a summary. Use this to decide urgency:
 
-- **HIGH impact + HIGH confidence** → proceed immediately to Troubleshooting Agent (TSA) analysis
-- **LOW impact or LOW confidence** → still run TSA, but note to the user that this may not warrant immediate remediation
+- **HIGH impact + HIGH incident likelihood** → proceed immediately to Troubleshooting Agent (TSA) analysis
+- **LOW impact or LOW incident likelihood** → still run TSA, but note to the user that this may not warrant immediate remediation
 
 #### Step 3: Root cause analysis (TSA)
 
