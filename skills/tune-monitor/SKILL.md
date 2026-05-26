@@ -41,9 +41,7 @@ them:
 | `create_or_update_metric_monitor` | Update a metric monitor in place (pass `monitor_uuid`; used in Phase 5) |
 | `create_or_update_sql_monitor` | Update a custom SQL monitor in place (pass `monitor_uuid`; used in Phase 5) |
 | `create_or_update_validation_monitor` | Update a validation monitor in place (pass `monitor_uuid`; used in Phase 5) |
-| `tune_freshness_table_monitor` | Tune freshness sensitivity/threshold for a table (used in Phase 5) |
-| `tune_volume_change_table_monitor` | Tune volume change sensitivity/threshold for a table (used in Phase 5) |
-| `tune_unchanged_size_table_monitor` | Tune unchanged size sensitivity/threshold for a table (used in Phase 5) |
+| `create_or_update_table_monitor_asset_rule` | Tune freshness / volume change / unchanged size for a single table; pick the per-metric variant via `rule_type` (`last_updated_on` / `total_row_count` / `total_row_count_last_changed_on`). One call per `(table, metric)` pair (used in Phase 5). |
 
 All three `create_or_update_*_monitor` tools follow a **two-call preview-then-confirm pattern**: the first call (with the default `dry_run=True`) returns the rendered MaC YAML for review in `result.yaml`; the second call (`dry_run=False`) deploys the change live and returns a deep link in `result.instructions`. **Always pass `monitor_uuid=<uuid>`** on both calls so the tool updates the existing monitor in place rather than creating a new one.
 

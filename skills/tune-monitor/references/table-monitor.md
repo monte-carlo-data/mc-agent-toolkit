@@ -79,7 +79,9 @@ anomalies alone is not enough — the pattern must clearly indicate noise.
 ### Schema anomalies
 
 **Do NOT recommend changes for schema anomalies** — they are not tunable via the
-`tune_*_table_monitor` tools.
+asset-rule tool. (Schema change is a separate per-table on/off flag via
+`create_or_update_table_monitor_asset_rule` with `rule_type="schema_monitor"`,
+but that's a different intent from tuning detector sensitivity.)
 
 ---
 
@@ -94,26 +96,43 @@ switch to explicit thresholds if:
 
 ## Applying changes
 
-Table monitor tuning uses per-metric tools — **not** `create_or_update_table_monitor`:
+Table monitor tuning uses **`create_or_update_table_monitor_asset_rule`** — **not**
+`create_or_update_table_monitor`. The single tool covers all three OOTB detectors;
+pick the per-metric variant via `rule_type`:
 
-| Metric | Tool |
+| Metric | `rule_type` arg |
 |---|---|
-| Freshness (`last_updated_on`) | `tune_freshness_table_monitor` |
-| Volume change (`total_row_count`) | `tune_volume_change_table_monitor` |
-| Unchanged size (`total_row_count_last_changed_on`) | `tune_unchanged_size_table_monitor` |
+| Freshness (`last_updated_on`) | `last_updated_on` |
+| Volume change (`total_row_count`) | `total_row_count` |
+| Unchanged size (`total_row_count_last_changed_on`) | `total_row_count_last_changed_on` |
 
-Each tool call targets one (MCON, metric) pair:
-- For sensitivity changes: pass `mcon` and `sensitivity`.
-- For explicit thresholds: pass `mcon` and the threshold parameters.
+Each tool call targets one `(table, rule_type)` pair. Pass the MCON in the `table`
+arg (the warehouse is parsed from it). For each `rule_type`, pick **one of two
+paths**:
 
-1. **Always preview first** — show the user the planned changes per (table, metric) pair and
-   ask for confirmation before applying.
+- **AUTO sensitivity** (default lever):
+  - `rule_type="last_updated_on"`: pass `threshold_sensitivity` (`low` / `medium` / `high`).
+  - `rule_type="total_row_count"` (volume): pass `alert_conditions=[{"type": "lookback", "operator": "AUTO", "thresholdSensitivity": "low"|"medium"|"high"}]`.
+  - `rule_type="total_row_count_last_changed_on"` (UCS): pass `alert_conditions=[{"type": "threshold", "operator": "AUTO", "thresholdSensitivity": "low"|"medium"|"high"}]`.
+  - Omit `schedule_type` — the platform's existing schedule is preserved.
+- **Explicit threshold + fixed cadence**:
+  - `rule_type="last_updated_on"`: pass `freshness_threshold_minutes=<int>` (single duration).
+  - `rule_type="total_row_count"`: pass `alert_conditions=[{"type": "lookback", "operator": "OUTSIDE_RANGE", "lowerThreshold": <pct>, "upperThreshold": <pct>, "thresholdLookbackMinutes": <minutes>}]` — thresholds are relative percentages (e.g. -50 / 50 = ±50 %).
+  - `rule_type="total_row_count_last_changed_on"`: pass `alert_conditions=[{"type": "threshold", "operator": "GT", "thresholdValue": <minutes>, "thresholdLookbackMinutes": <minutes>}]` — `thresholdValue` is duration in minutes.
+  - **Must** also pass `schedule_type="fixed"` plus an `interval_minutes` (or `interval_crontab`) cadence — the threshold's meaning depends on how often the check runs.
+
+1. **Always preview first** — show the user the planned changes per `(table, rule_type)` pair
+   and ask for confirmation before applying.
 2. **On confirmation**, make one tool call per recommendation.
 
 ### Common mistakes
 
 - **NEVER** apply changes without showing the preview first.
-- **NEVER** group multiple tables into one recommendation — one tool call per (MCON, metric).
+- **NEVER** group multiple tables into one recommendation — one tool call per
+  `(table, rule_type)`.
 - **NEVER** recommend tuning schema anomalies — they are not supported.
-- **IMPORTANT:** These mutations are full replacements. Pass `tags` if the current config has
-  any — omitting tags clears them.
+- **NEVER** combine AUTO sensitivity with `schedule_type="fixed"` or explicit cadence
+  args — AUTO preserves the platform schedule. Conversely, **always** pass
+  `schedule_type="fixed"` + a cadence when setting an explicit threshold.
+- **IMPORTANT:** These mutations are full replacements. Pass `tags` if the current
+  config has any — omitting tags clears them.
