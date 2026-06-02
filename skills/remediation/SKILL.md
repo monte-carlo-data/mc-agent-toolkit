@@ -42,7 +42,7 @@ Do not activate when the user is:
 
 ### Monte Carlo MCP server (investigation + post-remediation)
 
-The Monte Carlo MCP server (`monte-carlo`) provides the investigation tools used in the workflows below. The workflows reference key tools by name (e.g., `get_alerts`, `run_troubleshooting_agent`, `get_asset_lineage`), but **use any Monte Carlo tool that helps** — the server has additional tools beyond what the workflows explicitly call out. Explore what's available.
+The Monte Carlo MCP server (`monte-carlo-mcp`) provides the investigation tools used in the workflows below. The workflows reference key tools by name (e.g., `get_alerts`, `run_troubleshooting_agent`, `get_asset_lineage`), but **use any Monte Carlo tool that helps** — the server has additional tools beyond what the workflows explicitly call out. Explore what's available.
 
 > **Note on tool call examples:** The code blocks below show key parameters to guide you. Always check the tool's own description for the complete parameter list and exact parameter names — they are authoritative.
 

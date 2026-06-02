@@ -106,5 +106,5 @@ fi
 
 echo ""
 echo "Installation complete. Next steps:"
-echo "  1. Authenticate:  opencode mcp auth monte-carlo"
+echo "  1. Authenticate:  opencode mcp auth monte-carlo-mcp"
 echo "  2. Launch:        opencode"

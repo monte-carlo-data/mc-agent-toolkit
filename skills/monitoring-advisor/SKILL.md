@@ -59,7 +59,7 @@ Do not activate when the user is:
 
 ## Available MCP tools
 
-All tools are available via the `monte-carlo` MCP server.
+All tools are available via the `monte-carlo-mcp` MCP server.
 
 ### Coverage and discovery tools
 

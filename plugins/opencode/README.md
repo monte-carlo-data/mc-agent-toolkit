@@ -40,7 +40,7 @@ This installs all three components and creates the MCP server config:
 Then authenticate:
 
 ```bash
-opencode mcp auth monte-carlo
+opencode mcp auth monte-carlo-mcp
 ```
 
 ### Manual install
@@ -149,8 +149,8 @@ See [skills/prevent/references/TROUBLESHOOTING.md](../../../skills/prevent/refer
 
 ### MCP tools not appearing
 
-1. Run `opencode mcp auth monte-carlo` to authenticate
-2. Check that `opencode.json` has the `mcp.monte-carlo` configuration
+1. Run `opencode mcp auth monte-carlo-mcp` to authenticate
+2. Check that `opencode.json` has the `mcp.monte-carlo-mcp` configuration
 3. Verify connectivity: the `testConnection` tool should succeed
 
 ## Architecture
