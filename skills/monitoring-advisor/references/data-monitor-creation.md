@@ -233,7 +233,7 @@ Generated YAML must not include fields that don't appear in the schema for that 
 
 ## Available MCP Tools
 
-All tools are available via the `monte-carlo` MCP server.
+All tools are available via the `monte-carlo-mcp` MCP server.
 
 | Tool                            | Purpose                                                      |
 | ------------------------------- | ------------------------------------------------------------ |

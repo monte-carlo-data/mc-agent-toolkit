@@ -168,7 +168,7 @@ the change") — proceed but note the skipped assessment.
 
 ## Available MCP tools
 
-All tools are available via the `monte-carlo` MCP server.
+All tools are available via the `monte-carlo-mcp` MCP server.
 
 | Tool                         | Purpose                                                              |
 | ---------------------------- | -------------------------------------------------------------------- |
