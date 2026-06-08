@@ -9,7 +9,7 @@ when_to_use: |
   - Comparing data tables, monitors, or alerts (different domain).
   - Generic prompt evaluation without two existing conversation IDs to compare.
 bucket: Evaluate
-version: 0.3.1
+version: 0.4.0
 ---
 
 # Compare Trace
@@ -35,15 +35,28 @@ Parse the arguments:
 
 ---
 
+## Trace sources
+
+The comparator works on **normalized traces**. Two ingestion paths produce that shape:
+
+- **MC-stored agent conversations** — the default. Phases 1–3 below walk each conversation via MCP to its OTel trace and assemble the normalized dict.
+- **Locally-collected OTel traces** — for A/B-testing changes (prompt, code, model) before they ship, with no production conversation to point at. The skill ships a local OTLP/HTTP receiver and a span-to-normalized converter. Run your agent twice, capture spans, normalize, then jump straight to Phase 4. See [`references/local-otel-collection.md`](references/local-otel-collection.md).
+
+Both paths produce the same normalized trace shape and feed the same Phase 4+ comparator and HTML report.
+
+---
+
 ## Setup
 
 **Prerequisites:**
-- **`python3`** for the helper scripts (stdlib only, no extra deps).
+- **`python3`** for the helper scripts (stdlib only for the default MC-conversation path).
 - Monte Carlo MCP server (`monte-carlo-mcp`) configured and authenticated.
+- *Local OTel path only:* `opentelemetry-proto` in the Python env that runs the receiver (already a transitive dep of `opentelemetry-sdk`).
 
 Helper scripts live under `${CLAUDE_PLUGIN_ROOT}/skills/compare-trace/scripts/`:
 - `compare_traces.py` — main driver; takes two normalized trace JSON files (+ optional LLM-eval results JSON) and writes the HTML report.
 - `evaluators/graph_path_diff.py`, `evaluators/latency_diff.py`, `evaluators/tool_call_diff.py` — deterministic evaluators ported from PR #1236.
+- `local_otlp_receiver.py`, `sources/otel_spans.py` — used only by the local-OTel ingestion path. See `references/local-otel-collection.md`.
 
 ---
 
