@@ -77,7 +77,7 @@ done
 # standalone op via --sync-only.
 sync_shared_lib() {
   local SHARED_LIB_DIR="$REPO_ROOT/plugins/shared/prevent/lib"
-  local EDITOR_PLUGINS=(claude-code cursor copilot codex)
+  local EDITOR_PLUGINS=(claude-code cursor copilot codex cortex-code)
   echo ""
   if [[ ! -d "$SHARED_LIB_DIR" ]]; then
     echo "Warning: $SHARED_LIB_DIR does not exist; skipping shared lib sync."

@@ -31,5 +31,6 @@
     "./commands/incident-response/",
     "./commands/proactive-monitoring/",
     "./commands/instrument-agent/"
-  ]
+  ],
+  "hooks": ["./hooks/prevent/hooks.json"]
 }
