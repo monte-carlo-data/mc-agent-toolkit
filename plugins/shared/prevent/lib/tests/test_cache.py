@@ -10,6 +10,8 @@ from lib.cache import (
     TURN_PREFIX,
     PENDING_PREFIX,
     _validate_session_id,
+    _w4_path,
+    _mg_path,
     get_impact_check_state,
     mark_impact_check_injected,
     mark_impact_check_verified,
@@ -127,6 +129,32 @@ class TestSessionIdValidation:
     def test_rejects_empty(self):
         with pytest.raises(ValueError):
             _validate_session_id("")
+
+
+class TestTableNameSanitization:
+    """table_name flows into /tmp filenames; it must not be able to traverse
+    out of CACHE_DIR (unlike session_id, it isn't otherwise validated)."""
+
+    def _parent(self, path):
+        return os.path.dirname(os.path.realpath(path))
+
+    def test_w4_path_traversal_stays_in_cache_dir(self):
+        assert self._parent(_w4_path("s1", "../../etc/passwd")) == os.path.realpath(CACHE_DIR)
+
+    def test_mg_path_traversal_stays_in_cache_dir(self):
+        assert self._parent(_mg_path("s1", "../../etc/passwd")) == os.path.realpath(CACHE_DIR)
+
+    def test_path_separators_neutralized(self):
+        assert self._parent(_w4_path("s1", "a/b/c")) == os.path.realpath(CACHE_DIR)
+
+    def test_normal_table_name_unchanged(self):
+        # Sanitizer must be a no-op for ordinary dbt names.
+        assert _w4_path("s1", "client_hub_master") == \
+            os.path.join(CACHE_DIR, f"{IC_PREFIX}s1_client_hub_master")
+
+    def test_macro_prefix_preserved(self):
+        assert _w4_path("s1", "macro:helper") == \
+            os.path.join(CACHE_DIR, f"{IC_PREFIX}s1_macro:helper")
 
 
 class TestClearMonitorGap:
