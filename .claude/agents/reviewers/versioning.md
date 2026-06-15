@@ -6,7 +6,7 @@ You are reviewing this change to ensure the plugin version is bumped when needed
 
 **Context:** This repo distributes skills and hooks as editor plugins. Each plugin has a
 `plugin.json` (or `package.json`) with a `"version"` field. Editor clients use this version
-to detect updates — if it doesn't change, users won't get the new code. All 5 plugin config
+to detect updates — if it doesn't change, users won't get the new code. All 6 plugin config
 files must stay in sync (the release script handles this, but the diff should show at least
 the primary one changing).
 
@@ -17,6 +17,7 @@ the primary one changing).
 - `plugins/copilot/plugin.json`
 - `plugins/codex/.codex-plugin/plugin.json`
 - `plugins/opencode/package.json`
+- `plugins/cortex-code/.cortex-plugin/plugin.json`
 
 ## When a bump is required
 
@@ -49,7 +50,7 @@ When a bump is missing, suggest the appropriate level:
 ## How to check
 
 1. Look at the diff for changes to any version file listed above. If at least one shows a
-   `"version"` change, the bump is present — note whether all 5 are in sync.
+   `"version"` change, the bump is present — note whether all 6 are in sync.
 2. If no version change is present, check whether the diff touches any bump-required path.
 3. If it does, raise a finding with the suggested bump level.
 
@@ -64,7 +65,7 @@ If a bump is missing:
 
 If version files are out of sync (some bumped, some not):
 
-- Severity: **ISSUE** — all 5 plugin configs must have the same version.
+- Severity: **ISSUE** — all 6 plugin configs must have the same version.
 - Suggestion: run the bump script to synchronize.
 
 Do NOT flag:

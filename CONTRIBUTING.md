@@ -179,7 +179,7 @@ Setup and agent-routing skills are exempt from this rule. Setup skills are invok
 ## Updating an existing skill
 
 1. Edit files directly under `skills/<skill-name>/`. The corresponding plugin picks up changes automatically via the symlink — no additional steps needed.
-2. If the change is user-facing, bump the version: `./scripts/bump-version.sh patch` (or `minor`/`major` — see [Version bumping](#version-bumping)). This updates all 5 plugin config files in sync. Claude Code uses the version field to determine whether to update an installed plugin.
+2. If the change is user-facing, bump the version: `./scripts/bump-version.sh patch` (or `minor`/`major` — see [Version bumping](#version-bumping)). This updates all 6 plugin config files in sync. Claude Code uses the version field to determine whether to update an installed plugin.
 
 ## Fixing a bug
 
@@ -204,11 +204,11 @@ Setup and agent-routing skills are exempt from this rule. Setup skills are invok
 
 ## Releasing
 
-Version is tracked in code (the 5 plugin config files). Bump it as part of your feature PR — no separate release step needed. When the version change merges to `main`, a GitHub Actions workflow automatically creates the corresponding git tag and GitHub Release.
+Version is tracked in code (the 6 plugin config files). Bump it as part of your feature PR — no separate release step needed. When the version change merges to `main`, a GitHub Actions workflow automatically creates the corresponding git tag and GitHub Release.
 
 ### Bump the version
 
-Use the convenience script to update all 5 plugin config files and changelogs in one step:
+Use the convenience script to update all 6 plugin config files and changelogs in one step:
 
 ```bash
 # Bump patch version (1.0.0 → 1.0.1)
@@ -228,8 +228,8 @@ The script:
 1. Reads the current version from `plugins/claude-code/.claude-plugin/plugin.json`
 2. Computes the next version based on the bump type
 3. Opens `$EDITOR` with a changelog template pre-filled with commits since the last tag
-4. Updates `"version"` in all 5 plugin config files
-5. Prepends the changelog entry to all 5 `CHANGELOG.md` files
+4. Updates `"version"` in all 6 plugin config files
+5. Prepends the changelog entry to all 6 `CHANGELOG.md` files
 
 Commit the resulting changes as part of your PR.
 

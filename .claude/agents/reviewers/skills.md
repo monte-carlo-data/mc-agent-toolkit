@@ -75,12 +75,13 @@ DO/DON'T guidance) as an **ISSUE**.
 
 ### Symlink completeness
 
-Every skill in `skills/` must have a corresponding symlink in all 5 editor plugins:
+Every skill in `skills/` must have a corresponding symlink in all 6 editor plugins:
 - `plugins/claude-code/skills/<name>`
 - `plugins/cursor/skills/<name>`
 - `plugins/codex/skills/<name>`
 - `plugins/copilot/skills/<name>`
 - `plugins/opencode/skills/<name>`
+- `plugins/cortex-code/skills/<name>`
 
 A missing symlink means the skill won't be discovered by that editor plugin. Flag as an
 **ISSUE**.
@@ -118,7 +119,7 @@ A broken cross-reference is an **ISSUE**.
 ### Quality (all skill changes)
 - BLOCKER: `description` exceeds 250 characters
 - ISSUE: camelCase MCP tool name (should be snake_case)
-- ISSUE: Missing symlink in any of the 5 editor plugins
+- ISSUE: Missing symlink in any of the 6 editor plugins
 - ISSUE: Skill table mismatch between root README and skills/README
 - ISSUE: Broken cross-reference to another skill or reference file
 - ISSUE: Vague skill description that won't trigger reliably

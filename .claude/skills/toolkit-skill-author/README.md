@@ -12,7 +12,7 @@ Adding a skill to `mc-agent-toolkit` is more than dropping a `SKILL.md` into `sk
 2. **Named** without colliding with existing skills (exact or near-match).
 3. **Registered** in the orchestration layer (`signal-definitions`, `/mc` catalog) so context detection can find it.
 4. **Eval'd** so activation is measurable.
-5. **Symlinked** into all five editor plugins (`claude-code`, `cursor`, `codex`, `copilot`, `opencode`).
+5. **Symlinked** into all six editor plugins (`claude-code`, `cursor`, `codex`, `copilot`, `opencode`, `cortex-code`).
 6. **Versioned** via `scripts/bump-version.sh` so the marketplace ships the change.
 
 Doing all of that by hand is error-prone. This skill enforces the workflow and gates against the common mistakes (forbidden buckets, name collisions, skipping registration steps).
@@ -89,7 +89,7 @@ Do **not** use it for:
 - Forbidden-bucket and name-collision gates run **before** any survey questions, so a refusal is fast and unambiguous.
 - The four-step decision-rules test is documented in `references/decision-rules.md` and referenced by `CONTRIBUTING.md`. If the rule needs to change, update both.
 - `lint-skill.py` enforces the constraints from `.claude/rules/skills.md` (description length, name prefix). Failures block the registration checklist.
-- Version bumps go through `scripts/bump-version.sh`, which updates all five plugin manifests + changelogs in lockstep — no partial-bump risk.
+- Version bumps go through `scripts/bump-version.sh`, which updates all six plugin manifests + changelogs in lockstep — no partial-bump risk.
 
 ## Troubleshooting
 
