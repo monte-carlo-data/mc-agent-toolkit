@@ -12,6 +12,7 @@ from lib.protocol import (
     evaluate_turn_end,
     evaluate_validate_command,
     scan_transcript_for_markers,
+    scan_history_jsonl_for_markers,
 )
 
 
@@ -44,6 +45,43 @@ class TestScanTranscriptForMarkers:
         transcript = tmp_path / "transcript.jsonl"
         transcript.write_text('<!-- MC_IMPACT_CHECK_COMPLETE: client_hub -->\n')
         result = scan_transcript_for_markers(str(transcript), "client_hub_master")
+        assert result["impact_check"] is False
+
+
+class TestDenyReasonSelfBypass:
+    """The pre-edit deny reason must never contain a marker that its own
+    scanner would match. Harnesses that persist hook output back into the
+    transcript (e.g. Cortex records it as a tool_result) would otherwise let
+    the gate falsely unlock itself after the first deny. This is the
+    source-side guard and protects every harness's scanner.
+    """
+
+    def _deny_reason(self, tmp_path, dirname, filename, body):
+        d = tmp_path / dirname
+        d.mkdir()
+        sql_file = d / filename
+        sql_file.write_text(body)
+        result = evaluate_pre_edit(
+            HookInput(session_id="s1", file_path=str(sql_file), transcript_path="")
+        )
+        assert result.action == "deny"
+        return result.reason
+
+    def test_model_deny_reason_does_not_self_unlock_raw_line(self, tmp_path):
+        reason = self._deny_reason(tmp_path, "models", "orders.sql",
+                                   "SELECT * FROM {{ ref('raw') }}")
+        transcript = tmp_path / "t.jsonl"
+        transcript.write_text(reason + "\n")
+        result = scan_transcript_for_markers(str(transcript), "orders")
+        assert result["impact_check"] is False, \
+            "deny reason must not satisfy the raw-line scanner (CC/Codex/Cursor/Copilot)"
+
+    def test_macro_deny_reason_does_not_self_unlock_raw_line(self, tmp_path):
+        reason = self._deny_reason(tmp_path, "macros", "helper.sql",
+                                   "{% macro helper() %} SELECT 1 {% endmacro %}")
+        transcript = tmp_path / "t.jsonl"
+        transcript.write_text(reason + "\n")
+        result = scan_transcript_for_markers(str(transcript), "macro:helper")
         assert result["impact_check"] is False
 
 
@@ -288,3 +326,136 @@ class TestEvaluateValidateCommand:
         assert result.action == "context"
         assert "orders" in result.context
         assert "validation query workflow" in result.context
+
+
+def _history_line(role, blocks):
+    """Build one Anthropic Messages-style .history.jsonl line."""
+    return json.dumps({"role": role, "content": blocks})
+
+
+def _assistant_text(text):
+    return _history_line("assistant", [{"type": "text", "text": text}])
+
+
+def _user_tool_result(text):
+    """A tool_result delivered under role 'user' — how Cortex persists hook output."""
+    return _history_line("user", [{
+        "type": "tool_result",
+        "tool_result": {"content": [{"type": "text", "text": text}]},
+    }])
+
+
+class TestScanHistoryJsonl:
+    """Cortex scans only assistant-authored text blocks of <id>.history.jsonl."""
+
+    def test_marker_in_assistant_text_found(self, tmp_path):
+        h = tmp_path / "s.history.jsonl"
+        h.write_text(
+            _assistant_text("Assessment complete. <!-- MC_IMPACT_CHECK_COMPLETE: orders -->\n") + "\n"
+        )
+        result = scan_history_jsonl_for_markers(str(h), "orders")
+        assert result["impact_check"] is True
+
+    def test_marker_in_tool_result_not_found(self, tmp_path):
+        """The persisted hook deny reason lives in a tool_result (role user) and
+        must NOT unlock the gate, even if it contains a verbatim marker."""
+        h = tmp_path / "s.history.jsonl"
+        h.write_text(_user_tool_result("[Hook] ... MC_IMPACT_CHECK_COMPLETE: orders ...") + "\n")
+        result = scan_history_jsonl_for_markers(str(h), "orders")
+        assert result["impact_check"] is False
+
+    def test_monitor_gap_in_assistant_text_found(self, tmp_path):
+        h = tmp_path / "s.history.jsonl"
+        h.write_text(
+            _assistant_text("<!-- MC_MONITOR_GAP: orders --> <!-- MC_IMPACT_CHECK_COMPLETE: orders -->") + "\n"
+        )
+        result = scan_history_jsonl_for_markers(str(h), "orders")
+        assert result["impact_check"] is True
+        assert result["monitor_gap"] is True
+
+    def test_string_content_assistant_found(self, tmp_path):
+        h = tmp_path / "s.history.jsonl"
+        h.write_text(_history_line("assistant", "inline MC_IMPACT_CHECK_COMPLETE: orders here") + "\n")
+        result = scan_history_jsonl_for_markers(str(h), "orders")
+        assert result["impact_check"] is True
+
+    def test_partial_table_name_no_match(self, tmp_path):
+        h = tmp_path / "s.history.jsonl"
+        h.write_text(_assistant_text("<!-- MC_IMPACT_CHECK_COMPLETE: client_hub -->") + "\n")
+        result = scan_history_jsonl_for_markers(str(h), "client_hub_master")
+        assert result["impact_check"] is False
+
+    # --- robustness: must fail closed, never raise ---
+
+    def test_missing_file_not_found(self):
+        result = scan_history_jsonl_for_markers("/nonexistent/s.history.jsonl", "orders")
+        assert result == {"impact_check": False, "monitor_gap": False}
+
+    def test_malformed_line_skipped_valid_line_still_found(self, tmp_path):
+        h = tmp_path / "s.history.jsonl"
+        h.write_text(
+            "this is not json\n"
+            + _assistant_text("<!-- MC_IMPACT_CHECK_COMPLETE: orders -->") + "\n"
+            + "{also not valid\n"
+        )
+        result = scan_history_jsonl_for_markers(str(h), "orders")
+        assert result["impact_check"] is True
+
+    def test_lines_missing_role_or_content_skipped(self, tmp_path):
+        h = tmp_path / "s.history.jsonl"
+        h.write_text(
+            json.dumps({"foo": "bar"}) + "\n"
+            + json.dumps({"role": "assistant"}) + "\n"            # no content key
+            + json.dumps({"role": "user", "content": None}) + "\n"
+            + json.dumps(["not", "a", "dict"]) + "\n"
+        )
+        result = scan_history_jsonl_for_markers(str(h), "orders")
+        assert result == {"impact_check": False, "monitor_gap": False}
+
+
+class TestEvaluatePreEditCortex:
+    """evaluate_pre_edit honors transcript_format='messages_jsonl' for Cortex."""
+
+    def _model(self, tmp_path):
+        model_dir = tmp_path / "models"
+        model_dir.mkdir()
+        sql_file = model_dir / "orders.sql"
+        sql_file.write_text("SELECT * FROM {{ ref('raw') }}")
+        return sql_file
+
+    def test_injected_with_marker_in_history_verifies(self, tmp_path):
+        sql_file = self._model(tmp_path)
+        cache.mark_impact_check_injected("s1", "orders")
+        h = tmp_path / "s.history.jsonl"
+        h.write_text(_assistant_text("<!-- MC_IMPACT_CHECK_COMPLETE: orders -->") + "\n")
+
+        inp = HookInput(session_id="s1", file_path=str(sql_file),
+                        transcript_path=str(h), transcript_format="messages_jsonl")
+        result = evaluate_pre_edit(inp)
+        assert result.action == "noop"
+        assert cache.get_impact_check_state("s1", "orders") == "verified"
+
+    def test_state_none_with_marker_in_history_verifies(self, tmp_path):
+        sql_file = self._model(tmp_path)
+        h = tmp_path / "s.history.jsonl"
+        h.write_text(_assistant_text("<!-- MC_IMPACT_CHECK_COMPLETE: orders -->") + "\n")
+
+        inp = HookInput(session_id="s1", file_path=str(sql_file),
+                        transcript_path=str(h), transcript_format="messages_jsonl")
+        result = evaluate_pre_edit(inp)
+        assert result.action == "noop"
+        assert cache.get_impact_check_state("s1", "orders") == "verified"
+
+    def test_marker_only_in_tool_result_does_not_unlock(self, tmp_path):
+        """End-to-end: a marker the gate itself emitted (persisted as a tool_result)
+        must not unlock the gate — the edit stays denied within the grace period."""
+        sql_file = self._model(tmp_path)
+        cache.mark_impact_check_injected("s1", "orders")
+        h = tmp_path / "s.history.jsonl"
+        h.write_text(_user_tool_result("[Hook] ... MC_IMPACT_CHECK_COMPLETE: orders ...") + "\n")
+
+        inp = HookInput(session_id="s1", file_path=str(sql_file),
+                        transcript_path=str(h), transcript_format="messages_jsonl")
+        result = evaluate_pre_edit(inp)
+        assert result.action == "deny"
+        assert cache.get_impact_check_state("s1", "orders") == "injected"
