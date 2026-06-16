@@ -1,0 +1,25 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CORTEX_PLUGIN_ROOT}/hooks/telemetry/scripts/ensure-toolkit-ids.sh"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Skill",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CORTEX_PLUGIN_ROOT}/hooks/telemetry/scripts/skill-beacon.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

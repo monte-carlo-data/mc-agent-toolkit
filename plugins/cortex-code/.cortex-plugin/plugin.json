@@ -32,5 +32,5 @@
     "./commands/proactive-monitoring/",
     "./commands/instrument-agent/"
   ],
-  "hooks": ["./hooks/prevent/hooks.json"]
+  "hooks": ["./hooks/prevent/hooks.json", "./hooks/telemetry/hooks.json"]
 }
