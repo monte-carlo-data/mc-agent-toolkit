@@ -39,7 +39,7 @@ The toolkit sends anonymous skill-usage telemetry by default — which skills ar
 
 To opt out, set `MC_AGENT_TOOLKIT_TELEMETRY_DISABLED=1` in your shell environment before starting Cortex Code. The toolkit will not phone home.
 
-The UUIDs are generated locally on first session and stored under `~/.claude/mc-agent-toolkit/` (shared with other Monte Carlo toolkit installs on this machine). Deleting that directory resets your install identity to a fresh anonymous one.
+The UUIDs are generated locally on first session and stored under `~/.claude/mc-agent-toolkit/`, which is shared with other Monte Carlo toolkit installs on this machine (e.g. Claude Code). Deleting that directory resets the install identity for all of them to a fresh anonymous one.
 
 ## Available Features
 
@@ -61,11 +61,12 @@ See the [Prevent Hook Behavior](../README.md#prevent-hook-behavior) section in t
 
 ## Updating
 
-Re-run the installer to pull the latest skills and hooks:
+Re-run the installer from your repo checkout (the clone from the Installation step) to pull the latest skills and hooks:
 
 ```bash
-git -C mc-agent-toolkit pull
-bash mc-agent-toolkit/plugins/cortex-code/scripts/install.sh
+cd mc-agent-toolkit
+git pull
+bash plugins/cortex-code/scripts/install.sh
 ```
 
 ## Uninstalling

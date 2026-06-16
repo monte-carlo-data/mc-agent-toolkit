@@ -71,7 +71,7 @@ def _safe_table_component(table_name: str) -> str:
     ordinary table names.
     """
     cleaned = re.sub(r"[^A-Za-z0-9_.:-]", "_", table_name)
-    return cleaned.replace("..", "_")
+    return re.sub(r"\.\.+", "_", cleaned)
 
 
 def _w4_path(session_id: str, table_name: str) -> str:

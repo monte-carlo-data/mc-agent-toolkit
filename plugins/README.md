@@ -70,8 +70,8 @@ For detailed architecture decisions, see the [Plugin Architecture Guide](../docs
 | Language | Python | Python | TypeScript | Python | Python |
 | Hook config | `hooks/<skill>/hooks.json` | `hooks/<skill>/hooks.json` | Event handlers in `src/` | `hooks.json` (v1 format) at plugin root | `hooks/<skill>/hooks.json` |
 | Command field | `"command"` | `"command"` | SDK events | `"bash"` | `"command"` |
-| Tool names | `Write`, `Edit`, `Bash` | `Write`, `Edit` | `edit`, `write`, `apply_patch` | `edit`, `create`, `bash` | `Edit`/`Write`/`Bash` (matchers; tool names arrive lowercased) |
+| Tool names | `Write`, `Edit`, `Bash` | `Write`, `Edit` | `edit`, `write`, `apply_patch` | `edit`, `create`, `bash` | `Edit`/`Write`/`MultiEdit`/`Bash` (matchers; tool names arrive lowercased) |
 | Deny format | `hookSpecificOutput.permissionDecision` | `permission: "deny"` | Thrown `Error` | `permissionDecision: "deny"` | `hookSpecificOutput.permissionDecision` |
 | Session ID | `session_id` | `conversation_id` | SDK client | PID (not provided) | `session_id` |
 
-**Cortex Code** wraps Claude Code, so its hook config, hook I/O JSON, and `${CLAUDE_PLUGIN_ROOT}`/`${CORTEX_PLUGIN_ROOT}` expansion match Claude Code. The one difference: the hook `transcript_path` points at a `<id>.json` metadata file, while the session messages live in a sibling `<id>.history.jsonl`; the prevent pre-edit hook reads that sibling and matches markers only in assistant-authored text.
+**Cortex Code** wraps Claude Code, so its hook config and hook I/O JSON match Claude Code, and `${CORTEX_PLUGIN_ROOT}` expands in hook commands (the analog of Claude Code's `${CLAUDE_PLUGIN_ROOT}`; the Cortex hooks use `${CORTEX_PLUGIN_ROOT}`). The one difference: the hook `transcript_path` points at a `<id>.json` metadata file, while the session messages live in a sibling `<id>.history.jsonl`; the prevent pre-edit hook reads that sibling and matches markers only in assistant-authored text.

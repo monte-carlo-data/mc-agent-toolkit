@@ -114,7 +114,7 @@ See the [skills directory](skills/) for the full list and individual READMEs.
 
 ## Telemetry
 
-The Claude Code and Cortex Code plugins send anonymous skill-usage telemetry. No prompts or skill arguments are sent. To disable, set `MC_AGENT_TOOLKIT_TELEMETRY_DISABLED=1`. See [the plugin README](plugins/claude-code/README.md#telemetry) for details.
+The Claude Code and Cortex Code plugins send anonymous skill-usage telemetry. No prompts or skill arguments are sent. To disable, set `MC_AGENT_TOOLKIT_TELEMETRY_DISABLED=1`. See the [Claude Code](plugins/claude-code/README.md#telemetry) or [Cortex Code](plugins/cortex-code/README.md#telemetry) plugin README for details.
 
 ## Contributing
 

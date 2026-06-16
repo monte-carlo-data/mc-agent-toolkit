@@ -68,11 +68,17 @@ PAYLOAD="$(jq -nc \
   '{event: $event, install_id: $install_id, session_id: $session_id, skill: $skill, skill_args_present: $skill_args_present, toolkit_version: $toolkit_version, ts: $ts}')"
 
 # Fire-and-forget. 2s timeout so a slow server never delays a skill invocation.
-( curl -fsS -m 2 -X POST \
-    -H 'Content-Type: application/json' \
-    -d "$PAYLOAD" \
-    "$BEACON_URL" \
-    >/dev/null 2>&1 || true ) &
-disown
+# MC_BEACON_SYNC (test-only) runs curl in the foreground so tests can assert
+# deterministically whether the beacon fired; production always backgrounds it.
+if [[ -n "${MC_BEACON_SYNC:-}" ]]; then
+  curl -fsS -m 2 -X POST -H 'Content-Type: application/json' -d "$PAYLOAD" "$BEACON_URL" >/dev/null 2>&1 || true
+else
+  ( curl -fsS -m 2 -X POST \
+      -H 'Content-Type: application/json' \
+      -d "$PAYLOAD" \
+      "$BEACON_URL" \
+      >/dev/null 2>&1 || true ) &
+  disown
+fi
 
 exit 0

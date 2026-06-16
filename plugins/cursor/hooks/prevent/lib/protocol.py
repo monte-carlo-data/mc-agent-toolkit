@@ -150,14 +150,16 @@ def scan_history_jsonl_for_markers(history_path: str, table_name: str) -> dict:
 
     Each line is an Anthropic Messages-style object:
         {"role": "assistant", "content": [{"type": "text", "text": "..."}, ...]}
-    Malformed lines are skipped so the scan fails closed (no marker found ->
-    gate stays denied) rather than raising into the adapter's safe_run (which
+    Malformed (non-JSON) lines are skipped, and undecodable bytes are replaced
+    (errors="replace") so a stray non-UTF-8 byte doesn't abort the whole scan and
+    miss a genuine marker. Worst case the scan finds no marker and the gate stays
+    denied (fail closed) rather than raising into the adapter's safe_run (which
     would exit 0 and let the edit through).
     """
     found = {"impact_check": False, "monitor_gap": False}
     ic_pattern, mg_pattern = _compile_marker_patterns(table_name)
     try:
-        with open(history_path, "r", encoding="utf-8") as f:
+        with open(history_path, "r", encoding="utf-8", errors="replace") as f:
             for raw in f:
                 raw = raw.strip()
                 if not raw:
@@ -183,14 +185,21 @@ def _scan_markers(inp: "HookInput", table_name: str) -> dict:
 
     Adapters that store messages in an Anthropic Messages-style `.history.jsonl`
     (Cortex) set inp.transcript_format == "messages_jsonl" and point
-    transcript_path at that sibling file. Everything else uses the raw-line scan.
+    transcript_path at that sibling file. "raw" (the default) uses the raw-line
+    scan. An unrecognized format (e.g. a future adapter's typo) deliberately
+    returns no markers so the gate stays denied — failing CLOSED rather than
+    silently scanning with the wrong reader (which would drop the assistant-text
+    protection) or raising (which fails OPEN, since the adapter's safe_run exits 0).
     """
+    no_markers = {"impact_check": False, "monitor_gap": False}
     path = inp.transcript_path or ""
     if not path:
-        return {"impact_check": False, "monitor_gap": False}
+        return no_markers
     if inp.transcript_format == "messages_jsonl":
         return scan_history_jsonl_for_markers(path, table_name)
-    return scan_transcript_for_markers(path, table_name)
+    if inp.transcript_format == "raw":
+        return scan_transcript_for_markers(path, table_name)
+    return no_markers  # unknown format → fail closed
 
 
 def _get_staged_model_tables(cwd: str) -> list[str]:

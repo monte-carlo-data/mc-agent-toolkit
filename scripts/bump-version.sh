@@ -77,6 +77,8 @@ done
 # standalone op via --sync-only.
 sync_shared_lib() {
   local SHARED_LIB_DIR="$REPO_ROOT/plugins/shared/prevent/lib"
+  # opencode is intentionally excluded — it ports the prevent logic to TypeScript
+  # (plugins/opencode/src/prevent/) rather than copying the Python lib.
   local EDITOR_PLUGINS=(claude-code cursor copilot codex cortex-code)
   echo ""
   if [[ ! -d "$SHARED_LIB_DIR" ]]; then

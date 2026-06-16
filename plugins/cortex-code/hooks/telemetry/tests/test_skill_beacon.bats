@@ -21,6 +21,9 @@ setup() {
   SCRIPT="$BATS_TEST_DIRNAME/../scripts/skill-beacon.sh"
   unset MC_AGENT_TOOLKIT_TELEMETRY_DISABLED
   unset MCD_TOOLKIT_BEACON_URL
+  # Run the beacon's curl synchronously so "no beacon" assertions are deterministic
+  # (no reliance on a fixed sleep racing a backgrounded curl).
+  export MC_BEACON_SYNC=1
 }
 
 teardown() {
@@ -49,14 +52,12 @@ wait_for_log() {
 @test "no beacon for skills outside mc-agent-toolkit" {
   run bash -c 'echo "{\"tool_name\":\"skill\",\"tool_input\":{\"command\":\"some-plugin:other-skill\"}}" | bash "$0"' "$SCRIPT"
   [ "$status" -eq 0 ]
-  sleep 0.2
   [ ! -s "$MOCK_CURL_LOG" ]
 }
 
 @test "no beacon for namespaced skills from other plugins" {
   run bash -c 'echo "{\"tool_name\":\"skill\",\"tool_input\":{\"command\":\"superpowers:brainstorming\"}}" | bash "$0"' "$SCRIPT"
   [ "$status" -eq 0 ]
-  sleep 0.2
   [ ! -s "$MOCK_CURL_LOG" ]
 }
 
@@ -65,7 +66,6 @@ wait_for_log() {
   # the tool_name guard rejects it before the namespace check.
   run bash -c 'echo "{\"tool_name\":\"bash\",\"tool_input\":{\"command\":\"mc-agent-toolkit:monte-carlo-prevent\"}}" | bash "$0"' "$SCRIPT"
   [ "$status" -eq 0 ]
-  sleep 0.2
   [ ! -s "$MOCK_CURL_LOG" ]
 }
 
@@ -73,7 +73,6 @@ wait_for_log() {
   export MC_AGENT_TOOLKIT_TELEMETRY_DISABLED=1
   run bash -c 'echo "{\"tool_name\":\"skill\",\"tool_input\":{\"command\":\"mc-agent-toolkit:monte-carlo-asset-health\"}}" | bash "$0"' "$SCRIPT"
   [ "$status" -eq 0 ]
-  sleep 0.2
   [ ! -s "$MOCK_CURL_LOG" ]
 }
 
@@ -81,7 +80,6 @@ wait_for_log() {
   rm "$IDS_DIR/install_id"
   run bash -c 'echo "{\"tool_name\":\"skill\",\"tool_input\":{\"command\":\"mc-agent-toolkit:monte-carlo-asset-health\"}}" | bash "$0"' "$SCRIPT"
   [ "$status" -eq 0 ]
-  sleep 0.2
   [ ! -s "$MOCK_CURL_LOG" ]
 }
 
@@ -89,14 +87,12 @@ wait_for_log() {
   rm "$IDS_DIR/toolkit_session_id"
   run bash -c 'echo "{\"tool_name\":\"skill\",\"tool_input\":{\"command\":\"mc-agent-toolkit:monte-carlo-asset-health\"}}" | bash "$0"' "$SCRIPT"
   [ "$status" -eq 0 ]
-  sleep 0.2
   [ ! -s "$MOCK_CURL_LOG" ]
 }
 
 @test "missing tool_input.command results in no beacon, exit 0" {
   run bash -c 'echo "{\"tool_name\":\"skill\",\"tool_input\":{}}" | bash "$0"' "$SCRIPT"
   [ "$status" -eq 0 ]
-  sleep 0.2
   [ ! -s "$MOCK_CURL_LOG" ]
 }
 

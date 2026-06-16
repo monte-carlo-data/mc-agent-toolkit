@@ -84,6 +84,26 @@ class TestDenyReasonSelfBypass:
         result = scan_transcript_for_markers(str(transcript), "macro:helper")
         assert result["impact_check"] is False
 
+    def test_model_deny_reason_does_not_self_unlock_history_jsonl(self, tmp_path):
+        """The same invariant for the Cortex JSONL scanner (the path this work added)."""
+        reason = self._deny_reason(tmp_path, "models", "orders.sql",
+                                   "SELECT * FROM {{ ref('raw') }}")
+        # As Cortex actually persists it — a tool_result under role "user" (ignored).
+        tr = tmp_path / "tr.history.jsonl"
+        tr.write_text(_user_tool_result(reason) + "\n")
+        assert scan_history_jsonl_for_markers(str(tr), "orders")["impact_check"] is False
+        # And even if it somehow landed in an assistant text block, the wording must not match.
+        at = tmp_path / "at.history.jsonl"
+        at.write_text(_assistant_text(reason) + "\n")
+        assert scan_history_jsonl_for_markers(str(at), "orders")["impact_check"] is False
+
+    def test_macro_deny_reason_does_not_self_unlock_history_jsonl(self, tmp_path):
+        reason = self._deny_reason(tmp_path, "macros", "helper.sql",
+                                   "{% macro helper() %} SELECT 1 {% endmacro %}")
+        at = tmp_path / "at.history.jsonl"
+        at.write_text(_assistant_text(reason) + "\n")
+        assert scan_history_jsonl_for_markers(str(at), "macro:helper")["impact_check"] is False
+
 
 class TestEvaluatePreEdit:
     def test_non_dbt_file_noop(self):
@@ -459,3 +479,20 @@ class TestEvaluatePreEditCortex:
         result = evaluate_pre_edit(inp)
         assert result.action == "deny"
         assert cache.get_impact_check_state("s1", "orders") == "injected"
+
+    def test_empty_transcript_path_denies(self, tmp_path):
+        """Cortex format with no transcript yet (e.g. first turn) -> fail closed."""
+        sql_file = self._model(tmp_path)
+        inp = HookInput(session_id="s1", file_path=str(sql_file),
+                        transcript_path="", transcript_format="messages_jsonl")
+        assert evaluate_pre_edit(inp).action == "deny"
+
+    def test_unknown_transcript_format_fails_closed(self, tmp_path):
+        """A misspelled/unknown format must not unlock via the wrong scanner."""
+        sql_file = self._model(tmp_path)
+        cache.mark_impact_check_injected("s1", "orders")
+        h = tmp_path / "s.history.jsonl"
+        h.write_text(_assistant_text("<!-- MC_IMPACT_CHECK_COMPLETE: orders -->") + "\n")
+        inp = HookInput(session_id="s1", file_path=str(sql_file),
+                        transcript_path=str(h), transcript_format="messages-jsonl")  # typo
+        assert evaluate_pre_edit(inp).action == "deny"

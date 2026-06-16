@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
 # Monte Carlo Agent Toolkit — Cortex Code (CoCo) plugin installer.
 #
@@ -31,6 +31,9 @@ else
   TMPDIR_ROOT="${TMPDIR:-/tmp}"
   CLONE_DIR="$TMPDIR_ROOT/mc-agent-toolkit-$$"
   clone_cleanup() { rm -rf "$CLONE_DIR"; }
+  # Register cleanup before cloning so a failed/partial clone doesn't leak the temp dir
+  # (the full cleanup trap below supersedes this once STAGING exists).
+  trap clone_cleanup EXIT
   echo "  Cloning repository..."
   git clone --depth 1 --quiet "$REPO_URL" "$CLONE_DIR"
 fi
