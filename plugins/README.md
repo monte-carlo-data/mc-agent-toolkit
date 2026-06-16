@@ -8,11 +8,12 @@ For the user-facing feature list and installation instructions, see the [main RE
 
 | Agent | Status | Skills | MCP | Installation |
 |---|---|---|---|---|
-| **Claude Code** | Full | All 4 | OAuth | [Setup guide](claude-code/README.md) |
-| **Cursor** | Full | All 4 | OAuth | [Setup guide](cursor/README.md) |
-| **OpenCode** | Full | All 4 | OAuth | [Setup guide](opencode/README.md) |
-| **Copilot CLI** | Preliminary | All 4 | OAuth | [Setup guide](copilot/README.md) |
-| **Codex** | Preliminary | All 4 | OAuth | [Setup guide](codex/README.md) |
+| **Claude Code** | Full | All 17 | OAuth | [Setup guide](claude-code/README.md) |
+| **Cursor** | Full | All 17 | OAuth | [Setup guide](cursor/README.md) |
+| **OpenCode** | Full | All 17 | OAuth | [Setup guide](opencode/README.md) |
+| **Cortex Code** | Full | All 17 | OAuth | [Setup guide](cortex-code/README.md) |
+| **Copilot CLI** | Preliminary | All 17 | OAuth | [Setup guide](copilot/README.md) |
+| **Codex** | Preliminary | All 17 | OAuth | [Setup guide](codex/README.md) |
 
 Currently, only the **Prevent** skill leverages hooks for enforcement. The other skills are instruction-only.
 
@@ -37,7 +38,7 @@ The Prevent feature uses four hooks and a slash command to enforce the impact-as
 
 Hook availability and behavior varies by agent — see each agent's README for platform-specific details. The [Hook Format Comparison](#hook-format-comparison) table below shows the technical differences.
 
-**Editor compatibility:** Most agents run inside popular editors. **VS Code** users can use Copilot CLI or Claude Code. **JetBrains** users can use Copilot CLI. **Cursor** is a standalone editor with its own plugin. Claude Code, Copilot CLI, and OpenCode also run in any **terminal**. Codex runs on **GitHub**.
+**Editor compatibility:** Most agents run inside popular editors. **VS Code** users can use Copilot CLI or Claude Code. **JetBrains** users can use Copilot CLI. **Cursor** is a standalone editor with its own plugin. Claude Code, Copilot CLI, and OpenCode also run in any **terminal**. Codex runs on **GitHub**. **Cortex Code** is Snowflake's terminal CLI agent.
 
 ## Architecture
 
@@ -51,11 +52,12 @@ plugins/
 ├── cursor/              # Cursor plugin
 ├── opencode/            # OpenCode plugin (TypeScript port)
 ├── copilot/             # Copilot CLI plugin
-└── codex/               # Codex plugin (skills only)
+├── codex/               # Codex plugin (skills only)
+└── cortex-code/         # Cortex Code plugin (wraps Claude Code)
 ```
 
 **Key patterns:**
-- **Shared hook logic** lives in `shared/<skill>/lib/`. Editor plugins symlink to it and provide thin adapter scripts that translate editor-specific JSON formats.
+- **Shared hook logic** lives in `shared/<skill>/lib/`. Editor plugins copy it (kept in sync via `scripts/bump-version.sh --sync-only`; symlinks under `hooks/` are rejected by CI) and provide thin adapter scripts that translate editor-specific JSON formats.
 - **Skills** are symlinked from `../skills/` — authored once, shared across all editors.
 - **OpenCode** is an exception — it ports the shared logic to TypeScript since the `@opencode-ai/plugin` SDK requires it.
 
@@ -63,11 +65,13 @@ For detailed architecture decisions, see the [Plugin Architecture Guide](../docs
 
 ## Hook Format Comparison
 
-| Aspect | Claude Code | Cursor | OpenCode | Copilot CLI |
-|---|---|---|---|---|
-| Language | Python | Python | TypeScript | Python |
-| Hook config | `hooks/<skill>/hooks.json` | `hooks/<skill>/hooks.json` | Event handlers in `src/` | `hooks.json` (v1 format) at plugin root |
-| Command field | `"command"` | `"command"` | SDK events | `"bash"` |
-| Tool names | `Write`, `Edit`, `Bash` | `Write`, `Edit` | `edit`, `write`, `apply_patch` | `edit`, `create`, `bash` |
-| Deny format | `hookSpecificOutput.permissionDecision` | `permission: "deny"` | Thrown `Error` | `permissionDecision: "deny"` |
-| Session ID | `session_id` | `conversation_id` | SDK client | PID (not provided) |
+| Aspect | Claude Code | Cursor | OpenCode | Copilot CLI | Cortex Code |
+|---|---|---|---|---|---|
+| Language | Python | Python | TypeScript | Python | Python |
+| Hook config | `hooks/<skill>/hooks.json` | `hooks/<skill>/hooks.json` | Event handlers in `src/` | `hooks.json` (v1 format) at plugin root | `hooks/<skill>/hooks.json` |
+| Command field | `"command"` | `"command"` | SDK events | `"bash"` | `"command"` |
+| Tool names | `Write`, `Edit`, `Bash` | `Write`, `Edit` | `edit`, `write`, `apply_patch` | `edit`, `create`, `bash` | `Edit`/`Write`/`Bash` (matchers; tool names arrive lowercased) |
+| Deny format | `hookSpecificOutput.permissionDecision` | `permission: "deny"` | Thrown `Error` | `permissionDecision: "deny"` | `hookSpecificOutput.permissionDecision` |
+| Session ID | `session_id` | `conversation_id` | SDK client | PID (not provided) | `session_id` |
+
+**Cortex Code** wraps Claude Code, so its hook config, hook I/O JSON, and `${CLAUDE_PLUGIN_ROOT}`/`${CORTEX_PLUGIN_ROOT}` expansion match Claude Code. The one difference: the hook `transcript_path` points at a `<id>.json` metadata file, while the session messages live in a sibling `<id>.history.jsonl`; the prevent pre-edit hook reads that sibling and matches markers only in assistant-authored text.
