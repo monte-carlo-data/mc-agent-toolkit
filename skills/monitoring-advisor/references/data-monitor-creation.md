@@ -66,6 +66,23 @@ Use the `domains` list on the `get_table` response (each entry has `uuid` and `n
 
 Do NOT present all account domains as options when the table already has domains listed -- prefer domains that contain the table.
 
+### Step 3b: Ground thresholds and predicates in real data (profiling)
+
+Verified column names are not enough. Schema alone does not tell you whether a column is mostly-null, whether a status code is truly a closed set, or whether a numeric range is stable enough to alert on. Profiling once up front is the difference between a useful monitor and a noisy one the user mutes the next day.
+
+| Monitor / config | Profiling | How to ground it |
+| --- | --- | --- |
+| Metric monitor, **auto / ML threshold** | **Not required** | The backend learns the baseline from history -- you don't pick a number. |
+| Metric monitor, **manual `min`/`max`** | **Required** (unless the user pre-opts-out) | Sample the metric over a recent window and pick a threshold outside normal variation but tight enough to catch regressions. |
+| **Validation** monitor (any predicate) | **Required** | Membership predicates (`in_set`/`not_in_set`/equality): sample distinct values. Range/regex/cross-field: sample the actual distribution. |
+| **Custom SQL** monitor | **Required** | Run the proposed SQL once first -- confirm it parses, returns the expected shape, and produces values consistent with the threshold. |
+
+How to profile depends on the environment: use `get_table` field stats where they suffice, or an optional database MCP (`snowflake_query`, `bigquery_query`, etc.) for distributions and distinct values. **If you cannot profile** (no query access, permission denied, user declines): do NOT invent values. Fall back to **auto / ML thresholds** where the monitor supports them, propose a metadata-only sketch for the user to refine, or pause -- and say which. A user instruction like "use my number directly", "skip profiling", or "just give me the dry-run" is a valid pre-opt-out; honor it without re-prompting.
+
+### Step 3c: Field monitors require a live table monitor (prerequisite)
+
+A metric or validation monitor on a table only runs if that table has an active **user-deployed table monitor** -- not the auto-applied out-of-the-box freshness/volume. A field monitor on an OOTB-only table is silently inert. Before proposing a metric/validation monitor, check the table's monitors (`get_monitors` for the MCON); if there is no user table monitor, tell the user the field monitor would not actually run, and offer to create a table monitor first. (Custom SQL monitors are exempt.)
+
 ---
 
 ## Creation Phase (Steps 4-8)
@@ -105,6 +122,8 @@ Valid arguments:
 - Fixed: `schedule_type="fixed"`, `interval_minutes=<N>` (any integer, e.g. 30, 60, 90, 360, 720, 1440)
 - Dynamic: `schedule_type="dynamic"` (omit `interval_minutes`)
 - Manual: `schedule_type="manual"` (omit `interval_minutes`)
+
+**Views require a fixed schedule.** A view has no independent "last update" timestamp, so dynamic scheduling never triggers correctly. When the target is a view, always use a fixed schedule and surface that in the preview so the user sees the correct config.
 
 ### Step 6: Confirm with the user
 

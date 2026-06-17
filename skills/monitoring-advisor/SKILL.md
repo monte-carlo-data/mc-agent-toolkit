@@ -156,15 +156,17 @@ This is the primary flow when use cases are defined.
 - Call `get_use_case_tables` with `golden_tables_only=true` and mention specific golden-table names as concrete examples. Golden tables are the last layer in the warehouse -- they feed ML models, dashboards, and reports. Explain this when relevant.
 - Use `get_asset_lineage` to explain how tables in a use case are connected and why certain tables are important (e.g. a golden table with many upstream dependencies).
 
+### "Create a use case" requests
+
+You **cannot** create use cases -- they are generated automatically by Monte Carlo (along with their criticality), and there is no tool to author one. When the user asks to "create", "set up", or "define" a use case: briefly say so, and do NOT silently substitute monitor deployment. Then offer what you *can* do for the table(s) they named -- look up the existing use case / criticality, recommend field monitors, generate monitor previews, or analyze coverage gaps -- and act on the do-able part without expanding to sibling tables.
+
 ### Analyze coverage
 
 1. Call `get_use_case_table_summary` to show how many tables exist at each criticality level (HIGH / MEDIUM / LOW) for the use case.
 2. Call `get_use_case_tables` to obtain table MCONs, then call `get_monitors(mcons=[...])` to report how many are already monitored vs. not.
-3. Ask the user which criticality scope they prefer:
-   - **HIGH only** -- monitor only the most critical tables
-   - **MEDIUM + HIGH** -- broader coverage
-   - **ALL** -- full coverage including LOW-criticality tables
+3. **Default to HIGH + MEDIUM criticality scope.** This covers the most important tables without overwhelming the user. Do NOT ask the user which scope to use -- just proceed. If they want LOW-criticality tables included, they'll ask.
 4. You may suggest covering **multiple** use cases in one session.
+5. **Bias toward action, not questions.** When the scope is clear (HIGH + MEDIUM for the selected use case), proceed directly to generating monitor previews for all recommended monitors. Frame it as opt-out, not opt-in: "I'll generate previews for all N monitors -- tell me if you want to skip any." Do NOT ask "which would you like me to create?" one at a time -- batch them.
 
 ### Identify coverage gaps with anomaly data
 
@@ -185,8 +187,14 @@ When no use cases are defined, fall back to importance-based table discovery.
 1. **Find unmonitored tables:** Use `search(query="", is_monitored=false)` to find unmonitored tables sorted by importance.
 2. **Find tables with anomalies:** Use `get_unmonitored_tables_with_anomalies` with a recent time window (last 14-30 days) to find tables with recent anomalies but no monitors.
 3. **Inspect top candidates:** Use `get_table` to check table details, fields, and stats for the most important unmonitored tables.
-4. **Understand criticality via lineage:** Use `get_asset_lineage` to understand which tables are most connected -- tables with many downstream dependencies are higher priority.
+4. **Understand criticality via lineage:** Use `get_asset_lineage` with `direction="DOWNSTREAM"` to understand which tables are most connected -- a table with many downstream dependents is a stronger candidate for monitoring.
 5. **Prioritize:** Rank candidates by importance score and anomaly activity. Present the top candidates to the user with reasoning.
+
+### Important
+
+- **Do NOT present importance scores as business criticality.** Always explain that the importance score is a *computed* metric (query frequency, downstream dependencies, usage patterns), not business-defined criticality.
+- Tell the user their account doesn't have use-case data **yet** -- use cases are generated automatically by Monte Carlo from warehouse metadata and exposed as asset tags; they are not manually configured through a UI.
+- You can still create metric, validation, and custom SQL monitors for individual tables in this mode -- you just won't use tag-based table monitors, since there are no use-case tags.
 
 ---
 
@@ -206,9 +214,10 @@ If no database MCP is available, skip this step entirely. Do not ask the user to
 
 When coverage analysis leads to monitor creation, gather this context before reading the creation reference file:
 
-1. Call `get_audiences` to list available notification audiences. Ask the user which audience they want notifications sent to.
-2. Ask whether the monitor should be created as a **DRAFT** or active.
-3. When passing `audiences` or `failure_audiences`, use the audience **name/label** (not UUID).
+1. **Dedup first.** Before generating a use-case tag monitor, call `get_monitors` with the same tag pair (and `monitor_types=["TABLE"]`) you'd put in the monitor's `asset_selection.filters`. If a monitor already covers that `(tag, domain)` scope, surface it (description, uuid) and ask whether to update it (pass its `monitor_uuid`), add one with a distinct scope, or skip -- do NOT silently re-create. The backend upserts a table monitor on its `(description, domain)`, so a same-description definition silently overwrites the prior monitor's settings.
+2. Call `get_audiences` to list notification audiences. Suggest one or more relevant audiences (match by team or use-case context) and ask the user which they want -- they can pick **one or several**. This is the **one** question to ask before generating; do NOT also ask about draft/active or schedule. Default to **draft** (`is_draft=True`); the user can flip to active after seeing the preview.
+3. When passing `audiences` or `failure_audiences`, use the audience **name/label** (not UUID), as a list -- one entry per selected audience.
+4. **Never fabricate credit costs.** Do not give a generic per-monitor or per-field MC credit rate -- cost scales with the specific spec (segmentation, schedule, field count). If a preview response includes a backend estimate (e.g. `estimated_credits.credits_per_day`), report that; otherwise decline and offer to preview a specific monitor or use case to get the real estimate.
 
 ### Use-case tag monitors
 
@@ -236,14 +245,18 @@ Rules:
 - To monitor MEDIUM + HIGH: `["tag_name:high", "tag_name:medium"]`
 - To monitor ALL: `["tag_name:high", "tag_name:medium", "tag_name:low"]`
 
-### Monitor description guidelines
+### Monitor title (`description`) and reasoning (`notes`)
 
-Write a clear, meaningful `description` that explains what the monitor covers and why. The backend auto-generates the monitor `name` -- you cannot control it, but the description is what users see.
+Keep these distinct -- both are accepted by the creation tools. The backend auto-generates the monitor `name` slug; `description` is the title users see.
 
-- **Bad:** `"Data Quality Monitoring - HIGH criticality table monitor"`
-- **Good:** `"Monitor HIGH criticality tables in the Revenue Reporting use case to catch issues before they affect dashboards and financial reports."`
+- **`description` -- the title.** Short and scannable (≤ ~80 chars), plain English, naming the asset/use case and criticality scope. Do NOT cram reasoning here.
+- **`notes` -- the reasoning.** 1-3 sentences answering "why this monitor?", grounded in criticality, scope, and downstream impact.
 
-The description should mention the criticality scope, the use case name, and a brief reason why this monitoring matters.
+Example for a use-case tag monitor:
+
+- **Bad description** (this is reasoning, not a title): `"Monitor HIGH criticality tables in the Revenue Reporting use case to catch issues before they affect dashboards and financial reports."`
+- **Good description:** `"Revenue Reporting coverage -- HIGH + MEDIUM criticality tables"`
+- **Good notes** (paired): `"Covers HIGH/MEDIUM-criticality tables in the Revenue Reporting use case. Catches freshness, volume, and schema issues before they reach dashboards and financial reports."`
 
 ---
 

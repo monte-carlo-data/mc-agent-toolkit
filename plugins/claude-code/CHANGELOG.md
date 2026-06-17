@@ -16,6 +16,12 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Hardened the prevent impact-check gate: the pre-edit deny reason no longer contains a string that satisfies its own marker scanner, closing a latent self-unlock on harnesses that persist hook output back into the scanned transcript. Added `table_name` path sanitization for the `/tmp` cache, an unknown-transcript-format fail-closed guard, and tolerance for stray bytes when scanning Cortex's `.history.jsonl`. These shared-lib changes apply to all editor plugins.
 - Skill-usage telemetry beacon now carries a `harness` field (`claude-code`) so the telemetry sink can distinguish Claude Code installs from other editors (e.g. Cortex Code).
 
+## [1.12.1] - 2026-06-17
+
+### Changed
+
+- monitoring-advisor: align coverage and data-monitor-creation guidance with the internal Monte Carlo coverage agent — default to HIGH+MEDIUM scope (don't ask) with action-bias batching, "create a use case" handling, importance-score-is-not-business-criticality caveat, dedup + no-fabricated-credit-cost guidance, description(title)/notes(reasoning) split, a profiling-before-thresholds matrix, the field-monitor-requires-a-live-table-monitor prerequisite, and view fixed-schedule rule.
+
 ## [1.12.0] - 2026-05-20
 
 ### Added
