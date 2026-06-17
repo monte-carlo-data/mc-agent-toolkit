@@ -39,7 +39,7 @@ The toolkit sends anonymous skill-usage telemetry by default — which skills ar
 
 To opt out, set `MC_AGENT_TOOLKIT_TELEMETRY_DISABLED=1` in your shell environment before starting Cortex Code. The toolkit will not phone home.
 
-The UUIDs are generated locally on first session and stored under `~/.claude/mc-agent-toolkit/`, which is shared with other Monte Carlo toolkit installs on this machine (e.g. Claude Code). Deleting that directory resets the install identity for all of them to a fresh anonymous one.
+The data is stored in Mixpanel and Datadog and is used only for product-development decisions about which skills to invest in. The UUIDs are generated locally on first session and stored under `~/.snowflake/cortex/mc-agent-toolkit/` (Cortex Code's own config home) — separate from any Claude Code toolkit install, so each editor keeps its own anonymous identity. Deleting that directory resets the Cortex Code install identity to a fresh one.
 
 ## Available Features
 

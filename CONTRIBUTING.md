@@ -40,8 +40,20 @@ mc-agent-toolkit/
 │   │   ├── skills/prevent → symlink
 │   │   └── opencode.json
 │   │
-│   └── codex/                           # Unified mc-agent-toolkit plugin
-│       └── skills/prevent → symlink
+│   ├── copilot/                         # Unified mc-agent-toolkit plugin
+│   │   ├── hooks/prevent/              # Hook adapters (thin, call shared lib)
+│   │   ├── skills/prevent → symlink
+│   │   └── .mcp.json
+│   │
+│   ├── codex/                           # Unified mc-agent-toolkit plugin
+│   │   └── skills/prevent → symlink
+│   │
+│   └── cortex-code/                     # Snowflake Cortex Code — wraps Claude Code (6th editor)
+│       ├── .cortex-plugin/plugin.json
+│       ├── hooks/prevent/              # Hook adapters (thin, call shared lib)
+│       ├── hooks/telemetry/           # SessionStart id-mint + skill-usage beacon
+│       ├── skills/ (17 skills → symlinks)
+│       └── commands/ (prevent/, push-ingestion/, catalog/, monitoring-advisor/, …)
 │
 ├── .claude-plugin/marketplace.json
 ├── .cursor-plugin/marketplace.json
