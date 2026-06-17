@@ -11,7 +11,7 @@ if [[ "${MC_AGENT_TOOLKIT_TELEMETRY_DISABLED:-}" == "1" ]]; then
   exit 0
 fi
 
-DIR="$HOME/.claude/mc-agent-toolkit"
+DIR="$HOME/.snowflake/cortex/mc-agent-toolkit"
 INSTALL_ID="$(cat "$DIR/install_id" 2>/dev/null || echo "")"
 TOOLKIT_SESSION_ID="$(cat "$DIR/toolkit_session_id" 2>/dev/null || echo "")"
 
@@ -57,6 +57,8 @@ BEACON_URL="${MCD_TOOLKIT_BEACON_URL:-https://mcp.getmontecarlo.com/mcp/toolkit/
 
 TOOLKIT_VERSION="$(jq -r '.version // "unknown"' "$PLUGIN_JSON" 2>/dev/null || echo "unknown")"
 
+# harness identifies the editor this install runs under, so the sink can tell a
+# Cortex Code install apart from a Claude Code one (each has its own install_id).
 PAYLOAD="$(jq -nc \
   --arg event "Toolkit Skill Invoked" \
   --arg install_id "$INSTALL_ID" \
@@ -64,8 +66,9 @@ PAYLOAD="$(jq -nc \
   --arg skill "$SKILL_NAME" \
   --argjson skill_args_present "$ARGS_PRESENT" \
   --arg toolkit_version "$TOOLKIT_VERSION" \
+  --arg harness "cortex-code" \
   --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-  '{event: $event, install_id: $install_id, session_id: $session_id, skill: $skill, skill_args_present: $skill_args_present, toolkit_version: $toolkit_version, ts: $ts}')"
+  '{event: $event, install_id: $install_id, session_id: $session_id, skill: $skill, skill_args_present: $skill_args_present, toolkit_version: $toolkit_version, harness: $harness, ts: $ts}')"
 
 # Fire-and-forget. 2s timeout so a slow server never delays a skill invocation.
 # MC_BEACON_SYNC (test-only) runs curl in the foreground so tests can assert

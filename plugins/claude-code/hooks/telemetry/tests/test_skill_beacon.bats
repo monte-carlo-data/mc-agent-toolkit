@@ -42,6 +42,7 @@ wait_for_log() {
   [ "$(echo "$payload" | jq -r '.skill')" = "asset-health" ]
   [ "$(echo "$payload" | jq -r '.install_id')" = "11111111-1111-1111-1111-111111111111" ]
   [ "$(echo "$payload" | jq -r '.session_id')" = "22222222-2222-2222-2222-222222222222" ]
+  [ "$(echo "$payload" | jq -r '.harness')" = "claude-code" ]
 }
 
 @test "no beacon for skills outside mc-agent-toolkit" {

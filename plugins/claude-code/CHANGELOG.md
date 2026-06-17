@@ -14,6 +14,7 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Changed
 
 - Hardened the prevent impact-check gate: the pre-edit deny reason no longer contains a string that satisfies its own marker scanner, closing a latent self-unlock on harnesses that persist hook output back into the scanned transcript. Added `table_name` path sanitization for the `/tmp` cache, an unknown-transcript-format fail-closed guard, and tolerance for stray bytes when scanning Cortex's `.history.jsonl`. These shared-lib changes apply to all editor plugins.
+- Skill-usage telemetry beacon now carries a `harness` field (`claude-code`) so the telemetry sink can distinguish Claude Code installs from other editors (e.g. Cortex Code).
 
 ## [1.12.0] - 2026-05-20
 
