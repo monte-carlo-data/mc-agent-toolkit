@@ -5,6 +5,10 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Codex will be do
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+### Changed
+
+- monitoring-advisor: align coverage and data-monitor-creation guidance with the internal Monte Carlo coverage agent — default to HIGH+MEDIUM scope (don't ask) with action-bias batching, "create a use case" handling, importance-score-is-not-business-criticality caveat, dedup + no-fabricated-credit-cost guidance, description(title)/notes(reasoning) split, a profiling-before-thresholds matrix, the field-monitor-requires-a-live-table-monitor prerequisite, and view fixed-schedule rule.
+
 ## [1.12.0] - 2026-05-20
 
 ### Added
