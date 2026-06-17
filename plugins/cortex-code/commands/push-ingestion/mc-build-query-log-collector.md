@@ -16,19 +16,17 @@ and pushes it to Monte Carlo as query logs.
 Query logs use `log_type` (not `resource_type` — this is the only push endpoint where the
 field name differs). **Always confirm the correct value** for the customer's warehouse:
 
-| Warehouse | log_type |
-|---|---|
-| Snowflake | `"snowflake"` |
-| BigQuery | `"bigquery"` |
-| Databricks | `"databricks"` |
-| Redshift | `"redshift"` |
-| Hive (EMR) | `"hive-s3"` |
-| Athena | `"athena"` |
-| Teradata | `"teradata"` |
-| ClickHouse | `"clickhouse"` |
-| Databricks (SQL Warehouse) | `"databricks-metastore-sql-warehouse"` |
-| S3 | `"s3"` |
-| Presto (S3) | `"presto-s3"` |
+- Snowflake — `"snowflake"`
+- BigQuery — `"bigquery"`
+- Databricks — `"databricks"`
+- Redshift — `"redshift"`
+- Hive (EMR) — `"hive-s3"`
+- Athena — `"athena"`
+- Teradata — `"teradata"`
+- ClickHouse — `"clickhouse"`
+- Databricks (SQL Warehouse) — `"databricks-metastore-sql-warehouse"`
+- S3 — `"s3"`
+- Presto (S3) — `"presto-s3"`
 
 Using the wrong value causes `ValueError: Unsupported ingest query-log log_type`.
 

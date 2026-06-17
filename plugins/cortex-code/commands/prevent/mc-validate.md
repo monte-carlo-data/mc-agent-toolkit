@@ -4,12 +4,9 @@ description: Generate and run validation queries for the current change
 
 Parse `$ARGUMENTS` to decide which mode to run. The Monte Carlo Prevent skill defines four supported invocations:
 
-| Invocation | Mode | Workflows |
-|---|---|---|
-| _(empty)_ | default generate | W3 only |
-| `generate` | explicit generate | W3 only |
-| `run` | full validate | W4.1 (Build) → W4.2 (Execute) |
-| `run --skip-build` | execute-only | W4.2 only |
+- **_(empty)_** or **`generate`** — generate-only mode: Workflow 3 (W3) only.
+- **`run`** — full validate: Workflow 4.1 (Build), then Workflow 4.2 (Execute).
+- **`run --skip-build`** — execute-only: Workflow 4.2 only.
 
 `run` also accepts `--dev-db <NAME>` to bypass the dev-database prompt in W4.2. Flags can combine: `run --skip-build --dev-db <NAME>`.
 
