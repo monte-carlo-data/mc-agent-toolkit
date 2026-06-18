@@ -95,6 +95,8 @@ mc-agent-toolkit/
 │   │   │   ├── cache.py                 # State management (mc_prevent_* prefixed)
 │   │   │   ├── detect.py                # dbt file detection
 │   │   │   └── safe_run.py              # Error safety decorator
+│   │   ├── telemetry/lib/               # Install-beacon (copied into each editor's hooks/telemetry/lib/)
+│   │   │   └── install-beacon.sh        # One-shot "Toolkit Installed" beacon (bash)
 │   │   └── <future-skill>/lib/
 │   │       ├── protocol.py              # Separate business logic
 │   │       └── cache.py                 # Separate cache (mc_<skill>_* prefixed)
@@ -105,7 +107,8 @@ mc-agent-toolkit/
 │   │   ├── .claude-plugin/plugin.json
 │   │   ├── .mcp.json
 │   │   ├── hooks/
-│   │   │   └── prevent/                 # Adapters + lib/ (copied from plugins/shared/prevent/lib/)
+│   │   │   ├── prevent/                 # Adapters + lib/ (copied from plugins/shared/prevent/lib/)
+│   │   │   └── telemetry/               # SessionStart id-mint + install + skill-usage beacons
 │   │   ├── skills/                      # One symlink per skill → ../../../skills/<name>
 │   │   └── commands/
 │   │       ├── prevent/
@@ -147,7 +150,7 @@ mc-agent-toolkit/
 │       ├── .mcp.json
 │       ├── hooks/
 │       │   ├── prevent/                 # Adapters + lib/ (copied from plugins/shared/prevent/lib/)
-│       │   └── telemetry/               # SessionStart id-mint + skill-usage beacon
+│       │   └── telemetry/               # SessionStart id-mint + install + skill-usage beacons
 │       ├── skills/                      # One symlink per skill → ../../../skills/<name>
 │       ├── commands/
 │       └── scripts/install.sh           # cp -RL staging → cortex plugin install

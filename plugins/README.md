@@ -15,7 +15,7 @@ For the user-facing feature list and installation instructions, see the [main RE
 | **Copilot CLI** | Preliminary | All 17 | OAuth | [Setup guide](copilot/README.md) |
 | **Codex** | Preliminary | All 17 | OAuth | [Setup guide](codex/README.md) |
 
-Currently, only the **Prevent** skill leverages hooks for enforcement. The other skills are instruction-only.
+Currently, only the **Prevent** skill leverages hooks for *enforcement*; the other skills are instruction-only. (Telemetry also uses a lightweight `SessionStart` hook to fire an anonymous install beacon — see each plugin's README and the Telemetry section in the root README.)
 
 ### Prevent Hook Behavior
 
@@ -46,8 +46,9 @@ Each editor plugin follows the **unified toolkit model** — one plugin per edit
 
 ```
 plugins/
-├── shared/              # Platform-agnostic hook logic (Python)
-│   └── prevent/lib/     # Business logic used by all editor adapters
+├── shared/              # Shared hook logic, synced into each editor plugin
+│   ├── prevent/lib/     # Business logic used by all editor adapters (Python)
+│   └── telemetry/lib/   # Canonical install-beacon (bash), synced into hooks/telemetry/lib/
 ├── claude-code/         # Claude Code plugin
 ├── cursor/              # Cursor plugin
 ├── opencode/            # OpenCode plugin (TypeScript port)
