@@ -150,7 +150,7 @@ cat > "$HOOKS_FILE" << HOOKEOF
         "hooks": [
           {
             "type": "command",
-            "command": "bash $TELEMETRY_DIR/ensure-toolkit-ids.sh"
+            "command": "bash '$TELEMETRY_DIR/ensure-toolkit-ids.sh'"
           }
         ]
       }
@@ -161,7 +161,7 @@ cat > "$HOOKS_FILE" << HOOKEOF
         "hooks": [
           {
             "type": "command",
-            "command": "python3 $HOOKS_DIR/bash_hook.py"
+            "command": "python3 '$HOOKS_DIR/bash_hook.py'"
           }
         ]
       }
@@ -171,7 +171,7 @@ cat > "$HOOKS_FILE" << HOOKEOF
         "hooks": [
           {
             "type": "command",
-            "command": "python3 $HOOKS_DIR/turn_end_hook.py"
+            "command": "python3 '$HOOKS_DIR/turn_end_hook.py'"
           }
         ]
       }

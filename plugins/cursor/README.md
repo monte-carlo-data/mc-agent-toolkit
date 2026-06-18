@@ -59,5 +59,6 @@ The toolkit plugin wraps shared skills and hook logic, with each feature namespa
 - **Shared hook logic** — copied from `plugins/shared/prevent/lib/` into each plugin's `hooks/prevent/lib/` (platform-agnostic business logic)
 - **Adapter hooks** — Cursor-specific JSON parsing and output formatting under `hooks/prevent/`
 - **MCP config** — Monte Carlo MCP server connection
+- **Telemetry hook** — the install-beacon `sessionStart` is registered in `hooks/prevent/hooks.json` (Cursor loads a single manifest-referenced hooks file per plugin), while the script itself lives under `hooks/telemetry/`
 
 See the [plugins README](../README.md) for the overall plugin architecture and editor support comparison.

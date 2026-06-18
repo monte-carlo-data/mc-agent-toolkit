@@ -105,3 +105,12 @@ wait_for_log() {
   echo "$argv" | grep -q '"https://mcp.dev.getmontecarlo.com/mcp/toolkit/beacon"'
   ! echo "$argv" | grep -q '"https://mcp.getmontecarlo.com/mcp/toolkit/beacon"'
 }
+
+@test "backgrounded beacon (no MC_BEACON_SYNC) still fires" {
+  # Exercise the production default path: ( curl ... ) & disown.
+  unset MC_BEACON_SYNC
+  bash "$SCRIPT" "$IDS_DIR" "$MANIFEST" "claude-code"
+  wait_for_log
+  [ -s "$MOCK_CURL_LOG" ]
+  [ "$(jq -r '.data | fromjson | .event' "$MOCK_CURL_LOG")" = "Toolkit Installed" ]
+}

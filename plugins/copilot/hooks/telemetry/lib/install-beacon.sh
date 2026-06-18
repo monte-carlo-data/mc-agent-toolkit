@@ -24,7 +24,7 @@ fi
 IDS_DIR="${1:-}"
 PLUGIN_JSON="${2:-}"
 HARNESS="${3:-}"
-[[ -z "$IDS_DIR" || -z "$HARNESS" ]] && exit 0
+[[ -z "$IDS_DIR" || -z "$PLUGIN_JSON" || -z "$HARNESS" ]] && exit 0
 
 INSTALL_ID="$(cat "$IDS_DIR/install_id" 2>/dev/null || echo "")"
 TOOLKIT_SESSION_ID="$(cat "$IDS_DIR/toolkit_session_id" 2>/dev/null || echo "")"
