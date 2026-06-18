@@ -84,7 +84,7 @@ teardown() {
   [ "$(echo "$payload" | jq -r '.session_id')" = "$(cat "$IDS_DIR/toolkit_session_id")" ]
 }
 
-@test "second run does not fire the install beacon (install_id already exists)" {
+@test "second run does not fire the install beacon (same version)" {
   bash "$SCRIPT"
   : > "$MOCK_CURL_LOG"   # clear the first-run beacon
   run bash "$SCRIPT"
@@ -92,9 +92,9 @@ teardown() {
   [ ! -s "$MOCK_CURL_LOG" ]
 }
 
-@test "re-fires the install beacon after install_id is deleted (marker wipe)" {
+@test "re-fires the install beacon after a toolkit version change" {
   bash "$SCRIPT"
-  rm "$IDS_DIR/install_id"
+  echo "0.0.0" > "$IDS_DIR/beacon_sent_version"   # simulate an older recorded version
   : > "$MOCK_CURL_LOG"
   run bash "$SCRIPT"
   [ "$status" -eq 0 ]

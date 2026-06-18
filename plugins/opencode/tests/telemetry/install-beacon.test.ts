@@ -6,9 +6,9 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import {
   readFileSync,
+  writeFileSync,
   statSync,
   existsSync,
-  unlinkSync,
   mkdtempSync,
   rmSync,
 } from "fs";
@@ -125,16 +125,17 @@ describe("ensureToolkitIdsAndBeacon", () => {
     expect(session2).not.toBe(session1);
   });
 
-  it("second run does not fire the beacon (install_id already exists)", async () => {
+  it("second run does not fire the beacon (same version)", async () => {
     await ensureToolkitIdsAndBeacon();
     fetchCalls = [];
     await ensureToolkitIdsAndBeacon();
     expect(fetchCalls.length).toBe(0);
   });
 
-  it("re-fires the beacon after install_id is deleted (marker wipe)", async () => {
+  it("re-fires the beacon after a toolkit version change", async () => {
     await ensureToolkitIdsAndBeacon();
-    unlinkSync(installIdPath());
+    // Simulate an older recorded version so the next run sees a version change.
+    writeFileSync(join(idsDir(), "beacon_sent_version"), "0.0.0");
     fetchCalls = [];
     await ensureToolkitIdsAndBeacon();
     expect(fetchCalls.length).toBe(1);

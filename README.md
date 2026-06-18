@@ -114,7 +114,7 @@ See the [skills directory](skills/) for the full list and individual READMEs.
 
 ## Telemetry
 
-All six editor plugins send a one-shot anonymous **install beacon** at first session start — a `Toolkit Installed` event carrying an opaque per-install UUID, a per-session UUID, the toolkit version, and the editor name — so we can count installations. The Claude Code and Cortex Code plugins additionally send anonymous **skill-usage** telemetry (which skills are invoked, how often). No prompts, skill arguments, or code are ever sent, and telemetry is fail-open and non-blocking. To disable all of it, set `MC_AGENT_TOOLKIT_TELEMETRY_DISABLED=1`. See each plugin's README (e.g. [Claude Code](plugins/claude-code/README.md#telemetry), [Cortex Code](plugins/cortex-code/README.md#telemetry)) for details.
+All six editor plugins send an anonymous **install beacon** — a `Toolkit Installed` event carrying an opaque per-install UUID, a per-session UUID, the toolkit version, and the editor name — once per machine per toolkit version (first install and after each upgrade), so we can count installations and version adoption. The Claude Code and Cortex Code plugins additionally send anonymous **skill-usage** telemetry (which skills are invoked, how often). No prompts, skill arguments, or code are ever sent, and telemetry is fail-open and non-blocking. To disable all of it, set `MC_AGENT_TOOLKIT_TELEMETRY_DISABLED=1`. See each plugin's README (e.g. [Claude Code](plugins/claude-code/README.md#telemetry), [Cortex Code](plugins/cortex-code/README.md#telemetry)) for details.
 
 ## Contributing
 

@@ -108,7 +108,7 @@ plugins/copilot/
 
 ## Telemetry
 
-The toolkit sends a single anonymous install beacon the first time you start Copilot CLI after installing — a one-shot `Toolkit Installed` event so we can count installations. It includes an opaque per-install UUID, a per-session UUID, the toolkit version, and the editor it runs in (`copilot`). No prompts, arguments, skill names, or code are ever sent. It fires at most once per machine (deduped by a local marker), and is fail-open and non-blocking — it never delays or interrupts your session. The session-start hook is registered at the user level (`~/.copilot/hooks/`) so the install is counted once per machine, not once per repo.
+The toolkit sends an anonymous install beacon — a `Toolkit Installed` event so we can count installations and version adoption. It includes an opaque per-install UUID, a per-session UUID, the toolkit version, and the editor it runs in (`copilot`). No prompts, arguments, skill names, or code are ever sent. It fires once per machine per toolkit version — the first time you start Copilot CLI after installing, and again after each upgrade (deduped by a local marker) — and is fail-open and non-blocking, never delaying or interrupting your session. The session-start hook is registered at the user level (`~/.copilot/hooks/`) so the install is counted once per machine, not once per repo.
 
 To opt out, set `MC_AGENT_TOOLKIT_TELEMETRY_DISABLED=1` in your shell environment before starting Copilot CLI. The toolkit will not phone home.
 

@@ -114,3 +114,19 @@ wait_for_log() {
   [ -s "$MOCK_CURL_LOG" ]
   [ "$(jq -r '.data | fromjson | .event' "$MOCK_CURL_LOG")" = "Toolkit Installed" ]
 }
+
+@test "does not fire when beacon_sent_version matches the current version" {
+  echo "$(jq -r '.version' "$MANIFEST")" > "$IDS_DIR/beacon_sent_version"
+  run bash "$SCRIPT" "$IDS_DIR" "$MANIFEST" "codex"
+  [ "$status" -eq 0 ]
+  [ ! -s "$MOCK_CURL_LOG" ]
+}
+
+@test "re-fires and updates the marker when beacon_sent_version differs" {
+  echo "0.0.0" > "$IDS_DIR/beacon_sent_version"
+  bash "$SCRIPT" "$IDS_DIR" "$MANIFEST" "codex"
+  wait_for_log
+  [ -s "$MOCK_CURL_LOG" ]
+  [ "$(jq -r '.data | fromjson | .event' "$MOCK_CURL_LOG")" = "Toolkit Installed" ]
+  [ "$(cat "$IDS_DIR/beacon_sent_version")" = "$(jq -r '.version' "$MANIFEST")" ]
+}

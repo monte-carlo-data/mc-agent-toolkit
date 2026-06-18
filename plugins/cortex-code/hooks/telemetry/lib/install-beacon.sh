@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Fire a one-shot "Toolkit Installed" beacon at first-ever session start.
+# Fire a "Toolkit Installed" beacon once per (machine+editor, toolkit version).
 #
 # Editor-agnostic: the caller (each editor's ensure-toolkit-ids.sh) passes the
 # editor's id directory, plugin manifest path, and harness name, so this single
@@ -7,9 +7,11 @@
 # (plugins/shared/telemetry/lib/ -> plugins/<editor>/hooks/telemetry/lib/ via
 # `./scripts/bump-version.sh --sync-only`). Edit it here, never in the copies.
 #
-# Dedup is the caller's job: it invokes this only on the first run that creates
-# install_id (the persistent per-machine+editor marker). The sink also dedups on
-# install_id as a backstop in case the marker is wiped and the beacon re-fires.
+# Dedup lives here, keyed on a per-editor `beacon_sent_version` marker that records
+# the toolkit version the beacon last fired for. The beacon fires on first install
+# AND whenever the version changes (install -> upgrade), then updates the marker.
+# Callers invoke this every session start; it self-dedups. The sink also dedups on
+# (install_id, toolkit_version) as a backstop if the marker is lost.
 #
 # Usage: install-beacon.sh <ids_dir> <plugin_manifest_json> <harness>
 #
@@ -32,11 +34,24 @@ TOOLKIT_SESSION_ID="$(cat "$IDS_DIR/toolkit_session_id" 2>/dev/null || echo "")"
 # Don't send null/empty IDs — the sink requires valid v4 UUIDs for both.
 [[ -z "$INSTALL_ID" || -z "$TOOLKIT_SESSION_ID" ]] && exit 0
 
+TOOLKIT_VERSION="$(jq -r '.version // "unknown"' "$PLUGIN_JSON" 2>/dev/null || echo "unknown")"
+
+# Dedup: fire once per (install, version). The marker records the version we last
+# beaconed for; re-fire only when it differs from the current version (first run,
+# or any upgrade/downgrade). Same version → nothing to do.
+SENT_MARKER="$IDS_DIR/beacon_sent_version"
+SENT_VERSION="$(cat "$SENT_MARKER" 2>/dev/null || echo "")"
+[[ "$TOOLKIT_VERSION" == "$SENT_VERSION" ]] && exit 0
+
+# Record this version as beaconed BEFORE firing, so a rapid second session in the
+# same version doesn't double-fire. Best-effort; if it fails, the sink's
+# (install_id, toolkit_version) dedup is the backstop.
+printf '%s' "$TOOLKIT_VERSION" > "$SENT_MARKER" 2>/dev/null || true
+chmod 600 "$SENT_MARKER" 2>/dev/null || true
+
 # Beacon URL defaults to prod; MC engineers can override to dev for verification
 # work (e.g. against mcp.dev.getmontecarlo.com before promoting an endpoint change).
 BEACON_URL="${MCD_TOOLKIT_BEACON_URL:-https://mcp.getmontecarlo.com/mcp/toolkit/beacon}"
-
-TOOLKIT_VERSION="$(jq -r '.version // "unknown"' "$PLUGIN_JSON" 2>/dev/null || echo "unknown")"
 
 # harness identifies the editor this install runs under, so the sink can tell a
 # Cortex Code install apart from a Claude Code one (each has its own install_id).

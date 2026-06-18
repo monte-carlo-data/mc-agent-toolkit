@@ -3,8 +3,9 @@
  *
  * OpenCode has no bash/Python hook layer, so this is the TypeScript equivalent of
  * the other editors' ensure-toolkit-ids.sh + shared install-beacon.sh: it persists
- * a per-machine install_id (the dedup marker) plus a rotating toolkit_session_id,
- * and on the first-ever run fires a single "Toolkit Installed" beacon. The payload
+ * a per-machine install_id plus a rotating toolkit_session_id, and fires a "Toolkit
+ * Installed" beacon once per (machine+editor, toolkit version) — on first install
+ * and on every version change — deduped by a beacon_sent_version marker. The payload
  * shape matches the bash beacon exactly (a cross-harness parity test guards this).
  *
  * Fail-open and non-blocking: every path swallows errors, the POST is detached with
@@ -90,9 +91,10 @@ async function postInstallBeacon(installId: string, sessionId: string): Promise<
 }
 
 /**
- * Ensure a stable install_id and a fresh toolkit_session_id, and fire the one-shot
- * install beacon on the first-ever run (when install_id is created). Awaitable for
- * tests; callers fire it detached so it never blocks session start.
+ * Ensure a stable install_id and a fresh toolkit_session_id, and fire the install
+ * beacon once per (machine+editor, toolkit version) — first install and every
+ * version change, deduped by a beacon_sent_version marker. Awaitable for tests;
+ * callers fire it detached so it never blocks session start.
  */
 export async function ensureToolkitIdsAndBeacon(): Promise<void> {
   if (process.env.MC_AGENT_TOOLKIT_TELEMETRY_DISABLED === "1") return;
@@ -108,7 +110,6 @@ export async function ensureToolkitIdsAndBeacon(): Promise<void> {
     const installPath = join(dir, "install_id");
     const sessionPath = join(dir, "toolkit_session_id");
 
-    let installIdCreated = false;
     let installId = readId(installPath);
     if (!installId) {
       installId = randomUUID();
@@ -118,7 +119,6 @@ export async function ensureToolkitIdsAndBeacon(): Promise<void> {
       } catch {
         // best-effort
       }
-      installIdCreated = true;
     }
 
     // Rotate the session id every session.
@@ -130,10 +130,21 @@ export async function ensureToolkitIdsAndBeacon(): Promise<void> {
       // best-effort
     }
 
-    // Dedup: only beacon on the first-ever creation of install_id. The sink also
-    // dedups on install_id as a backstop if the marker is wiped and this re-fires.
-    if (!installIdCreated) return;
     if (!installId || !sessionId) return; // never send empty/null ids
+
+    // Dedup: fire once per (install, version). The marker records the version we
+    // last beaconed for; re-fire only when it differs from the current version
+    // (first run, or any upgrade/downgrade). The sink also dedups on
+    // (install_id, toolkit_version) as a backstop if the marker is lost.
+    const version = toolkitVersion();
+    const sentPath = join(dir, "beacon_sent_version");
+    if (readId(sentPath) === version) return;
+    writeFileSync(sentPath, version, { mode: 0o600 });
+    try {
+      chmodSync(sentPath, 0o600);
+    } catch {
+      // best-effort
+    }
 
     await postInstallBeacon(installId, sessionId);
   } catch {

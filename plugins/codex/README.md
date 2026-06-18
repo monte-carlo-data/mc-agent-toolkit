@@ -65,7 +65,7 @@ The skill-based impact assessment (via `SKILL.md`) works reliably regardless of 
 
 ## Telemetry
 
-The toolkit sends a single anonymous install beacon the first time you start Codex after installing — a one-shot `Toolkit Installed` event so we can count installations. It includes an opaque per-install UUID, a per-session UUID, the toolkit version, and the editor it runs in (`codex`). No prompts, arguments, skill names, or code are ever sent. It fires at most once per machine (deduped by a local marker), and is fail-open and non-blocking — it never delays or interrupts your session.
+The toolkit sends an anonymous install beacon — a `Toolkit Installed` event so we can count installations and version adoption. It includes an opaque per-install UUID, a per-session UUID, the toolkit version, and the editor it runs in (`codex`). No prompts, arguments, skill names, or code are ever sent. It fires once per machine per toolkit version — the first time you start Codex after installing, and again after each upgrade (deduped by a local marker) — and is fail-open and non-blocking, never delaying or interrupting your session.
 
 To opt out, set `MC_AGENT_TOOLKIT_TELEMETRY_DISABLED=1` in your shell environment before starting Codex. The toolkit will not phone home.
 
