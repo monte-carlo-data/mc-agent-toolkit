@@ -37,7 +37,7 @@ You should see `mc-agent-toolkit` listed as `[enabled, managed]` with command, s
 
 The toolkit sends anonymous skill-usage telemetry by default — which skills are invoked, how often. Each event includes an opaque per-install UUID, a per-session UUID, the skill name, the toolkit version, and the editor it runs in (`cortex-code`). No prompts, arguments, or code are ever sent.
 
-It also sends a `Toolkit Installed` beacon once per toolkit version — the first time you start Cortex Code after installing, and again after each upgrade — deduped by a local marker, independent of whether you ever run a skill. It carries the install/session UUIDs, toolkit version, and editor (`cortex-code`) — no skill field. Like the skill beacon, it is fail-open and non-blocking.
+It also sends a `Toolkit Installed` beacon once per toolkit version — the first time you start Cortex Code after installing, and again after each version change — deduped by a local marker, independent of whether you ever run a skill. It carries the install/session UUIDs, toolkit version, and editor (`cortex-code`) — no skill field. Like the skill beacon, it is fail-open and non-blocking.
 
 To opt out, set `MC_AGENT_TOOLKIT_TELEMETRY_DISABLED=1` in your shell environment before starting Cortex Code. The toolkit will not phone home.
 

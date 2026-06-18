@@ -130,3 +130,10 @@ wait_for_log() {
   [ "$(jq -r '.data | fromjson | .event' "$MOCK_CURL_LOG")" = "Toolkit Installed" ]
   [ "$(cat "$IDS_DIR/beacon_sent_version")" = "$(jq -r '.version' "$MANIFEST")" ]
 }
+
+@test "does not fire (or write marker) when the toolkit version is unknown" {
+  run bash "$SCRIPT" "$IDS_DIR" "/nonexistent/plugin.json" "cortex-code"
+  [ "$status" -eq 0 ]
+  [ ! -s "$MOCK_CURL_LOG" ]
+  [ ! -f "$IDS_DIR/beacon_sent_version" ]
+}

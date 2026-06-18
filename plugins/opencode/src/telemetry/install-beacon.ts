@@ -137,6 +137,9 @@ export async function ensureToolkitIdsAndBeacon(): Promise<void> {
     // (first run, or any upgrade/downgrade). The sink also dedups on
     // (install_id, toolkit_version) as a backstop if the marker is lost.
     const version = toolkitVersion();
+    // If the version can't be resolved, skip — don't send a junk "unknown" beacon
+    // or write the marker; retry next session once a real version is available.
+    if (version === "unknown") return;
     const sentPath = join(dir, "beacon_sent_version");
     if (readId(sentPath) === version) return;
     writeFileSync(sentPath, version, { mode: 0o600 });

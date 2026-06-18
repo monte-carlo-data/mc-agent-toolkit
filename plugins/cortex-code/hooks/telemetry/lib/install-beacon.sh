@@ -36,6 +36,11 @@ TOOLKIT_SESSION_ID="$(cat "$IDS_DIR/toolkit_session_id" 2>/dev/null || echo "")"
 
 TOOLKIT_VERSION="$(jq -r '.version // "unknown"' "$PLUGIN_JSON" 2>/dev/null || echo "unknown")"
 
+# If the version can't be resolved (no jq, unreadable/`.version`-less manifest),
+# skip entirely: don't send a junk "unknown" beacon and don't write the marker —
+# just retry next session once a real version is available.
+[[ "$TOOLKIT_VERSION" == "unknown" ]] && exit 0
+
 # Dedup: fire once per (install, version). The marker records the version we last
 # beaconed for; re-fire only when it differs from the current version (first run,
 # or any upgrade/downgrade). Same version → nothing to do.
