@@ -5,6 +5,10 @@ on:
   push:
     branches: [main]
 
+# Minimal default token scope — these jobs only check out and diff files.
+permissions:
+  contents: read
+
 jobs:
   no-symlinks-under-hooks:
     name: No symlinks under plugins/<editor>/hooks/
