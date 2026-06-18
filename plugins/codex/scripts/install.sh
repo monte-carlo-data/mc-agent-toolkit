@@ -101,7 +101,7 @@ done
 # --- Clean up dev artifacts ---
 find "$TARGET" -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
 find "$TARGET" -name "*.pyc" -delete 2>/dev/null || true
-rm -rf "$TARGET/hooks/prevent/lib/tests"
+rm -rf "$TARGET/hooks/prevent/lib/tests" "$TARGET/hooks/telemetry/tests"
 
 echo "  Plugin files installed."
 
@@ -134,14 +134,27 @@ done
 echo "[3/7] Registering hooks in .codex/hooks.json (project-level)..."
 
 HOOKS_DIR="$TARGET/hooks/prevent"
+TELEMETRY_DIR="$TARGET/hooks/telemetry/scripts"
 
 mkdir -p "$(dirname "$HOOKS_FILE")"
 
-# Note: Codex currently only emits PreToolUse/PostToolUse for the Bash tool.
-# Edit|Write matchers are omitted until Codex expands tool coverage.
+# SessionStart fires on every session (startup/resume/clear/compact) — no matcher,
+# since the install_id marker dedups the one-shot "Toolkit Installed" beacon to
+# once per machine+editor. Note: Codex currently only emits PreToolUse/PostToolUse
+# for the Bash tool; Edit|Write matchers are omitted until Codex expands tool coverage.
 cat > "$HOOKS_FILE" << HOOKEOF
 {
   "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash $TELEMETRY_DIR/ensure-toolkit-ids.sh"
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "Bash",
