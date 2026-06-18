@@ -72,6 +72,42 @@ cp "$SCRIPT_DIR/mc-prevent.json" "$HOOKS_DEST/"
 
 echo "  ✓ Hook registration copied to .github/hooks/mc-prevent.json"
 
+# --- 4. User-global session-start telemetry hook (install beacon) ---
+# Unlike the project-level Prevent hooks above, the install beacon is registered
+# at the user level (~/.copilot/hooks/) so the toolkit installation is counted
+# once per machine, regardless of which repo a session runs in. Fail-open: the
+# beacon never blocks a session and the marker dedups it to one POST per machine.
+COPILOT_HOME_DIR="${COPILOT_HOME:-$HOME/.copilot}"
+COPILOT_HOOKS_DIR="$COPILOT_HOME_DIR/hooks"
+TELEMETRY_DEST="$COPILOT_HOOKS_DIR/mc-agent-toolkit"
+
+mkdir -p "$TELEMETRY_DEST/hooks"
+# Copy the telemetry tree (scripts + synced lib) and the manifest, preserving the
+# layout so ensure-toolkit-ids.sh resolves ../../../plugin.json for the version.
+rm -rf "$TELEMETRY_DEST/hooks/telemetry"
+cp -R "$PLUGIN_DIR/hooks/telemetry" "$TELEMETRY_DEST/hooks/"
+cp "$PLUGIN_DIR/plugin.json" "$TELEMETRY_DEST/plugin.json"
+rm -rf "$TELEMETRY_DEST/hooks/telemetry/tests"
+ENSURE_IDS="$TELEMETRY_DEST/hooks/telemetry/scripts/ensure-toolkit-ids.sh"
+chmod +x "$ENSURE_IDS"
+
+cat > "$COPILOT_HOOKS_DIR/mc-agent-toolkit-telemetry.json" << EOF
+{
+    "version": 1,
+    "hooks": {
+        "sessionStart": [
+            {
+                "type": "command",
+                "bash": "bash '$ENSURE_IDS'",
+                "timeoutSec": 5
+            }
+        ]
+    }
+}
+EOF
+
+echo "  ✓ Session-start telemetry hook registered at $COPILOT_HOOKS_DIR/mc-agent-toolkit-telemetry.json"
+
 # --- Done ---
 
 echo ""
