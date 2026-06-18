@@ -16,9 +16,10 @@ TARGET_DIR="$(cd "$TARGET_DIR" && pwd)"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-REPO_ROOT="$(cd "$PLUGIN_DIR/../.." && pwd)"
 HOOKS_SRC="$PLUGIN_DIR/hooks/prevent"
-LIB_SRC="$REPO_ROOT/hooks/prevent/lib"
+# Plugin-local synced copy of the shared lib (kept in sync from plugins/shared/prevent/lib
+# by bump-version.sh), consistent with HOOKS_SRC above.
+LIB_SRC="$PLUGIN_DIR/hooks/prevent/lib"
 
 # --- Preflight checks ---
 
