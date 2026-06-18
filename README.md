@@ -74,7 +74,7 @@ Skills are grouped by the job they help you do. Orchestrated workflows sequence 
 
 See the [Claude Code plugin README](plugins/claude-code/README.md) for detailed setup and usage.
 
-For other coding agents (Cursor, Copilot CLI, OpenCode, Codex), see the [plugins page](plugins/) for installation guides.
+For other coding agents (Cursor, Copilot CLI, OpenCode, Codex, Cortex Code), see the [plugins page](plugins/) for installation guides.
 
 ## Using skills directly (advanced)
 
@@ -114,7 +114,7 @@ See the [skills directory](skills/) for the full list and individual READMEs.
 
 ## Telemetry
 
-The Claude Code plugin sends anonymous skill-usage telemetry. No prompts or skill arguments are sent. To disable, set `MC_AGENT_TOOLKIT_TELEMETRY_DISABLED=1`. See [the plugin README](plugins/claude-code/README.md#telemetry) for details.
+The Claude Code and Cortex Code plugins send anonymous skill-usage telemetry. No prompts or skill arguments are sent. To disable, set `MC_AGENT_TOOLKIT_TELEMETRY_DISABLED=1`. See the [Claude Code](plugins/claude-code/README.md#telemetry) or [Cortex Code](plugins/cortex-code/README.md#telemetry) plugin README for details.
 
 ## Contributing
 

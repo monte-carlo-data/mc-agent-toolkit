@@ -61,8 +61,21 @@ def _validate_session_id(session_id: str) -> str:
     return session_id
 
 
+def _safe_table_component(table_name: str) -> str:
+    """Neutralize anything in a table name that could traverse out of CACHE_DIR
+    when embedded in a temp filename.
+
+    dbt names are normally [A-Za-z0-9_]; the 'macro:' prefix keeps its colon.
+    Path separators and other unexpected characters become '_', and any '..'
+    sequence is collapsed so the name can never escape CACHE_DIR. A no-op for
+    ordinary table names.
+    """
+    cleaned = re.sub(r"[^A-Za-z0-9_.:-]", "_", table_name)
+    return re.sub(r"\.\.+", "_", cleaned)
+
+
 def _w4_path(session_id: str, table_name: str) -> str:
-    return os.path.join(CACHE_DIR, f"{IC_PREFIX}{_validate_session_id(session_id)}_{table_name}")
+    return os.path.join(CACHE_DIR, f"{IC_PREFIX}{_validate_session_id(session_id)}_{_safe_table_component(table_name)}")
 
 
 def _turn_path(session_id: str) -> str:
@@ -119,7 +132,7 @@ def get_impact_check_age_seconds(session_id: str, table_name: str) -> float:
 # --- Monitor coverage gap marker ---
 
 def _mg_path(session_id: str, table_name: str) -> str:
-    return os.path.join(CACHE_DIR, f"{MG_PREFIX}{_validate_session_id(session_id)}_{table_name}")
+    return os.path.join(CACHE_DIR, f"{MG_PREFIX}{_validate_session_id(session_id)}_{_safe_table_component(table_name)}")
 
 
 def has_monitor_gap(session_id: str, table_name: str) -> bool:

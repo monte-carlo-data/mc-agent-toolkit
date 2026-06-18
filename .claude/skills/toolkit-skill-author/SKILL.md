@@ -163,7 +163,7 @@ Both phases converge here.
    ```bash
    !./scripts/bump-version.sh <level>
    ```
-   The script opens `$EDITOR` for the changelog, then updates all 5 plugin configs and all 5 `CHANGELOG.md` files.
+   The script opens `$EDITOR` for the changelog, then updates all 6 plugin configs and all 6 `CHANGELOG.md` files.
 
 ## Done
 

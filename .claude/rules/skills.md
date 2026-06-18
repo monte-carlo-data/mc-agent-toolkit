@@ -60,6 +60,7 @@ Every skill in `skills/` must have a corresponding symlink in **every** editor p
 - `plugins/codex/skills/<name> → ../../../skills/<name>`
 - `plugins/copilot/skills/<name> → ../../../skills/<name>`
 - `plugins/opencode/skills/<name> → ../../../skills/<name>`
+- `plugins/cortex-code/skills/<name> → ../../../skills/<name>`
 
 Without these symlinks, the skill won't be discovered by the editor plugin — even if it exists in `skills/` and is listed in the READMEs.
 

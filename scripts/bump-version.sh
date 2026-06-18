@@ -2,7 +2,7 @@
 #
 # bump-version.sh — Bump versions and update changelogs across all plugins.
 #
-# Run this on your feature branch before committing. It updates all 5 plugin
+# Run this on your feature branch before committing. It updates all 6 plugin
 # config files and changelogs in one step. Commit the result as part of your PR.
 #
 # Usage:
@@ -37,6 +37,7 @@ VERSION_FILES=(
   "plugins/copilot/plugin.json"
   "plugins/codex/.codex-plugin/plugin.json"
   "plugins/opencode/package.json"
+  "plugins/cortex-code/.cortex-plugin/plugin.json"
 )
 
 CHANGELOG_FILES=(
@@ -45,6 +46,7 @@ CHANGELOG_FILES=(
   "plugins/copilot/CHANGELOG.md"
   "plugins/codex/CHANGELOG.md"
   "plugins/opencode/CHANGELOG.md"
+  "plugins/cortex-code/CHANGELOG.md"
 )
 
 # ── Defaults ────────────────────────────────────────────────────────────────
@@ -75,7 +77,9 @@ done
 # standalone op via --sync-only.
 sync_shared_lib() {
   local SHARED_LIB_DIR="$REPO_ROOT/plugins/shared/prevent/lib"
-  local EDITOR_PLUGINS=(claude-code cursor copilot codex)
+  # opencode is intentionally excluded — it ports the prevent logic to TypeScript
+  # (plugins/opencode/src/prevent/) rather than copying the Python lib.
+  local EDITOR_PLUGINS=(claude-code cursor copilot codex cortex-code)
   echo ""
   if [[ ! -d "$SHARED_LIB_DIR" ]]; then
     echo "Warning: $SHARED_LIB_DIR does not exist; skipping shared lib sync."

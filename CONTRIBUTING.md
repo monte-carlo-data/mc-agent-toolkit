@@ -40,8 +40,20 @@ mc-agent-toolkit/
 │   │   ├── skills/prevent → symlink
 │   │   └── opencode.json
 │   │
-│   └── codex/                           # Unified mc-agent-toolkit plugin
-│       └── skills/prevent → symlink
+│   ├── copilot/                         # Unified mc-agent-toolkit plugin
+│   │   ├── hooks/prevent/              # Hook adapters (thin, call shared lib)
+│   │   ├── skills/prevent → symlink
+│   │   └── .mcp.json
+│   │
+│   ├── codex/                           # Unified mc-agent-toolkit plugin
+│   │   └── skills/prevent → symlink
+│   │
+│   └── cortex-code/                     # Snowflake Cortex Code — wraps Claude Code (6th editor)
+│       ├── .cortex-plugin/plugin.json
+│       ├── hooks/prevent/              # Hook adapters (thin, call shared lib)
+│       ├── hooks/telemetry/           # SessionStart id-mint + skill-usage beacon
+│       ├── skills/ (17 skills → symlinks)
+│       └── commands/ (prevent/, push-ingestion/, catalog/, monitoring-advisor/, …)
 │
 ├── .claude-plugin/marketplace.json
 ├── .cursor-plugin/marketplace.json
@@ -179,7 +191,7 @@ Setup and agent-routing skills are exempt from this rule. Setup skills are invok
 ## Updating an existing skill
 
 1. Edit files directly under `skills/<skill-name>/`. The corresponding plugin picks up changes automatically via the symlink — no additional steps needed.
-2. If the change is user-facing, bump the version: `./scripts/bump-version.sh patch` (or `minor`/`major` — see [Version bumping](#version-bumping)). This updates all 5 plugin config files in sync. Claude Code uses the version field to determine whether to update an installed plugin.
+2. If the change is user-facing, bump the version: `./scripts/bump-version.sh patch` (or `minor`/`major` — see [Version bumping](#version-bumping)). This updates all 6 plugin config files in sync. Claude Code uses the version field to determine whether to update an installed plugin.
 
 ## Fixing a bug
 
@@ -204,11 +216,11 @@ Setup and agent-routing skills are exempt from this rule. Setup skills are invok
 
 ## Releasing
 
-Version is tracked in code (the 5 plugin config files). Bump it as part of your feature PR — no separate release step needed. When the version change merges to `main`, a GitHub Actions workflow automatically creates the corresponding git tag and GitHub Release.
+Version is tracked in code (the 6 plugin config files). Bump it as part of your feature PR — no separate release step needed. When the version change merges to `main`, a GitHub Actions workflow automatically creates the corresponding git tag and GitHub Release.
 
 ### Bump the version
 
-Use the convenience script to update all 5 plugin config files and changelogs in one step:
+Use the convenience script to update all 6 plugin config files and changelogs in one step:
 
 ```bash
 # Bump patch version (1.0.0 → 1.0.1)
@@ -228,8 +240,8 @@ The script:
 1. Reads the current version from `plugins/claude-code/.claude-plugin/plugin.json`
 2. Computes the next version based on the bump type
 3. Opens `$EDITOR` with a changelog template pre-filled with commits since the last tag
-4. Updates `"version"` in all 5 plugin config files
-5. Prepends the changelog entry to all 5 `CHANGELOG.md` files
+4. Updates `"version"` in all 6 plugin config files
+5. Prepends the changelog entry to all 6 `CHANGELOG.md` files
 
 Commit the resulting changes as part of your PR.
 
@@ -263,3 +275,7 @@ For skills that need hooks, follow the two-layer pattern:
 2. **Editor adapters** (`plugins/<editor>/hooks/<skill>/`): Thin scripts that read editor-specific JSON, call shared logic, and format output.
 
 OpenCode is an exception — it ports hook logic to TypeScript since the `@opencode-ai/plugin` SDK requires it. See `plugins/opencode/src/prevent/` for a complete example.
+
+If a harness exposes the session transcript in a format the line-based marker scanner can't read, add a reader to the shared lib rather than special-casing the adapter. **Cortex Code** is the worked example: its hook `transcript_path` is a metadata file with the messages in a sibling `<id>.history.jsonl`, so `plugins/shared/prevent/lib/protocol.py` provides `scan_history_jsonl_for_markers` (selected via `HookInput.transcript_format`) and the Cortex `pre_edit_hook.py` rewrites the path to that sibling. **Invariant:** prevent deny reasons must never contain a string the marker scanner would match — a harness that persists hook output back into the scanned transcript would otherwise let the impact-check gate unlock itself.
+
+**Cortex command bodies must not contain a `---` sequence** — Cortex truncates an injected slash-command body at the first `---`, silently dropping everything after it. A Markdown table's separator row (`|---|---|`) is the usual offender, so use bulleted lists instead of tables in `plugins/cortex-code/commands/*.md`. (Other harnesses tolerate tables; this constraint is Cortex-specific.)

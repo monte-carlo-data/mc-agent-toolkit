@@ -32,7 +32,8 @@ class HookInput:
     """Platform-agnostic hook input."""
 
     __slots__ = ("session_id", "file_path", "command", "transcript_path",
-                 "cwd", "tool_name", "stop_hook_active", "validate_command")
+                 "cwd", "tool_name", "stop_hook_active", "validate_command",
+                 "transcript_format")
 
     def __init__(
         self,
@@ -44,6 +45,7 @@ class HookInput:
         tool_name: str | None = None,
         stop_hook_active: bool = False,
         validate_command: str = "/mc-validate",
+        transcript_format: str = "raw",
     ):
         self.session_id = session_id
         self.file_path = file_path
@@ -53,6 +55,10 @@ class HookInput:
         self.tool_name = tool_name
         self.stop_hook_active = stop_hook_active
         self.validate_command = validate_command
+        # Transcript layout this adapter produced: "raw" (line-scannable text,
+        # the default for Claude Code/Cursor/Copilot/Codex) or "messages_jsonl"
+        # (Cortex `.history.jsonl`, where only assistant text blocks are scanned).
+        self.transcript_format = transcript_format
 
 
 class HookOutput:
@@ -76,24 +82,124 @@ class HookOutput:
 GRACE_PERIOD_SECONDS = 120
 
 
-def scan_transcript_for_markers(transcript_path: str, table_name: str) -> dict:
-    """Scan transcript for MC_IMPACT_CHECK_COMPLETE and MC_MONITOR_GAP markers."""
-    # Match the table name with an optional MCON-style prefix (e.g. "analytics:prod.client_hub")
-    # so markers work even if the model emits a fully qualified name instead of just "client_hub"
+def _compile_marker_patterns(table_name: str):
+    """Compile the impact-check and monitor-gap regexes for a table.
+
+    Matches the table name with an optional MCON-style prefix (e.g.
+    "analytics:prod.client_hub") so markers work even if the model emits a fully
+    qualified name instead of just "client_hub".
+    """
     esc = re.escape(table_name)
-    ic_pattern = re.compile(rf"MC_IMPACT_CHECK_COMPLETE:\s+(?:\S+\.)?{esc}\b")
-    mg_pattern = re.compile(rf"MC_MONITOR_GAP:\s+(?:\S+\.)?{esc}\b")
+    return (
+        re.compile(rf"MC_IMPACT_CHECK_COMPLETE:\s+(?:\S+\.)?{esc}\b"),
+        re.compile(rf"MC_MONITOR_GAP:\s+(?:\S+\.)?{esc}\b"),
+    )
+
+
+def _match_markers_in_lines(lines, table_name: str) -> dict:
+    """Run the marker regexes over an iterable of text lines/blocks."""
+    ic_pattern, mg_pattern = _compile_marker_patterns(table_name)
     found = {"impact_check": False, "monitor_gap": False}
+    for line in lines:
+        if ic_pattern.search(line):
+            found["impact_check"] = True
+        if mg_pattern.search(line):
+            found["monitor_gap"] = True
+    return found
+
+
+def scan_transcript_for_markers(transcript_path: str, table_name: str) -> dict:
+    """Scan a plain-text / JSONL transcript line-by-line for prevent markers.
+
+    Used by Claude Code, Cursor, Copilot, and Codex, whose transcripts can be
+    scanned as raw text. Cortex uses scan_history_jsonl_for_markers instead.
+    """
     try:
         with open(transcript_path, "r", encoding="utf-8") as f:
-            for line in f:
-                if ic_pattern.search(line):
-                    found["impact_check"] = True
-                if mg_pattern.search(line):
-                    found["monitor_gap"] = True
+            return _match_markers_in_lines(f, table_name)
+    except (OSError, UnicodeDecodeError):
+        return {"impact_check": False, "monitor_gap": False}
+
+
+def _iter_assistant_text(content) -> list[str]:
+    """Return text from assistant content blocks of type 'text'.
+
+    Defensive against shape drift: tolerates a plain string, a list of blocks,
+    or malformed entries (which are skipped).
+    """
+    if isinstance(content, str):
+        return [content]
+    if not isinstance(content, list):
+        return []
+    texts = []
+    for block in content:
+        if isinstance(block, dict) and block.get("type") == "text":
+            text = block.get("text")
+            if isinstance(text, str):
+                texts.append(text)
+    return texts
+
+
+def scan_history_jsonl_for_markers(history_path: str, table_name: str) -> dict:
+    """Scan a Cortex `<id>.history.jsonl` transcript for prevent markers.
+
+    Only assistant-authored text blocks are scanned. Cortex persists hook output
+    — including this gate's own deny reason — back into the transcript as a
+    tool_result delivered under role "user". Scanning only assistant text ensures
+    nothing but the model's own emitted marker can unlock the gate.
+
+    Each line is an Anthropic Messages-style object:
+        {"role": "assistant", "content": [{"type": "text", "text": "..."}, ...]}
+    Malformed (non-JSON) lines are skipped, and undecodable bytes are replaced
+    (errors="replace") so a stray non-UTF-8 byte doesn't abort the whole scan and
+    miss a genuine marker. Worst case the scan finds no marker and the gate stays
+    denied (fail closed) rather than raising into the adapter's safe_run (which
+    would exit 0 and let the edit through).
+    """
+    found = {"impact_check": False, "monitor_gap": False}
+    ic_pattern, mg_pattern = _compile_marker_patterns(table_name)
+    try:
+        with open(history_path, "r", encoding="utf-8", errors="replace") as f:
+            for raw in f:
+                raw = raw.strip()
+                if not raw:
+                    continue
+                try:
+                    msg = json.loads(raw)
+                except (json.JSONDecodeError, ValueError):
+                    continue
+                if not isinstance(msg, dict) or msg.get("role") != "assistant":
+                    continue
+                for text in _iter_assistant_text(msg.get("content")):
+                    if ic_pattern.search(text):
+                        found["impact_check"] = True
+                    if mg_pattern.search(text):
+                        found["monitor_gap"] = True
     except (OSError, UnicodeDecodeError):
         pass
     return found
+
+
+def _scan_markers(inp: "HookInput", table_name: str) -> dict:
+    """Dispatch to the right transcript scanner for the harness's format.
+
+    Adapters that store messages in an Anthropic Messages-style `.history.jsonl`
+    (Cortex) set inp.transcript_format == "messages_jsonl" and point
+    transcript_path at that sibling file. "raw" (the default) uses the raw-line
+    scan. An unrecognized format (e.g. a future adapter's typo) deliberately
+    returns no markers so the gate stays denied — failing CLOSED rather than
+    silently scanning with the wrong reader (which would drop the assistant-text
+    protection) or raising (which fails OPEN, since the adapter's safe_run exits 0).
+    """
+    no_markers = {"impact_check": False, "monitor_gap": False}
+    path = inp.transcript_path or ""
+    if not path:
+        return no_markers
+    if inp.transcript_format == "messages_jsonl":
+        return scan_history_jsonl_for_markers(path, table_name)
+    if inp.transcript_format == "raw":
+        return scan_transcript_for_markers(path, table_name)
+    return no_markers  # unknown format → fail closed
 
 
 def _get_staged_model_tables(cwd: str) -> list[str]:
@@ -148,8 +254,7 @@ def evaluate_pre_edit(inp: HookInput) -> HookOutput:
         return HookOutput()
 
     if state == "injected":
-        transcript_path = inp.transcript_path or ""
-        markers = scan_transcript_for_markers(transcript_path, table_name)
+        markers = _scan_markers(inp, table_name)
         if markers["monitor_gap"] and not has_monitor_gap(session_id, table_name):
             mark_monitor_gap(session_id, table_name)
         if markers["impact_check"]:
@@ -166,23 +271,27 @@ def evaluate_pre_edit(inp: HookInput) -> HookOutput:
         # Grace period expired and no marker — re-inject full instruction below
 
     elif state is None:
-        transcript_path = inp.transcript_path or ""
-        if transcript_path:
-            markers = scan_transcript_for_markers(transcript_path, table_name)
-            if markers["monitor_gap"] and not has_monitor_gap(session_id, table_name):
-                mark_monitor_gap(session_id, table_name)
-            if markers["impact_check"]:
-                mark_impact_check_verified(session_id, table_name)
-                return HookOutput()
+        markers = _scan_markers(inp, table_name)
+        if markers["monitor_gap"] and not has_monitor_gap(session_id, table_name):
+            mark_monitor_gap(session_id, table_name)
+        if markers["impact_check"]:
+            mark_impact_check_verified(session_id, table_name)
+            return HookOutput()
 
     # No marker or failed verification — block the edit
     mark_impact_check_injected(session_id, table_name)
 
+    # The marker is shown as a `MC_IMPACT_CHECK_COMPLETE: <table>` template with a
+    # separate substitution note rather than interpolating the table name directly
+    # after the token. This keeps the rendered deny reason from satisfying the gate's
+    # own scanner — harnesses that persist hook output back into the transcript (e.g.
+    # Cortex records it as a tool_result) would otherwise let the gate self-unlock.
     hook_triggered_note = (
         "This assessment is hook-triggered — only emit MC_IMPACT_CHECK_COMPLETE "
         "markers for tables whose lineage and monitor coverage were fetched "
-        "directly via Monte Carlo tools. When complete, emit exactly this marker "
-        f"on its own line: MC_IMPACT_CHECK_COMPLETE: {table_name}"
+        "directly via Monte Carlo tools. When complete, emit the completion marker "
+        "on its own line in the form `MC_IMPACT_CHECK_COMPLETE: <table>`, replacing "
+        f"<table> with the bare table name {table_name}."
     )
 
     no_bypass_note = (

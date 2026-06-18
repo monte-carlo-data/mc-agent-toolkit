@@ -5,6 +5,10 @@ on:
   push:
     branches: [main]
 
+# Minimal default token scope — these jobs only check out and diff files.
+permissions:
+  contents: read
+
 jobs:
   no-symlinks-under-hooks:
     name: No symlinks under plugins/<editor>/hooks/
@@ -14,7 +18,7 @@ jobs:
       - name: Find symlinks under hooks/
         run: |
           set -euo pipefail
-          symlinks=$(find plugins/claude-code plugins/cursor plugins/copilot plugins/codex \
+          symlinks=$(find plugins/claude-code plugins/cursor plugins/copilot plugins/codex plugins/cortex-code \
             -path '*/hooks/*' -type l 2>/dev/null || true)
           if [[ -n "$symlinks" ]]; then
             echo "::error::Symlinks under plugins/<editor>/hooks/ break marketplace installation."
@@ -28,3 +32,28 @@ jobs:
             exit 1
           fi
           echo "OK: no symlinks under plugins/<editor>/hooks/"
+
+  lib-in-sync:
+    name: Synced prevent lib matches plugins/shared
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Diff each plugin's prevent lib against the shared source
+        run: |
+          set -euo pipefail
+          shared="plugins/shared/prevent/lib"
+          rc=0
+          for libdir in plugins/*/hooks/prevent/lib; do
+            [ -d "$libdir" ] || continue
+            if ! diff -r -x '__pycache__' -x 'tests' -x '*.pyc' "$shared" "$libdir" >/dev/null; then
+              echo "::error::$libdir is out of sync with $shared."
+              echo "::error::Edit plugins/shared/prevent/lib/ and run ./scripts/bump-version.sh --sync-only."
+              echo "Drift:"
+              diff -r -x '__pycache__' -x 'tests' -x '*.pyc' "$shared" "$libdir" || true
+              rc=1
+            fi
+          done
+          if [[ "$rc" -eq 0 ]]; then
+            echo "OK: every plugin's prevent lib matches plugins/shared/prevent/lib"
+          fi
+          exit $rc

@@ -43,7 +43,7 @@ As more skills are added, a per-skill-per-editor plugin model creates `skills ×
 3. **Scalable UX.** New skills showing up as features in an existing toolkit is expected. New standalone plugins appearing unexpectedly is confusing.
 4. **Enable/disable is natural.** A toolkit has features you can toggle. A hidden plumbing layer doesn't.
 
-All editors (Claude Code, Cursor, OpenCode, Copilot CLI, Codex) follow the unified toolkit plugin model.
+All editors (Claude Code, Cursor, OpenCode, Copilot CLI, Codex, Cortex Code) follow the unified toolkit plugin model.
 
 ## How It Works Per Editor
 
@@ -54,6 +54,9 @@ All editors (Claude Code, Cursor, OpenCode, Copilot CLI, Codex) follow the unifi
 | **OpenCode** | `@opencode-ai/plugin` SDK (TypeScript) | Copied to `.opencode/skills/` | Event handlers in `index.ts` | `opencode.json` |
 | **Copilot CLI** | `plugin.json` + `hooks.json` (version 1) | `skills/` dir in plugin | `hooks.json` → Python scripts | `.mcp.json` |
 | **Codex** | `AGENTS.md` + config files | Copied to project | N/A (instruction-only) | Config file |
+| **Cortex Code** | `.cortex-plugin/plugin.json` (wraps Claude Code) | `skills/` dir in plugin | `hooks.json` → Python scripts | `.mcp.json` |
+
+**Cortex Code** wraps Claude Code, so it reuses Claude Code's plugin manifest, full hook lifecycle (PreToolUse/PostToolUse/Stop/SessionStart), hook I/O JSON, and MCP schema almost verbatim — including hook-command variable expansion (the Cortex hooks use `${CORTEX_PLUGIN_ROOT}`, the analog of Claude Code's `${CLAUDE_PLUGIN_ROOT}`). The one adapter-level difference is the prevent transcript reader: Cortex's hook `transcript_path` points at a `<id>.json` metadata file while session messages live in a sibling `<id>.history.jsonl`. Cortex's `pre_edit_hook.py` reads that sibling and matches the impact-assessment marker only in assistant-authored `text` blocks, because Cortex also persists hook output (including the gate's own deny reason) into the transcript as a `tool_result` — scanning assistant text only keeps the gate from unlocking itself. As defense in depth, the shared deny reason is worded so it can never match the scanner on any harness (`scan_history_jsonl_for_markers` and the `transcript_format` switch live in `plugins/shared/prevent/lib/protocol.py`).
 
 ## Separation of Concerns
 
@@ -136,8 +139,18 @@ mc-agent-toolkit/
 │   │       ├── install.sh               # Installs hooks to .github/hooks/
 │   │       └── mc-prevent.json          # Hook registration template for target project
 │   │
-│   └── codex/                           # mc-agent-toolkit plugin for Codex
-│       └── skills/                      # One symlink per skill → ../../../skills/<name>
+│   ├── codex/                           # mc-agent-toolkit plugin for Codex
+│   │   └── skills/                      # One symlink per skill → ../../../skills/<name>
+│   │
+│   └── cortex-code/                     # mc-agent-toolkit plugin for Cortex Code (wraps Claude Code)
+│       ├── .cortex-plugin/plugin.json
+│       ├── .mcp.json
+│       ├── hooks/
+│       │   ├── prevent/                 # Adapters + lib/ (copied from plugins/shared/prevent/lib/)
+│       │   └── telemetry/               # SessionStart id-mint + skill-usage beacon
+│       ├── skills/                      # One symlink per skill → ../../../skills/<name>
+│       ├── commands/
+│       └── scripts/install.sh           # cp -RL staging → cortex plugin install
 ```
 
 **Key distinctions:**
