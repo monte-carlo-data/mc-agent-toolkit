@@ -14,8 +14,9 @@
 #   ./scripts/bump-version.sh minor              # 1.0.0 → 1.1.0
 #   ./scripts/bump-version.sh 2.0.0              # Set explicit version
 #   ./scripts/bump-version.sh patch --dry-run    # Preview without changes
-#   ./scripts/bump-version.sh --sync-only        # Re-sync plugins/shared/prevent/lib/
-#                                                # into all editor plugins (no version bump)
+#   ./scripts/bump-version.sh --sync-only        # Re-sync plugins/shared/<skill>/lib/
+#                                                # (prevent, telemetry) into all editor
+#                                                # plugins (no version bump)
 #
 set -euo pipefail
 
@@ -72,32 +73,44 @@ for arg in "$@"; do
   esac
 done
 
-# ── Sync shared hook lib into all editor plugins ────────────────────────────
+# ── Sync shared hook libs into all editor plugins ───────────────────────────
 # Run unconditionally as part of bump (after version is known) and as a
-# standalone op via --sync-only.
+# standalone op via --sync-only. Each shared skill lib lives at
+# plugins/shared/<skill>/lib and is copied into plugins/<editor>/hooks/<skill>/lib.
+# An editor only receives a given lib if it already has that hooks/<skill>/ dir,
+# so editors without telemetry wiring are skipped automatically.
+SHARED_LIB_SKILLS=(prevent telemetry)
+
 sync_shared_lib() {
-  local SHARED_LIB_DIR="$REPO_ROOT/plugins/shared/prevent/lib"
-  # opencode is intentionally excluded — it ports the prevent logic to TypeScript
-  # (plugins/opencode/src/prevent/) rather than copying the Python lib.
+  for skill in "${SHARED_LIB_SKILLS[@]}"; do
+    _sync_shared_lib_skill "$skill"
+  done
+}
+
+_sync_shared_lib_skill() {
+  local skill="$1"
+  local SHARED_LIB_DIR="$REPO_ROOT/plugins/shared/$skill/lib"
+  # opencode is intentionally excluded — it ports hook logic to TypeScript
+  # (plugins/opencode/src/) rather than copying the shared lib.
   local EDITOR_PLUGINS=(claude-code cursor copilot codex cortex-code)
   echo ""
   if [[ ! -d "$SHARED_LIB_DIR" ]]; then
-    echo "Warning: $SHARED_LIB_DIR does not exist; skipping shared lib sync."
+    echo "Warning: $SHARED_LIB_DIR does not exist; skipping $skill lib sync."
     return
   fi
   for editor in "${EDITOR_PLUGINS[@]}"; do
-    local target="$REPO_ROOT/plugins/$editor/hooks/prevent/lib"
+    local target="$REPO_ROOT/plugins/$editor/hooks/$skill/lib"
     if [[ ! -d "$(dirname "$target")" ]]; then
       continue
     fi
     if [[ "$DRY_RUN" == true ]]; then
-      echo "[dry-run] Would sync shared lib → plugins/$editor/hooks/prevent/lib"
+      echo "[dry-run] Would sync $skill lib → plugins/$editor/hooks/$skill/lib"
     else
       rm -rf "$target"
       cp -R "$SHARED_LIB_DIR" "$target"
       rm -rf "$target/__pycache__" "$target/tests"
       find "$target" -name "*.pyc" -delete 2>/dev/null || true
-      echo "Synced shared lib → plugins/$editor/hooks/prevent/lib"
+      echo "Synced $skill lib → plugins/$editor/hooks/$skill/lib"
     fi
   done
 }

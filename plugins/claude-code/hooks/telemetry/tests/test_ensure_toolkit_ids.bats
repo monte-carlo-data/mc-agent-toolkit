@@ -4,10 +4,23 @@ setup() {
   TEST_HOME="$(mktemp -d)"
   export HOME="$TEST_HOME"
   SCRIPT="$BATS_TEST_DIRNAME/../scripts/ensure-toolkit-ids.sh"
+  IDS_DIR="$TEST_HOME/.claude/mc-agent-toolkit"
+
+  # First run now fires the install beacon — mock curl so no real network calls
+  # happen during tests, and run it synchronously for deterministic assertions.
+  MOCK_BIN="$(mktemp -d)"
+  cp "$BATS_TEST_DIRNAME/helpers/mock_curl.sh" "$MOCK_BIN/curl"
+  chmod +x "$MOCK_BIN/curl"
+  export PATH="$MOCK_BIN:$PATH"
+  export MOCK_CURL_LOG="$(mktemp)"
+  export MC_BEACON_SYNC=1
+  unset MC_AGENT_TOOLKIT_TELEMETRY_DISABLED
+  unset MCD_TOOLKIT_BEACON_URL
 }
 
 teardown() {
-  rm -rf "$TEST_HOME"
+  rm -rf "$TEST_HOME" "$MOCK_BIN"
+  rm -f "$MOCK_CURL_LOG"
 }
 
 @test "creates install_id and toolkit_session_id files" {
@@ -57,4 +70,40 @@ teardown() {
   touch "$TEST_HOME"
   run bash "$SCRIPT"
   [ "$status" -eq 0 ]
+}
+
+@test "first run fires exactly one Toolkit Installed beacon" {
+  run bash "$SCRIPT"
+  [ "$status" -eq 0 ]
+  [ -s "$MOCK_CURL_LOG" ]
+  [ "$(wc -l < "$MOCK_CURL_LOG" | tr -d ' ')" = "1" ]
+  payload="$(jq -r '.data' "$MOCK_CURL_LOG")"
+  [ "$(echo "$payload" | jq -r '.event')" = "Toolkit Installed" ]
+  [ "$(echo "$payload" | jq -r '.harness')" = "claude-code" ]
+  [ "$(echo "$payload" | jq -r '.install_id')" = "$(cat "$IDS_DIR/install_id")" ]
+  [ "$(echo "$payload" | jq -r '.session_id')" = "$(cat "$IDS_DIR/toolkit_session_id")" ]
+}
+
+@test "second run does not fire the install beacon (same version)" {
+  bash "$SCRIPT"
+  : > "$MOCK_CURL_LOG"   # clear the first-run beacon
+  run bash "$SCRIPT"
+  [ "$status" -eq 0 ]
+  [ ! -s "$MOCK_CURL_LOG" ]
+}
+
+@test "re-fires the install beacon after a toolkit version change" {
+  bash "$SCRIPT"
+  echo "0.0.0" > "$IDS_DIR/beacon_sent_version"   # simulate an older recorded version
+  : > "$MOCK_CURL_LOG"
+  run bash "$SCRIPT"
+  [ "$status" -eq 0 ]
+  [ -s "$MOCK_CURL_LOG" ]
+  [ "$(jq -r '.data | fromjson.event' "$MOCK_CURL_LOG")" = "Toolkit Installed" ]
+}
+
+@test "toolkit_session_id is written even on the first (beacon-firing) run" {
+  run bash "$SCRIPT"
+  [ "$status" -eq 0 ]
+  [ -f "$IDS_DIR/toolkit_session_id" ]
 }

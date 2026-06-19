@@ -43,6 +43,14 @@ bash <(curl -fsSL https://raw.githubusercontent.com/monte-carlo-data/mc-agent-to
 
 - **Hook denials may not be enforced.** Cursor's `beforeReadFile` (and potentially other `before*` hooks) may fail to block the operation even when the hook exits with a deny response. This means Prevent hooks can detect and warn about breaking changes but cannot guarantee the edit is stopped. See [Cursor forum discussion](https://forum.cursor.com/t/hook-beforereadfile-does-not-work-in-the-agent/150520) for details.
 
+## Telemetry
+
+The toolkit sends an anonymous install beacon — a `Toolkit Installed` event so we can count installations and version adoption. It includes an opaque per-install UUID, a per-session UUID, the toolkit version, and the editor it runs in (`cursor`). No prompts, arguments, skill names, or code are ever sent. It fires once per machine per toolkit version — the first time you start Cursor after installing, and again after each version change (deduped by a local marker) — and is fail-open and non-blocking, never delaying or interrupting your session.
+
+To opt out, set `MC_AGENT_TOOLKIT_TELEMETRY_DISABLED=1` in your shell environment before starting Cursor. The toolkit will not phone home.
+
+The data is stored in Mixpanel and Datadog and is used only for product-development decisions. The UUIDs are generated locally on first session and stored under `~/.cursor/mc-agent-toolkit/`. Deleting that directory resets your install identity to a fresh anonymous one.
+
 ## Architecture
 
 The toolkit plugin wraps shared skills and hook logic, with each feature namespaced independently:
@@ -51,5 +59,6 @@ The toolkit plugin wraps shared skills and hook logic, with each feature namespa
 - **Shared hook logic** — copied from `plugins/shared/prevent/lib/` into each plugin's `hooks/prevent/lib/` (platform-agnostic business logic)
 - **Adapter hooks** — Cursor-specific JSON parsing and output formatting under `hooks/prevent/`
 - **MCP config** — Monte Carlo MCP server connection
+- **Telemetry hook** — the install-beacon `sessionStart` is registered in `hooks/prevent/hooks.json` (Cursor loads a single manifest-referenced hooks file per plugin), while the script itself lives under `hooks/telemetry/`
 
 See the [plugins README](../README.md) for the overall plugin architecture and editor support comparison.

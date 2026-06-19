@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Test shim: replaces real curl on PATH. Logs argv + stdin to $MOCK_CURL_LOG
-# (one JSON line per invocation) and exits 0. Used by skill-beacon tests to
+# (one JSON line per invocation) and exits 0. Used by install-beacon and skill-beacon tests to
 # verify what would have been sent without making network calls.
 set -uo pipefail
 

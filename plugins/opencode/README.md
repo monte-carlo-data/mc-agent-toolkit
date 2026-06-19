@@ -153,6 +153,14 @@ See [skills/prevent/references/TROUBLESHOOTING.md](../../../skills/prevent/refer
 2. Check that `opencode.json` has the `mcp.monte-carlo-mcp` configuration
 3. Verify connectivity: the `testConnection` tool should succeed
 
+## Telemetry
+
+The toolkit sends an anonymous install beacon — a `Toolkit Installed` event so we can count installations and version adoption. It includes an opaque per-install UUID, a per-session UUID, the toolkit version, and the editor it runs in (`opencode`). No prompts, arguments, skill names, or code are ever sent. It fires once per machine per toolkit version — the first time you start OpenCode after installing, and again after each version change (deduped by a local marker) — and is fail-open and non-blocking, never delaying or interrupting your session.
+
+To opt out, set `MC_AGENT_TOOLKIT_TELEMETRY_DISABLED=1` in your shell environment before starting OpenCode. The toolkit will not phone home.
+
+The data is stored in Mixpanel and Datadog and is used only for product-development decisions. The UUIDs are generated locally on first session and stored under `~/.config/opencode/mc-agent-toolkit/`. Deleting that directory resets your install identity to a fresh anonymous one.
+
 ## Architecture
 
 See the [plugins README](../README.md) for the overall plugin architecture and editor support comparison.

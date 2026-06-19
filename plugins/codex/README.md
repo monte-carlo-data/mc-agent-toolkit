@@ -63,6 +63,14 @@ Codex hook coverage is incomplete, which may cause hooks to not fire consistentl
 
 The skill-based impact assessment (via `SKILL.md`) works reliably regardless of these hook limitations.
 
+## Telemetry
+
+The toolkit sends an anonymous install beacon — a `Toolkit Installed` event so we can count installations and version adoption. It includes an opaque per-install UUID, a per-session UUID, the toolkit version, and the editor it runs in (`codex`). No prompts, arguments, skill names, or code are ever sent. It fires once per machine per toolkit version — the first time you start Codex after installing, and again after each version change (deduped by a local marker) — and is fail-open and non-blocking, never delaying or interrupting your session.
+
+To opt out, set `MC_AGENT_TOOLKIT_TELEMETRY_DISABLED=1` in your shell environment before starting Codex. The toolkit will not phone home.
+
+The data is stored in Mixpanel and Datadog and is used only for product-development decisions. The UUIDs are generated locally on first session and stored under `~/.codex/mc-agent-toolkit/`. Deleting that directory resets your install identity to a fresh anonymous one.
+
 ## Architecture
 
 This plugin uses the shared core library at `hooks/prevent/lib/` (symlinked). All business logic lives in the shared library; the hooks in this plugin are thin adapters (~20 lines each) that translate Codex JSON to/from the platform-agnostic interface.

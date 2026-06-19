@@ -11,6 +11,7 @@
  */
 import type { Plugin } from "@opencode-ai/plugin";
 import { existsSync } from "fs";
+import { ensureToolkitIdsAndBeacon } from "../telemetry/install-beacon";
 import { isDbtModel, isDbtSchemaFile, extractTableName } from "./detect";
 import {
   cleanupStaleCache,
@@ -278,6 +279,14 @@ export const McPrevent: Plugin = async ({ client, directory, worktree }) => {
     },
 
     event: async ({ event }) => {
+      // Install telemetry: on the first-ever session start, fire a one-shot
+      // "Toolkit Installed" beacon (deduped by the persistent install_id marker).
+      // Detached + fail-open so it never blocks or breaks the session.
+      if (event.type === "session.created") {
+        void ensureToolkitIdsAndBeacon().catch(() => {});
+        return;
+      }
+
       try {
         if (event.type !== "session.idle") return;
         const sessionID = (event as any).properties?.sessionID;

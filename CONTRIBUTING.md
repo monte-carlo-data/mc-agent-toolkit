@@ -21,7 +21,8 @@ mc-agent-toolkit/
 │
 ├── plugins/
 │   ├── shared/                          # Canonical hook logic (source of truth)
-│   │   └── prevent/lib/                 # Business logic (copied into each editor plugin's hooks/prevent/lib/)
+│   │   ├── prevent/lib/                 # Business logic (copied into each editor plugin's hooks/prevent/lib/)
+│   │   └── telemetry/lib/               # Install-beacon (copied into each editor plugin's hooks/telemetry/lib/)
 │   │
 │   ├── claude-code/                     # Unified mc-agent-toolkit plugin
 │   │   ├── .claude-plugin/plugin.json
@@ -205,7 +206,7 @@ Setup and agent-routing skills are exempt from this rule. Setup skills are invok
 - For new skills: include example prompts that should trigger the skill.
 - For bug fixes: describe the incorrect behavior and how to reproduce.
 - Ensure skill symlinks are relative and resolve correctly (CI will verify this).
-- If you changed files in `plugins/shared/prevent/lib/`, run `./scripts/bump-version.sh --sync-only` to sync copies to all editor plugins without bumping the version. Symlinks under `plugins/<editor>/hooks/` are rejected by CI — see `.github/workflows/validate.yml`.
+- If you changed files under `plugins/shared/<skill>/lib/` (e.g. `prevent/lib/` or `telemetry/lib/`), run `./scripts/bump-version.sh --sync-only` to sync copies to all editor plugins without bumping the version. Symlinks under `plugins/<editor>/hooks/` are rejected by CI — see `.github/workflows/validate.yml`.
 - Run `git log --follow` on any moved files to confirm history is preserved.
 
 ## Version bumping

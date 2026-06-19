@@ -55,6 +55,7 @@ cp -rL "$CLONE_DIR/$PLUGIN_SRC" "$TARGET"
 
 # --- Remove test files and dev artifacts from installation ---
 rm -rf "$TARGET/tests" "$TARGET/scripts" "$TARGET/hooks/prevent/lib/tests" \
+       "$TARGET/hooks/telemetry/tests" \
        "$TARGET/__pycache__" "$TARGET/.DS_Store" "$TARGET/.git"
 find "$TARGET" -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
 find "$TARGET" -name "*.pyc" -delete 2>/dev/null || true
