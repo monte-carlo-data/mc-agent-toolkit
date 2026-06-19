@@ -9,6 +9,14 @@ version: 1.0.0
 
 This skill teaches you to investigate and remediate data quality issues detected by Monte Carlo. You use MC MCP tools to understand the alert context, run root cause analysis, assess blast radius, and then execute the appropriate remediation action using whatever external tools the user has connected.
 
+> **Monte Carlo tool routing (required):** Always call Monte Carlo MCP tools through this plugin's
+> bundled server, whose fully-qualified tool names are
+> `mcp__plugin_mc-agent-toolkit_monte-carlo-mcp__<tool>` (e.g.
+> `mcp__plugin_mc-agent-toolkit_monte-carlo-mcp__get_alerts`). Bare tool names used in this skill
+> (`get_alerts`, `search`, `get_table`, …) refer to that bundled server. If the session also has a
+> separately-configured `monte-carlo-mcp` server, do **not** route to it — it may point at a
+> different endpoint or credentials.
+
 Reference files live next to this skill file. **Use the Read tool** (not MCP resources) to access them:
 
 - Common remediation patterns and examples: `references/patterns.md` (relative to this file)

@@ -9,6 +9,14 @@ version: 2.1.1
 
 This skill handles all monitoring requests -- coverage analysis, data monitor creation, and AI agent monitoring. It routes to the right reference file based on the user's intent.
 
+> **Monte Carlo tool routing (required):** Always call Monte Carlo MCP tools through this plugin's
+> bundled server, whose fully-qualified tool names are
+> `mcp__plugin_mc-agent-toolkit_monte-carlo-mcp__<tool>` (e.g.
+> `mcp__plugin_mc-agent-toolkit_monte-carlo-mcp__get_alerts`). Bare tool names used in this skill
+> (`get_alerts`, `search`, `get_table`, …) refer to that bundled server. If the session also has a
+> separately-configured `monte-carlo-mcp` server, do **not** route to it — it may point at a
+> different endpoint or credentials.
+
 Reference files live next to this skill file. **Use the Read tool** (not MCP resources) to access them:
 
 - Data monitor creation procedure: `references/data-monitor-creation.md` (relative to this file)

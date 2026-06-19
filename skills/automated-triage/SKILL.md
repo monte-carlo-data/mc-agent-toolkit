@@ -12,6 +12,14 @@ version: 1.1.1
 
 This skill helps you design, test, and deploy an automated triage agent for Monte Carlo alerts. Rather than a fixed workflow, it gives you the building blocks — a set of MCP tools, a description of each triage stage, and a working example — so you can build a process that matches how your team actually responds to alerts.
 
+> **Monte Carlo tool routing (required):** Always call Monte Carlo MCP tools through this plugin's
+> bundled server, whose fully-qualified tool names are
+> `mcp__plugin_mc-agent-toolkit_monte-carlo-mcp__<tool>` (e.g.
+> `mcp__plugin_mc-agent-toolkit_monte-carlo-mcp__get_alerts`). Bare tool names used in this skill
+> (`get_alerts`, `search`, `get_table`, …) refer to that bundled server. If the session also has a
+> separately-configured `monte-carlo-mcp` server, do **not** route to it — it may point at a
+> different endpoint or credentials.
+
 Read the reference files before proceeding:
 
 - Triage stages and customisation: `references/triage-stages.md` (relative to this file)
