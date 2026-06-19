@@ -15,9 +15,9 @@ For example:
 - `mcp__dbt_cloud__trigger_run` — a dbt Cloud MCP tool
 - `mcp__github__create_pull_request` — a GitHub MCP tool
 
-Monte Carlo tools also follow this pattern but may use different server names depending on configuration:
-- `mcp__monte_carlo__getAlerts`
-- `mcp__mc__search`
+Monte Carlo's own tools are bundled by this plugin and namespaced under the plugin server — see the **Monte Carlo tool routing** block at the top of the skill. Examples:
+- `mcp__plugin_mc-agent-toolkit_monte-carlo-mcp__get_alerts`
+- `mcp__plugin_mc-agent-toolkit_monte-carlo-mcp__search`
 
 Scan your tool list for any `mcp__*__*` patterns and group by server name.
 

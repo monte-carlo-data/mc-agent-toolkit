@@ -51,6 +51,26 @@ getAssetLineage(...)
 
 The actual MCP tool names follow the `mcp__<server>__<tool_name>` convention where `tool_name` is always snake_case. Using camelCase causes the agent to hallucinate tool names that don't exist.
 
+## Route Monte Carlo MCP calls to the plugin-bundled server
+
+The toolkit bundles an MCP server named `monte-carlo-mcp`. When loaded through the plugin, its tools are namespaced **`mcp__plugin_mc-agent-toolkit_monte-carlo-mcp__<tool>`** (the general form is `mcp__plugin_<plugin-name>_<server-name>__<tool>`). If a user has independently configured *another* MCP server also named `monte-carlo-mcp` (or any server exposing same-named tools), both namespaces coexist in the session and a bare tool name like `get_alerts` becomes ambiguous — the model could route to the user's server (different endpoint and credentials) instead of the plugin's.
+
+This cannot be hard-blocked per skill: `allowed-tools` frontmatter only *pre-approves* tools (suppresses prompts) — it does **not** restrict which tools are callable, so listing only the plugin tool does not block a same-named server. Soft enforcement via skill prose is the realistic ceiling.
+
+**Rule:** Every `SKILL.md` that calls Monte Carlo MCP tools must include the routing block below **verbatim**, placed near the top of the router (right after the intro paragraph, or as a note under the "MCP Tools Used" heading). This file is the single source of truth for both the block text and the namespace string.
+
+```markdown
+> **Monte Carlo tool routing (required):** Always call Monte Carlo MCP tools through this plugin's
+> bundled server, whose fully-qualified tool names are
+> `mcp__plugin_mc-agent-toolkit_monte-carlo-mcp__<tool>` (e.g.
+> `mcp__plugin_mc-agent-toolkit_monte-carlo-mcp__get_alerts`). Bare tool names used in this skill
+> (`get_alerts`, `search`, `get_table`, …) refer to that bundled server. If the session also has a
+> separately-configured `monte-carlo-mcp` server, do **not** route to it — it may point at a
+> different endpoint or credentials.
+```
+
+When the plugin name or server name changes, update the prefix **here and in every skill carrying the block in the same change**. To find them: `grep -rl 'Monte Carlo tool routing (required)' skills/*/SKILL.md`.
+
 ## Create symlinks in all editor plugins when adding a skill
 
 Every skill in `skills/` must have a corresponding symlink in **every** editor plugin's `skills/` directory:

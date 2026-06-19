@@ -14,6 +14,14 @@ version: 1.0.0
 
 This skill helps investigate data incidents — freshness delays, volume anomalies, schema changes, field metric drift, and ETL failures — by guiding the agent through a systematic investigation using Monte Carlo's MCP tools. It combines observability metadata with optional direct data querying to find the root cause.
 
+> **Monte Carlo tool routing (required):** Always call Monte Carlo MCP tools through this plugin's
+> bundled server, whose fully-qualified tool names are
+> `mcp__plugin_mc-agent-toolkit_monte-carlo-mcp__<tool>` (e.g.
+> `mcp__plugin_mc-agent-toolkit_monte-carlo-mcp__get_alerts`). Bare tool names used in this skill
+> (`get_alerts`, `search`, `get_table`, …) refer to that bundled server. If the session also has a
+> separately-configured `monte-carlo-mcp` server, do **not** route to it — it may point at a
+> different endpoint or credentials.
+
 Reference files live next to this skill file. **Use the Read tool** (not MCP resources) to access them:
 
 - Investigation playbooks by issue type: `references/<type>-investigation.md`
