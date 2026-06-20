@@ -26,9 +26,16 @@ Installation has two steps: the **plugin** (for skills + MCP) and the **hooks** 
 
 ### Step 1: Install hooks into your project
 
+Use the shell installer on macOS/Linux, or the PowerShell installer on Windows.
+
 ```bash
 git clone https://github.com/monte-carlo-data/mc-agent-toolkit.git
 ./mc-agent-toolkit/plugins/copilot/scripts/install.sh /path/to/your/dbt-project
+```
+
+```powershell
+git clone https://github.com/monte-carlo-data/mc-agent-toolkit.git
+.\mc-agent-toolkit\plugins\copilot\scripts\install.ps1 -TargetDir C:\path\to\your\dbt-project
 ```
 
 This copies hook scripts and registration to `.github/hooks/` in your project.
