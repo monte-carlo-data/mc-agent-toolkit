@@ -4,7 +4,11 @@
   "mcp": {
     "monte-carlo-mcp": {
       "type": "remote",
-      "url": "https://mcp.getmontecarlo.com/mcp/toolkit"
+      "url": "https://mcp.getmontecarlo.com/mcp/toolkit",
+      "headers": {
+        "x-mcd-toolkit-install-id": "{file:~/.config/opencode/mc-agent-toolkit/install_id}",
+        "x-mcd-toolkit-version": "{file:~/.config/opencode/mc-agent-toolkit/toolkit_version}"
+      }
     }
   },
   "permission": {
