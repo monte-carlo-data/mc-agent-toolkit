@@ -20,6 +20,15 @@ CONFIG_FILE="$CONFIG_DIR/config.toml"
 HOOKS_FILE=""  # set after TARGET_REPO is resolved
 SERVER_NAME="monte-carlo-mcp"
 SERVER_URL="https://mcp.getmontecarlo.com/mcp/toolkit"
+IDS_DIR="$HOME/.codex/mc-agent-toolkit"
+
+# Sourceable helpers (resolved relative to this script in the repo checkout):
+# toolkit-ids.sh is the synced shared lib; codex-config.sh bakes the MCP block.
+INSTALLER_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=/dev/null
+source "$INSTALLER_DIR/../hooks/telemetry/lib/toolkit-ids.sh"
+# shellcheck source=/dev/null
+source "$INSTALLER_DIR/lib/codex-config.sh"
 
 # --- Parse arguments ---
 # Usage: install.sh [--local /path/to/mc-agent-toolkit] <target-repo>
@@ -222,19 +231,15 @@ fi
 echo "[5/7] Configuring Monte Carlo MCP server..."
 mkdir -p "$CONFIG_DIR"
 
-if [ -f "$CONFIG_FILE" ] && grep -q "\[mcp_servers\.${SERVER_NAME}\]" "$CONFIG_FILE" 2>/dev/null; then
-  echo "  MCP server already configured — skipping."
-else
-  echo "" >> "$CONFIG_FILE"
-  cat >> "$CONFIG_FILE" << EOF
-
-[mcp_servers.${SERVER_NAME}]
-url = "${SERVER_URL}"
-enabled = true
-http_headers = { "User-Agent" = "codex-mcp/1.0" }
-EOF
-  echo "  Added monte-carlo MCP server to $CONFIG_FILE"
-fi
+# Bake the MCP block with toolkit telemetry headers. Idempotent: refreshes the
+# http_headers line if the block already exists (so upgrades pick up a new
+# version), else appends a fresh block. install_id is generated via the shared
+# ensure_install_id so it matches the SessionStart hook's id (streams join);
+# the install-id header is omitted entirely when telemetry is opted out.
+configure_codex_mcp_server \
+  "$CONFIG_FILE" "$SERVER_NAME" "$SERVER_URL" \
+  "$IDS_DIR" "$TARGET/.codex-plugin/plugin.json"
+echo "  Configured monte-carlo MCP server in $CONFIG_FILE"
 
 # ============================================================
 # STEP 6: Enable hooks
