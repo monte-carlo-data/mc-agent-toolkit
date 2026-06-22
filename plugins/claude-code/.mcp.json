@@ -2,7 +2,8 @@
   "mcpServers": {
     "monte-carlo-mcp": {
       "type": "http",
-      "url": "https://mcp.getmontecarlo.com/mcp/toolkit"
+      "url": "https://mcp.getmontecarlo.com/mcp/toolkit",
+      "headersHelper": "python3 \"$HOME/.claude/mc-agent-toolkit/mcp-headers-helper.py\" 2>/dev/null || echo '{}'"
     }
   }
 }
