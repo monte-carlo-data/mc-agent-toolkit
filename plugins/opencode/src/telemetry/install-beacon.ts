@@ -140,6 +140,18 @@ export async function ensureToolkitIdsAndBeacon(): Promise<void> {
     // If the version can't be resolved, skip — don't send a junk "unknown" beacon
     // or write the marker; retry next session once a real version is available.
     if (version === "unknown") return;
+
+    // Persist the toolkit version so opencode.json's {file:} header substitution
+    // can emit it as x-mcd-toolkit-version on authed MCP traffic. Rewritten each
+    // session to stay current across upgrades; only ever a real version.
+    const versionPath = join(dir, "toolkit_version");
+    writeFileSync(versionPath, version, { mode: 0o600 });
+    try {
+      chmodSync(versionPath, 0o600);
+    } catch {
+      // best-effort
+    }
+
     const sentPath = join(dir, "beacon_sent_version");
     if (readId(sentPath) === version) return;
     writeFileSync(sentPath, version, { mode: 0o600 });

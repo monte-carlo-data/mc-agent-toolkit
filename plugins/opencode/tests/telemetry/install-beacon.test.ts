@@ -165,6 +165,29 @@ describe("ensureToolkitIdsAndBeacon", () => {
     expect(statSync(sessionIdPath()).mode & 0o777).toBe(0o600);
   });
 
+  it("writes toolkit_version (mode 0600) matching package.json for the {file:} header", async () => {
+    await ensureToolkitIdsAndBeacon();
+    const versionPath = join(idsDir(), "toolkit_version");
+    expect(existsSync(versionPath)).toBe(true);
+    expect(statSync(versionPath).mode & 0o777).toBe(0o600);
+    const expected = JSON.parse(
+      readFileSync(join(import.meta.dir, "../../package.json"), "utf8")
+    ).version;
+    expect(readFileSync(versionPath, "utf8").trim()).toBe(expected);
+  });
+
+  it("rewrites toolkit_version every session even when the beacon is deduped", async () => {
+    await ensureToolkitIdsAndBeacon();
+    const versionPath = join(idsDir(), "toolkit_version");
+    rmSync(versionPath);
+    fetchCalls = [];
+    // Second run: beacon is deduped (same version), but the version file must
+    // still be rewritten so the header substitution always has it.
+    await ensureToolkitIdsAndBeacon();
+    expect(fetchCalls.length).toBe(0);
+    expect(existsSync(versionPath)).toBe(true);
+  });
+
   it("honors MCD_TOOLKIT_BEACON_URL override", async () => {
     process.env.MCD_TOOLKIT_BEACON_URL =
       "https://mcp.dev.getmontecarlo.com/mcp/toolkit/beacon";
