@@ -238,7 +238,7 @@ mkdir -p "$CONFIG_DIR"
 # the install-id header is omitted entirely when telemetry is opted out.
 configure_codex_mcp_server \
   "$CONFIG_FILE" "$SERVER_NAME" "$SERVER_URL" \
-  "$IDS_DIR" "$TARGET/.codex-plugin/plugin.json"
+  "$IDS_DIR" "$REPO_ROOT/$PLUGIN_SRC/.codex-plugin/plugin.json"
 echo "  Configured monte-carlo MCP server in $CONFIG_FILE"
 
 # ============================================================
