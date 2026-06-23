@@ -31,30 +31,30 @@ build_codex_http_headers() {
 }
 
 # configure_codex_mcp_server <config_file> <server_name> <server_url> <ids_dir> <plugin_json>
-# Idempotently write the [mcp_servers.<name>] block. If the block already exists,
-# the http_headers line is upserted in place (so upgrades refresh the baked id);
-# otherwise a fresh block is appended. Other config and the block's other keys
-# are preserved.
+# Write the canonical [mcp_servers.<name>] block. This installer OWNS that block:
+# if it already exists it is stripped and rewritten (url + enabled + http_headers),
+# so a later endpoint change or header update migrates existing users on
+# reinstall/upgrade rather than leaving a stale url. Everything else in the file
+# (other servers, other sections) is left untouched. Note: manual edits to *this*
+# block (e.g. a dev url) are intentionally reset on reinstall — use an env override
+# for transient changes, not a hand-edit.
 configure_codex_mcp_server() {
   local config_file="$1" server_name="$2" server_url="$3" ids_dir="$4" plugin_json="$5"
   local headers_line
   headers_line="$(build_codex_http_headers "$ids_dir" "$plugin_json")"
 
+  # Strip any existing block (from its header to the next section or EOF), leaving
+  # all other sections intact.
   if [ -f "$config_file" ] && grep -q "^\[mcp_servers\.${server_name}\]" "$config_file" 2>/dev/null; then
-    # Block exists — replace its http_headers line in place. The block was
-    # written by this installer, so it always has an http_headers line.
     local tmp
-    tmp="$(mktemp)"
-    awk -v hdr="$headers_line" -v server="[mcp_servers.${server_name}]" '
-      $0 == server { in_block = 1; print; next }
+    tmp="$(mktemp)" || return 0
+    awk -v server="[mcp_servers.${server_name}]" '
+      $0 == server { in_block = 1; next }
       /^\[/ && $0 != server { in_block = 0 }
-      in_block && /^http_headers[[:space:]]*=/ { print hdr; next }
-      { print }
+      !in_block { print }
     ' "$config_file" > "$tmp" && mv "$tmp" "$config_file"
-    return 0
   fi
 
-  # Fresh block.
   printf '\n[mcp_servers.%s]\nurl = "%s"\nenabled = true\n%s\n' \
     "$server_name" "$server_url" "$headers_line" >> "$config_file"
 }

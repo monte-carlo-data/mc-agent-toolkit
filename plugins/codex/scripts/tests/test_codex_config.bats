@@ -43,7 +43,7 @@ teardown() {
   [ "$baked" = "$from_helper" ]
 }
 
-@test "re-run is idempotent: refreshes in place, no duplicate block or header" {
+@test "re-run is idempotent: rewrites in place, no duplicate block or header" {
   configure_codex_mcp_server "$CONFIG" "monte-carlo-mcp" "https://x/mcp/toolkit" "$IDS_DIR" "$PLUGIN_JSON"
   # bump the version to simulate an upgrade, then re-run
   echo '{"version": "10.0.0"}' > "$PLUGIN_JSON"
@@ -54,14 +54,22 @@ teardown() {
   ! grep -q '9.9.9' "$CONFIG"                              # old version gone
 }
 
-@test "re-run preserves other config and the block's other keys" {
-  printf '[other]\nfoo = "bar"\n' > "$CONFIG"
-  configure_codex_mcp_server "$CONFIG" "monte-carlo-mcp" "https://x/mcp/toolkit" "$IDS_DIR" "$PLUGIN_JSON"
+@test "installer owns the block: a stale url is migrated to canonical on re-run" {
+  # Simulate a pre-existing block with an old/different url.
+  printf '\n[mcp_servers.monte-carlo-mcp]\nurl = "https://old.example.com/mcp"\nenabled = true\nhttp_headers = { "User-Agent" = "x" }\n' > "$CONFIG"
+  configure_codex_mcp_server "$CONFIG" "monte-carlo-mcp" "https://mcp.dev.getmontecarlo.com/mcp/toolkit" "$IDS_DIR" "$PLUGIN_JSON"
+  grep -q 'url = "https://mcp.dev.getmontecarlo.com/mcp/toolkit"' "$CONFIG"   # migrated
+  ! grep -q 'old.example.com' "$CONFIG"                                       # stale url gone
+  [ "$(grep -c '^\[mcp_servers\.monte-carlo-mcp\]' "$CONFIG")" -eq 1 ]        # not duplicated
+}
+
+@test "leaves other sections untouched while rewriting our block" {
+  printf '[other]\nfoo = "bar"\n\n[mcp_servers.monte-carlo-mcp]\nurl = "https://old/mcp"\nenabled = true\nhttp_headers = { }\n' > "$CONFIG"
   configure_codex_mcp_server "$CONFIG" "monte-carlo-mcp" "https://x/mcp/toolkit" "$IDS_DIR" "$PLUGIN_JSON"
   grep -q '^\[other\]' "$CONFIG"
   grep -q 'foo = "bar"' "$CONFIG"
-  grep -q 'url = "https://x/mcp/toolkit"' "$CONFIG"
-  grep -q 'enabled = true' "$CONFIG"
+  grep -q 'url = "https://x/mcp/toolkit"' "$CONFIG"   # our block rewritten to canonical
+  [ "$(grep -c '^\[mcp_servers\.monte-carlo-mcp\]' "$CONFIG")" -eq 1 ]
 }
 
 @test "opt-out bakes no install-id header (version still rides)" {
