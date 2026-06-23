@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "monte-carlo-mcp": {
-      "type": "http",
-      "url": "https://mcp.getmontecarlo.com/mcp/toolkit"
-    }
-  }
-}

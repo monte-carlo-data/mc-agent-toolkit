@@ -109,11 +109,29 @@ EOF
 
 echo "  ✓ Session-start telemetry hook registered at $COPILOT_HOOKS_DIR/mc-agent-toolkit-telemetry.json"
 
+# --- 5. Register the Monte Carlo MCP server (with toolkit telemetry headers) ---
+# Copilot reads MCP servers from ~/.copilot/mcp-config.json. We register
+# monte-carlo-mcp there via `copilot mcp add` with install_id + version baked as
+# headers — Copilot has no runtime header mechanism, and the plugin no longer
+# declares the server, so this is the single source. install_id matches the
+# SessionStart hook/beacon id (shared ensure_install_id). Fail-open: a no-op if
+# the copilot CLI isn't on PATH.
+SERVER_URL="https://mcp.getmontecarlo.com/mcp/toolkit"
+# shellcheck source=/dev/null
+source "$PLUGIN_DIR/hooks/telemetry/lib/toolkit-ids.sh"
+# shellcheck source=/dev/null
+source "$SCRIPT_DIR/lib/copilot-config.sh"
+# id dir matches the telemetry hook's hardcoded location so the baked install_id
+# equals the beacon's (the join key) regardless of COPILOT_HOME.
+configure_copilot_mcp_server "monte-carlo-mcp" "$SERVER_URL" \
+  "$HOME/.copilot/mc-agent-toolkit" "$PLUGIN_DIR/plugin.json"
+echo "  ✓ Registered monte-carlo MCP server (copilot mcp add)"
+
 # --- Done ---
 
 echo ""
 echo "Hook installation complete. Next steps:"
-echo "  1. Install the plugin (for skills + MCP):"
+echo "  1. Install the plugin (for skills):"
 echo "       copilot plugin install $PLUGIN_DIR"
 echo "  2. Start a Copilot session:"
 echo "       copilot"
