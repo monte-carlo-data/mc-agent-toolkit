@@ -22,18 +22,18 @@ For detailed workflow descriptions, activation rules, and synthesis guidelines, 
 
 ## Installation
 
-Installation has two steps: the **plugin** (for skills + MCP) and the **hooks** (for enforcement).
+Installation has two steps: the **install script** (hooks + the Monte Carlo MCP server) and the **plugin** (skills).
 
-### Step 1: Install hooks into your project
+### Step 1: Run the install script
 
 ```bash
 git clone https://github.com/monte-carlo-data/mc-agent-toolkit.git
 ./mc-agent-toolkit/plugins/copilot/scripts/install.sh /path/to/your/dbt-project
 ```
 
-This copies hook scripts and registration to `.github/hooks/` in your project.
+This copies the enforcement hooks to `.github/hooks/` in your project, registers a user-level session-start telemetry hook, and registers the Monte Carlo MCP server in `~/.copilot/mcp-config.json` (via `copilot mcp add`).
 
-### Step 2: Install the plugin (skills + MCP)
+### Step 2: Install the plugin (skills)
 
 ```bash
 copilot plugin install ./mc-agent-toolkit/plugins/copilot
@@ -43,9 +43,10 @@ Verify:
 
 ```bash
 copilot plugin list
+copilot mcp list   # should list monte-carlo-mcp
 ```
 
-> **Note:** Hooks live in the project repo (`.github/hooks/`) because Copilot CLI loads hooks from the working directory, not from plugins. The plugin delivers skills and MCP server configuration.
+> **Note:** Hooks live in the project repo (`.github/hooks/`) because Copilot CLI loads hooks from the working directory, not from plugins. The MCP server is registered by the install script via `copilot mcp add` — Copilot CLI has no runtime header mechanism, so the toolkit's telemetry headers are baked in at registration time. The plugin delivers skills.
 
 ## How it works
 
@@ -62,9 +63,8 @@ The plugin uses Copilot CLI's hook system to intercept tool calls at key lifecyc
 
 ```
 plugins/copilot/
-├── plugin.json          # Plugin manifest
+├── plugin.json          # Plugin manifest (skills + hooks; MCP is registered by install.sh)
 ├── hooks.json           # Hook registration (Copilot CLI format)
-├── .mcp.json            # Monte Carlo MCP server config
 ├── hooks/
 │   └── prevent/         # MC Prevent hook adapters (Python)
 ├── skills/
@@ -103,7 +103,7 @@ plugins/copilot/
 - Check hook scripts are executable: `chmod +x plugins/copilot/hooks/prevent/*.py`
 
 **MCP tools not appearing:**
-- Check that `.mcp.json` exists in the plugin directory
+- Run `copilot mcp list` — `monte-carlo-mcp` should be listed; if not, re-run the install script (`scripts/install.sh`)
 - Run `/skills list` to verify the prevent skill is loaded
 
 ## Telemetry
