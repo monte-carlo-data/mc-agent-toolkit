@@ -5,6 +5,25 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Claude Code will
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.13.3] - 2026-06-23
+
+### Changed
+
+- efef342 feat(copilot): bake toolkit headers via `copilot mcp add` (un-defer Copilot)
+- 5705a06 fix(codex): installer owns the monte-carlo-mcp block (migrate url on reinstall)
+- aef03e6 fix(codex): read toolkit version from source manifest when baking headers
+- ac121c0 fix(opencode): inject MCP headers via config hook instead of {file:} (fail-open)
+- 532c473 feat(cursor): bake toolkit install id + version into mcp.json at install
+- da46291 feat(codex): bake toolkit install id + version into config.toml http_headers
+- 8d873cb feat(telemetry): add shared toolkit-ids.sh for consistent install_id generation
+- 6bb5543 feat(opencode): attach toolkit install id + version headers via {file:} substitution
+- bd632f5 feat(opencode): persist toolkit_version for {file:} header substitution
+- 6cb838c feat(cortex-code): stamp toolkit headers on authed MCP traffic via headersHelper
+- 0bc26e6 feat(claude-code): stamp toolkit headers on authed MCP traffic via headersHelper
+- 5003aa0 feat(cortex-code): ensure-toolkit-ids writes version + seeds MCP headers helper
+- 3768ea9 feat(claude-code): ensure-toolkit-ids writes version + seeds MCP headers helper
+- 66f8de8 feat(telemetry): add mcp-headers-helper.py for MCP header injection
+
 ## [1.13.2] - 2026-06-19
 
 ### Changed
