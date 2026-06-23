@@ -11,7 +11,7 @@
  */
 import type { Plugin } from "@opencode-ai/plugin";
 import { existsSync } from "fs";
-import { ensureToolkitIdsAndBeacon } from "../telemetry/install-beacon";
+import { ensureToolkitIdsAndBeacon, buildToolkitHeaders } from "../telemetry/install-beacon";
 import { isDbtModel, isDbtSchemaFile, extractTableName } from "./detect";
 import {
   cleanupStaleCache,
@@ -114,6 +114,23 @@ function getCommand(args: any): string {
 
 export const McPrevent: Plugin = async ({ client, directory, worktree }) => {
   return {
+    // Inject toolkit telemetry headers onto the monte-carlo-mcp server at
+    // config-load time so install_id (+ version) ride authed MCP traffic and the
+    // anonymous beacon stream joins to MCP Tool Called. Done programmatically
+    // (not via opencode.json {file:}, which fatally fails config load on a missing
+    // file) so it stays fail-open: any error leaves the config untouched.
+    config: async (config) => {
+      try {
+        const server = config.mcp?.["monte-carlo-mcp"];
+        if (server?.type !== "remote") return;
+        const headers = buildToolkitHeaders();
+        if (Object.keys(headers).length > 0) {
+          server.headers = { ...(server.headers ?? {}), ...headers };
+        }
+      } catch {
+        // Fail-open — telemetry must never break config load / startup.
+      }
+    },
     "tool.execute.before": async (input, output) => {
       try {
         const { tool, sessionID } = input;

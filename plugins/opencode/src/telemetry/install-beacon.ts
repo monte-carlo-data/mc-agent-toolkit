@@ -91,13 +91,12 @@ async function postInstallBeacon(installId: string, sessionId: string): Promise<
 }
 
 /**
- * Ensure a stable install_id and a fresh toolkit_session_id, and fire the install
- * beacon once per (machine+editor, toolkit version) — first install and every
- * version change, deduped by a beacon_sent_version marker. Awaitable for tests;
- * callers fire it detached so it never blocks session start.
+ * Read-or-create the stable per-machine install_id and return it. Generates a
+ * v4 UUID (mode 0600) on first call; later calls read the existing file. Returns
+ * "" on any failure (callers treat empty as "skip"). Used by both the install
+ * beacon and the MCP `config` hook so they share one install_id.
  */
-export async function ensureToolkitIdsAndBeacon(): Promise<void> {
-  if (process.env.MC_AGENT_TOOLKIT_TELEMETRY_DISABLED === "1") return;
+export function ensureInstallId(): string {
   try {
     const dir = idsDir();
     mkdirSync(dir, { recursive: true });
@@ -106,10 +105,7 @@ export async function ensureToolkitIdsAndBeacon(): Promise<void> {
     } catch {
       // best-effort
     }
-
     const installPath = join(dir, "install_id");
-    const sessionPath = join(dir, "toolkit_session_id");
-
     let installId = readId(installPath);
     if (!installId) {
       installId = randomUUID();
@@ -120,6 +116,52 @@ export async function ensureToolkitIdsAndBeacon(): Promise<void> {
         // best-effort
       }
     }
+    return installId;
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Build the toolkit telemetry headers for the monte-carlo-mcp server, injected
+ * at config-load time by the plugin's `config` hook (see ../prevent/index.ts).
+ *
+ * Returns ``x-mcd-toolkit-install-id`` (stable, the join key) and
+ * ``x-mcd-toolkit-version``. session_id is intentionally NOT carried: the config
+ * hook runs once at process startup, whereas the rotating session id is a
+ * per-session-created (per-conversation) concept written by the beacon — the two
+ * granularities don't align, so binding it here would be misleading.
+ *
+ * Fail-open by contract: returns {} on opt-out or ANY error. A `config` hook that
+ * threw would break opencode startup — telemetry must never do that.
+ */
+export function buildToolkitHeaders(): Record<string, string> {
+  if (process.env.MC_AGENT_TOOLKIT_TELEMETRY_DISABLED === "1") return {};
+  try {
+    const headers: Record<string, string> = {};
+    const installId = ensureInstallId();
+    if (installId) headers["x-mcd-toolkit-install-id"] = installId;
+    const version = toolkitVersion();
+    if (version && version !== "unknown") headers["x-mcd-toolkit-version"] = version;
+    return headers;
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Ensure a stable install_id and a fresh toolkit_session_id, and fire the install
+ * beacon once per (machine+editor, toolkit version) — first install and every
+ * version change, deduped by a beacon_sent_version marker. Awaitable for tests;
+ * callers fire it detached so it never blocks session start.
+ */
+export async function ensureToolkitIdsAndBeacon(): Promise<void> {
+  if (process.env.MC_AGENT_TOOLKIT_TELEMETRY_DISABLED === "1") return;
+  try {
+    const dir = idsDir();
+    const sessionPath = join(dir, "toolkit_session_id");
+
+    const installId = ensureInstallId();
 
     // Rotate the session id every session.
     const sessionId = randomUUID();
@@ -140,17 +182,6 @@ export async function ensureToolkitIdsAndBeacon(): Promise<void> {
     // If the version can't be resolved, skip — don't send a junk "unknown" beacon
     // or write the marker; retry next session once a real version is available.
     if (version === "unknown") return;
-
-    // Persist the toolkit version so opencode.json's {file:} header substitution
-    // can emit it as x-mcd-toolkit-version on authed MCP traffic. Rewritten each
-    // session to stay current across upgrades; only ever a real version.
-    const versionPath = join(dir, "toolkit_version");
-    writeFileSync(versionPath, version, { mode: 0o600 });
-    try {
-      chmodSync(versionPath, 0o600);
-    } catch {
-      // best-effort
-    }
 
     const sentPath = join(dir, "beacon_sent_version");
     if (readId(sentPath) === version) return;

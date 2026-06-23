@@ -17,6 +17,8 @@ import { tmpdir } from "os";
 import {
   ensureToolkitIdsAndBeacon,
   buildInstallPayload,
+  buildToolkitHeaders,
+  ensureInstallId,
   idsDir,
 } from "../../src/telemetry/install-beacon";
 
@@ -165,27 +167,11 @@ describe("ensureToolkitIdsAndBeacon", () => {
     expect(statSync(sessionIdPath()).mode & 0o777).toBe(0o600);
   });
 
-  it("writes toolkit_version (mode 0600) matching package.json for the {file:} header", async () => {
-    await ensureToolkitIdsAndBeacon();
-    const versionPath = join(idsDir(), "toolkit_version");
-    expect(existsSync(versionPath)).toBe(true);
-    expect(statSync(versionPath).mode & 0o777).toBe(0o600);
-    const expected = JSON.parse(
-      readFileSync(join(import.meta.dir, "../../package.json"), "utf8")
-    ).version;
-    expect(readFileSync(versionPath, "utf8").trim()).toBe(expected);
-  });
-
-  it("rewrites toolkit_version every session even when the beacon is deduped", async () => {
-    await ensureToolkitIdsAndBeacon();
-    const versionPath = join(idsDir(), "toolkit_version");
-    rmSync(versionPath);
-    fetchCalls = [];
-    // Second run: beacon is deduped (same version), but the version file must
-    // still be rewritten so the header substitution always has it.
-    await ensureToolkitIdsAndBeacon();
-    expect(fetchCalls.length).toBe(0);
-    expect(existsSync(versionPath)).toBe(true);
+  it("ensureInstallId creates a stable v4 id (mode 0600), idempotent across calls", () => {
+    const first = ensureInstallId();
+    expect(first).toMatch(V4_UUID_RE);
+    expect(statSync(installIdPath()).mode & 0o777).toBe(0o600);
+    expect(ensureInstallId()).toBe(first); // reads existing, doesn't regenerate
   });
 
   it("honors MCD_TOOLKIT_BEACON_URL override", async () => {
@@ -195,5 +181,36 @@ describe("ensureToolkitIdsAndBeacon", () => {
     expect(fetchCalls[0].url).toBe(
       "https://mcp.dev.getmontecarlo.com/mcp/toolkit/beacon"
     );
+  });
+});
+
+describe("buildToolkitHeaders (config-hook injection)", () => {
+  it("returns install_id (matching ensureInstallId) + version, no session_id", () => {
+    const headers = buildToolkitHeaders();
+    expect(headers["x-mcd-toolkit-install-id"]).toMatch(V4_UUID_RE);
+    expect(headers["x-mcd-toolkit-install-id"]).toBe(ensureInstallId());
+    const expected = JSON.parse(
+      readFileSync(join(import.meta.dir, "../../package.json"), "utf8")
+    ).version;
+    expect(headers["x-mcd-toolkit-version"]).toBe(expected);
+    expect("x-mcd-toolkit-session-id" in headers).toBe(false);
+  });
+
+  it("the install_id it emits matches the install beacon's install_id (the join key)", async () => {
+    await ensureToolkitIdsAndBeacon();
+    const beaconId = JSON.parse(fetchCalls[0].init.body).install_id;
+    expect(buildToolkitHeaders()["x-mcd-toolkit-install-id"]).toBe(beaconId);
+  });
+
+  it("opt-out returns no headers (and never throws)", () => {
+    process.env.MC_AGENT_TOOLKIT_TELEMETRY_DISABLED = "1";
+    expect(buildToolkitHeaders()).toEqual({});
+  });
+
+  it("is fail-open: a fresh machine with no id files still returns headers, never throws", () => {
+    // idsDir points at the temp XDG home; nothing exists yet.
+    expect(existsSync(installIdPath())).toBe(false);
+    const headers = buildToolkitHeaders();
+    expect(headers["x-mcd-toolkit-install-id"]).toMatch(V4_UUID_RE); // self-seeds
   });
 });
