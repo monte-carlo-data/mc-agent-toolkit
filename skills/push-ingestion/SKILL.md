@@ -365,4 +365,3 @@ Additionally, when fetching query history:
 ## Next
 
 - **[deferred]** Once ingestion has landed (pushed metadata, lineage, and query logs take time to process in Monte Carlo), add coverage on the newly ingested tables — point the user to `../monitoring-advisor/SKILL.md`. Don't run it now; it would return nothing until ingestion completes.
-- **[deferred]** If the user instead wants to verify one specific ingested table once it appears, point them to `../asset-health/SKILL.md`.

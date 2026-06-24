@@ -165,10 +165,42 @@ def test_main_cycle():
         check("main: cycle → 1", run_main() == 1)
 
 
+def test_main_missing_mode_tag():
+    # F1 (round 2): a ## Next bullet with a path but no mode tag must fail (can't bypass the gate)
+    table = ("| From | Condition | To | Mode |\n|--|--|--|--|\n"
+             "| monitoring-advisor | yaml | manage-mac | confirm |\n")
+    nxt = {"monitoring-advisor": "## Next\n- read and follow `../manage-mac/SKILL.md`.\n"}
+    with fake_repo(table, nxt):
+        check("main: untagged ## Next bullet (map expects a mode) → 1", run_main() == 1)
+
+
+def test_main_target_not_in_map():
+    # ## Next references a real skill that isn't a declared target for this source
+    table = ("| From | Condition | To | Mode |\n|--|--|--|--|\n"
+             "| asset-health | alerts | incident-response | immediate |\n")
+    nxt = {"asset-health": "## Next\n- **[immediate]** read and follow `../manage-mac/SKILL.md`.\n"}
+    with fake_repo(table, nxt):
+        check("main: ## Next target not in map → 1", run_main() == 1)
+
+
+def test_main_multi_target_valid():
+    # The PR's motivating fan-out: one source, two bullets/targets, both matching the map → 0
+    table = ("| From | Condition | To | Mode |\n|--|--|--|--|\n"
+             "| asset-health | alerts | incident-response | immediate |\n"
+             "| asset-health | gap | monitoring-advisor | immediate |\n")
+    nxt = {"asset-health": "## Next\n"
+                           "- **[immediate]** alerts → read and follow `../incident-response/SKILL.md`.\n"
+                           "- **[immediate]** gap → read and follow `../monitoring-advisor/SKILL.md`.\n"}
+    with fake_repo(table, nxt):
+        check("main: valid multi-target source → 0", run_main() == 0)
+
+
 def main() -> int:
     for fn in [test_parse_chain_map, test_find_cycle, test_parse_next_entries,
                test_parse_next_entries_none, test_main_valid, test_main_mode_mismatch,
-               test_main_unknown_source_single_error, test_main_cycle]:
+               test_main_unknown_source_single_error, test_main_cycle,
+               test_main_missing_mode_tag, test_main_target_not_in_map,
+               test_main_multi_target_valid]:
         print(fn.__name__)
         fn()
     print()

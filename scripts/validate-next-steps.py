@@ -7,7 +7,9 @@ Source of truth: skills/CHAINING.md (the "## Chain map" table). This script chec
      no cycles (A->B->A or longer); every mode is one of immediate/deferred/confirm (or
      "-" for terminal rows).
   2. Hand-off conformance — every `## Next` section in a skill's SKILL.md only references
-     real skills, and every (source -> target) it declares exists in the chain map.
+     real skills, every (source -> target) it declares exists in the chain map, and each
+     bullet's mode tag ([immediate|deferred|confirm]) matches the map (a missing tag where
+     the map expects one is an error, so the mode gate can't be bypassed by omitting it).
 
 Rollout is incremental: a chain-map row whose source skill hasn't grown a `## Next` yet is
 reported as "pending", not an error. Stdlib only (no pip install), mirroring the other CI
@@ -129,7 +131,9 @@ def main() -> int:
         return 1
 
     edges: list[tuple[str, str]] = []
-    map_modes: dict[tuple[str, str], str] = {}
+    # Modes accumulate into a set per (from, to): a source may fan out to the same target
+    # under more than one condition/mode, so we never silently overwrite.
+    map_modes: dict[tuple[str, str], set[str]] = {}
     for r in rows:
         frm, to, mode = r["from"], r["to"], r["mode"]
         if frm not in skills:
@@ -146,13 +150,15 @@ def main() -> int:
             errors.append(f"chain map: '{frm}' -> '{to}' has invalid mode '{mode}' "
                           f"(expected one of {sorted(VALID_MODES)})")
         edges.append((frm, to))
-        map_modes[(frm, to)] = mode
+        map_modes.setdefault((frm, to), set()).add(mode)
 
     cyc = find_cycle(edges)
     if cyc:
         errors.append("chain map: cycle detected: " + " -> ".join(cyc))
 
-    # Conformance: every `## Next` reference is a real skill, declared in the map, with a matching mode.
+    # Conformance: every `## Next` reference is a real skill, declared in the map, with a tagged
+    # mode that matches the map. An untagged bullet that the map expects to carry a mode is an error
+    # (otherwise the mode gate could be bypassed by simply omitting the tag).
     implemented_sources: set[str] = set()
     for skill_dir in sorted(SKILLS_DIR.iterdir()):
         if not skill_dir.is_dir():
@@ -166,9 +172,14 @@ def main() -> int:
                 errors.append(f"{src}/SKILL.md '## Next' references unknown skill '{tgt}'")
             elif (src, tgt) not in map_modes:
                 errors.append(f"{src}/SKILL.md '## Next' -> '{tgt}' is not in the CHAINING.md map")
-            elif mode is not None and mode != map_modes[(src, tgt)]:
-                errors.append(f"{src}/SKILL.md '## Next' -> '{tgt}' tagged [{mode}] "
-                              f"but the map says [{map_modes[(src, tgt)]}]")
+            else:
+                allowed = map_modes[(src, tgt)]
+                if mode is None:
+                    errors.append(f"{src}/SKILL.md '## Next' -> '{tgt}' is missing a mode tag "
+                                  f"(map says {sorted(allowed)})")
+                elif mode not in allowed:
+                    errors.append(f"{src}/SKILL.md '## Next' -> '{tgt}' tagged [{mode}] "
+                                  f"but the map says {sorted(allowed)}")
 
     # Informational: map sources not yet implemented as `## Next` (rollout in progress).
     map_sources = {frm for (frm, _to) in map_modes}

@@ -119,8 +119,10 @@ changed by this convention and do not get a `## Next`.
 
 **The authoritative chain map lives in [`skills/CHAINING.md`](../../skills/CHAINING.md)** — one row per
 skill (`From · Condition · To · Mode`), plus a diagram. That file is the single source of truth;
-`scripts/validate-next-steps.py` validates every `## Next` section against it (and runs in CI). Update
-the map there when you add or change a hand-off.
+`scripts/validate-next-steps.py` validates every `## Next` section against it (and runs in CI) — the
+target must resolve to a real skill, exist in the map, and carry a **mode tag that matches the map**
+(a missing or mismatched `**[mode]**` tag is a CI failure, so the confirm gate can't be dropped by
+omitting the tag). Update the map there when you add or change a hand-off.
 
 ### The three modes
 

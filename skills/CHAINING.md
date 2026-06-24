@@ -5,7 +5,8 @@ finishes, which skill (if any) it hands off to, under what condition, and in whi
 itself — what `## Next` is, the three modes, and the rules — lives in
 [`.claude/rules/skills.md`](../.claude/rules/skills.md). This file is the single source of truth for the
 map; `scripts/validate-next-steps.py` validates every skill's `## Next` section against the table below
-and runs in CI.
+and runs in CI — every hand-off must resolve to a real skill, exist in this table, and carry a mode tag
+that matches the Mode column (a missing or mismatched mode tag fails the build).
 
 ## Modes
 
@@ -29,8 +30,7 @@ and runs in CI.
 | performance-diagnosis | slow / expensive query | (terminal) | — |
 | generate-validation-notebook | change merged & live in prod | monitoring-advisor | deferred |
 | instrument-agent | traces verified | monitoring-advisor | deferred |
-| push-ingestion | ingestion landed → add coverage | monitoring-advisor | deferred |
-| push-ingestion | ingestion landed → verify one table | asset-health | deferred |
+| push-ingestion | ingestion landed | monitoring-advisor | deferred |
 | automated-triage | high-signal unresolved alert (optional) | remediation | confirm |
 | manage-mac | — | (terminal) | — |
 | connection-auth-rules | — | (terminal) | — |
@@ -50,7 +50,6 @@ flowchart LR
   gvn["generate-validation-notebook"] -->|"deferred"| ma
   ia["instrument-agent"] -->|"deferred"| ma
   pi["push-ingestion"] -->|"deferred"| ma
-  pi -->|"deferred"| ah
   at["automated-triage"] -->|"optional · confirm"| rem
 ```
 
