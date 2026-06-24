@@ -9,20 +9,7 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- efef342 feat(copilot): bake toolkit headers via `copilot mcp add` (un-defer Copilot)
-- 5705a06 fix(codex): installer owns the monte-carlo-mcp block (migrate url on reinstall)
-- aef03e6 fix(codex): read toolkit version from source manifest when baking headers
-- ac121c0 fix(opencode): inject MCP headers via config hook instead of {file:} (fail-open)
-- 532c473 feat(cursor): bake toolkit install id + version into mcp.json at install
-- da46291 feat(codex): bake toolkit install id + version into config.toml http_headers
-- 8d873cb feat(telemetry): add shared toolkit-ids.sh for consistent install_id generation
-- 6bb5543 feat(opencode): attach toolkit install id + version headers via {file:} substitution
-- bd632f5 feat(opencode): persist toolkit_version for {file:} header substitution
-- 6cb838c feat(cortex-code): stamp toolkit headers on authed MCP traffic via headersHelper
-- 0bc26e6 feat(claude-code): stamp toolkit headers on authed MCP traffic via headersHelper
-- 5003aa0 feat(cortex-code): ensure-toolkit-ids writes version + seeds MCP headers helper
-- 3768ea9 feat(claude-code): ensure-toolkit-ids writes version + seeds MCP headers helper
-- 66f8de8 feat(telemetry): add mcp-headers-helper.py for MCP header injection
+- Authenticated Monte Carlo MCP requests now carry the toolkit's anonymous install id (`x-mcd-toolkit-install-id`) and version (`x-mcd-toolkit-version`) as HTTP headers, so the anonymous usage-beacon stream can be joined to authenticated MCP activity server-side — no new user- or account-level identifier is introduced. On Copilot CLI — which has no runtime header mechanism — the headers are baked in at install time when the install script registers the Monte Carlo MCP server via `copilot mcp add` (other editors use a runtime helper or their own install-time registration). Fail-open and honors `MC_AGENT_TOOLKIT_TELEMETRY_DISABLED=1`.
 
 ## [1.13.2] - 2026-06-19
 
