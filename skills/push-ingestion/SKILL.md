@@ -361,3 +361,7 @@ Call `_check_available_memory()` before connecting to the warehouse.
 Additionally, when fetching query history:
 - Use `cursor.fetchmany(batch_size)` in a loop instead of `cursor.fetchall()` when possible
 - For very large result sets, consider adding a LIMIT clause and processing in windows
+
+## Next
+
+- **[deferred]** Ingestion runs asynchronously — pushed metadata, lineage, and query logs take time to land and process in Monte Carlo. Once the assets appear (give it time, or check in Monte Carlo), point the user to add coverage on the newly ingested tables via `../monitoring-advisor/SKILL.md`, or to check a specific one with `../asset-health/SKILL.md`. Don't run either now — they would return nothing until ingestion completes.
