@@ -5,6 +5,15 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Cursor will be d
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.14.0] - 2026-06-24
+
+### Added
+
+- Cross-skill chaining: skills now hand off to the logical next skill when their work is done, via a `## Next` convention with three modes — immediate, deferred, and confirm (the last gates any state-mutating hand-off behind explicit user approval).
+- `skills/CHAINING.md`: the authoritative chain map (table + diagram) and single source of truth for hand-offs.
+- `## Next` hand-offs across asset-health, monitoring-advisor, instrument-agent, remediation, performance-diagnosis, analyze-root-cause, generate-validation-notebook, tune-monitor, push-ingestion, and automated-triage.
+- CI check (`scripts/validate-next-steps.py`, wired into validate.yml) that validates every hand-off against the chain map — targets resolve, no self-references, no cycles, map and skills stay in sync.
+
 ## [1.13.3] - 2026-06-23
 
 ### Changed
