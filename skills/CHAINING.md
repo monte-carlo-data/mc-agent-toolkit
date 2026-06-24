@@ -36,26 +36,7 @@ that matches the Mode column (a missing or mismatched mode tag fails the build).
 | connection-auth-rules | — | (terminal) | — |
 | storage-cost-analysis | — | (terminal) | — |
 
-## Diagram
-
-```mermaid
-flowchart LR
-  ah["asset-health"] -->|"alerts · immediate"| ir["incident-response"]
-  ah -->|"gap · immediate"| ma["monitoring-advisor"]
-  arc["analyze-root-cause"] -->|"confirm"| rem["remediation"]
-  rem -->|"systemic · immediate"| ma
-  ma -->|"confirm"| mm["manage-mac"]
-  tm["tune-monitor"] -->|"MaC-managed · confirm"| mm
-  pd["performance-diagnosis"] -->|"failing job · confirm"| rem
-  gvn["generate-validation-notebook"] -->|"deferred"| ma
-  ia["instrument-agent"] -->|"deferred"| ma
-  pi["push-ingestion"] -->|"deferred"| ma
-  at["automated-triage"] -->|"optional · confirm"| rem
-```
-
-Edge labels carry the mode. Nodes with no outgoing edge (`manage-mac`, plus the terminal branches of
-`asset-health`, `tune-monitor`, `performance-diagnosis`) are end states — handing off further would
-return nothing, which the convention forbids.
+Rows marked `(terminal)` are end states — handing off further would return nothing, which the convention forbids.
 
 ## Not in the map (and why)
 
