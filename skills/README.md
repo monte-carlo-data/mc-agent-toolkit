@@ -23,6 +23,12 @@ Skills are platform-agnostic instruction sets that tell an AI coding agent what 
 | **[Connection Auth Rules](connection-auth-rules/)** | Build a Connection Auth Rules configuration for a Monte Carlo connection type. Fetches live connector schemas and transform steps from the apollo-agent repo. |
 | **[Instrument Agent](instrument-agent/)** | Instruments a Python AI agent for Monte Carlo Agent Observability — detects AI libraries, installs the Monte Carlo OpenTelemetry SDK, sets up tracing, and verifies traces in Monte Carlo. Asks before editing. |
 
+## Cross-skill chaining
+
+Skills hand off to the logical next skill when their work is done (e.g. a health check that finds active
+alerts points to incident response). The authoritative map of these hand-offs — and the `## Next`
+convention behind them — is in **[CHAINING.md](CHAINING.md)**.
+
 ## Standalone Installation
 
 Skills can be installed without the plugin via skill registries:
