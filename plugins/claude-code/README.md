@@ -39,6 +39,8 @@ The toolkit sends anonymous skill-usage telemetry by default — which skills ar
 
 It also sends a `Toolkit Installed` beacon once per toolkit version — the first time you start Claude Code after installing, and again after each version change — deduped by a local marker, independent of whether you ever run a skill. It carries the install/session UUIDs, toolkit version, and editor (`claude-code`) — no skill field. Like the skill beacon, it is fail-open and non-blocking.
 
+**Authenticated MCP traffic (v1.13.3+).** The same anonymous `install_id`, a per-session id, and the toolkit version also ride as HTTP headers (`x-mcd-toolkit-install-id`, `x-mcd-toolkit-session-id`, `x-mcd-toolkit-version`) on **authenticated** requests to the Monte Carlo MCP server. This lets the otherwise-anonymous install record be correlated with your account's MCP tool usage server-side — still no prompts, arguments, or code, only the opaque ids and version. The opt-out below disables these headers too.
+
 To opt out, set `MC_AGENT_TOOLKIT_TELEMETRY_DISABLED=1` in your shell environment before starting Claude Code. The toolkit will not phone home.
 
 The data is stored in Mixpanel and Datadog and is used only for product-development decisions about which skills to invest in. The UUIDs are generated locally on first session and stored under `~/.claude/mc-agent-toolkit/`. Deleting that directory resets your install identity to a fresh anonymous one.

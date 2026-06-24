@@ -23,7 +23,7 @@ The script handles everything:
 2. Registers skills in `<repo>/.agents/skills/` (prevent, generate-validation-notebook, push-ingestion)
 3. Writes hooks to `<repo>/.codex/hooks.json` (project-level)
 4. Creates `.agents/plugins/marketplace.json` for Codex plugin discovery
-5. Adds the Monte Carlo MCP server to `~/.codex/config.toml` with the required `User-Agent` header (workaround for [codex#12859](https://github.com/openai/codex/issues/12859))
+5. Adds (and, on reinstall, refreshes) the Monte Carlo MCP server block in `~/.codex/config.toml` with `http_headers`: the required `User-Agent` (workaround for [codex#12859](https://github.com/openai/codex/issues/12859)) plus anonymous toolkit telemetry headers (`x-mcd-toolkit-install-id`, `x-mcd-toolkit-version`) baked in at install time. Opt out with `MC_AGENT_TOOLKIT_TELEMETRY_DISABLED=1` (see Telemetry below).
 6. Enables `codex_hooks` in your config
 7. Opens a browser for OAuth login with your Monte Carlo account
 
@@ -66,6 +66,8 @@ The skill-based impact assessment (via `SKILL.md`) works reliably regardless of 
 ## Telemetry
 
 The toolkit sends an anonymous install beacon — a `Toolkit Installed` event so we can count installations and version adoption. It includes an opaque per-install UUID, a per-session UUID, the toolkit version, and the editor it runs in (`codex`). No prompts, arguments, skill names, or code are ever sent. It fires once per machine per toolkit version — the first time you start Codex after installing, and again after each version change (deduped by a local marker) — and is fail-open and non-blocking, never delaying or interrupting your session.
+
+**Authenticated MCP traffic (v1.13.3+).** The same anonymous `install_id` and the toolkit version also ride as HTTP headers (`x-mcd-toolkit-install-id`, `x-mcd-toolkit-version`) on **authenticated** requests to the Monte Carlo MCP server (baked into `~/.codex/config.toml` at install time). This lets the otherwise-anonymous install record be correlated with your account's MCP tool usage server-side — still no prompts, arguments, or code. The opt-out below disables these headers too.
 
 To opt out, set `MC_AGENT_TOOLKIT_TELEMETRY_DISABLED=1` in your shell environment before starting Codex. The toolkit will not phone home.
 

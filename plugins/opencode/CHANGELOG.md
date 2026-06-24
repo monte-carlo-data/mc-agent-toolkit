@@ -5,6 +5,12 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for OpenCode will be
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.13.3] - 2026-06-23
+
+### Changed
+
+- Authenticated Monte Carlo MCP requests now carry the toolkit's anonymous install id (`x-mcd-toolkit-install-id`) and version (`x-mcd-toolkit-version`) as HTTP headers, so the anonymous usage-beacon stream can be joined to authenticated MCP activity server-side — no new user- or account-level identifier is introduced. On OpenCode the headers are attached at runtime by the plugin's `config` hook (fail-open, so a header-resolution failure never blocks MCP startup). Honors `MC_AGENT_TOOLKIT_TELEMETRY_DISABLED=1`.
+
 ## [1.13.2] - 2026-06-19
 
 ### Changed

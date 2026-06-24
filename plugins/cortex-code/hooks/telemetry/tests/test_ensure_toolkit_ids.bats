@@ -107,3 +107,35 @@ teardown() {
   [ "$status" -eq 0 ]
   [ -f "$IDS_DIR/toolkit_session_id" ]
 }
+
+@test "writes toolkit_version matching plugin.json" {
+  run bash "$SCRIPT"
+  [ "$status" -eq 0 ]
+  [ -f "$IDS_DIR/toolkit_version" ]
+  expected="$(jq -r '.version' "$BATS_TEST_DIRNAME/../../../.cortex-plugin/plugin.json")"
+  [ "$(cat "$IDS_DIR/toolkit_version")" = "$expected" ]
+}
+
+@test "seeds mcp-headers-helper.py into the id dir with mode 600" {
+  run bash "$SCRIPT"
+  [ "$status" -eq 0 ]
+  [ -f "$IDS_DIR/mcp-headers-helper.py" ]
+  cmp -s "$IDS_DIR/mcp-headers-helper.py" "$BATS_TEST_DIRNAME/../lib/mcp-headers-helper.py"
+  perms="$(stat -f '%Lp' "$IDS_DIR/mcp-headers-helper.py" 2>/dev/null || stat -c '%a' "$IDS_DIR/mcp-headers-helper.py")"
+  [ "$perms" = "600" ]
+}
+
+@test "does not recopy the helper when it is already current" {
+  bash "$SCRIPT"
+  touch -t 200001010000 "$IDS_DIR/mcp-headers-helper.py"   # backdate well before 2020
+  bash "$SCRIPT"
+  mt="$(stat -f '%m' "$IDS_DIR/mcp-headers-helper.py" 2>/dev/null || stat -c '%Y' "$IDS_DIR/mcp-headers-helper.py")"
+  [ "$mt" -lt 1577836800 ]   # unchanged backdated mtime → cmp matched, no copy
+}
+
+@test "recopies the helper when it differs from source" {
+  bash "$SCRIPT"
+  echo "TAMPERED" > "$IDS_DIR/mcp-headers-helper.py"
+  bash "$SCRIPT"
+  cmp -s "$IDS_DIR/mcp-headers-helper.py" "$BATS_TEST_DIRNAME/../lib/mcp-headers-helper.py"
+}

@@ -157,6 +157,8 @@ See [skills/prevent/references/TROUBLESHOOTING.md](../../../skills/prevent/refer
 
 The toolkit sends an anonymous install beacon — a `Toolkit Installed` event so we can count installations and version adoption. It includes an opaque per-install UUID, a per-session UUID, the toolkit version, and the editor it runs in (`opencode`). No prompts, arguments, skill names, or code are ever sent. It fires once per machine per toolkit version — the first time you start OpenCode after installing, and again after each version change (deduped by a local marker) — and is fail-open and non-blocking, never delaying or interrupting your session.
 
+**Authenticated MCP traffic (v1.13.3+).** The same anonymous `install_id` and the toolkit version also ride as HTTP headers (`x-mcd-toolkit-install-id`, `x-mcd-toolkit-version`) on **authenticated** requests to the Monte Carlo MCP server (injected at config-load by the plugin's `config` hook). This lets the otherwise-anonymous install record be correlated with your account's MCP tool usage server-side — still no prompts, arguments, or code. The opt-out below disables these headers too.
+
 To opt out, set `MC_AGENT_TOOLKIT_TELEMETRY_DISABLED=1` in your shell environment before starting OpenCode. The toolkit will not phone home.
 
 The data is stored in Mixpanel and Datadog and is used only for product-development decisions. The UUIDs are generated locally on first session and stored under `~/.config/opencode/mc-agent-toolkit/`. Deleting that directory resets your install identity to a fresh anonymous one.

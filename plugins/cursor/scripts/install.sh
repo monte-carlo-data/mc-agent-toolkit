@@ -60,6 +60,20 @@ rm -rf "$TARGET/tests" "$TARGET/scripts" "$TARGET/hooks/prevent/lib/tests" \
 find "$TARGET" -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
 find "$TARGET" -name "*.pyc" -delete 2>/dev/null || true
 
+# --- Bake toolkit telemetry headers into the installed mcp.json ---
+# Cursor's MCP config supports only static headers, so install_id + version are
+# baked into this per-machine copy. install_id comes from the shared
+# ensure_install_id (matches the SessionStart hook's id → telemetry streams join).
+# The committed mcp.json stays clean; only this installed copy carries the headers.
+# shellcheck source=/dev/null
+source "$SCRIPT_DIR/../hooks/telemetry/lib/toolkit-ids.sh"
+# shellcheck source=/dev/null
+source "$SCRIPT_DIR/lib/cursor-config.sh"
+configure_cursor_mcp_headers \
+  "$TARGET/mcp.json" "monte-carlo-mcp" \
+  "$HOME/.cursor/mc-agent-toolkit" "$TARGET/.cursor-plugin/plugin.json"
+echo "  ✓ Toolkit telemetry headers baked into mcp.json"
+
 echo ""
 echo "Done! $PLUGIN_NAME installed to $TARGET"
 echo ""

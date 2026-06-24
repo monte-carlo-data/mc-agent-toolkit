@@ -10,12 +10,14 @@
 set -uo pipefail
 
 DIR="$HOME/.codex/mc-agent-toolkit"
-mkdir -p "$DIR" 2>/dev/null || exit 0
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-if [[ ! -f "$DIR/install_id" ]]; then
-  uuidgen 2>/dev/null | tr '[:upper:]' '[:lower:]' > "$DIR/install_id" 2>/dev/null || exit 0
-  chmod 600 "$DIR/install_id" 2>/dev/null || exit 0
-fi
+# Generate-or-read install_id via the shared helper — the SAME implementation
+# install.sh uses to bake the install_id header into config.toml, so the baked
+# header and the install beacon carry an identical install_id (streams join).
+# shellcheck source=/dev/null
+source "$SCRIPT_DIR/../lib/toolkit-ids.sh"
+ensure_install_id "$DIR" >/dev/null || exit 0
 
 uuidgen 2>/dev/null | tr '[:upper:]' '[:lower:]' > "$DIR/toolkit_session_id" 2>/dev/null || exit 0
 chmod 600 "$DIR/toolkit_session_id" 2>/dev/null || exit 0
@@ -24,7 +26,6 @@ chmod 600 "$DIR/toolkit_session_id" 2>/dev/null || exit 0
 # self-dedups by toolkit version — firing once per version (first install plus
 # upgrades). Backgrounded, fail-open — never let telemetry break a session, and
 # never gate the id writes above on its outcome.
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 bash "$SCRIPT_DIR/../lib/install-beacon.sh" \
   "$DIR" \
   "$SCRIPT_DIR/../../../.codex-plugin/plugin.json" \

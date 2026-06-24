@@ -5,6 +5,12 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Copilot CLI will
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.13.3] - 2026-06-23
+
+### Changed
+
+- Authenticated Monte Carlo MCP requests now carry the toolkit's anonymous install id (`x-mcd-toolkit-install-id`) and version (`x-mcd-toolkit-version`) as HTTP headers, so the anonymous usage-beacon stream can be joined to authenticated MCP activity server-side — no new user- or account-level identifier is introduced. On Copilot CLI — which has no runtime header mechanism — the headers are baked in at install time when the install script registers the Monte Carlo MCP server via `copilot mcp add` (other editors use a runtime helper or their own install-time registration). Fail-open and honors `MC_AGENT_TOOLKIT_TELEMETRY_DISABLED=1`.
+
 ## [1.13.2] - 2026-06-19
 
 ### Changed
