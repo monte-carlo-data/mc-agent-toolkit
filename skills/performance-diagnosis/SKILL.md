@@ -145,3 +145,8 @@ Structure your response as:
 - **Read vs write queries**: When the user asks about "reads" or "read queries", filter with `query_type="read"`. When they ask about "writes", use `query_type="write"`. Do NOT mix them.
 - **Never expose MCONs, UUIDs, or internal identifiers** to the user. Use human-readable names.
 - **Cross-platform**: This skill works across Airflow, dbt, and Databricks. Note which platform each finding comes from.
+
+## Next
+
+- **If the diagnosis found a failing or broken job** (not merely slow) → **[confirm]** hand off to remediation to restart / rerun / backfill: summarize the proposed action, get explicit approval, then read and follow `../remediation/SKILL.md`.
+- **If the finding is a slow or expensive query** → terminal. The diagnosis and recommendations are the deliverable; the actual query or cluster tuning happens outside the toolkit.

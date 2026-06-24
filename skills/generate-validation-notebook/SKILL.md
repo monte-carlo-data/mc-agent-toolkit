@@ -675,3 +675,7 @@ gh api repos/monte-carlo-data/mc-bridge/readme --jq '.content' | base64 --decode
 ```
 
 Focus on: how to install, configure connections, and run MC Bridge. Don't dump the entire README — extract just the setup-relevant sections.
+
+## Next
+
+- **[deferred]** After the validated change is merged and the model has run in production, add monitoring on the new logic — point the user to `../monitoring-advisor/SKILL.md`. Don't run it now: the dev model isn't live yet, so monitoring-advisor (which validates against the live workspace) would have nothing to act on.

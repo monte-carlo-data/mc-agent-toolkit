@@ -27,7 +27,7 @@ and runs in CI.
 | tune-monitor | API-managed (tunes in place itself) | (terminal) | — |
 | performance-diagnosis | failing / broken job | remediation | confirm |
 | performance-diagnosis | slow / expensive query | (terminal) | — |
-| generate-validation-notebook | change validated | monitoring-advisor | immediate |
+| generate-validation-notebook | change merged & live in prod | monitoring-advisor | deferred |
 | instrument-agent | traces verified | monitoring-advisor | deferred |
 | push-ingestion | ingestion in flight | monitoring-advisor | deferred |
 | push-ingestion | ingestion in flight | asset-health | deferred |
@@ -47,7 +47,7 @@ flowchart LR
   ma -->|"confirm"| mm["manage-mac"]
   tm["tune-monitor"] -->|"MaC-managed · confirm"| mm
   pd["performance-diagnosis"] -->|"failing job · confirm"| rem
-  gvn["generate-validation-notebook"] -->|"immediate"| ma
+  gvn["generate-validation-notebook"] -->|"deferred"| ma
   ia["instrument-agent"] -->|"deferred"| ma
   pi["push-ingestion"] -->|"deferred"| ma
   pi -->|"deferred"| ah
