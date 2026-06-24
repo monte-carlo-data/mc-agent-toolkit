@@ -187,3 +187,11 @@ Only include recommendations derivable from collected data:
 - Upstream health issues that may be root causes
 - Active alerts that need acknowledgment or investigation
 - Do NOT recommend specific monitor types — that is outside this skill's scope
+
+## Next
+
+Hand off based on the health result — and only when it points somewhere. A healthy, well-monitored asset is a finished, good outcome; do not invent a next step for it.
+
+- **🔴 Active alerts found** → **[immediate]** investigate them: read and follow `../incident-response/SKILL.md`.
+- **🟡 Unmonitored / thin coverage** (degraded, or 0 active monitors on an important asset) → **[immediate]** close the gap: read and follow `../monitoring-advisor/SKILL.md`.
+- **🟢 Healthy and well-covered** → nothing to do. Don't suggest a further step. (terminal)
