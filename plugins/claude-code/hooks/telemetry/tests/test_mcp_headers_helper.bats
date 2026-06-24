@@ -70,3 +70,26 @@ write_all_ids() {
   run python3 "$HELPER"
   echo "$output" | jq -e . >/dev/null
 }
+
+# Exercises the LITERAL headersHelper shell string shipped in .mcp.json — the
+# `$HOME` path resolution and the `|| echo '{}'` bootstrap fallback — end to end.
+@test ".mcp.json headersHelper string: {} when helper absent, headers when seeded" {
+  cmd="$(jq -r '.mcpServers["monte-carlo-mcp"].headersHelper' "$BATS_TEST_DIRNAME/../../../.mcp.json")"
+  H="$(mktemp -d)"
+
+  # Helper not yet present at $HOME/.claude/... → python3 fails → fallback fires.
+  out_absent="$(HOME="$H" bash -c "$cmd")"
+  [ "$out_absent" = "{}" ]
+
+  # Seed the helper + id files where the string references them.
+  mkdir -p "$H/.claude/mc-agent-toolkit"
+  cp "$BATS_TEST_DIRNAME/../lib/mcp-headers-helper.py" "$H/.claude/mc-agent-toolkit/"
+  printf '%s' "$INSTALL_ID" > "$H/.claude/mc-agent-toolkit/install_id"
+  printf '%s' "$VERSION" > "$H/.claude/mc-agent-toolkit/toolkit_version"
+
+  out_seeded="$(HOME="$H" bash -c "$cmd")"
+  [ "$(echo "$out_seeded" | jq -r '."x-mcd-toolkit-install-id"')" = "$INSTALL_ID" ]
+  [ "$(echo "$out_seeded" | jq -r '."x-mcd-toolkit-version"')" = "$VERSION" ]
+
+  rm -rf "$H"
+}

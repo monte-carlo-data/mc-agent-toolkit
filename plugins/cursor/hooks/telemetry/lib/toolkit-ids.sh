@@ -20,8 +20,14 @@ ensure_install_id() {
   local dir="$1"
   [ -n "$dir" ] || return 0
   mkdir -p "$dir" 2>/dev/null || return 0
-  if [ ! -f "$dir/install_id" ]; then
+  chmod 700 "$dir" 2>/dev/null || true
+  # Regenerate when the file is missing OR empty (-s, not -f): a prior failed
+  # write — e.g. uuidgen absent in a minimal container — can leave a zero-byte
+  # file that must not permanently block generating a real id.
+  if [ ! -s "$dir/install_id" ]; then
     uuidgen 2>/dev/null | tr '[:upper:]' '[:lower:]' > "$dir/install_id" 2>/dev/null || return 0
+    # If generation produced nothing, don't leave an empty file behind.
+    [ -s "$dir/install_id" ] || { rm -f "$dir/install_id" 2>/dev/null; return 0; }
     chmod 600 "$dir/install_id" 2>/dev/null || true
   fi
   cat "$dir/install_id" 2>/dev/null || true

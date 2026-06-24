@@ -16,14 +16,18 @@ set -uo pipefail
 
 DIR="$HOME/.snowflake/cortex/mc-agent-toolkit"
 mkdir -p "$DIR" 2>/dev/null || exit 0
+chmod 700 "$DIR" 2>/dev/null || true
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PLUGIN_JSON="$SCRIPT_DIR/../../../.cortex-plugin/plugin.json"
 
-if [[ ! -f "$DIR/install_id" ]]; then
-  uuidgen 2>/dev/null | tr '[:upper:]' '[:lower:]' > "$DIR/install_id" 2>/dev/null || exit 0
-  chmod 600 "$DIR/install_id" 2>/dev/null || exit 0
-fi
+# install_id via the shared helper — the SAME implementation install.sh and the
+# other editors use — so the value is byte-identical everywhere (the telemetry
+# join key). Fail-open: if the lib is missing, ensure_install_id is undefined and
+# the `|| exit 0` below catches it.
+# shellcheck source=/dev/null
+source "$SCRIPT_DIR/../lib/toolkit-ids.sh" 2>/dev/null || true
+ensure_install_id "$DIR" >/dev/null || exit 0
 
 uuidgen 2>/dev/null | tr '[:upper:]' '[:lower:]' > "$DIR/toolkit_session_id" 2>/dev/null || exit 0
 chmod 600 "$DIR/toolkit_session_id" 2>/dev/null || exit 0

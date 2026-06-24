@@ -46,8 +46,11 @@ configure_codex_mcp_server() {
   # Strip any existing block (from its header to the next section or EOF), leaving
   # all other sections intact.
   if [ -f "$config_file" ] && grep -q "^\[mcp_servers\.${server_name}\]" "$config_file" 2>/dev/null; then
+    # Temp file adjacent to the config so the mv is an atomic same-filesystem
+    # rename (mktemp's default /tmp can be a different volume → mv falls back to
+    # copy, which is non-atomic).
     local tmp
-    tmp="$(mktemp)" || return 0
+    tmp="$(mktemp "${config_file}.XXXXXX")" || return 0
     awk -v server="[mcp_servers.${server_name}]" '
       $0 == server { in_block = 1; next }
       /^\[/ && $0 != server { in_block = 0 }
