@@ -22,12 +22,18 @@ ensure_install_id() {
   mkdir -p "$dir" 2>/dev/null || return 0
   chmod 700 "$dir" 2>/dev/null || true
   # Regenerate when the file is missing OR empty (-s, not -f): a prior failed
-  # write — e.g. uuidgen absent in a minimal container — can leave a zero-byte
-  # file that must not permanently block generating a real id.
+  # write — e.g. uuidgen absent in a minimal container — must not permanently
+  # block generating a real id. Capture to a var and write only once a non-empty
+  # id is in hand, so a failed/absent uuidgen never creates a zero-byte file
+  # (the redirect-then-cleanup approach can't clean up: under `set -o pipefail`,
+  # inherited from the calling hook, the pipeline failure trips `|| return 0`
+  # before any cleanup line runs).
   if [ ! -s "$dir/install_id" ]; then
-    uuidgen 2>/dev/null | tr '[:upper:]' '[:lower:]' > "$dir/install_id" 2>/dev/null || return 0
-    # If generation produced nothing, don't leave an empty file behind.
-    [ -s "$dir/install_id" ] || { rm -f "$dir/install_id" 2>/dev/null; return 0; }
+    rm -f "$dir/install_id" 2>/dev/null
+    local id
+    id="$(uuidgen 2>/dev/null | tr '[:upper:]' '[:lower:]')" || return 0
+    [ -n "$id" ] || return 0
+    printf '%s' "$id" > "$dir/install_id" 2>/dev/null || return 0
     chmod 600 "$dir/install_id" 2>/dev/null || true
   fi
   cat "$dir/install_id" 2>/dev/null || true

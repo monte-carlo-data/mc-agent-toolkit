@@ -12,11 +12,12 @@ setup() {
   IDS_DIR="$(mktemp -d)"
   HELPER="$IDS_DIR/mcp-headers-helper.py"
   cp "$BATS_TEST_DIRNAME/../lib/mcp-headers-helper.py" "$HELPER"
+  HOME_DIR="$(mktemp -d)"   # sandbox $HOME for the .mcp.json shell-string test
   unset MC_AGENT_TOOLKIT_TELEMETRY_DISABLED
 }
 
 teardown() {
-  rm -rf "$IDS_DIR"
+  rm -rf "$IDS_DIR" "$HOME_DIR"
 }
 
 write_all_ids() {
@@ -75,21 +76,18 @@ write_all_ids() {
 # `$HOME` path resolution and the `|| echo '{}'` bootstrap fallback — end to end.
 @test ".mcp.json headersHelper string: {} when helper absent, headers when seeded" {
   cmd="$(jq -r '.mcpServers["monte-carlo-mcp"].headersHelper' "$BATS_TEST_DIRNAME/../../../.mcp.json")"
-  H="$(mktemp -d)"
 
   # Helper not yet present at $HOME/.claude/... → python3 fails → fallback fires.
-  out_absent="$(HOME="$H" bash -c "$cmd")"
+  out_absent="$(HOME="$HOME_DIR" bash -c "$cmd")"
   [ "$out_absent" = "{}" ]
 
   # Seed the helper + id files where the string references them.
-  mkdir -p "$H/.claude/mc-agent-toolkit"
-  cp "$BATS_TEST_DIRNAME/../lib/mcp-headers-helper.py" "$H/.claude/mc-agent-toolkit/"
-  printf '%s' "$INSTALL_ID" > "$H/.claude/mc-agent-toolkit/install_id"
-  printf '%s' "$VERSION" > "$H/.claude/mc-agent-toolkit/toolkit_version"
+  mkdir -p "$HOME_DIR/.claude/mc-agent-toolkit"
+  cp "$BATS_TEST_DIRNAME/../lib/mcp-headers-helper.py" "$HOME_DIR/.claude/mc-agent-toolkit/"
+  printf '%s' "$INSTALL_ID" > "$HOME_DIR/.claude/mc-agent-toolkit/install_id"
+  printf '%s' "$VERSION" > "$HOME_DIR/.claude/mc-agent-toolkit/toolkit_version"
 
-  out_seeded="$(HOME="$H" bash -c "$cmd")"
+  out_seeded="$(HOME="$HOME_DIR" bash -c "$cmd")"
   [ "$(echo "$out_seeded" | jq -r '."x-mcd-toolkit-install-id"')" = "$INSTALL_ID" ]
   [ "$(echo "$out_seeded" | jq -r '."x-mcd-toolkit-version"')" = "$VERSION" ]
-
-  rm -rf "$H"
 }

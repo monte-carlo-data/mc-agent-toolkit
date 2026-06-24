@@ -28,21 +28,25 @@ teardown() {
   [ "$perms" = "700" ]
 }
 
-@test "uuidgen unavailable: leaves NO empty install_id, and recovers once uuidgen returns" {
+@test "uuidgen unavailable (under pipefail): leaves NO empty install_id, recovers when uuidgen returns" {
   # Shadow uuidgen with a stub that produces nothing (simulates absence/failure).
   STUB="$(mktemp -d)"
   printf '#!/usr/bin/env bash\nexit 1\n' > "$STUB/uuidgen"
   chmod +x "$STUB/uuidgen"
+  LIB="$BATS_TEST_DIRNAME/../lib/toolkit-ids.sh"
 
-  PATH="$STUB:$PATH" run ensure_install_id "$IDS_DIR"
+  # Run in the PRODUCTION shell context (set -uo pipefail, inherited from the
+  # SessionStart hook) — bats `run` alone strips pipefail and wouldn't exercise
+  # the pipeline-failure path.
+  run env "PATH=$STUB:$PATH" bash -c "set -uo pipefail; source '$LIB'; ensure_install_id '$IDS_DIR'"
   [ "$status" -eq 0 ]                       # fail-open
   [ "$output" = "" ]                        # no id emitted
   [ ! -f "$IDS_DIR/install_id" ]            # crucial: no zero-byte file left behind
 
   rm -rf "$STUB"
-  # uuidgen works again → a real id is generated (not permanently blocked)
+  # uuidgen works again → a real (v4) id is generated, not permanently blocked.
   id="$(ensure_install_id "$IDS_DIR")"
-  [[ "$id" =~ ^[0-9a-f-]{36}$ ]]
+  [[ "$id" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$ ]]
 }
 
 @test "an existing EMPTY install_id is regenerated, not treated as valid" {
