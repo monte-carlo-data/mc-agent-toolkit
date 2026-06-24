@@ -8,7 +8,7 @@ Monte Carlo's official toolkit for AI coding agents. Brings data observability �
 
 The toolkit bundles the following capabilities as a single **mc-agent-toolkit** plugin. Each feature is a [skill](skills/) that can also be used standalone.
 
-Skills are grouped by the job they help you do. Orchestrated workflows sequence individual skills into guided multi-step flows; atomic skills can be invoked directly by name. Both are loaded the same way.
+Skills are grouped by the job they help you do. Orchestrated workflows sequence individual skills into guided multi-step flows; atomic skills can be invoked directly by name. Both are loaded the same way. Atomic skills also hand off to the logical next skill when their work is done — see [skills/CHAINING.md](skills/CHAINING.md) for the full chain map.
 
 ### Trust — pre-query and pre-build checks
 

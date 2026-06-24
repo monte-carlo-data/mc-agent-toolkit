@@ -29,8 +29,8 @@ and runs in CI.
 | performance-diagnosis | slow / expensive query | (terminal) | — |
 | generate-validation-notebook | change merged & live in prod | monitoring-advisor | deferred |
 | instrument-agent | traces verified | monitoring-advisor | deferred |
-| push-ingestion | ingestion in flight | monitoring-advisor | deferred |
-| push-ingestion | ingestion in flight | asset-health | deferred |
+| push-ingestion | ingestion landed → add coverage | monitoring-advisor | deferred |
+| push-ingestion | ingestion landed → verify one table | asset-health | deferred |
 | automated-triage | high-signal unresolved alert (optional) | remediation | confirm |
 | manage-mac | — | (terminal) | — |
 | connection-auth-rules | — | (terminal) | — |

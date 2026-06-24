@@ -26,6 +26,7 @@ CHAINING_MD = SKILLS_DIR / "CHAINING.md"
 VALID_MODES = {"immediate", "deferred", "confirm"}
 TERMINAL_TOKENS = {"(terminal)", "terminal", "—", "-", ""}
 NEXT_TARGET_RE = re.compile(r"\.\./([a-z0-9][a-z0-9-]*)/SKILL\.md")
+NEXT_MODE_RE = re.compile(r"\*\*\[(immediate|deferred|confirm)\]\*\*")
 
 
 def existing_skills() -> set[str]:
@@ -87,24 +88,31 @@ def find_cycle(edges: list[tuple[str, str]]) -> list[str] | None:
     return None
 
 
-def parse_next_targets(skill_dir: Path) -> list[str]:
-    """Return target skills referenced in a skill's `## Next` section."""
+def parse_next_entries(skill_dir: Path) -> list[tuple[str | None, str]]:
+    """Return (mode, target) pairs referenced in a skill's `## Next` section.
+
+    `mode` is the bracketed tag (immediate/deferred/confirm) on the same bullet as the
+    target, or None if the bullet carries no tag. Parses per-line so each target is
+    associated with its own bullet's mode. Stops at the next `##` or `###` heading.
+    """
     skill_md = skill_dir / "SKILL.md"
     if not skill_md.is_file():
         return []
-    text = skill_md.read_text(encoding="utf-8")
-    lines = text.splitlines()
+    entries: list[tuple[str | None, str]] = []
     in_next = False
-    block: list[str] = []
-    for line in lines:
+    for line in skill_md.read_text(encoding="utf-8").splitlines():
         if re.match(r"^##\s+Next\b", line):
             in_next = True
             continue
-        if in_next and re.match(r"^##\s+\S", line):
-            break
-        if in_next:
-            block.append(line)
-    return NEXT_TARGET_RE.findall("\n".join(block))
+        if in_next and re.match(r"^###?\s+\S", line):
+            break  # next section (level-2 or level-3 heading)
+        if not in_next:
+            continue
+        mode_match = NEXT_MODE_RE.search(line)
+        mode = mode_match.group(1) if mode_match else None
+        for target in NEXT_TARGET_RE.findall(line):
+            entries.append((mode, target))
+    return entries
 
 
 def main() -> int:
@@ -121,11 +129,12 @@ def main() -> int:
         return 1
 
     edges: list[tuple[str, str]] = []
-    map_pairs: set[tuple[str, str]] = set()
+    map_modes: dict[tuple[str, str], str] = {}
     for r in rows:
         frm, to, mode = r["from"], r["to"], r["mode"]
         if frm not in skills:
             errors.append(f"chain map: unknown source skill '{frm}'")
+            continue  # don't treat an invalid row as a real edge (avoids misleading follow-on errors)
         terminal = to in TERMINAL_TOKENS or to.lower().startswith("(terminal")
         if terminal:
             continue
@@ -137,29 +146,32 @@ def main() -> int:
             errors.append(f"chain map: '{frm}' -> '{to}' has invalid mode '{mode}' "
                           f"(expected one of {sorted(VALID_MODES)})")
         edges.append((frm, to))
-        map_pairs.add((frm, to))
+        map_modes[(frm, to)] = mode
 
     cyc = find_cycle(edges)
     if cyc:
         errors.append("chain map: cycle detected: " + " -> ".join(cyc))
 
-    # Conformance: every `## Next` reference is a real skill and is declared in the map.
+    # Conformance: every `## Next` reference is a real skill, declared in the map, with a matching mode.
     implemented_sources: set[str] = set()
     for skill_dir in sorted(SKILLS_DIR.iterdir()):
         if not skill_dir.is_dir():
             continue
         src = skill_dir.name
-        targets = parse_next_targets(skill_dir)
-        if targets:
+        entries = parse_next_entries(skill_dir)
+        if entries:
             implemented_sources.add(src)
-        for tgt in targets:
+        for mode, tgt in entries:
             if tgt not in skills:
                 errors.append(f"{src}/SKILL.md '## Next' references unknown skill '{tgt}'")
-            elif (src, tgt) not in map_pairs:
+            elif (src, tgt) not in map_modes:
                 errors.append(f"{src}/SKILL.md '## Next' -> '{tgt}' is not in the CHAINING.md map")
+            elif mode is not None and mode != map_modes[(src, tgt)]:
+                errors.append(f"{src}/SKILL.md '## Next' -> '{tgt}' tagged [{mode}] "
+                              f"but the map says [{map_modes[(src, tgt)]}]")
 
     # Informational: map sources not yet implemented as `## Next` (rollout in progress).
-    map_sources = {frm for (frm, _to) in map_pairs}
+    map_sources = {frm for (frm, _to) in map_modes}
     pending = sorted(map_sources - implemented_sources)
 
     if errors:
