@@ -254,3 +254,8 @@ General rules for all types:
 - **Degrade gracefully.** If troubleshooting runs are missing, note the limited context and
   reason from alert patterns alone.
 - **Add `$schema` when saving YAML to a file.** If the user asks to save the MaC YAML to a file, add `# yaml-language-server: $schema=https://clidocs.getmontecarlo.com/mac/schema.json` as the first line of that file.
+
+## Next
+
+- **If the monitor is MaC-managed** (`get_monitors` returns a `mac_name`, or the user says it's defined in a YAML file) → **[confirm]** don't tune via the API — it would be overwritten on the next `montecarlo monitors apply`. Summarize the change and, on approval, read and follow `../manage-mac/SKILL.md` to edit the YAML source of truth.
+- **Otherwise** → terminal. This skill applies the tuning itself in Phase 5 (preview → confirm); no further hand-off is needed.
