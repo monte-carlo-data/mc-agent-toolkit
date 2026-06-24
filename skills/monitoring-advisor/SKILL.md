@@ -304,3 +304,7 @@ Never error out or stop the conversation because one tool returned empty results
 - Always use **ISO 8601** format for datetime values in tool calls.
 - Never reformat YAML values returned by creation tools.
 - When passing `audiences` or `failure_audiences` to monitor creation tools, use the audience **name/label** (not UUID). The API accepts audience names.
+
+## Next
+
+- **When monitor YAML has been generated and the user wants to apply or version it** → **[confirm]** hand off to manage-mac so the YAML stays the source of truth: summarize exactly what will be created or changed, get explicit user approval, then read and follow `../manage-mac/SKILL.md`. Never apply monitors as a silent side effect of generating them.
