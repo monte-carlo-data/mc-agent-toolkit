@@ -180,3 +180,7 @@ After the workflow completes:
 
    Adapt the options to context — if the run had many LOW-scoring alerts with no troubleshooting, lean towards refinement; if results looked solid, lean towards scheduling.
 
+## Next
+
+- **If triage surfaced a high-signal, unresolved alert that needs a fix** → **[confirm]** hand off to remediation: summarize the proposed action, get explicit approval, then read and follow `../remediation/SKILL.md`. This is separate from the workflow options above — those refine the triage workflow itself.
+
