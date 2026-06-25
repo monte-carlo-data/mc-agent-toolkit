@@ -224,5 +224,6 @@ Read `references/common-root-causes.md` to match findings against known patterns
 
 ## Next
 
-- **Once a root cause is confirmed and a fix is applicable** → **[confirm]** hand off to remediation: summarize the proposed fix and its blast radius, get explicit approval, then read and follow `../remediation/SKILL.md`. (When this skill runs inside the incident-response workflow, that orchestrator already drives this step — the hand-off is for standalone use.)
-- **If the root cause is inconclusive or no fix applies** → terminal; present findings and stop.
+- **Root cause confirmed and a fix is applicable** → **[confirm]** hand off with the recommended fix + blast radius from the synthesis above, get explicit approval, then read and follow `../remediation/SKILL.md`. (Inside the incident-response workflow, that orchestrator drives this step — the hand-off is for standalone use.)
+- **TSA and the manual investigation disagree and the user hasn't chosen a thread** → surface both, explain the disagreement, and wait for direction (resolving it loops within this skill). (terminal)
+- **Inconclusive or no fix applies** → present findings and stop. (terminal)

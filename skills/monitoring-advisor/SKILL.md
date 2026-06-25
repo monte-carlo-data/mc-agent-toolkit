@@ -307,4 +307,5 @@ Never error out or stop the conversation because one tool returned empty results
 
 ## Next
 
-- **When monitor YAML has been generated and the user wants to apply or version it** → **[confirm]** hand off to manage-mac so the YAML stays the source of truth: summarize exactly what will be created or changed, get explicit user approval, then read and follow `../manage-mac/SKILL.md`. Never apply monitors as a silent side effect of generating them.
+- **YAML generated and the user wants to manage it in a Monitors-as-Code repo** → **[confirm]** hand off so the YAML stays the source of truth: summarize what will be created or changed, get explicit approval, then read and follow `../manage-mac/SKILL.md`. (Applying directly via the CLI is handled within this skill; never apply as a silent side effect.)
+- **Report only, or monitors already created/applied here** → nothing further. (terminal)

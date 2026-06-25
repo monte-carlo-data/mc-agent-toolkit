@@ -145,6 +145,17 @@ Decision order: does it mutate state? → **confirm**. Else, are inputs ready no
 - **Loop-free.** No A→B→A. The validator enforces this against the chain map.
 - **Terminal is a valid, correct outcome.** Setup generators, hubs, and a clean/healthy result legitimately
   have no `## Next`. Forcing a step there is the nagging this convention forbids.
+- **Findings vs. hand-off (diagnosis vs. disposition).** Many skills already emit a findings /
+  recommendations / diagnosis section — that is *diagnosis* (what's wrong, why, including actions outside
+  the toolkit like "fix the upstream dbt job"). `## Next` is *disposition* — the single toolkit skill to
+  continue into. So `## Next` must **reference** the findings, not **restate** them ("Based on the staleness
+  above, run analyze-root-cause?" — not a second copy of the recommendation list), and it is **terminal when
+  no recommendation maps to a toolkit skill**. Never present the same proposed action twice (once in the
+  findings, once in `## Next`).
+- **Conditional on the result — no unconditional hand-offs.** Every `## Next` bullet must name the specific
+  result-state that triggers it. Failure, in-progress/troubleshooting, no-findings, and
+  not-ready-yet states are **explicit `(terminal)`** lines, not silent omissions. A single bullet that fires
+  regardless of outcome (e.g. "after this, run X") is a bug — it will fire on the failure path too.
 
 ### Format (so the validator can parse it)
 

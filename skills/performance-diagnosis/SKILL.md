@@ -148,5 +148,6 @@ Structure your response as:
 
 ## Next
 
-- **If the diagnosis found a failing or broken job** (not merely slow) → **[confirm]** hand off to remediation to restart / rerun / backfill: summarize the proposed action, get explicit approval, then read and follow `../remediation/SKILL.md`.
-- **If the finding is a slow or expensive query** → terminal. The diagnosis and recommendations are the deliverable; the actual query or cluster tuning happens outside the toolkit.
+- **Found a failing or broken job** (not merely slow) → **[confirm]** hand off to restart / rerun / backfill: get explicit approval on the action from the Recommendations above, then read and follow `../remediation/SKILL.md`.
+- **Slow or expensive query** → the Recommendations are the deliverable; query/cluster tuning happens outside the toolkit. (terminal)
+- **No performance issues found** → nothing to hand off. (terminal)

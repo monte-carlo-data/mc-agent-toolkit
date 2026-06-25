@@ -125,4 +125,5 @@ Version constraints for instrumentor packages come from PyPI live (`fetch_sdk_do
 
 ## Next
 
-- **[deferred]** Once the instrumented agent has run and its traces appear in Monte Carlo (confirmed via `get_agent_metadata`), you can add monitoring on the agent's behavior — run `../monitoring-advisor/SKILL.md`, which covers AI agents, not just warehouse tables. Don't invoke it now: agent monitors need real traces and a behavioral baseline first, so point the user there for when the data has landed rather than chaining into empty results.
+- **Instrumentation verified (Step 10 passed)** → **[deferred]** once the agent has run and its traces appear in Monte Carlo (via `get_agent_metadata`), add monitoring on the agent's behavior: read and follow `../monitoring-advisor/SKILL.md` (it covers AI agents, not just tables). Don't invoke it now — agent monitors need real traces and a behavioral baseline first.
+- **Verification failed or still troubleshooting** → resolve that first; no hand-off. (terminal)

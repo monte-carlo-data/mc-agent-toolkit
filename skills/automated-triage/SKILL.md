@@ -182,5 +182,9 @@ After the workflow completes:
 
 ## Next
 
-- **If triage surfaced a high-signal, unresolved alert that needs a fix** → **[confirm]** hand off to remediation: summarize the proposed action, get explicit approval, then read and follow `../remediation/SKILL.md`. This is separate from the workflow options above — those refine the triage workflow itself.
+Pick the route the triage outcome implies (separate from the Step 4 workflow-refinement options, which iterate on the triage process itself):
+
+- **High-signal, unresolved alert needing a data fix** → **[confirm]** hand off: get explicit approval on the action, then read and follow `../remediation/SKILL.md`.
+- **Chronic noise from a mis-tuned monitor** (e.g. a static threshold firing repeatedly on benign data) → **[confirm]** fix it at the source: get approval, then read and follow `../tune-monitor/SKILL.md`.
+- **Benign/expected and handled inline** (marked normal, acknowledged) → nothing to hand off. (terminal)
 

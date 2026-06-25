@@ -349,5 +349,8 @@ Do not automatically create monitors or tickets — suggest them and let the use
 
 ## Next
 
-- **If the root cause was systemic** (a flaky pipeline, a missing monitor) and the user wants to prevent recurrence → **[immediate]** add coverage: read and follow `../monitoring-advisor/SKILL.md`.
-- **If it was a one-off** (infra blip, manual error) → terminal; document and stop. Don't push a monitor.
+Act on the prevention assessment above — don't restate it:
+
+- **Root cause was systemic** (flaky pipeline, missing monitor) and the user wants to prevent recurrence → **[immediate]** add coverage: read and follow `../monitoring-advisor/SKILL.md`.
+- **One-off** (infra blip, manual error) → document and stop. (terminal)
+- **No remediation tool was available — plan only** → the incident is documented; no further toolkit action applies. (terminal)

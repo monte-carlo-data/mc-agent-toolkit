@@ -227,8 +227,9 @@ miscalibration, genuine issues, etc.}
 {Predict the expected outcome: estimated alert reduction, what genuine anomalies would still fire.}
 ```
 
-**Next step:** "Want me to apply any of these changes to the monitor config, or explore the alert
-history further?"
+**Next step:** Differentiate by how the monitor is managed:
+- **API-managed:** "Want me to apply these changes to the monitor config, or explore the alert history further?" (apply = Phase 5)
+- **MaC-managed** (`get_monitors` returns a `mac_name`): do **not** offer an API apply — it would be overwritten on the next `montecarlo monitors apply`. Route to the manage-mac hand-off (see `## Next`) so the YAML stays the source of truth.
 
 ---
 
@@ -257,5 +258,6 @@ General rules for all types:
 
 ## Next
 
-- **If the monitor is MaC-managed** (`get_monitors` returns a `mac_name`, or the user says it's defined in a YAML file) → **[confirm]** don't tune via the API — it would be overwritten on the next `montecarlo monitors apply`. Summarize the change and, on approval, read and follow `../manage-mac/SKILL.md` to edit the YAML source of truth.
-- **Otherwise** → terminal. This skill applies the tuning itself in Phase 5 (preview → confirm); no further hand-off is needed.
+- **Monitor is MaC-managed** (`get_monitors` returns a `mac_name`, or the user says it's defined in a YAML file) → **[confirm]** don't tune via the API (it'd be overwritten on the next `montecarlo monitors apply`); summarize the change, get approval, then read and follow `../manage-mac/SKILL.md` to edit the YAML source of truth.
+- **API-managed** → this skill applies the tuning itself in Phase 5 (preview → confirm); no further hand-off. (terminal)
+- **No changes recommended** → nothing to do. (terminal)

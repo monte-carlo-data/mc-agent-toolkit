@@ -19,11 +19,12 @@ that matches the Mode column (a missing or mismatched mode tag fails the build).
 | From | Condition | To | Mode |
 |------|-----------|----|------|
 | asset-health | active alerts found | incident-response | immediate |
+| asset-health | unhealthy / stale, no active alert | analyze-root-cause | immediate |
 | asset-health | thin / no monitor coverage | monitoring-advisor | immediate |
 | asset-health | healthy and well-covered | (terminal) | — |
 | analyze-root-cause | root cause confirmed, fix applicable | remediation | confirm |
 | remediation | systemic (flaky pipeline / missing monitor) | monitoring-advisor | immediate |
-| monitoring-advisor | YAML produced | manage-mac | confirm |
+| monitoring-advisor | YAML to manage in a MaC repo | manage-mac | confirm |
 | tune-monitor | monitor is MaC-managed | manage-mac | confirm |
 | tune-monitor | API-managed (tunes in place itself) | (terminal) | — |
 | performance-diagnosis | failing / broken job | remediation | confirm |
@@ -31,7 +32,8 @@ that matches the Mode column (a missing or mismatched mode tag fails the build).
 | generate-validation-notebook | change merged & live in prod | monitoring-advisor | deferred |
 | instrument-agent | traces verified | monitoring-advisor | deferred |
 | push-ingestion | ingestion landed | monitoring-advisor | deferred |
-| automated-triage | high-signal unresolved alert (optional) | remediation | confirm |
+| automated-triage | high-signal unresolved alert needing a data fix | remediation | confirm |
+| automated-triage | chronic noise from a mis-tuned monitor | tune-monitor | confirm |
 | manage-mac | — | (terminal) | — |
 | connection-auth-rules | — | (terminal) | — |
 | storage-cost-analysis | — | (terminal) | — |

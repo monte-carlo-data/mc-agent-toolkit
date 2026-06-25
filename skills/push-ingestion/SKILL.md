@@ -364,4 +364,5 @@ Additionally, when fetching query history:
 
 ## Next
 
-- **[deferred]** Once ingestion has landed (pushed metadata, lineage, and query logs take time to process in Monte Carlo), add coverage on the newly ingested tables — point the user to `../monitoring-advisor/SKILL.md`. Don't run it now; it would return nothing until ingestion completes.
+- **Push succeeded** (202 + invocation_id, validation passes) → **[deferred]** once ingestion has landed (metadata/lineage/query logs take time to process), add coverage on the newly ingested tables: read and follow `../monitoring-advisor/SKILL.md`. Don't run it now — it would return nothing until ingestion completes.
+- **Push failed or is still being debugged** → resolve the push first; no hand-off. (terminal)
