@@ -675,3 +675,8 @@ gh api repos/monte-carlo-data/mc-bridge/readme --jq '.content' | base64 --decode
 ```
 
 Focus on: how to install, configure connections, and run MC Bridge. Don't dump the entire README — extract just the setup-relevant sections.
+
+## Next
+
+- **A validation notebook was generated** → **[deferred]** after the change is merged and the model has run in production, add monitoring on the new logic: read and follow `../monitoring-advisor/SKILL.md`. Don't run it now — the dev model isn't live yet, so monitoring-advisor (which validates against the live workspace) would have nothing to act on.
+- **Stopped early** (no changed models, schema resolution failed, or the filter matched nothing) → no notebook, no hand-off. (terminal)

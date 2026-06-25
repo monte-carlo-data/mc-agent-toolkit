@@ -346,3 +346,11 @@ Do not automatically create monitors or tickets — suggest them and let the use
 - **NEVER modify data directly** (DELETE, UPDATE, DROP) without explicit user confirmation AND a clearly stated rollback plan.
 - **NEVER mark an alert as FIXED before verifying the fix.** Check that the underlying condition has actually improved.
 - **NEVER remediate silently.** Always document what was done via `create_or_update_alert_comment`.
+
+## Next
+
+Act on the prevention assessment above — don't restate it:
+
+- **Root cause was systemic** (flaky pipeline, missing monitor) and the user wants to prevent recurrence → **[immediate]** add coverage: read and follow `../monitoring-advisor/SKILL.md`.
+- **One-off** (infra blip, manual error) → document and stop. (terminal)
+- **No remediation tool was available — plan only** → the incident is documented; no further toolkit action applies. (terminal)

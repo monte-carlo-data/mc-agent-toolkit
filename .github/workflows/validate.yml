@@ -60,3 +60,13 @@ jobs:
             echo "OK: every plugin's shared libs match plugins/shared"
           fi
           exit $rc
+
+  next-steps-in-sync:
+    name: Cross-skill ## Next hand-offs match the chain map
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unit-test the validator
+        run: python3 scripts/tests/test_validate_next_steps.py
+      - name: Validate skills/CHAINING.md and every ## Next section
+        run: python3 scripts/validate-next-steps.py

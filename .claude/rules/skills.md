@@ -104,3 +104,68 @@ When adding a new skill or renaming an existing one, update the skill tables in 
 2. `skills/README.md` — the Available Skills table
 
 These are the two places users discover skills. A skill that exists but isn't listed in both READMEs is effectively invisible.
+
+## Cross-skill hand-offs: the `## Next` convention
+
+When an atomic skill finishes its primary job, it may hand off to the logical next skill so the user
+keeps moving through a workflow. This is the toolkit's core value — chaining tools into guided flows —
+but it must never nag, loop, or fire into an empty or destructive next step.
+
+**What `## Next` is.** A short, optional section at the **end** of an atomic skill's `SKILL.md`. It is a
+*terminal* hand-off — the current skill's work is done and it points to what comes next. This is
+**distinct from** the way orchestrators (`incident-response`, `proactive-monitoring`) embed
+`**Skill:** Read and follow ../<name>/SKILL.md` *mid-workflow* to sequence steps. Orchestrators are not
+changed by this convention and do not get a `## Next`.
+
+**The authoritative chain map lives in [`skills/CHAINING.md`](../../skills/CHAINING.md)** — one row per
+skill (`From · Condition · To · Mode`). That file is the single source of truth;
+`scripts/validate-next-steps.py` validates every `## Next` section against it (and runs in CI) — the
+target must resolve to a real skill, exist in the map, and carry a **mode tag that matches the map**
+(a missing or mismatched `**[mode]**` tag is a CI failure, so the confirm gate can't be dropped by
+omitting the tag). Update the map there when you add or change a hand-off.
+
+### The three modes
+
+| Mode | Use when | What the `## Next` does |
+|------|----------|-------------------------|
+| **immediate** | the next skill's inputs are available right now | `Read and follow ../<skill>/SKILL.md` — proceed directly |
+| **deferred** | an async/latency dependency must complete first (ingestion landing, trace baselines, a long job) | **State the readiness condition** and point — do **not** auto-invoke: *"Once X appears in `<tool>`, run `<skill>`."* |
+| **confirm** | the next skill (or its next phase) **mutates state** (`manage-mac` apply, `remediation`, `tune-monitor` apply, `update_alert`) | Present a summary of the proposed change and **require explicit user approval** before invoking the write. Never auto-execute a mutation. |
+
+Decision order: does it mutate state? → **confirm**. Else, are inputs ready now? → **immediate**, otherwise **deferred**.
+
+### Rules
+
+- **One high-confidence next step**, conditional on the result, plus at most one alternative. **No menus**
+  for cross-skill hand-offs. (Intra-skill "what next" menus — iterating on the skill's own output, e.g.
+  `automated-triage` refine/test/schedule — are still allowed; just don't duplicate the same target across
+  both a menu and a `## Next`.)
+- **Data-driven.** Only offer the step the result implies (alerts present → triage; healthy + well-covered →
+  nothing). Never a generic "you could also…".
+- **Loop-free.** No A→B→A. The validator enforces this against the chain map.
+- **Terminal is a valid, correct outcome.** Setup generators, hubs, and a clean/healthy result legitimately
+  have no `## Next`. Forcing a step there is the nagging this convention forbids.
+- **Findings vs. hand-off (diagnosis vs. disposition).** Many skills already emit a findings /
+  recommendations / diagnosis section — that is *diagnosis* (what's wrong, why, including actions outside
+  the toolkit like "fix the upstream dbt job"). `## Next` is *disposition* — the single toolkit skill to
+  continue into. So `## Next` must **reference** the findings, not **restate** them ("Based on the staleness
+  above, run analyze-root-cause?" — not a second copy of the recommendation list), and it is **terminal when
+  no recommendation maps to a toolkit skill**. Never present the same proposed action twice (once in the
+  findings, once in `## Next`).
+- **Conditional on the result — no unconditional hand-offs.** Every `## Next` bullet must name the specific
+  result-state that triggers it. Failure, in-progress/troubleshooting, no-findings, and
+  not-ready-yet states are **explicit `(terminal)`** lines, not silent omissions. A single bullet that fires
+  regardless of outcome (e.g. "after this, run X") is a bug — it will fire on the failure path too.
+
+### Format (so the validator can parse it)
+
+In a `## Next` section, reference each target skill as a relative path — `../<skill-name>/SKILL.md` —
+exactly as orchestrators do, and tag the mode in bold. Example:
+
+```markdown
+## Next
+
+- If active alerts were found → **[immediate]** investigate them: read and follow `../incident-response/SKILL.md`.
+- If the table is under-monitored → **[immediate]** close the gap: read and follow `../monitoring-advisor/SKILL.md`.
+- If the table is healthy and well-covered → nothing to do. (terminal)
+```

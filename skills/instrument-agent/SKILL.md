@@ -122,3 +122,8 @@ Version constraints for instrumentor packages come from PyPI live (`fetch_sdk_do
 | Command | Purpose |
 |---|---|
 | `/instrument-agent` | Kicks off the workflow against the current Python codebase. |
+
+## Next
+
+- **Instrumentation verified (Step 10 passed)** → **[deferred]** once the agent has run and its traces appear in Monte Carlo (via `get_agent_metadata`), add monitoring on the agent's behavior: read and follow `../monitoring-advisor/SKILL.md` (it covers AI agents, not just tables). Don't invoke it now — agent monitors need real traces and a behavioral baseline first.
+- **Verification failed or still troubleshooting** → resolve that first; no hand-off. (terminal)

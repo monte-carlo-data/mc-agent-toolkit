@@ -361,3 +361,8 @@ Call `_check_available_memory()` before connecting to the warehouse.
 Additionally, when fetching query history:
 - Use `cursor.fetchmany(batch_size)` in a loop instead of `cursor.fetchall()` when possible
 - For very large result sets, consider adding a LIMIT clause and processing in windows
+
+## Next
+
+- **Push succeeded** (202 + invocation_id, validation passes) → **[deferred]** once ingestion has landed (metadata/lineage/query logs take time to process), add coverage on the newly ingested tables: read and follow `../monitoring-advisor/SKILL.md`. Don't run it now — it would return nothing until ingestion completes.
+- **Push failed or is still being debugged** → resolve the push first; no hand-off. (terminal)

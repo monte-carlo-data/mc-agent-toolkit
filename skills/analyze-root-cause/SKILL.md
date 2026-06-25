@@ -221,3 +221,9 @@ Read `references/common-root-causes.md` to match findings against known patterns
 - **Cross-platform awareness.** ETL issues can come from Airflow, dbt, or Databricks. Check all platforms that are relevant.
 - **Do not invoke TSA without an incident UUID.** `run_troubleshooting_agent` requires one. If intake is on the no-incident path, skip TSA entirely until/unless an alert is identified.
 - **Honor explicit user opt-outs.** If the user says "skip TSA", "manual only", or similar, do not call `run_troubleshooting_agent` or `alert_assessment` — proceed with the manual investigation only.
+
+## Next
+
+- **Root cause confirmed and a fix is applicable** → **[confirm]** hand off with the recommended fix + blast radius from the synthesis above, get explicit approval, then read and follow `../remediation/SKILL.md`. (Inside the incident-response workflow, that orchestrator drives this step — the hand-off is for standalone use.)
+- **TSA and the manual investigation disagree and the user hasn't chosen a thread** → surface both, explain the disagreement, and wait for direction (resolving it loops within this skill). (terminal)
+- **Inconclusive or no fix applies** → present findings and stop. (terminal)

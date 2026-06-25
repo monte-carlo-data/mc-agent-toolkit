@@ -187,3 +187,13 @@ Only include recommendations derivable from collected data:
 - Upstream health issues that may be root causes
 - Active alerts that need acknowledgment or investigation
 - Do NOT recommend specific monitor types — that is outside this skill's scope
+
+## Next
+
+Hand off based on the health result — pick the one route the result implies, and **reference the Recommendations above rather than restating them**. A healthy, well-monitored asset is a finished, good outcome.
+
+- **Active alerts in the queue** → **[immediate]** investigate them: read and follow `../incident-response/SKILL.md`.
+- **Unhealthy but no queued alert** (stale, or a monitor firing/auto-resolving outside the alert queue) → **[immediate]** find out why: read and follow `../analyze-root-cause/SKILL.md`.
+- **Healthy data but missing monitor coverage** (few/no active monitors, especially on an important asset) → **[immediate]** close the gap: read and follow `../monitoring-advisor/SKILL.md`.
+- **Healthy and well-covered** → nothing to do. (terminal)
+- **The only fix is outside the toolkit** (e.g. repair the upstream dbt/ML job) → note it in the Recommendations; no toolkit hand-off. (terminal)
