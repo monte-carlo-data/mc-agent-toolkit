@@ -7,23 +7,24 @@ Run LLM-evaluated quality checks on agent outputs. Best for:
 - **Answer relevance scoring** — is the response relevant to the question?
 - **Helpfulness and clarity** — is the response useful and well-structured?
 - **Task completion** — did the agent complete what was asked?
-- **Content safety** — does the output avoid PII/secrets?
+- **Banned-keyword check** — does the output avoid specific banned keywords (e.g. password, ssn, api secret)?
 - **Custom evaluation criteria** — via custom transforms
 
 ## Constraints
 
-> **CRITICAL:** Agent monitors can ONLY be created on the `traceTableMcon` returned by
-> `get_agent_metadata`. You cannot use any other table or MCON — the API will reject it
-> with "table must be validated".
+> **CRITICAL:** The monitor's source is authored via the `agent` reference, NOT a
+> `dw_id` + `data_source`/MCON. Pass the `agentReference` value from `get_agent_metadata`
+> — a platform `{database}:{schema}.{name}` reference or an OTel `service_name`. Do NOT
+> pass an MCON as `agent`.
 
-> **CRITICAL:** Always use the exact `traceTableMcon` from `get_agent_metadata` as the
-> `data_source.mcon` — NEVER modify, truncate, or reconstruct it.
+> **IMPORTANT:** `transforms` is now a TOP-LEVEL parameter (not nested under
+> `data_source`). It defines the evaluation logic.
 
-> **IMPORTANT:** Always use `FIXED` (uppercase) for `scheduleType` in schedule configs.
-> All schedule type values must be uppercase. Using lowercase causes
-> "Expected type ScheduleType" errors.
+> **IMPORTANT:** `schedule_type` defaults to `fixed` (lowercase) and `interval_minutes`
+> defaults to `60`. Valid `schedule_type` values: `fixed`, `dynamic`, `manual`.
 
-> **IMPORTANT:** Agent span filters always need at least the `agent` field set.
+> **IMPORTANT:** `agent_span_filters` is an optional refinement; when used, include at
+> least the `agent` field.
 
 > **IMPORTANT:** Use predefined transforms when possible — they have known output field
 > names (see the predefined transforms tables below). Custom transforms require you to
@@ -38,9 +39,10 @@ Run LLM-evaluated quality checks on agent outputs. Best for:
 
 ## Key characteristics
 
-- Requires `sampling_config` — controls how many traces are sampled for evaluation
-- Supports `transforms` in `data_source` — defines the evaluation logic
+- Requires `sampling_config` — controls how many spans are sampled for evaluation
+- Supports a top-level `transforms` array — defines the evaluation logic
 - Transform output field names are used in `alert_conditions.fields`
+- Optional `is_agent_conversation_aggregation=True` to aggregate per conversation
 - Does NOT support a `context` field on transforms — do not use it
 - For predefined transforms, do NOT set the `field` parameter — omit it entirely
 
@@ -48,14 +50,21 @@ Run LLM-evaluated quality checks on agent outputs. Best for:
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `dw_id` | string | Yes | Warehouse UUID |
-| `description` | string | Yes | Human-readable monitor description |
-| `data_source` | object | Yes | Includes `type`, `mcon`, and `transforms` array |
+| `description` | string | Yes | Human-readable monitor description (shown as display name) |
+| `agent` | string | Yes | Agent reference — `agentReference` from `get_agent_metadata` (`{db}:{schema}.{name}` or OTel `service_name`) |
 | `alert_conditions` | array | Yes | Alert conditions using transform output field names |
-| `schedule_config` | object | Yes | `{"scheduleType": "FIXED", "intervalMinutes": 60}` |
-| `agent_span_filters` | array | Yes | Span filters — always include at least `agent` |
-| `sampling_config` | object | Yes | `{"percentage": 10.0}` or `{"count": 100}` (max 10,000) |
-| `dry_run` | boolean | No | Default `True` — preview without creating |
+| `sampling_config` | object | Yes | `{"percentage": 10.0}` or `{"count": 100}` |
+| `transforms` | array | No | Evaluation transforms (predefined or custom); top-level, not under `data_source` |
+| `is_agent_conversation_aggregation` | boolean | No | Aggregate evaluation per conversation instead of per span |
+| `warehouse` | string | No | Warehouse name or UUID — only when the agent reference doesn't pin it down |
+| `trace_table` | string | No | Explicit trace table — only for non-ClickHouse OTel agents |
+| `agent_span_filters` | array | No | Optional span-scope refinement (`agent`, `workflow`, `task`, `spanName`) |
+| `sensitivity` | string | No | Anomaly detection sensitivity for AUTO operators |
+| `aggregate_by` | string | No | Time-window bucketing (`hour`/`day`/`week`/`month`) |
+| `schedule_type` | string | No | Defaults to `fixed`. `fixed`/`dynamic`/`manual` |
+| `interval_minutes` | int | No | Defaults to `60` for `fixed` |
+| `monitor_uuid` | string | No | UUID of an existing monitor to update in place (PUT semantics) |
+| `dry_run` | boolean | No | Default `True` — preview YAML; set `False` to deploy |
 
 ## Predefined LLM transforms
 
@@ -75,9 +84,9 @@ These have default output field names — no `alias` needed and do NOT set `fiel
 
 | Transform function | Output field | Output type | Description |
 |-------------------|-------------|-------------|-------------|
-| `word_count` | `word_count` | number | Word count of the completion |
+| `output_length` | `word_count` | number | Word count of the completion |
 | `json_validity` | `json_valid` | boolean | Is the completion valid JSON? |
-| `content_safety` | `content_safe` | boolean | Does the completion avoid PII/secrets? |
+| `keywords` | `content_safe` | boolean | TRUE if output does NOT contain banned keywords (password, ssn, api secret, credit card). Not a general PII/secrets detector. |
 
 ## Custom transforms
 
@@ -107,52 +116,44 @@ Use `thresholdValue` (camelCase) for threshold operators — NOT `threshold_valu
 
 ## Examples
 
-### Answer relevance evaluation
+The `agent` value below comes from `get_agent_metadata`'s `agentReference` field. The
+first example uses a platform `{database}:{schema}.{name}` reference; the others use an
+OTel `service_name`. Use whichever form `get_agent_metadata` returns for your agent.
+Note that `transforms` is now a top-level parameter, no longer nested under `data_source`.
+
+### Answer relevance evaluation (platform agent reference)
 
 ```
-create_agent_evaluation_monitor(
-    dw_id="<warehouse_uuid>",
+create_or_update_agent_evaluation_monitor(
     description="Chat Agent relevance evaluation",
-    data_source={
-        "type": "TABLE",
-        "mcon": "<trace_table_mcon>",
-        "transforms": [
-            {"function": "answer_relevance"}
-        ]
-    },
+    agent="analytics:agents.support_bot",
+    transforms=[
+        {"function": "answer_relevance"}
+    ],
     alert_conditions=[
         {"metric": "NUMERIC_MEAN", "operator": "LT", "fields": ["relevance_score"],
          "thresholdValue": 2}
     ],
-    schedule_config={"scheduleType": "FIXED", "intervalMinutes": 60},
+    sampling_config={"percentage": 10.0},
     agent_span_filters=[
         {"agent": {"value": "My Agent"}, "workflow": {"value": "Chat Agent"}}
     ],
-    sampling_config={"percentage": 10.0},
     dry_run=True
 )
 ```
 
-### Content safety check
+### Banned-keyword check (OTel service_name)
 
 ```
-create_agent_evaluation_monitor(
-    dw_id="<warehouse_uuid>",
+create_or_update_agent_evaluation_monitor(
     description="Chat Agent content safety check",
-    data_source={
-        "type": "TABLE",
-        "mcon": "<trace_table_mcon>",
-        "transforms": [
-            {"function": "content_safety"}
-        ]
-    },
+    agent="checkout-agent",
+    transforms=[
+        {"function": "keywords"}
+    ],
     alert_conditions=[
         {"metric": "NUMERIC_MEAN", "operator": "LT", "fields": ["content_safe"],
          "thresholdValue": 1}
-    ],
-    schedule_config={"scheduleType": "FIXED", "intervalMinutes": 60},
-    agent_span_filters=[
-        {"agent": {"value": "My Agent"}}
     ],
     sampling_config={"count": 100},
     dry_run=True
@@ -162,33 +163,27 @@ create_agent_evaluation_monitor(
 ### Custom classification
 
 ```
-create_agent_evaluation_monitor(
-    dw_id="<warehouse_uuid>",
+create_or_update_agent_evaluation_monitor(
     description="Chat Agent response tone classification",
-    data_source={
-        "type": "TABLE",
-        "mcon": "<trace_table_mcon>",
-        "transforms": [
-            {
-                "function": "classification",
-                "alias": "tone_label",
-                "categories": [
-                    {"label": "professional", "description": "Business-appropriate tone"},
-                    {"label": "casual", "description": "Informal or overly relaxed tone"},
-                    {"label": "inappropriate", "description": "Rude, dismissive, or harmful tone"}
-                ]
-            }
-        ]
-    },
+    agent="checkout-agent",
+    transforms=[
+        {
+            "function": "classification",
+            "alias": "tone_label",
+            "categories": [
+                {"label": "professional", "description": "Business-appropriate tone"},
+                {"label": "casual", "description": "Informal or overly relaxed tone"},
+                {"label": "inappropriate", "description": "Rude, dismissive, or harmful tone"}
+            ]
+        }
+    ],
     alert_conditions=[
         {"metric": "NUMERIC_MEAN", "operator": "GT", "fields": ["tone_label"],
          "thresholdValue": 0}
     ],
-    schedule_config={"scheduleType": "FIXED", "intervalMinutes": 360},
-    agent_span_filters=[
-        {"agent": {"value": "My Agent"}}
-    ],
     sampling_config={"percentage": 5.0},
+    schedule_type="fixed",
+    interval_minutes=360,
     dry_run=True
 )
 ```
@@ -197,6 +192,5 @@ create_agent_evaluation_monitor(
 
 | Error message | Cause | Fix |
 |--------------|-------|-----|
-| "table must be validated" | MCON doesn't match a registered trace table | Verify the exact `traceTableMcon` from `get_agent_metadata` — use it as-is, do not modify |
+| invalid / unresolvable `agent` reference | The `agent` value wasn't taken from `get_agent_metadata` | Use the exact `agentReference` value from `get_agent_metadata` — do not construct it by hand |
 | "Field X doesn't exist" | Wrong transform output field name used in `alert_conditions.fields` | For predefined transforms, use the documented output field name (e.g., `relevance_score` for `answer_relevance`); for custom transforms, verify the `alias` matches |
-| "Expected type ScheduleType" | Schedule type is lowercase or invalid | Use `FIXED` (uppercase) — all schedule type values must be uppercase |

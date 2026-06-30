@@ -10,18 +10,16 @@ Track quantitative span-level metrics over time. Best for:
 
 ## Constraints
 
-> **CRITICAL:** Agent monitors can ONLY be created on the `traceTableMcon` returned by
-> `get_agent_metadata`. You cannot use any other table or MCON — the API will reject it
-> with "table must be validated".
+> **CRITICAL:** The monitor's source is authored via the `agent` reference, NOT a
+> `dw_id` + `data_source`/MCON. Pass the `agentReference` value from `get_agent_metadata`
+> — a platform `{database}:{schema}.{name}` reference or an OTel `service_name`. Do NOT
+> pass an MCON as `agent`.
 
-> **CRITICAL:** Always use the exact `traceTableMcon` from `get_agent_metadata` as the
-> `data_source.mcon` — NEVER modify, truncate, or reconstruct it.
+> **IMPORTANT:** `schedule_type` defaults to `fixed` (lowercase) and `interval_minutes`
+> defaults to `60`. Valid `schedule_type` values: `fixed`, `dynamic`, `manual`.
 
-> **IMPORTANT:** Always use `FIXED` (uppercase) for `scheduleType` in schedule configs.
-> All schedule type values must be uppercase. Using lowercase (e.g., `fixed`) causes
-> "Expected type ScheduleType" errors.
-
-> **IMPORTANT:** Agent span filters always need at least the `agent` field set.
+> **IMPORTANT:** `agent_span_filters` is an optional refinement — the `agent` reference
+> already scopes the monitor. When you do filter, include at least the `agent` field.
 
 > **IMPORTANT:** Use `duration_sec` (not `duration_ms`) for latency monitoring. The field
 > is named `duration_sec` in the PARSED_SPANS layer — `duration_ms` does not exist.
@@ -35,22 +33,28 @@ Track quantitative span-level metrics over time. Best for:
 ## Key characteristics
 
 - Uses `alert_conditions` with metric + operator (same as standard metric monitors)
-- Supports AUTO (anomaly detection) and threshold operators (GT, LT, EQ, GTE, LTE, NE)
+- Supports AUTO (anomaly detection) and threshold operators (GT, LT, EQ, GTE, LTE, NEQ)
 - Optional `is_agent_trace_aggregation=True` to aggregate per trace instead of per span
+- Optional `sensitivity` to tune anomaly detection for AUTO operators
 - Does NOT support transforms or sampling — raw numeric fields only
 
 ## Parameters
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `dw_id` | string | Yes | Warehouse UUID |
-| `description` | string | Yes | Human-readable monitor description |
-| `data_source` | object | Yes | `{"type": "TABLE", "mcon": "<trace_table_mcon>"}` |
+| `description` | string | Yes | Human-readable monitor description (shown as display name) |
+| `agent` | string | Yes | Agent reference — `agentReference` from `get_agent_metadata` (`{db}:{schema}.{name}` or OTel `service_name`) |
 | `alert_conditions` | array | Yes | List of alert condition objects (see below) |
-| `schedule_config` | object | Yes | `{"scheduleType": "FIXED", "intervalMinutes": 60}` |
-| `agent_span_filters` | array | Yes | Span filters — always include at least `agent` |
+| `warehouse` | string | No | Warehouse name or UUID — only when the agent reference doesn't pin it down |
+| `trace_table` | string | No | Explicit trace table — only for non-ClickHouse OTel agents |
+| `agent_span_filters` | array | No | Optional span-scope refinement (`agent`, `workflow`, `task`, `spanName`) |
 | `is_agent_trace_aggregation` | boolean | No | Aggregate per trace instead of per span |
-| `dry_run` | boolean | No | Default `True` — preview without creating |
+| `aggregate_by` | string | No | Time-window bucketing (`hour`/`day`/`week`/`month`) |
+| `sensitivity` | string | No | Anomaly detection sensitivity for AUTO operators |
+| `schedule_type` | string | No | Defaults to `fixed`. `fixed`/`dynamic`/`manual` |
+| `interval_minutes` | int | No | Defaults to `60` for `fixed` |
+| `monitor_uuid` | string | No | UUID of an existing monitor to update in place (PUT semantics) |
+| `dry_run` | boolean | No | Default `True` — preview YAML; set `False` to deploy |
 
 ## Alert condition format
 
@@ -66,23 +70,25 @@ Available metrics: `NUMERIC_MEAN`, `NUMERIC_MIN`, `NUMERIC_MAX`, `ROW_COUNT_CHAN
 
 Available operators:
 - `AUTO` — anomaly detection (recommended for most cases)
-- `GT`, `LT`, `EQ`, `GTE`, `LTE`, `NE` — threshold-based (requires `thresholdValue`)
+- `GT`, `LT`, `EQ`, `GTE`, `LTE`, `NEQ` — threshold-based (requires `thresholdValue`)
 
 **Important:** For `ROW_COUNT_CHANGE`, do NOT include the `fields` array — it operates on row counts, not specific fields.
 
 ## Examples
 
-### Latency monitoring
+The `agent` value below comes from `get_agent_metadata`'s `agentReference` field. The
+first example uses a platform `{database}:{schema}.{name}` reference; the others use an
+OTel `service_name`. Use whichever form `get_agent_metadata` returns for your agent.
+
+### Latency monitoring (platform agent reference)
 
 ```
-create_agent_metric_monitor(
-    dw_id="<warehouse_uuid>",
+create_or_update_agent_metric_monitor(
     description="Chat Agent latency monitor",
-    data_source={"type": "TABLE", "mcon": "<trace_table_mcon>"},
+    agent="analytics:agents.support_bot",
     alert_conditions=[
         {"metric": "NUMERIC_MEAN", "operator": "AUTO", "fields": ["duration_sec"]}
     ],
-    schedule_config={"scheduleType": "FIXED", "intervalMinutes": 60},
     agent_span_filters=[
         {"agent": {"value": "My Agent"}, "workflow": {"value": "Chat Agent"}}
     ],
@@ -90,18 +96,16 @@ create_agent_metric_monitor(
 )
 ```
 
-### Token usage monitoring
+### Token usage monitoring (OTel service_name)
 
 ```
-create_agent_metric_monitor(
-    dw_id="<warehouse_uuid>",
+create_or_update_agent_metric_monitor(
     description="Chat Agent token usage monitor",
-    data_source={"type": "TABLE", "mcon": "<trace_table_mcon>"},
+    agent="checkout-agent",
     alert_conditions=[
         {"metric": "NUMERIC_MEAN", "operator": "GT", "fields": ["total_tokens"],
          "thresholdValue": 5000}
     ],
-    schedule_config={"scheduleType": "FIXED", "intervalMinutes": 60},
     agent_span_filters=[
         {"agent": {"value": "My Agent"}, "workflow": {"value": "Chat Agent"}}
     ],
@@ -112,14 +116,12 @@ create_agent_metric_monitor(
 ### Volume monitoring (ROW_COUNT_CHANGE — no fields array)
 
 ```
-create_agent_metric_monitor(
-    dw_id="<warehouse_uuid>",
+create_or_update_agent_metric_monitor(
     description="Chat Agent span volume monitor",
-    data_source={"type": "TABLE", "mcon": "<trace_table_mcon>"},
+    agent="checkout-agent",
     alert_conditions=[
         {"metric": "ROW_COUNT_CHANGE", "operator": "AUTO"}
     ],
-    schedule_config={"scheduleType": "FIXED", "intervalMinutes": 60},
     agent_span_filters=[
         {"agent": {"value": "My Agent"}, "workflow": {"value": "Chat Agent"}}
     ],
@@ -130,16 +132,11 @@ create_agent_metric_monitor(
 ### Trace-level latency (aggregated per trace)
 
 ```
-create_agent_metric_monitor(
-    dw_id="<warehouse_uuid>",
+create_or_update_agent_metric_monitor(
     description="Chat Agent end-to-end trace latency",
-    data_source={"type": "TABLE", "mcon": "<trace_table_mcon>"},
+    agent="checkout-agent",
     alert_conditions=[
         {"metric": "NUMERIC_MEAN", "operator": "AUTO", "fields": ["duration_sec"]}
-    ],
-    schedule_config={"scheduleType": "FIXED", "intervalMinutes": 60},
-    agent_span_filters=[
-        {"agent": {"value": "My Agent"}}
     ],
     is_agent_trace_aggregation=True,
     dry_run=True
@@ -150,6 +147,5 @@ create_agent_metric_monitor(
 
 | Error message | Cause | Fix |
 |--------------|-------|-----|
-| "table must be validated" | MCON doesn't match a registered trace table | Verify the exact `traceTableMcon` from `get_agent_metadata` — use it as-is, do not modify |
+| invalid / unresolvable `agent` reference | The `agent` value wasn't taken from `get_agent_metadata` | Use the exact `agentReference` value from `get_agent_metadata` — do not construct it by hand |
 | "Field X doesn't exist" | Field name not in the PARSED_SPANS schema | Check `agent-span-fields.md` for valid field names; use `duration_sec` not `duration_ms` |
-| "Expected type ScheduleType" | Schedule type is lowercase or invalid | Use `FIXED` (uppercase) — all schedule type values must be uppercase |
