@@ -7,7 +7,7 @@ Run LLM-evaluated quality checks on agent outputs. Best for:
 - **Answer relevance scoring** — is the response relevant to the question?
 - **Helpfulness and clarity** — is the response useful and well-structured?
 - **Task completion** — did the agent complete what was asked?
-- **Content safety** — does the output avoid PII/secrets?
+- **Banned-keyword check** — does the output avoid specific banned keywords (e.g. password, ssn, api secret)?
 - **Custom evaluation criteria** — via custom transforms
 
 ## Constraints
@@ -86,7 +86,7 @@ These have default output field names — no `alias` needed and do NOT set `fiel
 |-------------------|-------------|-------------|-------------|
 | `output_length` | `word_count` | number | Word count of the completion |
 | `json_validity` | `json_valid` | boolean | Is the completion valid JSON? |
-| `keywords` | `content_safe` | boolean | Does the completion avoid PII/secrets? |
+| `keywords` | `content_safe` | boolean | TRUE if output does NOT contain banned keywords (password, ssn, api secret, credit card). Not a general PII/secrets detector. |
 
 ## Custom transforms
 
@@ -142,7 +142,7 @@ create_or_update_agent_evaluation_monitor(
 )
 ```
 
-### Content safety check (OTel service_name)
+### Banned-keyword check (OTel service_name)
 
 ```
 create_or_update_agent_evaluation_monitor(
