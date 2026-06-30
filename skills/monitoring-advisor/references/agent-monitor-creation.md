@@ -156,7 +156,7 @@ monitor in place instead of creating a new one (PUT semantics — re-pass every 
 you want to keep).
 
 1. **Always start with `dry_run=True`** (the default). Show the user the
-   generated queries and configuration preview.
+   configuration preview (the rendered YAML).
 2. Call `get_audiences` to list available notification audiences. Suggest the
    most relevant one and ask the user to pick. Pass audience **names** (not UUIDs)
    as the `audiences` list.
