@@ -84,9 +84,9 @@ These have default output field names — no `alias` needed and do NOT set `fiel
 
 | Transform function | Output field | Output type | Description |
 |-------------------|-------------|-------------|-------------|
-| `word_count` | `word_count` | number | Word count of the completion |
+| `output_length` | `word_count` | number | Word count of the completion |
 | `json_validity` | `json_valid` | boolean | Is the completion valid JSON? |
-| `content_safety` | `content_safe` | boolean | Does the completion avoid PII/secrets? |
+| `keywords` | `content_safe` | boolean | Does the completion avoid PII/secrets? |
 
 ## Custom transforms
 
@@ -149,7 +149,7 @@ create_or_update_agent_evaluation_monitor(
     description="Chat Agent content safety check",
     agent="checkout-agent",
     transforms=[
-        {"function": "content_safety"}
+        {"function": "keywords"}
     ],
     alert_conditions=[
         {"metric": "NUMERIC_MEAN", "operator": "LT", "fields": ["content_safe"],
