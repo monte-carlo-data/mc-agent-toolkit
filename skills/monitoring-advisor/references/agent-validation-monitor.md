@@ -11,27 +11,25 @@ Assert logical conditions on aggregated agent span data. Best for:
 
 ## Constraints
 
-> **CRITICAL:** Agent monitors can ONLY be created on the `traceTableMcon` returned by
-> `get_agent_metadata`. You cannot use any other table or MCON — the API will reject it
-> with "table must be validated".
+> **CRITICAL:** The monitor's source is authored via the `agent` reference, NOT a
+> `dw_id` + `data_source`/MCON. Pass the `agentReference` value from `get_agent_metadata`
+> — a platform `{database}:{schema}.{name}` reference or an OTel `service_name`. Do NOT
+> pass an MCON as `agent`.
 
-> **CRITICAL:** Always use the exact `traceTableMcon` from `get_agent_metadata` as the
-> `data_source.mcon` — NEVER modify, truncate, or reconstruct it.
-
-> **IMPORTANT:** Always use `FIXED` (uppercase) for `scheduleType` in schedule configs.
-> All schedule type values must be uppercase. Using lowercase causes
-> "Expected type ScheduleType" errors.
+> **IMPORTANT:** `schedule_type` defaults to `fixed` (lowercase) and `interval_minutes`
+> defaults to `60`. Valid `schedule_type` values: `fixed`, `dynamic`, `manual`.
 
 > **IMPORTANT:** Always use `ingest_ts` as the `timeField`. The time filter must be
 > `{"timeField": {"field": "ingest_ts"}, "lookbackInHrs": <hours>}`. Using any other
-> time field will fail.
+> time field will fail. `time_filter` is REQUIRED.
 
-> **IMPORTANT:** Agent span filters always need at least the `agent` field set.
+> **IMPORTANT:** `agent_span_filters` is an optional refinement; when used, include at
+> least the `agent` field.
 
 ## Key characteristics
 
 - Uses `alert_condition` as a `FilterGroup` with `left`/`right` typed values
-- Requires `time_filter` and `agent_span_filters`
+- Requires `time_filter`
 - Optional `is_agent_trace_aggregation` for trace-level assertions
 - Returns a `CustomRule`
 
@@ -39,15 +37,18 @@ Assert logical conditions on aggregated agent span data. Best for:
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `dw_id` | string | Yes | Warehouse UUID |
-| `description` | string | Yes | Human-readable monitor description |
-| `data_source` | object | Yes | `{"type": "TABLE", "mcon": "<trace_table_mcon>"}` |
+| `description` | string | Yes | Human-readable monitor description (shown as display name) |
+| `agent` | string | Yes | Agent reference — `agentReference` from `get_agent_metadata` (`{db}:{schema}.{name}` or OTel `service_name`) |
 | `alert_condition` | object | Yes | FilterGroup with conditions (see below) |
 | `time_filter` | object | Yes | `{"timeField": {"field": "ingest_ts"}, "lookbackInHrs": 24}` |
-| `schedule_config` | object | Yes | `{"scheduleType": "FIXED", "intervalMinutes": 60}` |
-| `agent_span_filters` | array | Yes | Span filters — always include at least `agent` |
+| `warehouse` | string | No | Warehouse name or UUID — only when the agent reference doesn't pin it down |
+| `trace_table` | string | No | Explicit trace table — only for non-ClickHouse OTel agents |
+| `agent_span_filters` | array | No | Optional span-scope refinement (`agent`, `workflow`, `task`, `spanName`) |
 | `is_agent_trace_aggregation` | boolean | No | Aggregate per trace for trace-level assertions |
-| `dry_run` | boolean | No | Default `True` — preview without creating |
+| `schedule_type` | string | No | Defaults to `fixed`. `fixed`/`dynamic`/`manual` |
+| `interval_minutes` | int | No | Defaults to `60` for `fixed` |
+| `monitor_uuid` | string | No | UUID of an existing monitor to update in place (PUT semantics) |
+| `dry_run` | boolean | No | Default `True` — preview YAML; set `False` to deploy |
 
 ## alert_condition format
 
@@ -74,13 +75,16 @@ Assert logical conditions on aggregated agent span data. Best for:
 
 ## Examples
 
-### Assert token usage below threshold
+The `agent` value below comes from `get_agent_metadata`'s `agentReference` field. The
+first example uses a platform `{database}:{schema}.{name}` reference; the others use an
+OTel `service_name`. Use whichever form `get_agent_metadata` returns for your agent.
+
+### Assert token usage below threshold (platform agent reference)
 
 ```
-create_agent_validation(
-    dw_id="<warehouse_uuid>",
+create_or_update_agent_validation_monitor(
     description="Assert token usage below threshold",
-    data_source={"type": "TABLE", "mcon": "<trace_table_mcon>"},
+    agent="analytics:agents.support_bot",
     alert_condition={
         "operator": "AND",
         "conditions": [
@@ -93,7 +97,6 @@ create_agent_validation(
         ]
     },
     time_filter={"timeField": {"field": "ingest_ts"}, "lookbackInHrs": 24},
-    schedule_config={"scheduleType": "FIXED", "intervalMinutes": 60},
     agent_span_filters=[
         {"agent": {"value": "My Agent"}, "workflow": {"value": "Chat Agent"}}
     ],
@@ -101,13 +104,12 @@ create_agent_validation(
 )
 ```
 
-### Assert latency stays reasonable (trace-level)
+### Assert latency stays reasonable (trace-level, OTel service_name)
 
 ```
-create_agent_validation(
-    dw_id="<warehouse_uuid>",
+create_or_update_agent_validation_monitor(
     description="Assert trace duration under 120 seconds",
-    data_source={"type": "TABLE", "mcon": "<trace_table_mcon>"},
+    agent="checkout-agent",
     alert_condition={
         "operator": "AND",
         "conditions": [
@@ -120,10 +122,6 @@ create_agent_validation(
         ]
     },
     time_filter={"timeField": {"field": "ingest_ts"}, "lookbackInHrs": 24},
-    schedule_config={"scheduleType": "FIXED", "intervalMinutes": 60},
-    agent_span_filters=[
-        {"agent": {"value": "My Agent"}}
-    ],
     is_agent_trace_aggregation=True,
     dry_run=True
 )
@@ -132,10 +130,9 @@ create_agent_validation(
 ### Compound condition — token usage AND latency
 
 ```
-create_agent_validation(
-    dw_id="<warehouse_uuid>",
+create_or_update_agent_validation_monitor(
     description="Assert token and latency within bounds",
-    data_source={"type": "TABLE", "mcon": "<trace_table_mcon>"},
+    agent="checkout-agent",
     alert_condition={
         "operator": "OR",
         "conditions": [
@@ -154,10 +151,11 @@ create_agent_validation(
         ]
     },
     time_filter={"timeField": {"field": "ingest_ts"}, "lookbackInHrs": 24},
-    schedule_config={"scheduleType": "FIXED", "intervalMinutes": 1440},
     agent_span_filters=[
         {"agent": {"value": "My Agent"}, "workflow": {"value": "Chat Agent"}}
     ],
+    schedule_type="fixed",
+    interval_minutes=1440,
     dry_run=True
 )
 ```
@@ -166,6 +164,5 @@ create_agent_validation(
 
 | Error message | Cause | Fix |
 |--------------|-------|-----|
-| "table must be validated" | MCON doesn't match a registered trace table | Verify the exact `traceTableMcon` from `get_agent_metadata` — use it as-is, do not modify |
+| invalid / unresolvable `agent` reference | The `agent` value wasn't taken from `get_agent_metadata` | Use the exact `agentReference` value from `get_agent_metadata` — do not construct it by hand |
 | "Field X doesn't exist" | Field name not in the PARSED_SPANS schema | Check `agent-span-fields.md` for valid field names |
-| "Expected type ScheduleType" | Schedule type is lowercase or invalid | Use `FIXED` (uppercase) — all schedule type values must be uppercase |

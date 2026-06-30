@@ -104,13 +104,13 @@ All five tools follow a **two-call preview-then-confirm pattern**: the first cal
 
 | Tool | Purpose |
 | --- | --- |
-| `get_agent_metadata` | List AI agents -- returns agent names, trace table MCONs, source types |
+| `get_agent_metadata` | List AI agents -- returns agent names, `agentReference` values (the `agent` arg for monitor creation), trace table MCONs, source types |
 | `get_agent_conversation` | Retrieve recent LLM interactions/conversations for an agent |
 | `get_agent_trace` | Inspect execution traces and span trees |
-| `create_agent_metric_monitor` | Create monitors for quantitative span-level metrics |
-| `create_agent_evaluation_monitor` | Create monitors for LLM-evaluated quality metrics |
-| `create_agent_trajectory` | Create trajectory monitors for execution pattern alerts |
-| `create_agent_validation` | Create validation monitors for logical assertions |
+| `create_or_update_agent_metric_monitor` | Create or update monitors for quantitative span-level metrics (preview YAML on `dry_run=True`, deploy on `dry_run=False`) |
+| `create_or_update_agent_evaluation_monitor` | Create or update monitors for LLM-evaluated quality metrics (preview YAML on `dry_run=True`, deploy on `dry_run=False`) |
+| `create_or_update_agent_trajectory_monitor` | Create or update trajectory monitors for execution pattern alerts (preview YAML on `dry_run=True`, deploy on `dry_run=False`) |
+| `create_or_update_agent_validation_monitor` | Create or update validation monitors for logical assertions (preview YAML on `dry_run=True`, deploy on `dry_run=False`) |
 
 ---
 
