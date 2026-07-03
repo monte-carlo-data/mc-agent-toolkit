@@ -23,12 +23,13 @@ Key fields in the response:
 | `traceTableMcon` | Trace table MCON — used as the `trace_table_mcon` input for the read tools (`get_agent_conversations`, `get_agent_conversation`, `get_agent_traces`, `get_agent_trace`, `get_agent_segments`) |
 | `sourceType` | `TRACE_TABLE` (custom) or `PLATFORM_AGENT` (Monte Carlo native) |
 | `warehouse_uuid` | Warehouse holding the agent's trace data — the value to pass as the `warehouse` arg when creating monitors. Null when it cannot be derived; fall back to `get_warehouses` (see Warehouse below). |
+| `warehouse_name` | Display name of that warehouse — what you show the user. Null when unavailable; fall back to `get_warehouses`. |
 
 **Duplicate agent names:** The same agent name may appear more than once (e.g.,
 deployed in both prod and staging). Each entry is distinguished by its own
-`agentReference`, `traceTableMcon`, and `warehouse_uuid` — ask the user which one
-they want to monitor and pass that entry's `agentReference` verbatim. When you ask
-the user to choose, present warehouse **names** (via `get_warehouses`), never UUIDs.
+`agentReference`, `traceTableMcon`, and warehouse — ask the user which one they
+want to monitor and pass that entry's `agentReference` verbatim. When you ask the
+user to choose, present each entry's `warehouse_name`, never a UUID.
 
 ---
 
@@ -96,8 +97,8 @@ optional companions:
 ## Warehouse
 
 `warehouse` names the warehouse the agent's trace data lives in — pass it as a name
-or UUID. Use the agent entry's `warehouse_uuid` from `get_agent_metadata`; when it is
-null, or when you need to resolve a warehouse by display name, use `get_warehouses`.
+or UUID. Use the agent entry's `warehouse_uuid` from `get_agent_metadata` (and its
+`warehouse_name` when talking to the user); when both are null, use `get_warehouses`.
 Whether `warehouse` is required or optional depends on the monitor type — see the
 per-type reference.
 
