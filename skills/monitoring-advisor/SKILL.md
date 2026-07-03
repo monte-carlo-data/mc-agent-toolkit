@@ -104,9 +104,12 @@ All five tools follow a **two-call preview-then-confirm pattern**: the first cal
 
 | Tool | Purpose |
 | --- | --- |
-| `get_agent_metadata` | List AI agents -- returns agent names, `agentReference` values (the `agent` arg for monitor creation), trace table MCONs, source types |
-| `get_agent_conversation` | Retrieve recent LLM interactions/conversations for an agent |
-| `get_agent_trace` | Inspect execution traces and span trees |
+| `get_agent_metadata` | List AI agents -- returns agent names, `agentReference` values (the `agent` arg for monitor creation), trace table MCONs, source types, and each agent's `warehouse_uuid`/`warehouse_name` (the `warehouse` arg -- show the name, pass the uuid) |
+| `get_agent_conversations` | List recent conversations for an agent (newest first; filter by errors/status/turns/tokens/duration; optional inline transcripts) |
+| `get_agent_conversation` | Retrieve one conversation's full prompt/completion thread by `conversation_id` |
+| `get_agent_traces` | List traces with per-trace workflows, tasks, models, LLM-call counts, tokens, duration, and error counts |
+| `get_agent_trace` | Inspect one execution trace's full span tree |
+| `get_agent_segments` | Enumerate the distinct `workflow` / `task` / `model` values to scope a monitor to a real segment |
 | `create_or_update_agent_metric_monitor` | Create or update monitors for quantitative span-level metrics (preview YAML on `dry_run=True`, deploy on `dry_run=False`) |
 | `create_or_update_agent_evaluation_monitor` | Create or update monitors for LLM-evaluated quality metrics (preview YAML on `dry_run=True`, deploy on `dry_run=False`) |
 | `create_or_update_agent_trajectory_monitor` | Create or update trajectory monitors for execution pattern alerts (preview YAML on `dry_run=True`, deploy on `dry_run=False`) |
