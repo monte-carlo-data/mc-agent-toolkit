@@ -5,6 +5,17 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Codex will be do
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.14.0] - 2026-07-03
+
+### Changed
+
+- Refresh agent monitor references to match the current tool contract: single `agent` reference source (no `dw_id`/`data_source`), required `warehouse` for metric/evaluation/validation, `schedule_type` limited to `fixed`/`manual` with per-type interval floors, and `agent_span_filters` capped at one filter object.
+- Evaluation reference: correct predefined transform functions (`output_length`, `json_validity`, `keywords`), typed custom transforms (`custom_prompt`/`custom_sql` with camelCase `outputType`/`sqlExpression`), boolean-output alerting via `TRUE_RATE`/`FALSE_RATE`, and removal of unsupported `classification`/`sentiment`.
+- Metric reference: full agent metric catalog, `NEQ` operator, operator/threshold rules, `ROW_COUNT_CHANGE` and trace-aggregation constraints.
+- Validation reference: `negated`-flag negation (no `not_equal`/`not_null`), UNARY `value` vs BINARY `left`/`right`, numeric `status_code`.
+- Trajectory reference: `SPAN_OCCURRENCE` and `SPAN_RELATION` conditions, OR-only combination, occurrence count floors, `spanField` hierarchy, and the negated-relation pattern for a missing step.
+- Span-field reference: add `parent_span_id`, `model_name`, `status_code`, `is_tool_call`, `is_llm_call`, `has_prompts`, `has_completions` and the platform-vs-OpenTelemetry availability caveat.
+
 ## [1.13.3] - 2026-06-23
 
 ### Changed

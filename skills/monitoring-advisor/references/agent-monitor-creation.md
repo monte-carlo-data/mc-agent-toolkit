@@ -20,68 +20,99 @@ Key fields in the response:
 |-------|-------------|
 | `agentName` | Human-readable agent name |
 | `agentReference` | The value to pass as the `agent` arg when creating monitors — a platform `{database}:{schema}.{name}` reference (Snowflake Cortex / Databricks) or an OpenTelemetry `service_name`. May be null for agents that cannot be referenced. |
-| `traceTableMcon` | Trace table MCON — used as the `trace_table_mcon` input for `get_agent_conversation`/`get_agent_trace` |
+| `traceTableMcon` | Trace table MCON — used as the `trace_table_mcon` input for the read tools (`get_agent_conversations`, `get_agent_conversation`, `get_agent_traces`, `get_agent_trace`, `get_agent_segments`) |
 | `sourceType` | `TRACE_TABLE` (custom) or `PLATFORM_AGENT` (Monte Carlo native) |
 
 **Duplicate agents across warehouses:** The same agent name may appear in
 multiple warehouses (e.g., deployed in both prod and staging). When this
 happens, present the warehouse **names** (never UUIDs) and ask the user which
-warehouse they want to monitor. Pass the chosen warehouse as the `warehouse`
-arg (name or UUID) when the agent reference does not pin it down.
+warehouse they want to monitor. Each entry has a different `agentReference` /
+`warehouse`, so the choice determines which agent the monitor tracks. Pass the
+chosen warehouse as the `warehouse` arg (name or UUID); resolve names via
+`get_warehouses` when the agent reference does not pin it.
 
 ---
 
 ## Step 2: Investigate agent behavior
 
 Use the read tools to understand the agent's behavior before suggesting monitors.
+These read tools are your sampling surface — do **not** query the trace store with
+SQL. Agents are tracked as agents, not tables: platform agents (Snowflake Cortex /
+Databricks) have no queryable trace table, and for custom agents the raw table's
+columns are not the fields monitors use.
 
 ### 2a. Review recent conversations
 
-Call `get_agent_conversation` with the agent's `agent_name` and
-`trace_table_mcon` to see recent LLM interactions. Look for:
+Call `get_agent_conversations` with the agent's `agent_name` and `trace_table_mcon`
+to list recent conversations (newest first). Filter to surface interesting ones —
+`has_errors`, `status`, or turn/token/duration bounds — and set
+`include_transcript=True` to read the prompt/completion transcripts inline. Drill
+into one conversation you already have the id for with `get_agent_conversation`.
+Look for:
 
 - **Error patterns** — spans with error status or failure indicators
 - **Latency outliers** — unusually long durations
 - **Token usage** — high token counts that may indicate inefficiency
 - **Conversation quality** — check prompt/completion text for relevance
 
-### 2b. Inspect execution traces
+### 2b. Inspect execution shape and traces
 
-Pick a few trace IDs from the conversation results and call `get_agent_trace`
-to see the full span tree. Look for:
+Call `get_agent_traces` to list traces with per-trace `workflows`, `tasks`,
+`models`, `count_llm_calls`, `total_tokens`, `duration_seconds`, and error counts —
+sort by the field you plan to monitor to see typical values and outliers. Call
+`get_agent_segments` to enumerate the distinct `workflow` / `task` / `model` values
+so you can scope a monitor to a real segment. Then pick a trace id and call
+`get_agent_trace` to see the full span tree. Look for:
 
 - **Excessive tool calls** — an agent calling the same tool many times
 - **Missing steps** — expected spans that don't appear
 - **Error cascades** — a failed span causing downstream failures
 - **Unusual paths** — the agent taking an unexpected execution route
 
+You are identifying **what** to monitor — you don't need exact percentiles up
+front; anomaly-detection operators (`AUTO`) learn the baseline themselves.
+
 ---
 
 ## The `agent` reference
 
-All four `create_or_update_agent_*_monitor` tools author the monitor's source via
-a single top-level **`agent`** argument — there is no `dw_id` or `data_source`/MCON.
-Two accepted forms:
+All four `create_or_update_agent_*_monitor` tools author the monitor's source from
+a single top-level **`agent`** argument. Two accepted forms:
 
 - **Platform agent reference** — `{database}:{schema}.{name}` (Snowflake Cortex /
   Databricks agents), e.g. `analytics:agents.support_bot`.
 - **OpenTelemetry `service_name`** — for OTel-instrumented agents, e.g. `checkout-agent`.
 
-Get the exact value from `get_agent_metadata`'s **`agentReference`** field — never
-construct it by hand. Two optional companions:
+Get the exact value from `get_agent_metadata`'s **`agentReference`** field and pass
+it verbatim — never construct, modify, or truncate it, and never pass an MCON. Two
+optional companions:
 
-- `warehouse` (name or UUID) — only needed when the agent reference doesn't pin down
-  the warehouse. Resolve names via `get_warehouses`.
 - `trace_table` — only for non-ClickHouse OTel agents whose trace storage cannot be
   inferred from the agent reference.
+- The per-type reference tells you whether `warehouse` is required (see below).
+
+There is no `dw_id` and no `data_source` argument — the `agent` reference is the
+whole source.
+
+---
+
+## Warehouse
+
+`warehouse` is the name or UUID of the warehouse the agent's trace data lives in.
+Resolve names via `get_warehouses`, or use the `warehouse` returned alongside the
+agent in `get_agent_metadata`.
+
+- **Required** for metric, evaluation, and validation monitors — omitting it fails
+  with "Warehouse not found".
+- **Optional** for trajectory monitors — they fall back to the account default.
 
 ---
 
 ## Agent span filters
 
-The optional `agent_span_filters` parameter refines which spans are monitored. Each
-filter is an object with optional fields: `agent`, `workflow`, `task`, `spanName`.
-Each field contains a `{"value": "..."}` sub-object.
+The optional `agent_span_filters` parameter refines which spans are monitored. It
+accepts **at most one** filter object. Each field of the object holds a
+`{"value": "..."}` sub-object.
 
 | Filter field | Description | Example |
 |-------------|-------------|---------|
@@ -90,14 +121,20 @@ Each field contains a `{"value": "..."}` sub-object.
 | `task` | Filter by task name | `{"task": {"value": "call_model"}}` |
 | `spanName` | Filter by span name | `{"spanName": {"value": "ChatBedrockConverse.chat"}}` |
 
-Multiple fields can be combined in one filter object. Example:
+Multiple fields can be combined in the single filter object:
+
 ```json
-[{"agent": {"value": "My Agent"}, "workflow": {"value": "Chat Agent"}, "task": {"value": "call_model"}}]
+[{"workflow": {"value": "Chat Agent"}, "task": {"value": "call_model"}}]
 ```
 
 `agent_span_filters` is a refinement and is optional — the `agent` reference already
-scopes the monitor. (Trajectory monitors are the exception: there `agent_span_filters`
-may set ONLY the `agent` field — see `agent-trajectory-monitor.md`.)
+scopes the monitor. Two exceptions, covered in the per-type references:
+
+- **Trajectory monitors** allow only the `agent` field here — workflow / task /
+  spanName go in the alert condition's `spanField` instead (see
+  `agent-trajectory-monitor.md`).
+- **Trace-aggregated metric / validation monitors** allow only the `agent` field —
+  the per-trace result has no workflow / task / spanName column.
 
 ---
 
@@ -105,12 +142,16 @@ may set ONLY the `agent` field — see `agent-trajectory-monitor.md`.)
 
 Schedule is set via two top-level args, not a nested object:
 
-- `schedule_type` — defaults to `fixed`. Valid values: `fixed`, `dynamic`, `manual`.
-- `interval_minutes` — defaults to `60` for `fixed`. Common patterns: `60` (hourly),
-  `360` (every 6 hours), `1440` (daily).
+- `schedule_type` — defaults to `fixed`. Valid values: `fixed`, `manual`.
+- `interval_minutes` — defaults to `60`. The floor and alignment depend on the
+  monitor type:
+  - **Metric and evaluation:** at least 60 minutes **and** a multiple of 60
+    (`60` hourly, `360` every 6 hours, `1440` daily).
+  - **Validation and trajectory:** at least 5 minutes; sub-hourly is allowed with no
+    60-minute alignment.
 
-Omit both to accept the hourly fixed default. Use shorter intervals for critical
-agents, longer for less critical ones.
+No agent monitor accepts a dynamic schedule — use `fixed` or `manual`. Use shorter
+intervals for critical agents, longer for less critical ones.
 
 ---
 
@@ -153,13 +194,13 @@ monitor tools: the first call (`dry_run=True`, the default) returns the rendered
 YAML for review; the second call (`dry_run=False`) deploys the monitor live and
 returns its UUID. Pass `monitor_uuid` on either call to update an existing agent
 monitor in place instead of creating a new one (PUT semantics — re-pass every field
-you want to keep).
+you want to keep, since omitted fields revert to defaults).
 
 1. **Always start with `dry_run=True`** (the default). Show the user the
    configuration preview (the rendered YAML).
 2. Call `get_audiences` to list available notification audiences. Suggest the
-   most relevant one and ask the user to pick. Pass audience **names** (not UUIDs)
-   as the `audiences` list.
+   most relevant one(s) and ask the user to pick — they can choose one or several.
+   Pass audience **names** (not UUIDs) as the `audiences` list.
 3. After showing the preview, offer to create or adjust settings.
 4. Only set `dry_run=False` when the user explicitly confirms creation.
 
