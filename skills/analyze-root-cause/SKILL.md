@@ -78,7 +78,6 @@ Do not activate when the user is:
 | `get_github_prs` | Recent GitHub PRs from the account's MC GitHub integration |
 | `get_jobs_performance` | Job runtime stats, failure rates, 7-day trends |
 | `get_change_timeline` | Unified timeline: query changes + volume + ETL failures |
-| `get_current_time` | Current timestamp for relative time ranges |
 | `alert_assessment` | Optional ~2-min triage of an incident — returns HIGH/MEDIUM/LOW confidence and impact. Useful when you want a quick read before deciding to escalate to TSA. |
 | `run_troubleshooting_agent` | Starts the Troubleshooting Agent (TSA) on an incident. Async by default; idempotent (returns existing results unless `force_rerun=True`). Auto-invoked at Step 1.5 when an incident UUID is present. |
 | `get_troubleshooting_agent_results` | Polls TSA results for an incident (`status` is `not_found` / `running` / `success` / `failed`). Use to check on the async run started at Step 1.5. |
@@ -107,7 +106,9 @@ Do not activate when the user is:
 Read `references/intake-no-incident.md` for the full intake flow. In short:
 1. Ask clarifying questions: what table? what looks wrong? when did it start?
 2. Search for the table: `search(query="table_name")`
-3. Search for related alerts: `get_alerts` with a recent time range
+3. Search for related alerts: `get_alerts` with a recent time range. Pass ISO 8601
+   timestamps computed from the current date — e.g. `created_after="2026-07-03T00:00:00Z"`,
+   `created_before="2026-07-10T00:00:00Z"` for a 7-day window (use the actual current date).
 4. Check table health: `get_table_freshness`, `get_table_size_history`
 5. Narrow down the issue type and proceed to Step 2.
 
