@@ -55,13 +55,21 @@ All tools are available via the `monte-carlo-mcp` MCP server.
 | Tool                             | Toolset  | Purpose                                                         |
 | -------------------------------- | -------- | --------------------------------------------------------------- |
 | `get_alerts`                          | default  | Fetch recent alerts for a time window                                                                             |
-| `alert_assessment`                    | default  | Score an alert by incident likelihood and potential impact (HIGH/MEDIUM/LOW each)                                 |
+| `alert_assessment`                    | default  | **Read-only** scoring — scores an alert by incident likelihood and potential impact (HIGH/MEDIUM/LOW each) and returns the verdict without recording anything. Steerable via `user_instructions`; safe to run in parallel across many alerts |
+| `triage_alert`                        | default  | **Persisted** triage — scores an alert and writes the verdict back onto it, exactly like the in-app Triage button (marks the alert triaged, posts a completion notification, records ML feedback). Blocks until done; reuses an existing triage if the alert was already triaged |
 | `run_troubleshooting_agent`           | default  | Run the Monte Carlo Troubleshooting Agent on a single alert; async by default — returns immediately, reuses existing results when available |
 | `get_troubleshooting_agent_results`   | default  | Poll an async troubleshooting run by `incident_id`; returns status (`not_found`/`running`/`success`/`failed`) and results when complete |
 | `update_alert`                        | default  | Update an alert's status and/or declare an incident by setting severity                                           |
 | `set_alert_owner`                     | default  | Assign an owner to an alert by email                                                                              |
 | `create_or_update_alert_comment`      | default  | Post or update a triage comment on an alert                                                                       |
 | `mark_event_as_normal`                | default  | Mark all anomaly events in an alert as normal, triggering ML threshold recalibration to prevent re-alerting on the same pattern |
+
+### `alert_assessment` vs `triage_alert` — which to use
+
+Both score an alert on the same two dimensions; the difference is whether the result is recorded.
+
+- **`alert_assessment` — read-only scoring.** Nothing is written to the alert. Use it to score in bulk and decide what to do next, to preview a verdict without committing to it, or when you want to record the outcome your own way using the action tools below (`update_alert`, `create_or_update_alert_comment`, `mark_event_as_normal`). It accepts `user_instructions` to steer the scoring. This is the tool the workflow stages below are built around.
+- **`triage_alert` — persisted triage.** Equivalent to a user clicking **Triage** in the product: it scores the alert *and* writes the verdict back (marks it triaged, posts a notification, records ML feedback), so the triage is visible in the UI and feeds the anomaly model. Use it when the user asks to triage a specific alert and have that recorded — not for bulk scoring where you don't want every alert marked triaged. It's idempotent: if the alert is already triaged it returns the existing verdict without re-running. It requires the `mcp/edit` scope (it's a write); read-only integrations won't see it.
 
 ---
 
@@ -116,7 +124,9 @@ The user wants to look at specific alerts now. Use the triage tools directly to 
 3. For any alert where both incident likelihood and potential impact are MEDIUM or higher, offer to run `run_troubleshooting_agent` for a deeper root cause analysis. Wait for confirmation before running it.
 4. Summarise findings. Do not prompt to save a workflow file or set up automation unless the user brings it up.
 
-**Write tools in interactive triage:** After findings are clear, proactively offer relevant actions — updating status, declaring a severity, assigning an owner, posting a comment, or marking events as normal (for alerts that are natural data variation). Ask before executing.
+**When the user wants the triage recorded:** if the ask is to triage a specific alert *and have it show up in the product* (e.g. "triage alert X" rather than "score my alerts"), use `triage_alert` — it scores and persists in one step, just like the in-app Triage button. Ask first, since it writes to the alert. For scoring many alerts to decide what to do, stay on `alert_assessment` (read-only) and record outcomes with the action tools below.
+
+**Write tools in interactive triage:** After findings are clear, proactively offer relevant actions — running `triage_alert` to record the triage, updating status, declaring a severity, assigning an owner, posting a comment, or marking events as normal (for alerts that are natural data variation). Ask before executing.
 
 ---
 
@@ -151,7 +161,7 @@ Ask how they'd like to get started:
 
 Execute the workflow from the file, following its instructions exactly. Do not improvise steps or add actions not described in the file.
 
-**Action guard — workflow mode:** Never call write tools (`update_alert`, `set_alert_owner`, `create_or_update_alert_comment`) while building or testing a workflow, regardless of what the workflow document says. Only describe what would be done. This guard exists to prevent accidental writes on real alerts during development; lift it only when the user explicitly switches to action mode for a production run.
+**Action guard — workflow mode:** Never call write tools (`triage_alert`, `update_alert`, `set_alert_owner`, `create_or_update_alert_comment`) while building or testing a workflow, regardless of what the workflow document says. Only describe what would be done. In workflow mode, score with `alert_assessment` (read-only) rather than `triage_alert`, which would mark every alert triaged. This guard exists to prevent accidental writes on real alerts during development; lift it only when the user explicitly switches to action mode for a production run.
 
 **For first runs (starting fresh):** always run step by step — after each stage completes, summarise what it produced, proactively suggest alternatives or adjustments based on what you observed, and wait for confirmation before continuing.
 

@@ -56,6 +56,12 @@ It returns:
 
 Start with the defaults and tune `user_instructions` once you've seen real output.
 
+### Scoring vs. persisting: `alert_assessment` vs `triage_alert`
+
+`alert_assessment` is **read-only** — it returns a verdict but records nothing. That's exactly what you want for this stage: score every alert cheaply, then decide per alert whether it warrants troubleshooting and which action to take. The workflow persists outcomes later, in Stage 5, through the explicit action tools — so you stay in control of what gets written and when.
+
+`triage_alert` is the **persisted** counterpart: it scores *and* writes the verdict back onto the alert (marks it triaged, posts a notification, records ML feedback), identical to the in-app Triage button. It's the right tool for interactive "triage this alert" requests where the user wants the result recorded, but it's a poor fit for the scoring stage of a batch workflow — it would mark every alert in the batch triaged and fire a notification for each. Keep batch scoring on `alert_assessment`, and reserve `triage_alert` for the case where recording a single alert's triage *is* the action. It's idempotent (re-running on an already-triaged alert returns the existing verdict) and requires the `mcp/edit` scope.
+
 ---
 
 ## Stage 3: Deep troubleshooting
