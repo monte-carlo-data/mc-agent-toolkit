@@ -22,8 +22,8 @@ Key fields in the response:
 | `agentReference` | The value to pass as the `agent` arg when creating monitors — a platform `{database}:{schema}.{name}` reference (Snowflake Cortex / Databricks) or an OpenTelemetry `service_name`. May be null for agents that cannot be referenced. |
 | `traceTableMcon` | Trace table MCON — used as the `trace_table_mcon` input for the read tools (`get_agent_conversations`, `get_agent_conversation`, `get_agent_traces`, `get_agent_trace`, `get_agent_segments`) |
 | `sourceType` | `TRACE_TABLE` (custom) or `PLATFORM_AGENT` (Monte Carlo native) |
-| `warehouse_uuid` | Warehouse holding the agent's trace data — the value to pass as the `warehouse` arg when creating monitors. Null when it cannot be derived; fall back to `get_warehouses` (see Warehouse below). |
-| `warehouse_name` | Display name of that warehouse — what you show the user. Null when unavailable; fall back to `get_warehouses`. |
+| `warehouse_uuid` | Warehouse holding the agent's trace data — the value to pass as the `warehouse` arg when creating monitors. Null when the warehouse was deleted or cannot be resolved; fall back to `get_warehouses` (see Warehouse below). |
+| `warehouse_name` | Display name of that warehouse — what you show the user. Null alongside `warehouse_uuid`; fall back to `get_warehouses`. |
 
 **Duplicate agent names:** The same agent name may appear more than once (e.g.,
 deployed in both prod and staging). Each entry is distinguished by its own
