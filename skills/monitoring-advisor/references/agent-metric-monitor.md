@@ -107,8 +107,9 @@ Each condition has:
 | `UNIQUE_COUNT` | numeric / text / date |
 
 Numeric metrics apply to `duration_sec` / `*_tokens` / `status_code`; boolean metrics
-apply to `is_tool_call` / `is_llm_call` / `has_prompts` / `has_completions`;
-`NULL_RATE` applies to any field. Duplicate `(metric, field)` pairs across conditions
+apply to `is_tool_call` / `is_llm_call` / `has_prompts` / `has_completions` (the last
+three are OTel/ClickHouse only — platform/Cortex agents lack them); `NULL_RATE`
+applies to any field. Duplicate `(metric, field)` pairs across conditions
 are rejected.
 
 Common numeric fields: `duration_sec`, `total_tokens`, `prompt_tokens`,

@@ -27,8 +27,10 @@ trend a numeric metric (mean latency, token counts) — that's
 > several patterns to all hold, use separate monitors.
 
 > **CRITICAL:** Trajectory `agent_span_filters` allow only the `agent` field — at
-> most one filter. Setting `workflow`, `task`, or `spanName` there causes a
-> validation error. Those go in the condition's `spanField` instead.
+> most one filter, e.g. `agent_span_filters=[{"agent": {"value": "My Agent"}}]`.
+> Setting `workflow`, `task`, or `spanName` there causes a validation error — those go
+> in the condition's `spanField` instead. For OpenTelemetry agents the filter's
+> `agent` value must equal the top-level `agent` reference.
 
 > **CRITICAL:** A span that never appears produces no rows to count, so "occurs 0
 > times" (a missing span) cannot be expressed with SPAN_OCCURRENCE — `EXACTLY 0` and
@@ -70,7 +72,8 @@ trend a numeric metric (mean latency, token counts) — that's
 ## agent_span_alert_condition structure
 
 `{"operator": "OR", "conditions": [...]}`. Supply at least one condition. Each is one
-of two types.
+of two types. To OR several patterns together, list them as multiple entries in
+`conditions` — a trace is flagged if any one matches.
 
 ### SPAN_OCCURRENCE — count how many times a span occurs
 
@@ -238,52 +241,6 @@ create_or_update_agent_trajectory_monitor(
                 },
                 "count": 2,
                 "comparisonOperator": "LESS_THAN"
-            }
-        ]
-    },
-    time_filter={"timeField": {"field": "ingest_ts"}, "lookbackInHrs": 24},
-    dry_run=True
-)
-```
-
-### Combined conditions (OR): too many searches OR a broken order
-
-```
-create_or_update_agent_trajectory_monitor(
-    description="Alert when search exceeds 10 calls OR generate runs before retrieve",
-    agent="checkout-agent",
-    agent_span_alert_condition={
-        "operator": "OR",
-        "conditions": [
-            {
-                "type": "SPAN_OCCURRENCE",
-                "predicate": {"name": "occurs"},
-                "spanField": {
-                    "spanName": {"literal": "search_tool"},
-                    "task": {"literal": "execute_search"},
-                    "workflow": {"literal": "RAG Agent"},
-                    "type": "SPAN_FIELD"
-                },
-                "count": 10,
-                "comparisonOperator": "MORE_THAN"
-            },
-            {
-                "type": "SPAN_RELATION",
-                "predicate": {"name": "occurs_before"},
-                "spanField": {
-                    "spanName": {"literal": "generate"},
-                    "task": {"literal": "generate_answer"},
-                    "workflow": {"literal": "RAG Agent"},
-                    "type": "SPAN_FIELD"
-                },
-                "relatedSpanFields": [
-                    {
-                        "spanName": {"literal": "retrieve"},
-                        "task": {"literal": "generate_answer"},
-                        "workflow": {"literal": "RAG Agent"},
-                        "type": "SPAN_FIELD"
-                    }
-                ]
             }
         ]
     },

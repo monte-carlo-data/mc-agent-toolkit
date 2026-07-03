@@ -66,7 +66,7 @@ transforms, which those don't need.
 | `transforms` | array | No | Evaluation transforms (predefined or custom); top-level |
 | `is_agent_conversation_aggregation` | boolean | No | Aggregate evaluation per conversation (OTel agents only) |
 | `trace_table` | string | No | Explicit trace table — only for non-ClickHouse OTel agents |
-| `agent_span_filters` | array | No | Optional span-scope refinement; at most ONE filter object |
+| `agent_span_filters` | array | No | Optional span-scope refinement; at most ONE filter object. At conversation grain (`is_agent_conversation_aggregation=True`) only `agent`/`workflow` are allowed — not `task`/`spanName` |
 | `sensitivity` | string | No | Anomaly detection sensitivity for AUTO operators (`low`/`medium`/`high`) |
 | `aggregate_by` | string | No | Time-window bucketing (`hour`/`day`/`week`/`month`) |
 | `schedule_type` | string | No | `fixed` (default) or `manual` |
@@ -78,7 +78,8 @@ transforms, which those don't need.
 
 Pass only `function` (and an optional `alias`, plus `modelConnectionId` on
 BigQuery). Do NOT set `prompt`, `sqlExpression`, `outputType`, or `field` — the tool
-rejects them. Each writes a numeric 1–5 score to its built-in output field:
+rejects them. Each writes a numeric score (1–5, except `semantic_similarity` which is
+0–5) to its built-in output field:
 
 | Transform function | Output field | Output type | Description |
 |-------------------|-------------|-------------|-------------|
@@ -143,7 +144,8 @@ name:
 
 At conversation grain, a `custom_prompt` may only reference `{{conversation}}`, and
 the predefined SQL checks and `custom_sql` are not supported. At span grain,
-`{{conversation}}` is not available.
+`{{conversation}}` is not available. `agent_span_filters` at conversation grain may
+scope only by `agent`/`workflow` — `task`/`spanName` are span-level and are rejected.
 
 ## Alert conditions
 
@@ -307,3 +309,4 @@ create_or_update_agent_evaluation_monitor(
 | invalid / unresolvable `agent` reference | The `agent` value wasn't taken from `get_agent_metadata` | Use the exact `agentReference` value — do not construct it by hand, and never pass an MCON |
 | "Field X doesn't exist" | Wrong transform output field name, or a `classification`/`sentiment` output that isn't in the schema | Use the documented output field (e.g. `relevance_score`) or a custom transform's `alias`; replace `classification`/`sentiment` with a `custom_prompt` (`outputType` `boolean`/`string`) |
 | metric/output-type mismatch | Numeric metric on a boolean field (or vice versa) | `NUMERIC_MEAN` for numbers, `TRUE_RATE`/`FALSE_RATE` for booleans, `NULL_RATE` for any type |
+| `task`/`spanName` rejected in `agent_span_filters` | Used a span-level filter dimension at conversation grain | At conversation grain (`is_agent_conversation_aggregation=True`), scope only by `agent`/`workflow` — `task`/`spanName` are span-level |

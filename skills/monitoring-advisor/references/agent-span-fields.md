@@ -12,10 +12,15 @@ so you MUST use these field names when creating monitors.
 Do NOT run `SHOW COLUMNS` or `SELECT *` on the trace table to discover
 field names for monitors — the raw table has different columns (e.g.,
 `VALUE`, `FILENAME`, `INGEST_TS`, `DATE_PART`) that are NOT the fields
-monitors use. Instead, use the field names listed below. These are also the
-fields the read tools (`get_agent_traces`, `get_agent_segments`,
-`get_agent_trace`) surface, so the names below are exactly what you'll see when
-sampling.
+monitors use. Instead, use the field names listed below.
+
+> **The read tools use different names and units for some fields.** The names below
+> are the **monitor** field names. The tools you sample with do not all match them:
+> `get_agent_traces` returns `duration_seconds` and `count_llm_calls` (the monitor
+> fields are `duration_sec` and `llm_call_count`), and `get_agent_trace` reports
+> `duration` in **milliseconds** (the monitor field `duration_sec` is in seconds).
+> Always use the monitor field names below in monitor payloads — never copy a read
+> tool's column name or unit into a monitor.
 
 ## Span-level fields (default, per-span rows)
 
@@ -70,3 +75,19 @@ agents only):
 | `start_time` | TIMESTAMP | Earliest span start in the trace |
 | `end_time` | TIMESTAMP | Latest span end in the trace |
 | `ingest_ts` | TIMESTAMP | Ingestion timestamp |
+
+## Conversation-aggregation fields (is_agent_conversation_aggregation=True)
+
+Agent evaluation monitors can aggregate per conversation
+(`is_agent_conversation_aggregation=True`, OpenTelemetry agents only). At this grain,
+`alert_conditions.fields` may reference these raw conversation columns alongside any
+judge output field:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `turn_count` | INTEGER | Number of turns in the conversation |
+| `duration_seconds` | FLOAT | Total conversation duration in seconds |
+| `status` | STRING | Conversation status |
+
+Plus the conversation-grain judge output fields (e.g. `relevance_score`,
+`task_completion_score`) — see `agent-evaluation-monitor.md`.

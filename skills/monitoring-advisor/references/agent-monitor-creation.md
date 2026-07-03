@@ -23,13 +23,12 @@ Key fields in the response:
 | `traceTableMcon` | Trace table MCON — used as the `trace_table_mcon` input for the read tools (`get_agent_conversations`, `get_agent_conversation`, `get_agent_traces`, `get_agent_trace`, `get_agent_segments`) |
 | `sourceType` | `TRACE_TABLE` (custom) or `PLATFORM_AGENT` (Monte Carlo native) |
 
-**Duplicate agents across warehouses:** The same agent name may appear in
-multiple warehouses (e.g., deployed in both prod and staging). When this
-happens, present the warehouse **names** (never UUIDs) and ask the user which
-warehouse they want to monitor. Each entry has a different `agentReference` /
-`warehouse`, so the choice determines which agent the monitor tracks. Pass the
-chosen warehouse as the `warehouse` arg (name or UUID); resolve names via
-`get_warehouses` when the agent reference does not pin it.
+**Duplicate agent names:** The same agent name may appear more than once (e.g.,
+deployed in both prod and staging). Each entry is distinguished by its own
+`agentReference` and `traceTableMcon` — ask the user which one they want to monitor
+and pass that entry's `agentReference` verbatim. The warehouse the traces live in is
+resolved separately via `get_warehouses` (see Warehouse below); when you ask the user
+to choose a warehouse, present its **name** (never a UUID).
 
 ---
 
@@ -77,7 +76,8 @@ front; anomaly-detection operators (`AUTO`) learn the baseline themselves.
 ## The `agent` reference
 
 All four `create_or_update_agent_*_monitor` tools author the monitor's source from
-a single top-level **`agent`** argument. Two accepted forms:
+a single top-level **`agent`** argument (there is no `dw_id` and no `data_source`
+argument — the `agent` reference is the whole source). Two accepted forms:
 
 - **Platform agent reference** — `{database}:{schema}.{name}` (Snowflake Cortex /
   Databricks agents), e.g. `analytics:agents.support_bot`.
@@ -91,20 +91,13 @@ optional companions:
   inferred from the agent reference.
 - The per-type reference tells you whether `warehouse` is required (see below).
 
-There is no `dw_id` and no `data_source` argument — the `agent` reference is the
-whole source.
-
 ---
 
 ## Warehouse
 
-`warehouse` is the name or UUID of the warehouse the agent's trace data lives in.
-Resolve names via `get_warehouses`, or use the `warehouse` returned alongside the
-agent in `get_agent_metadata`.
-
-- **Required** for metric, evaluation, and validation monitors — omitting it fails
-  with "Warehouse not found".
-- **Optional** for trajectory monitors — they fall back to the account default.
+`warehouse` names the warehouse the agent's trace data lives in — pass it as a name
+or UUID. Resolve names to the right warehouse with `get_warehouses`. Whether it is
+required or optional depends on the monitor type — see the per-type reference.
 
 ---
 
@@ -128,13 +121,9 @@ Multiple fields can be combined in the single filter object:
 ```
 
 `agent_span_filters` is a refinement and is optional — the `agent` reference already
-scopes the monitor. Two exceptions, covered in the per-type references:
-
-- **Trajectory monitors** allow only the `agent` field here — workflow / task /
-  spanName go in the alert condition's `spanField` instead (see
-  `agent-trajectory-monitor.md`).
-- **Trace-aggregated metric / validation monitors** allow only the `agent` field —
-  the per-trace result has no workflow / task / spanName column.
+scopes the monitor. Some monitor types restrict which fields are allowed here (e.g.
+trajectory monitors, and trace-aggregated metric / validation monitors) — see the
+per-type reference for the exact rule.
 
 ---
 
@@ -143,12 +132,8 @@ scopes the monitor. Two exceptions, covered in the per-type references:
 Schedule is set via two top-level args, not a nested object:
 
 - `schedule_type` — defaults to `fixed`. Valid values: `fixed`, `manual`.
-- `interval_minutes` — defaults to `60`. The floor and alignment depend on the
-  monitor type:
-  - **Metric and evaluation:** at least 60 minutes **and** a multiple of 60
-    (`60` hourly, `360` every 6 hours, `1440` daily).
-  - **Validation and trajectory:** at least 5 minutes; sub-hourly is allowed with no
-    60-minute alignment.
+- `interval_minutes` — defaults to `60`. The floor and alignment differ per monitor
+  type — see each reference.
 
 No agent monitor accepts a dynamic schedule — use `fixed` or `manual`. Use shorter
 intervals for critical agents, longer for less critical ones.

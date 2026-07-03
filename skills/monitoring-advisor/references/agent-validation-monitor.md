@@ -153,9 +153,9 @@ table columns. Note in particular:
 
 ## Trace aggregation
 
-`is_agent_trace_aggregation=True` is **OpenTelemetry-only.** For a platform agent
-(`{database}:{schema}.{name}`) the flag is silently ignored and the monitor runs at
-span grain, so target an OTel `service_name` (or pass `trace_table`). At trace grain,
+`is_agent_trace_aggregation=True` is **OpenTelemetry-only.** A platform agent reference
+(`{database}:{schema}.{name}`) is rejected — target an OTel `service_name`, or pass an
+explicit `trace_table` to force the agent to be read as OpenTelemetry. At trace grain,
 use trace-level fields (`span_count`, `llm_call_count`, `total_tokens`, …) and filter
 only by `agent`.
 
