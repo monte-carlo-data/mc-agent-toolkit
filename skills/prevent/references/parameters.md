@@ -17,7 +17,9 @@ The MCP tool uses Python snake_case, **not** the camelCase params from the MC we
 ```
 
 Always provide `created_after` and `created_before`. Max window is 60 days.
-Use `getCurrentTime()` to get the current ISO timestamp when needed.
+Pass ISO 8601 timestamps computed from the current date — e.g. for a 7-day
+window ending now: `created_after="2026-07-03T00:00:00Z"`,
+`created_before="2026-07-10T00:00:00Z"` (use the actual current date).
 
 ---
 

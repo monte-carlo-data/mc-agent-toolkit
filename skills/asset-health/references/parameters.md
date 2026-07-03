@@ -16,7 +16,9 @@ statuses
 ```
 
 Always provide `created_after` and `created_before`. Max window is 60 days.
-Use `get_current_time()` to get the current ISO timestamp when needed.
+Pass ISO 8601 timestamps computed from the current date — e.g. for a 7-day
+window ending now: `created_after="2026-07-03T00:00:00Z"`,
+`created_before="2026-07-10T00:00:00Z"` (use the actual current date).
 
 When requesting active alerts, pass these three statuses:
 
@@ -88,13 +90,6 @@ environment). Call once in Phase 1 and store the result. Use it to construct all
 Monte Carlo links — never hardcode the base URL:
 - Assets/tables: `{result}/assets/{mcon}`
 - Alerts: `{result}/alerts/{alert_uuid}`
-
----
-
-## `get_current_time` — get current timestamp
-
-Takes no arguments. Returns an ISO 8601 timestamp. Use this to compute
-`created_after` and `created_before` for `get_alerts`.
 
 ---
 

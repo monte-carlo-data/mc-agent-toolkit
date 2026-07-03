@@ -196,7 +196,6 @@ All tools are available via the `monte-carlo-mcp` MCP server.
 | `getAudiences`               | List notification audiences                                          |
 | `getDomains`                 | List MC domains                                                      |
 | `getUser`                    | Current user info                                                    |
-| `getCurrentTime`             | ISO timestamp for API calls                                          |
 
 ## Core workflows
 

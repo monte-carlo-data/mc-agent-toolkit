@@ -54,8 +54,9 @@ get_asset_lineage(mcon="<mcon>", direction="upstream")
 → 1-hop upstream parent assets
 ```
 
-Use `get_current_time()` in Phase 1 or Phase 2 if you need the current timestamp
-for `get_alerts`. Or compute it from system time if available.
+For the `get_alerts` time range, compute ISO 8601 timestamps from the current
+date — e.g. `created_before` = now (`2026-07-10T00:00:00Z`) and `created_after`
+= 7 days earlier (`2026-07-03T00:00:00Z`), using the actual current date.
 
 ### Phase 3 — Check upstream health (ALL parents in parallel)
 
