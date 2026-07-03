@@ -43,9 +43,9 @@ trend a numeric metric (mean latency, token counts) — that's
 > **IMPORTANT:** `schedule_type` is `fixed` (default) or `manual` — never dynamic.
 > `interval_minutes` defaults to `60` and must be at least 5 (sub-hourly allowed).
 
-> **IMPORTANT:** `warehouse` is OPTIONAL here — trajectory monitors fall back to the
-> account default. Pass it (name or UUID) when the agent reference doesn't pin the
-> warehouse; resolve via `get_warehouses`.
+> **IMPORTANT:** `warehouse` is OPTIONAL here — when omitted, the backend falls back
+> to the account's default warehouse, which may not be where the agent's traces live.
+> Prefer passing the agent's `warehouse_uuid` from `get_agent_metadata` explicitly.
 
 ## Key characteristics
 

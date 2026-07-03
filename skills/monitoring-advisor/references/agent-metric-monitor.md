@@ -20,8 +20,8 @@ Do NOT use this for LLM-evaluated quality (relevance, correctness, tone) — tha
 > `{database}:{schema}.{name}` reference or an OTel `service_name`. Never modify,
 > truncate, or reconstruct it, and never pass an MCON.
 
-> **CRITICAL:** `warehouse` is REQUIRED. Pass the warehouse (name or UUID) holding
-> the agent's traces; resolve via `get_warehouses`.
+> **CRITICAL:** `warehouse` is REQUIRED. Pass the agent's `warehouse_uuid` from
+> `get_agent_metadata`; use `get_warehouses` when it is null or to resolve by name.
 
 > **IMPORTANT:** `schedule_type` is `fixed` (default) or `manual` — never dynamic.
 > `interval_minutes` defaults to `60` and must be at least 60 **and** a multiple of 60.
@@ -214,7 +214,7 @@ create_or_update_agent_metric_monitor(
 
 | Error message | Cause | Fix |
 |--------------|-------|-----|
-| Warehouse not found | `warehouse` omitted or wrong | Pass the warehouse (name or UUID) the agent's traces live in; list via `get_warehouses` |
+| Warehouse not found | `warehouse` omitted or wrong | Pass the agent's `warehouse_uuid` from `get_agent_metadata`; if null, list warehouses via `get_warehouses` |
 | invalid / unresolvable `agent` reference | The `agent` value wasn't taken from `get_agent_metadata` | Use the exact `agentReference` value — do not construct it by hand, and never pass an MCON |
 | "Field X doesn't exist" | Field name not in the PARSED_SPANS schema | Check `agent-span-fields.md`; use `duration_sec` not `duration_ms` |
 | metric/field-type mismatch | Numeric metric on a boolean field (or vice versa) | Numeric metrics on numeric fields, boolean metrics on boolean fields, `NULL_RATE` on any |

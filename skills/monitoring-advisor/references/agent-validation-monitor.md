@@ -19,8 +19,8 @@ or to alert on span sequences / call counts (use
 > `{database}:{schema}.{name}` reference or an OTel `service_name`. Never modify,
 > truncate, or reconstruct it, and never pass an MCON.
 
-> **CRITICAL:** `warehouse` is REQUIRED. Pass the warehouse (name or UUID) the
-> agent's traces live in; resolve via `get_warehouses`.
+> **CRITICAL:** `warehouse` is REQUIRED. Pass the agent's `warehouse_uuid` from
+> `get_agent_metadata`; use `get_warehouses` when it is null or to resolve by name.
 
 > **CRITICAL:** `alert_condition` matches the rows to ALERT on. A `null` predicate
 > alerts on spans where the field IS null. Express negation with the `negated` flag —
@@ -265,7 +265,7 @@ create_or_update_agent_validation_monitor(
 
 | Error message | Cause | Fix |
 |--------------|-------|-----|
-| Warehouse not found | `warehouse` omitted or wrong | Pass the warehouse (name or UUID) the agent's traces live in; list via `get_warehouses` |
+| Warehouse not found | `warehouse` omitted or wrong | Pass the agent's `warehouse_uuid` from `get_agent_metadata`; if null, list warehouses via `get_warehouses` |
 | invalid / unresolvable `agent` reference | The `agent` value wasn't taken from `get_agent_metadata` | Use the exact `agentReference` value — do not construct it by hand, and never pass an MCON |
 | unknown predicate `not_equal` / `not_null` | Used a `not_`-prefixed predicate | Use the base predicate (`equal` / `null`) with `"negated": true` |
 | UNARY condition rejected | Used `left` instead of `value` | UNARY conditions put the field in `value`; only BINARY uses `left`/`right` |

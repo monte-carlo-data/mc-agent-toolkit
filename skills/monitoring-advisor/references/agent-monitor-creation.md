@@ -22,13 +22,13 @@ Key fields in the response:
 | `agentReference` | The value to pass as the `agent` arg when creating monitors — a platform `{database}:{schema}.{name}` reference (Snowflake Cortex / Databricks) or an OpenTelemetry `service_name`. May be null for agents that cannot be referenced. |
 | `traceTableMcon` | Trace table MCON — used as the `trace_table_mcon` input for the read tools (`get_agent_conversations`, `get_agent_conversation`, `get_agent_traces`, `get_agent_trace`, `get_agent_segments`) |
 | `sourceType` | `TRACE_TABLE` (custom) or `PLATFORM_AGENT` (Monte Carlo native) |
+| `warehouse_uuid` | Warehouse holding the agent's trace data — the value to pass as the `warehouse` arg when creating monitors. Null when it cannot be derived; fall back to `get_warehouses` (see Warehouse below). |
 
 **Duplicate agent names:** The same agent name may appear more than once (e.g.,
 deployed in both prod and staging). Each entry is distinguished by its own
-`agentReference` and `traceTableMcon` — ask the user which one they want to monitor
-and pass that entry's `agentReference` verbatim. The warehouse the traces live in is
-resolved separately via `get_warehouses` (see Warehouse below); when you ask the user
-to choose a warehouse, present its **name** (never a UUID).
+`agentReference`, `traceTableMcon`, and `warehouse_uuid` — ask the user which one
+they want to monitor and pass that entry's `agentReference` verbatim. When you ask
+the user to choose, present warehouse **names** (via `get_warehouses`), never UUIDs.
 
 ---
 
@@ -96,8 +96,10 @@ optional companions:
 ## Warehouse
 
 `warehouse` names the warehouse the agent's trace data lives in — pass it as a name
-or UUID. Resolve names to the right warehouse with `get_warehouses`. Whether it is
-required or optional depends on the monitor type — see the per-type reference.
+or UUID. Use the agent entry's `warehouse_uuid` from `get_agent_metadata`; when it is
+null, or when you need to resolve a warehouse by display name, use `get_warehouses`.
+Whether `warehouse` is required or optional depends on the monitor type — see the
+per-type reference.
 
 ---
 

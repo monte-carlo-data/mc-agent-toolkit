@@ -21,9 +21,9 @@ transforms, which those don't need.
 > `{database}:{schema}.{name}` reference or an OTel `service_name`. Never modify,
 > truncate, or reconstruct it, and never pass an MCON.
 
-> **CRITICAL:** `warehouse` is REQUIRED. Pass the warehouse (name or UUID) the
-> agent's traces live in; omitting it fails with "Warehouse not found". List the
-> account's warehouses with `get_warehouses`.
+> **CRITICAL:** `warehouse` is REQUIRED. Pass the agent's `warehouse_uuid` from
+> `get_agent_metadata`; omitting it fails with "Warehouse not found". Use
+> `get_warehouses` when `warehouse_uuid` is null or to resolve a warehouse by name.
 
 > **CRITICAL:** `sampling_config` is REQUIRED. Provide `percentage`, `count`, or
 > both. Per-span monitors cap `count` at 10,000; conversation-level monitors cap it
@@ -305,7 +305,7 @@ create_or_update_agent_evaluation_monitor(
 
 | Error message | Cause | Fix |
 |--------------|-------|-----|
-| Warehouse not found | `warehouse` omitted or wrong | Pass the warehouse (name or UUID) the agent's traces live in; list via `get_warehouses` |
+| Warehouse not found | `warehouse` omitted or wrong | Pass the agent's `warehouse_uuid` from `get_agent_metadata`; if null, list warehouses via `get_warehouses` |
 | invalid / unresolvable `agent` reference | The `agent` value wasn't taken from `get_agent_metadata` | Use the exact `agentReference` value — do not construct it by hand, and never pass an MCON |
 | "Field X doesn't exist" | Wrong transform output field name, or a `classification`/`sentiment` output that isn't in the schema | Use the documented output field (e.g. `relevance_score`) or a custom transform's `alias`; replace `classification`/`sentiment` with a `custom_prompt` (`outputType` `boolean`/`string`) |
 | metric/output-type mismatch | Numeric metric on a boolean field (or vice versa) | `NUMERIC_MEAN` for numbers, `TRUE_RATE`/`FALSE_RATE` for booleans, `NULL_RATE` for any type |
