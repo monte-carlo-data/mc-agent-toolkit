@@ -10,6 +10,7 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Changed
 
 - Refresh agent monitor references to match the current tool contract: single `agent` reference source (no `dw_id`/`data_source`), required `warehouse` for metric/evaluation/validation, `schedule_type` limited to `fixed`/`manual` with per-type interval floors, and `agent_span_filters` capped at one filter object.
+- Agent monitor warehouse is now sourced from `get_agent_metadata`'s `warehouse_uuid`/`warehouse_name` (show the name, pass the uuid; fall back to `get_warehouses` only when both are null).
 - Evaluation reference: correct predefined transform functions (`output_length`, `json_validity`, `keywords`), typed custom transforms (`custom_prompt`/`custom_sql` with camelCase `outputType`/`sqlExpression`), boolean-output alerting via `TRUE_RATE`/`FALSE_RATE`, and removal of unsupported `classification`/`sentiment`.
 - Metric reference: full agent metric catalog, `NEQ` operator, operator/threshold rules, `ROW_COUNT_CHANGE` and trace-aggregation constraints.
 - Validation reference: `negated`-flag negation (no `not_equal`/`not_null`), UNARY `value` vs BINARY `left`/`right`, numeric `status_code`.

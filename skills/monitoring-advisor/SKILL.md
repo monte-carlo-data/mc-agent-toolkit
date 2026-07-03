@@ -104,7 +104,7 @@ All five tools follow a **two-call preview-then-confirm pattern**: the first cal
 
 | Tool | Purpose |
 | --- | --- |
-| `get_agent_metadata` | List AI agents -- returns agent names, `agentReference` values (the `agent` arg for monitor creation), trace table MCONs, source types |
+| `get_agent_metadata` | List AI agents -- returns agent names, `agentReference` values (the `agent` arg for monitor creation), trace table MCONs, source types, and each agent's `warehouse_uuid`/`warehouse_name` (the `warehouse` arg -- show the name, pass the uuid) |
 | `get_agent_conversations` | List recent conversations for an agent (newest first; filter by errors/status/turns/tokens/duration; optional inline transcripts) |
 | `get_agent_conversation` | Retrieve one conversation's full prompt/completion thread by `conversation_id` |
 | `get_agent_traces` | List traces with per-trace workflows, tasks, models, LLM-call counts, tokens, duration, and error counts |
