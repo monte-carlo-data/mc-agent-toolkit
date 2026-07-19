@@ -25,6 +25,7 @@ workflow to the routing system.
 | Validation notebook | "validation notebook", "generate validation", "compare baseline" | generate-validation-notebook (direct) |
 | Push ingestion | "push ingestion", "metadata collector", "lineage collector" | push-ingestion (direct) |
 | Agent instrumentation | "instrument my agent", "instrument", "set up tracing", "set up Monte Carlo tracing", "setting up an agent", "add MC tracing" | instrument-agent (direct) |
+| Agent alert / trace investigation | "agent alert", "eval score drop", "agent trace", "agent conversation", "why is my agent failing" | troubleshoot-agent-traces (direct) |
 
 ## API Signals (detected via scoped MCP tool calls)
 

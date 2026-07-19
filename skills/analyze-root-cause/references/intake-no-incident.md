@@ -52,6 +52,7 @@ Based on the evidence gathered, determine the issue type:
 | Data values look wrong (nulls, weird averages) | Field anomaly | `references/field-anomaly-investigation.md` |
 | Pipeline failed or errored | ETL failure | `references/etl-failure-investigation.md` |
 | Query was modified | Query change | `references/query-change-investigation.md` |
+| Problem is about an AI agent (quality, latency, traces, conversations) | Agent issue | Hand off — read and follow `../../troubleshoot-agent-traces/SKILL.md` |
 
 ### 6. Proceed to investigation
 

@@ -41,7 +41,6 @@ Activate when the user:
 - Wants to add monitoring after new transformation logic (when the prevent skill is not active)
 - Asks about monitoring AI agents, agent latency, agent token usage, or agent quality
 - Wants to set up alerts on agent behavior or execution patterns
-- Asks about investigating agent traces or conversations
 - Says things like "monitor my agent", "track agent latency", "alert on agent errors"
 - Asks about agent evaluation monitors, trajectory monitors, or validation monitors
 - Mentions agent observability or agent monitoring
@@ -55,6 +54,7 @@ Do not activate when the user is:
 - Running impact assessments before code changes (use the prevent skill's Workflow 4)
 - Asking about existing monitor configuration (use `get_monitors` directly)
 - Editing or deleting existing monitors
+- Investigating agent alerts or agent traces (this skill creates agent monitors; investigating what they catch uses the `monte-carlo-troubleshoot-agent-traces` skill)
 
 ---
 

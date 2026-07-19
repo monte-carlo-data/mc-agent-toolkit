@@ -45,6 +45,7 @@ Activate when the user:
 Do not activate when the user is:
 
 - Creating monitors (use the monitoring-advisor skill)
+- Investigating agent-monitor alerts (agent evaluation, agent metric, agent trajectory, agent validation) or AI-agent traces/conversations (use the `monte-carlo-troubleshoot-agent-traces` skill — read `../troubleshoot-agent-traces/SKILL.md`)
 - Running impact assessments before code changes (use the prevent skill)
 - Looking at storage costs (use the storage-cost-analysis skill)
 - Exploring pipeline performance without a specific incident (use the performance-diagnosis skill)
@@ -159,6 +160,7 @@ Read the appropriate reference file and follow its investigation playbook:
 | Airflow/dbt/Databricks pipeline failures | `references/etl-failure-investigation.md` |
 | SQL modifications causing data changes | `references/query-change-investigation.md` |
 | Field-level metric drift (null rate, mean, etc.) | `references/field-anomaly-investigation.md` |
+| Agent-monitor alert (agent evaluation, metric, trajectory, or validation) | Hand off — read and follow `../troubleshoot-agent-traces/SKILL.md` instead of continuing here |
 
 ### Step 4: Check for upstream causes
 

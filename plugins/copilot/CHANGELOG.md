@@ -5,6 +5,16 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Copilot CLI will
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.15.0] - 2026-07-19
+
+### Added
+
+- New `troubleshoot-agent-traces` skill: investigates AI-agent alerts (evaluation, metric, trajectory, validation) and agent traces/conversations. Kicks off the trace troubleshooting agent in parallel (`run_troubleshooting_agent`), identifies the agent's backend exclusively from the new `get_alert_agent_classification` tool (server-side classification — never name/MCON heuristics), and routes to per-alert-type and per-backend investigation playbooks (ClickHouse OTel, Snowflake Cortex, Databricks Genie, customer OTel trace table, Databricks MLflow SDK, MLflow Knowledge Assistant).
+
+### Changed
+
+- analyze-root-cause, incident-response, and context-detection route agent-monitor alerts to the new skill; monitoring-advisor's "investigating agent traces" trigger moved there (it keeps monitor creation).
+
 ## [1.14.0] - 2026-07-03
 
 ### Changed

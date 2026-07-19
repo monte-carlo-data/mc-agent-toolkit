@@ -24,6 +24,7 @@ Skills are grouped by the job they help you do. Orchestrated workflows sequence 
 | **Automated Triage** | Scores and prioritizes active alerts; runs deep troubleshooting on high-signal ones. | [SKILL](skills/automated-triage/SKILL.md) |
 | **Analyze Root Cause** | Investigates incidents via lineage tracing, ETL checks, query analysis, and data profiling. | [README](skills/analyze-root-cause/README.md) |
 | **Remediation** | Proposes and executes fixes for data-quality alerts; assesses blast radius before acting, or escalates with full context. | [README](skills/remediation/README.md) |
+| **Troubleshoot Agent Traces** | Investigates AI-agent alerts (evaluation, metric, trajectory, validation) and agent traces — kicks off the trace troubleshooting agent and guides a backend-aware manual investigation. | [README](skills/troubleshoot-agent-traces/README.md) |
 
 ### Monitoring — coverage gaps, monitor creation, noise reduction
 

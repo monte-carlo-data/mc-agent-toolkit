@@ -15,6 +15,7 @@ Skills are platform-agnostic instruction sets that tell an AI coding agent what 
 | **[Push Ingestion](push-ingestion/)** | Generates warehouse-specific collection scripts for pushing metadata, lineage, and query logs to Monte Carlo. |
 | **[Automated Triage](automated-triage/)** | Guides you through designing, testing, and deploying automated alert triage for your Monte Carlo environment — covering the triage stages, customisation options, and a working example to start from. |
 | **[Analyze Root Cause](analyze-root-cause/)** | Investigates data incidents — freshness, volume, schema, ETL, query changes — with systematic root cause analysis using lineage and observability data. |
+| **[Troubleshoot Agent Traces](troubleshoot-agent-traces/)** | Investigates AI-agent alerts (evaluation, metric, trajectory, validation) and agent traces — kicks off the trace troubleshooting agent and guides a backend-aware manual investigation. |
 | **[Storage Cost Analysis](storage-cost-analysis/)** | Identifies storage waste patterns (unread, zombie, dead-end tables) and recommends safe cleanup with cost estimates. |
 | **[Performance Diagnosis](performance-diagnosis/)** | Diagnoses slow pipelines and expensive queries across Airflow, dbt, and Databricks with tiered investigation. |
 | **[Remediation](remediation/)** | Investigates and remediates data quality alerts — runs TSA root cause analysis, discovers available tools, executes fixes (or escalates), and documents the resolution. |

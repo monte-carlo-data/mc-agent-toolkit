@@ -2,7 +2,7 @@
 
 This is the agent monitor creation procedure for AI agent observability. Follow
 these steps in order when a user asks to monitor their AI agents — setting up
-alerts on agent behavior, investigating agent traces, or creating agent monitors.
+alerts on agent behavior or creating agent monitors.
 
 All tools are available via the `monte-carlo-mcp` MCP server.
 
