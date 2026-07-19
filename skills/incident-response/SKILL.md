@@ -61,6 +61,7 @@ Before starting, determine which step to enter based on the user's context:
 - **User has no specific alert** ("I have alerts firing", "what's going on?") → Start at **Step 1: Triage**
 - **User has a specific alert ID or table** ("alert ABC-123", "stg_payments is stale") → Skip to **Step 2: Root Cause Analysis**
 - **User knows the root cause** ("the ETL job failed, help me fix it") → Skip to **Step 3: Remediation**
+- **Alert is an agent-monitor alert** (`alert_types` starting with "Agent ", or the user's issue is about an AI agent) → for the investigation, read `../troubleshoot-agent-traces/SKILL.md` instead of `../analyze-root-cause/SKILL.md`; the remediation and monitoring steps still apply
 - **Ambiguous** → Ask: "Do you have a specific alert or table you want to investigate, or should I check your recent alerts first?"
 
 ---
