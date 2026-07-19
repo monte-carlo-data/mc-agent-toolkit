@@ -42,11 +42,11 @@ decision path changed.
    a plain sentence — "traces where `web_search` ran more than 15 times" — before
    querying anything.
 3. **Prefer the exactly-resolved violating set.** Call
-   `get_troubleshooting_agent_results(alert_id)`: when the troubleshooting agent has run
+   `get_troubleshooting_agent_results(incident_id)`: when the troubleshooting agent has run
    on this alert, its findings contain the exactly-resolved violating trace IDs — the
    set the rule actually matched. Merge your investigation with those traces rather than
    re-deriving a cohort. If it has not run, kick it off with
-   `run_troubleshooting_agent(alert_id)` and continue manually in parallel.
+   `run_troubleshooting_agent(incident_id)` and continue manually in parallel.
 4. **Otherwise approximate candidates.** `get_agent_traces` over the alert window,
    filtered by whatever proxy signal the rule implies: LLM-call counts (runaway loops),
    trace duration, error counts, workflow/task. For "span X more than N times", find the

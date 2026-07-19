@@ -9,7 +9,7 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- New `troubleshoot-agent-traces` skill (`/monte-carlo-troubleshoot-agent-traces`): investigates AI-agent alerts (evaluation, metric, trajectory, validation) and agent traces/conversations. Kicks off the trace troubleshooting agent in parallel (`run_troubleshooting_agent`), identifies the agent's backend exclusively from the new `get_alert_agent_classification` tool (server-side classification — never name/MCON heuristics), and routes to per-alert-type and per-backend investigation playbooks (ClickHouse OTel, Snowflake Cortex, Databricks Genie, customer OTel trace table, Databricks MLflow SDK, MLflow Knowledge Assistant).
+- New `troubleshoot-agent-traces` skill: investigates AI-agent alerts (evaluation, metric, trajectory, validation) and agent traces/conversations. Kicks off the trace troubleshooting agent in parallel (`run_troubleshooting_agent`), identifies the agent's backend exclusively from the new `get_alert_agent_classification` tool (server-side classification — never name/MCON heuristics), and routes to per-alert-type and per-backend investigation playbooks (ClickHouse OTel, Snowflake Cortex, Databricks Genie, customer OTel trace table, Databricks MLflow SDK, MLflow Knowledge Assistant).
 
 ### Changed
 

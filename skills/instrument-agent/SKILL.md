@@ -4,7 +4,7 @@ description: Instrument a new AI agent in a Python codebase for Monte Carlo Agen
 when_to_use: |
   Activates when the user wants to instrument a new AI agent in their Python codebase for Monte Carlo Agent Observability. Triggers include: "instrument my agent for Monte Carlo", "instrument my LangChain/LangGraph/CrewAI/Bedrock/OpenAI/Anthropic agent for Monte Carlo", "set up Monte Carlo tracing on a new agent", "set up MC tracing", "add MC tracing to this agent", "wire up the Monte Carlo OpenTelemetry SDK", "set up agent observability for a new agent", "set up Monte Carlo Agent Observability tracing".
 
-  Do NOT activate for: monitoring or alerting on an existing agent (use monitoring-advisor); investigating agent issues, alerts, or traces (use incident-response or analyze-root-cause); pushing agent metadata (use push-ingestion); creating monitors on agent traces ("monitor my agent latency", "alert on agent errors" — those go to monitoring-advisor). Boundary: this skill PRODUCES traces; monitoring-advisor consumes them.
+  Do NOT activate for: monitoring or alerting on an existing agent (use monitoring-advisor); investigating agent issues, alerts, or traces (use troubleshoot-agent-traces); pushing agent metadata (use push-ingestion); creating monitors on agent traces ("monitor my agent latency", "alert on agent errors" — those go to monitoring-advisor). Boundary: this skill PRODUCES traces; monitoring-advisor consumes them.
 bucket: Setup
 version: 1.0.0
 ---
@@ -51,7 +51,7 @@ Activate when the user expresses intent to instrument a new AI agent:
 Do not activate when the user is:
 
 - Asking to **monitor** an existing agent (latency, token usage, evaluation, trajectory, validation) → `monte-carlo-monitoring-advisor`
-- Investigating an active agent **incident** or alert → `monte-carlo-incident-response` / `monte-carlo-analyze-root-cause`
+- Investigating an active agent **incident** or alert → `monte-carlo-incident-response` / `monte-carlo-troubleshoot-agent-traces`
 - Asking about **pushing metadata or query logs** to Monte Carlo (data ingestion, not agent tracing) → `push-ingestion`
 - Building a **Connection Auth Rules** config → `connection-auth-rules`
 - Asking why traces are missing for an *already-instrumented* agent → that's troubleshooting; this skill covers it via `references/troubleshooting.md`, but the *first* invocation should be deliberate (not a coverage question)

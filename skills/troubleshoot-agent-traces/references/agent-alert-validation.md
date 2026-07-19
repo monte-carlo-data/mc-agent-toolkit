@@ -45,10 +45,10 @@ the rule looks back **about one hour** from each run, not a whole day.
      to read the breaching spans' content;
    - a **numeric ceiling** (tokens, duration) → treat like a targeted metric check.
 3. **Prefer the exactly-resolved rows.** Call
-   `get_troubleshooting_agent_results(alert_id)`: when the troubleshooting agent has run,
+   `get_troubleshooting_agent_results(incident_id)`: when the troubleshooting agent has run,
    its findings contain the exactly-resolved breaching traces/spans — merge with those
    rather than re-deriving. If it has not run, kick it off with
-   `run_troubleshooting_agent(alert_id)` and continue manually in parallel.
+   `run_troubleshooting_agent(incident_id)` and continue manually in parallel.
 4. **Otherwise find the offending traces/spans.** `get_agent_traces` filtered by the
    assertion's signal — error status, span name, workflow/task, token or duration
    thresholds — over the window ending at the alert's timestamp (default lookback about

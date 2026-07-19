@@ -89,7 +89,7 @@ says so. If the backend is not `ao_clickhouse_otel`, it is span/trace grain.
    prompt change detected").
 
 The troubleshooting agent can run this alert end-to-end in parallel:
-`run_troubleshooting_agent(alert_id)`, then `get_troubleshooting_agent_results` for its
+`run_troubleshooting_agent(incident_id)`, then `get_troubleshooting_agent_results` for its
 evidence timeline. Merge rather than duplicate.
 
 ## Reading the results
