@@ -26,6 +26,14 @@ Key fields in the response:
 | `warehouse_uuid` | Warehouse holding the agent's trace data — the value to pass as the `warehouse` arg when creating monitors. Null when the warehouse was deleted or cannot be resolved; fall back to `get_warehouses` (see Warehouse below). |
 | `warehouse_name` | Display name of that warehouse — what you show the user. Null alongside `warehouse_uuid`; fall back to `get_warehouses`. |
 
+**What `backend_class` tells you about capabilities:** conversation-grain
+evaluation monitors (`is_agent_conversation_aggregation=True`) are supported for
+`ao_clickhouse_otel`, `platform_agent` (Snowflake Cortex), and `databricks_genie`;
+the MLflow classes are span-only (the backend rejects conversation aggregation for
+them). `databricks_genie` agents emit no token or model data — skip token-usage
+metrics for them (see `agent-metric-monitor.md`). A null `backend_class` means the
+server couldn't classify the agent — default to span-grain proposals.
+
 **Duplicate agent names:** The same agent name may appear more than once (e.g.,
 deployed in both prod and staging). Each entry is distinguished by its own
 `agentReference`, `traceTableMcon`, and warehouse — ask the user which one they

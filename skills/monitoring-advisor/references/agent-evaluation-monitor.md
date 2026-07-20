@@ -52,7 +52,8 @@ transforms, which those don't need.
 - Supports a top-level `transforms` array — the evaluation logic
 - Transform output field names are what `alert_conditions.fields` reference
 - Optional `is_agent_conversation_aggregation=True` aggregates per conversation
-  (see the conversation-grain section — OTel agents only)
+  (see the conversation-grain section — OTel/ClickHouse, Snowflake Cortex, and
+  Databricks Genie agents; Databricks MLflow agents are span-only)
 
 ## Parameters
 
@@ -64,7 +65,7 @@ transforms, which those don't need.
 | `alert_conditions` | array | Yes | Alert conditions using transform output field names |
 | `sampling_config` | object | Yes | `{"percentage": 10.0}`, `{"count": 100}`, or both |
 | `transforms` | array | No | Evaluation transforms (predefined or custom); top-level |
-| `is_agent_conversation_aggregation` | boolean | No | Aggregate evaluation per conversation (OTel agents only) |
+| `is_agent_conversation_aggregation` | boolean | No | Aggregate evaluation per conversation (OTel/ClickHouse, Cortex, and Genie agents; MLflow agents are span-only) |
 | `trace_table` | string | No | Explicit trace table — only for non-ClickHouse OTel agents |
 | `agent_span_filters` | array | No | Optional span-scope refinement; at most ONE filter object. At conversation grain (`is_agent_conversation_aggregation=True`) only `agent`/`workflow` are allowed — not `task`/`spanName` |
 | `sensitivity` | string | No | Anomaly detection sensitivity for AUTO operators (`low`/`medium`/`high`) |
@@ -128,9 +129,9 @@ Each writes an output column named by its `alias`, and that alias is what
 
 Each LLM judge has a `*_conversation` variant that evaluates a whole conversation
 instead of a single span. These require `is_agent_conversation_aggregation: true`
-**AND an OpenTelemetry agent** (platform agents like Snowflake Cortex reject
-conversation aggregation). The output/score column is not always the span judge's
-name:
+**AND a conversation-capable agent** — OpenTelemetry/ClickHouse, Snowflake Cortex,
+or Databricks Genie (Databricks MLflow agents reject conversation aggregation).
+The output/score column is not always the span judge's name:
 
 | Conversation function | Output/score field |
 |-----------------------|--------------------|
