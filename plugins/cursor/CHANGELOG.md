@@ -5,6 +5,13 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Cursor will be d
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.15.1] - 2026-07-20
+
+### Changed
+
+- troubleshoot-agent-traces: the direct (no-alert) path resolves the exact backend from `get_agent_metadata`'s new `backend_class` field instead of asking the user / splitting on `sourceType` (AI-635; a null `backend_class` — older server or unclassifiable agent — still falls back to asking)
+- monitoring-advisor, troubleshoot-agent-traces, instrument-agent: `get_agent_metadata` field docs gain `backend_class`
+
 ## [1.15.0] - 2026-07-19
 
 ### Added
