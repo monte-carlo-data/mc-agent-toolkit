@@ -27,8 +27,8 @@ The response shape:
 
 ```json
 [
-  {"agentName": "customer-support", "traceTableMcon": "MCON://...", "sourceType": "TRACE_TABLE"},
-  {"agentName": "monitoring-agent", "traceTableMcon": "MCON://...", "sourceType": "PLATFORM_AGENT"}
+  {"agentName": "customer-support", "traceTableMcon": "MCON://...", "sourceType": "TRACE_TABLE", "backend_class": "customer_otel_trace_table"},
+  {"agentName": "monitoring-agent", "traceTableMcon": "MCON://...", "sourceType": "PLATFORM_AGENT", "backend_class": "platform_agent"}
 ]
 ```
 

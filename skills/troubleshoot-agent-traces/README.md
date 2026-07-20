@@ -21,7 +21,7 @@ Connect to Monte Carlo's MCP server (`integrations.getmontecarlo.com/mcp`). The 
 | `get_alerts` | Fetch alert details; list recent alerts (agent alert categories in `alert_types`) |
 | `get_alert_agent_classification` | Classify one alert: agent or not, alert shape, and the agent's backend class |
 | `alert_assessment` | Optional ~2-min triage of an alert (HIGH/MEDIUM/LOW confidence + impact) |
-| `get_agent_metadata` | List AI agents — names, trace tables, source types, warehouses |
+| `get_agent_metadata` | List AI agents — names, trace tables, backend classes, source types, warehouses |
 | `get_agent_traces` | List traces with workflows, tasks, models, tokens, duration, error counts |
 | `get_agent_trace` | Inspect one execution trace's full span tree |
 | `get_agent_conversations` | List recent conversations for an agent (filterable) |

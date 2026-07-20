@@ -20,12 +20,12 @@ this** — and only then investigate the specific traces.
 Call `get_agent_metadata` and match the user's agent by name or reference. If more than
 one agent plausibly matches, **ask the user which one** — do not pick.
 
-> **NEVER** guess the backend from an agent's name. The router's classification tool
-> (`get_alert_agent_classification`) is alert-scoped — it takes an alert UUID, so it
-> cannot be used here. On this path the backend comes from asking the user, or from
-> `get_agent_metadata`'s `sourceType` field — which only splits platform-managed agents
-> from trace-table agents, not the six backend classes. If the split plus the user's
-> answer still leaves it ambiguous, say so rather than assuming.
+> **NEVER** guess the backend from an agent's name. On this path the backend comes from
+> the agent's `backend_class` in the `get_agent_metadata` response — the same server-side
+> classification the alert path gets from `get_alert_agent_classification` (which is
+> alert-scoped and cannot be used here). If `backend_class` is null (an agent the server
+> could not classify, or an older Monte Carlo server), ask the user which backend applies
+> rather than assuming.
 
 ### 2. Search for a matching agent alert
 
@@ -94,7 +94,7 @@ start, and what changed at the onset (prompt, model, config, deploy)?
 | Mistake | Why it fails / what to do instead |
 |---|---|
 | Passing a trace/conversation ID to `run_troubleshooting_agent` | It requires an alert/incident UUID; this path is manual-only |
-| Guessing the backend from the agent's name | Ask the user, or use `sourceType`'s platform/trace-table split — never name heuristics |
+| Guessing the backend from the agent's name | Read `backend_class` from `get_agent_metadata` — never name heuristics |
 | Skipping the `get_alerts` check | A matching alert gives you the resolved breaching set, classification, and automated troubleshooting |
 | Judging a single trace in isolation | Always compare against its cohort before concluding |
 | Running a full root-cause pipeline for a lookup | Match depth to the question |
