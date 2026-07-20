@@ -68,7 +68,7 @@ The Step 2 gate uses the `get_alert_agent_classification` tool. If that tool is 
 
 | Tool | Purpose |
 |------|---------|
-| `get_agent_metadata` | List AI agents — names, trace tables, source types, warehouses |
+| `get_agent_metadata` | List AI agents — names, trace tables, backend classes, source types, warehouses |
 | `get_agent_traces` | List traces with per-trace workflows, tasks, models, LLM-call counts, tokens, duration, and error counts |
 | `get_agent_trace` | Inspect one execution trace's full span tree |
 | `get_agent_conversations` | List recent conversations for an agent (filter by errors/status/turns/tokens/duration; optional inline transcripts) |
