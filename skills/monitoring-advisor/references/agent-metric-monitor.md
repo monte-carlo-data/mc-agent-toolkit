@@ -117,6 +117,10 @@ Common numeric fields: `duration_sec`, `total_tokens`, `prompt_tokens`,
 token totals, `duration_sec` (trace grain). Do NOT use `duration_ms` or raw table
 column names.
 
+**Databricks Genie agents (`backend_class: databricks_genie`) emit no token or
+model data** — token-usage metrics on them are permanently silent. Propose
+latency (`duration_sec`), volume, and error/outcome metrics instead.
+
 ## Trace aggregation
 
 `is_agent_trace_aggregation=True` rolls spans up per trace. Constraints:

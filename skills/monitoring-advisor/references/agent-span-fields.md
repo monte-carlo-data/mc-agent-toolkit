@@ -57,6 +57,11 @@ text fields — `duration_sec`, `total_tokens`, `prompt_tokens`, `completion_tok
 `has_completions`. Those presence/kind flags exist only for OTel/ClickHouse agents.
 Stick to the core fields unless you know the agent is OTel-instrumented.
 
+**Databricks Genie agents (`backend_class: databricks_genie`) emit NO token or
+model data** — `total_tokens` / `prompt_tokens` / `completion_tokens` are always
+empty, so don't build token-usage metrics for them; prefer latency
+(`duration_sec`), volume, and error/outcome signals.
+
 ## Trace-aggregation fields (is_agent_trace_aggregation=True)
 
 When `is_agent_trace_aggregation=True`, rows are aggregated per trace (OpenTelemetry
@@ -79,7 +84,9 @@ agents only):
 ## Conversation-aggregation fields (is_agent_conversation_aggregation=True)
 
 Agent evaluation monitors can aggregate per conversation
-(`is_agent_conversation_aggregation=True`, OpenTelemetry agents only). At this grain,
+(`is_agent_conversation_aggregation=True` — supported for OpenTelemetry/ClickHouse,
+Snowflake Cortex, and Databricks Genie agents; Databricks MLflow agents are
+span-only). At this grain,
 `alert_conditions.fields` may reference these raw conversation columns alongside any
 judge output field:
 

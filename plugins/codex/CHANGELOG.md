@@ -5,6 +5,12 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Codex will be do
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.15.2] - 2026-07-20
+
+### Changed
+
+- monitoring-advisor: conversation-grain evaluation guidance updated for the AI-636 backend change — Snowflake Cortex and Databricks Genie agents now support `is_agent_conversation_aggregation` (Databricks MLflow agents remain span-only); added Genie no-token/model caveats to the metric guidance and a `backend_class` capability note to agent-monitor-creation
+
 ## [1.15.1] - 2026-07-20
 
 ### Changed
