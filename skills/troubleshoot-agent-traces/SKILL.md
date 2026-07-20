@@ -96,7 +96,7 @@ The Step 2 gate uses the `get_alert_agent_classification` tool. If that tool is 
 3. Proceed to Step 1.5.
 
 **If the user brings a trace ID, conversation ID, or a plain problem description with no alert:**
-Read `references/agent-direct-trace.md` and follow its intake flow. In short: identify the agent (`get_agent_metadata`), determine its backend (the reference explains how without an alert), anchor strictly on the supplied trace(s)/conversation(s) — or find candidates via `get_agent_traces` / `get_agent_conversations` — and read the matching backend guide before investigating. There is no incident UUID on this path, so skip Step 1.5 and Step 2's classification; pick up at Step 4's investigation shape. If the intake later identifies a matching agent alert, return to Step 1 with its UUID — Step 1.5 then applies normally.
+Read `references/agent-direct-trace.md` and follow its intake flow. In short: identify the agent (`get_agent_metadata`), determine its backend from that response's `backend_class`, anchor strictly on the supplied trace(s)/conversation(s) — or find candidates via `get_agent_traces` / `get_agent_conversations` — and read the matching backend guide before investigating. There is no incident UUID on this path, so skip Step 1.5 and Step 2's classification; pick up at Step 4's investigation shape. If the intake later identifies a matching agent alert, return to Step 1 with its UUID — Step 1.5 then applies normally.
 
 ### Step 1.5: Auto-invoke TTSA (when applicable)
 
