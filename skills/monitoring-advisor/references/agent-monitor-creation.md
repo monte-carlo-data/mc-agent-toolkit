@@ -171,6 +171,7 @@ corresponding reference doc for the detailed creation guide.
 | I want to... | Monitor type | Reference file |
 |-------------|-------------|----------------|
 | Track a numeric metric trend (latency, tokens) | Agent Metric | `agent-metric-monitor.md` |
+| Set up performance coverage (latency, token cost, errors, SLO) | Agent Metric — Performance pillar | `agent-metric-monitor.md` |
 | Score output quality with LLM evaluation | Agent Evaluation | `agent-evaluation-monitor.md` |
 | Alert on execution patterns or span sequences | Agent Trajectory | `agent-trajectory-monitor.md` |
 | Assert a logical rule on span data | Agent Validation | `agent-validation-monitor.md` |
@@ -181,6 +182,8 @@ corresponding reference doc for the detailed creation guide.
 
 After selecting the monitor type, **read the reference doc** for that type to
 get the detailed parameter guide, examples, constraints, and creation workflow.
+For a blanket "performance monitoring" ask, follow the **Performance pillar**
+baseline set in `agent-metric-monitor.md` rather than assembling one-offs.
 
 ---
 

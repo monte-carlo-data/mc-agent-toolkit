@@ -41,7 +41,8 @@ Activate when the user:
 - Wants to add monitoring after new transformation logic (when the prevent skill is not active)
 - Asks about monitoring AI agents, agent latency, agent token usage, or agent quality
 - Wants to set up alerts on agent behavior or execution patterns
-- Says things like "monitor my agent", "track agent latency", "alert on agent errors"
+- Says things like "monitor my agent", "track agent latency", "alert on agent errors",
+  "set up performance monitoring for my agent", or asks for an agent latency SLO
 - Asks about agent evaluation monitors, trajectory monitors, or validation monitors
 - Mentions agent observability or agent monitoring
 
