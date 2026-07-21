@@ -161,8 +161,8 @@ The set:
 
 | # | Monitor | `alert_conditions` | Notes |
 |---|---------|--------------------|-------|
-| 1 | Latency anomaly | `NUMERIC_MEDIAN` + `PERCENTILE_95` on `duration_sec`, both `AUTO` | One monitor, two conditions — catches drift in the typical and the worst experience. Distinct metrics on the same field are fine; only duplicate metric+field pairs are rejected. |
-| 2 | Token anomaly | `NUMERIC_MEDIAN` + `PERCENTILE_95` on `total_tokens`, both `AUTO` | Per-interaction cost drift. |
+| 1 | Latency anomaly | `NUMERIC_MEDIAN` + `PERCENTILE_95` on `duration_sec`, both `AUTO` | ONE monitor, TWO conditions (do not split) — catches drift in the typical and the worst experience. Distinct metrics on the same field are fine; only duplicate metric+field pairs are rejected. p50 = `NUMERIC_MEDIAN`: there is no `PERCENTILE_50` metric — never substitute `PERCENTILE_40`. |
+| 2 | Token anomaly | `NUMERIC_MEDIAN` + `PERCENTILE_95` on `total_tokens`, both `AUTO` | Per-interaction cost drift; same one-monitor-two-conditions shape. |
 | 3 | Daily token spend | `SUM` on `total_tokens`, `AUTO`, with `aggregate_by="day"` | Aggregate cost creep. `aggregate_by` buckets the datapoints; `interval_minutes` only sets the run cadence — set both. |
 | 4 | Error-level anomaly | `NUMERIC_MEAN` on `status_code`, `AUTO_HIGH` | Error-rate proxy — see rationale below. |
 | 5 | Latency SLO | `PERCENTILE_95` on `duration_sec`, `GT`, `thresholdValue` = measured p95 × 1.2 | Separate monitor, measure-then-propose — see below. |
