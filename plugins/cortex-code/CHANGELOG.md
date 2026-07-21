@@ -5,6 +5,13 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Snowflake Cortex
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.18.0] - 2026-07-21
+
+### Added
+
+- monitoring-advisor: custom-prompt template library (`frustration_free_score`, `answer_attempt_score`, `user_correction`) and Output-pillar eval packs — baseline pack for every agent, analytics pack for Snowflake Cortex / Databricks Genie — in `agent-evaluation-monitor.md`, with pack routing in `agent-monitor-creation.md` and a starting-packs pointer in the POBC walkthrough's Output row (AI-647)
+- monitoring-advisor: documented the `tags` parameter on `create_or_update_agent_evaluation_monitor` (name/value shape) and the tag-every-monitor `agent:<AGENT_NAME>` default (AI-647)
+
 ## [1.17.0] - 2026-07-21
 
 ### Added
