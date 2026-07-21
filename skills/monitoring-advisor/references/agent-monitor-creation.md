@@ -158,7 +158,10 @@ What each pillar maps to:
 
 Mind the backend caveats from Step 1 (`backend_class`): no token or model
 metrics for Genie / Knowledge Assistant agents, and conversation-grain evals
-only on OTel/ClickHouse, Snowflake Cortex, and Genie.
+only on OTel/ClickHouse, Snowflake Cortex, and Genie. Aggregate (per-trace)
+validation assertions require `is_agent_trace_aggregation=True`, supported
+only on `ao_clickhouse_otel` / `customer_otel_trace_table` agents — on other
+backends, use per-span assertions instead.
 
 **Context is a recommendation for now** — creating data-quality monitors from
 the agent's lineage is not wired into this flow yet. Present the pillar rather
@@ -241,8 +244,9 @@ Schedule is set via two top-level args, not a nested object:
   monitor. The floor and alignment differ per monitor type — see each reference.
 
 No agent monitor accepts a dynamic schedule — use `fixed` or `manual`. Daily is
-the right cadence for most agents; go shorter (hourly) only for critical agents
-where a same-hour alert matters.
+the right cadence for most agents. If you judge an agent critical enough that a
+same-hour alert would matter, suggest hourly to the user and let them decide —
+the default stays daily unless they opt in.
 
 ---
 
