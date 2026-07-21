@@ -83,6 +83,101 @@ front; anomaly-detection operators (`AUTO`) learn the baseline themselves.
 
 ---
 
+## Propose with the POBC framing (walk the user through all four pillars)
+
+When the user is setting up monitoring for an agent (rather than asking for one
+specific monitor), structure the proposal around the four pillars of agent
+observability — **Performance, Output, Behavior, Context (POBC)** — and walk
+through them one at a time. Do NOT dump every proposed monitor in one
+monolithic list.
+
+### 1. Open with the framing
+
+Before presenting any monitors, briefly explain the framework. Use this copy,
+adapting the agent's actual name into the prose where it reads naturally:
+
+> A quick word on how we think about agent observability. Agents fail in four
+> distinct ways, so we monitor four distinct things — **Performance, Output,
+> Behavior, and Context (POBC)**: how efficiently the agent answers, what it
+> says, how it gets there, and the data it stands on.
+>
+> **Performance** — is it fast and affordable? Latency, token cost, and error
+> monitoring catch drift in both the typical experience and the worst one.
+>
+> **Output** — is the agent giving good answers? Evals score response quality
+> (helpfulness, non-answers, user corrections) so quality regressions surface
+> as alerts, not user complaints.
+>
+> **Behavior** — is it working sensibly under the hood? Trajectory monitoring
+> flags runs that loop or take paths a healthy run never takes — including
+> failures the agent recovers from and hides.
+>
+> **Context** — is the data it relies on healthy? The agent's answers are only
+> as good as its upstream tables; we monitor those for freshness, schema
+> changes, and anomalies.
+>
+> Everything below maps to one of these four. Here's the plan:
+
+### 2. Walk through the plan pillar by pillar
+
+Present the pillars in order — Performance, Output, Behavior, Context — one
+short block each:
+
+1. **Evidence** — one or two sentences of what you observed in Step 2 that
+   motivates this pillar's monitors ("p95 latency is 40s with outliers over
+   three minutes", "several conversations show repeated user corrections").
+   If you found nothing notable for a pillar, say so and propose baseline
+   coverage anyway — monitoring exists to catch what hasn't happened yet.
+2. **Proposed monitors** — the specific monitors for this pillar, each with
+   its monitor type, field or judge, and alert condition.
+3. **Confirm** — ask whether to keep, adjust, or drop this pillar's monitors,
+   and fold the answer in before moving to the next pillar.
+
+A healthy agent usually warrants coverage in every pillar you can serve —
+keep proposals broad across pillars, not deep in one.
+
+**Global defaults for proposed monitors** (apply unless the user asks
+otherwise):
+
+- **Daily schedule** — pass `interval_minutes=1440` explicitly; the tools'
+  built-in default is hourly (see Schedule configuration below).
+- **Eval sampling** — `sampling_config={"count": 100}` (a fixed 100-sample
+  budget per run), not a percentage, so evaluation cost stays predictable as
+  traffic grows.
+- **Audience before creation** — never create a monitor without asking which
+  audience(s) should be notified (Step 4).
+
+What each pillar maps to:
+
+| Pillar | Monitor types | Reference |
+|---|---|---|
+| **Performance** | Metric (validation for hard limits) — latency (`duration_sec`), token cost (`total_tokens`), error rate (`status_code`), volume (`ROW_COUNT_CHANGE`) | `agent-metric-monitor.md` |
+| **Output** | Evaluation — predefined judges (`answer_relevance`, `helpfulness`, `task_completion`, `clarity`, `prompt_adherence`), rule checks (`output_length`, `json_validity`), and one custom eval per recurring user intent or failure mode you observed | `agent-evaluation-monitor.md` |
+| **Behavior** | Trajectory (validation for aggregate assertions) — runaway loops (`SPAN_OCCURRENCE`), missing or mis-ordered steps (`SPAN_RELATION`), token budgets | `agent-trajectory-monitor.md`, `agent-validation-monitor.md` |
+| **Context** | Data-quality monitors on the agent's upstream tables — see below | — |
+
+Mind the backend caveats from Step 1 (`backend_class`): no token or model
+metrics for Genie / Knowledge Assistant agents, and conversation-grain evals
+only on OTel/ClickHouse, Snowflake Cortex, and Genie. Aggregate (per-trace)
+validation assertions require `is_agent_trace_aggregation=True`, supported
+only on `ao_clickhouse_otel` / `customer_otel_trace_table` agents — on other
+backends, use per-span assertions instead.
+
+**Context is a recommendation for now** — creating data-quality monitors from
+the agent's lineage is not wired into this flow yet. Present the pillar rather
+than skipping it: name it in the plan, ask the user which upstream tables the
+agent depends on, and suggest Monte Carlo's standard data-quality monitoring
+(freshness, volume, schema changes, anomalies) on those tables as a follow-up
+(the data-monitor workflow in this skill covers them).
+
+### 3. Create the confirmed monitors
+
+Once the user has confirmed the pillars, continue to Step 3 (pick each
+monitor's reference doc) and Step 4 (dry-run preview, audience selection,
+creation on explicit confirmation) for each approved monitor.
+
+---
+
 ## The `agent` reference
 
 All four `create_or_update_agent_*_monitor` tools author the monitor's source from
@@ -141,14 +236,17 @@ per-type reference for the exact rule.
 
 ## Schedule configuration
 
+**Propose daily schedules by default** — pass `interval_minutes=1440` explicitly.
 Schedule is set via two top-level args, not a nested object:
 
 - `schedule_type` — defaults to `fixed`. Valid values: `fixed`, `manual`.
-- `interval_minutes` — defaults to `60`. The floor and alignment differ per monitor
-  type — see each reference.
+- `interval_minutes` — defaults to `60` (hourly), so omitting it creates an hourly
+  monitor. The floor and alignment differ per monitor type — see each reference.
 
-No agent monitor accepts a dynamic schedule — use `fixed` or `manual`. Use shorter
-intervals for critical agents, longer for less critical ones.
+No agent monitor accepts a dynamic schedule — use `fixed` or `manual`. Daily is
+the right cadence for most agents. If you judge an agent critical enough that a
+same-hour alert would matter, suggest hourly to the user and let them decide —
+the default stays daily unless they opt in.
 
 ---
 

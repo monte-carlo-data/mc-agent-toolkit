@@ -7,10 +7,14 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [1.16.0] - 2026-07-21
 
-### Added
+### Changed
 
-- monitoring-advisor: Performance pillar baseline monitor set in the agent-metric-monitor reference — p50+p95 latency anomaly, p50+p95 token anomaly, daily token SUM, status_code error-level anomaly, and a measured-p95 latency SLO threshold, with per-backend gating and shared defaults (daily schedule, agent tag, draft-capable) (AI-646)
-- monitoring-advisor: documented `tags` and `is_draft` (un-draft-on-edit footgun) on create_or_update_agent_metric_monitor; routing rows for performance-coverage asks
+- monitoring-advisor: POBC proposal walkthrough in the agent monitor creation
+  reference — open with the Performance/Output/Behavior/Context framing, walk
+  the user through the plan pillar by pillar (evidence → proposed monitors →
+  confirm), Context as a recommendation-only pillar until lineage wiring
+  lands. Global defaults: daily schedules (`interval_minutes=1440`) and
+  count-based eval sampling (`{"count": 100}`). (AI-645)
 
 ## [1.15.2] - 2026-07-20
 
