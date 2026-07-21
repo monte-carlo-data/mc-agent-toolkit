@@ -5,11 +5,36 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Copilot CLI will
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.15.3] - 2026-07-21
+## [1.18.1] - 2026-07-21
 
 ### Added
 
-- monitoring-advisor: Behavior pillar (AI-648) — agent-understanding investigation summary before proposing monitors (purpose, dominant tool span, healthy trajectory shape, intents, failure modes); runaway-loop trajectory playbook with thresholds derived from observed trace history (max observed + headroom; zero historical matches by design — a regression guardrail); ungrounded-in-data pattern created as a draft with a breach preview and an LLM-judge upgrade path; `preview` / `tags` / `is_draft` documented on the trajectory reference with the `agent:<AGENT_NAME>` tag convention and daily schedule default
+- monitoring-advisor: Behavior pillar (AI-648) — agent-understanding investigation summary before proposing monitors (purpose, dominant tool span, healthy trajectory shape, intents, failure modes); runaway-loop trajectory playbook with thresholds derived from observed trace history (max observed + headroom; zero historical matches by design — a regression guardrail, proven with a pre-create breach preview); ungrounded-in-data pattern created as a draft with a breach preview and an LLM-judge upgrade path; `preview` / `is_draft` documented on the trajectory reference with the `agent:<AGENT_NAME>` tag convention
+
+## [1.18.0] - 2026-07-21
+
+### Added
+
+- monitoring-advisor: custom-prompt template library (`frustration_free_score`, `answer_attempt_score`, `user_correction`) and Output-pillar eval packs — baseline pack for every agent, analytics pack for Snowflake Cortex / Databricks Genie — in `agent-evaluation-monitor.md`, with pack routing in `agent-monitor-creation.md` and a starting-packs pointer in the POBC walkthrough's Output row (AI-647)
+- monitoring-advisor: documented the `tags` parameter on `create_or_update_agent_evaluation_monitor` (name/value shape) and the tag-every-monitor `agent:<AGENT_NAME>` default (AI-647)
+
+## [1.17.0] - 2026-07-21
+
+### Added
+
+- monitoring-advisor: Performance pillar baseline monitor set in the agent-metric-monitor reference — p50+p95 latency anomaly, p50+p95 token anomaly, daily token SUM, status_code error-level anomaly, and a measured-p95 latency SLO threshold, with per-backend gating and shared defaults (daily schedule, agent tag, draft-capable) (AI-646)
+- monitoring-advisor: documented `tags` and `is_draft` (un-draft-on-edit footgun) on create_or_update_agent_metric_monitor; routing rows for performance-coverage asks
+
+## [1.16.0] - 2026-07-21
+
+### Changed
+
+- monitoring-advisor: POBC proposal walkthrough in the agent monitor creation
+  reference — open with the Performance/Output/Behavior/Context framing, walk
+  the user through the plan pillar by pillar (evidence → proposed monitors →
+  confirm), Context as a recommendation-only pillar until lineage wiring
+  lands. Global defaults: daily schedules (`interval_minutes=1440`) and
+  count-based eval sampling (`{"count": 100}`). (AI-645)
 
 ## [1.15.2] - 2026-07-20
 

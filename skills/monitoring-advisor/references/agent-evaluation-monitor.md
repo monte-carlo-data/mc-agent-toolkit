@@ -72,6 +72,7 @@ transforms, which those don't need.
 | `aggregate_by` | string | No | Time-window bucketing (`hour`/`day`/`week`/`month`) |
 | `schedule_type` | string | No | `fixed` (default) or `manual` |
 | `interval_minutes` | int | No | Default `60`; at least 60 and a multiple of 60 |
+| `tags` | array | No | Key-value tags on the monitor. Each tag is `{"name": "<key>", "value": "<value>"}` — the key field is `name` (NOT `key`), and unknown fields are rejected. **Default: tag every agent monitor with its agent** — `[{"name": "agent", "value": "<AGENT_NAME>"}]` (the `agentName` from `get_agent_metadata`) — so one agent's monitors can be filtered as a group |
 | `monitor_uuid` | string | No | UUID of an existing monitor to update in place (PUT semantics) |
 | `dry_run` | boolean | No | Default `True` — preview YAML; set `False` to deploy |
 
@@ -197,7 +198,7 @@ create_or_update_agent_evaluation_monitor(
         {"metric": "NUMERIC_MEAN", "operator": "LT", "fields": ["relevance_score"],
          "thresholdValue": 2}
     ],
-    sampling_config={"percentage": 10.0},
+    sampling_config={"count": 100},
     dry_run=True
 )
 ```
@@ -274,7 +275,7 @@ create_or_update_agent_evaluation_monitor(
         {"metric": "NUMERIC_MEAN", "operator": "LT", "fields": ["answer_chars"],
          "thresholdValue": 40}
     ],
-    sampling_config={"percentage": 10.0},
+    sampling_config={"count": 100},
     dry_run=True
 )
 ```
@@ -301,6 +302,142 @@ create_or_update_agent_evaluation_monitor(
     dry_run=True
 )
 ```
+
+## Custom-prompt template library
+
+Named, reusable `custom_prompt` templates for the most common Output-pillar checks. All three are
+**conversation-level**: set `is_agent_conversation_aggregation=True` and reference
+`{{conversation}}` — the only template variable a conversation-grain prompt may use. On a
+span-only agent (Databricks MLflow), adapt the prompt to `{{completions}}` at span grain instead.
+
+**Render, don't recite.** Before proposing a template, replace every `<AGENT_NAME>` placeholder
+with the agent's actual name (from `get_agent_metadata`) and tailor the wording to the intents and
+failure modes you observed in its real conversations — a template proposed as generic boilerplate
+judges generically. `<AGENT_NAME>` is an authoring placeholder, **not** a template variable: never
+send it verbatim or turn it into a curly-brace variable — the agent name goes into the prompt as
+plain literal text. Always show the user the full rendered prompt text for approval before
+creating the monitor (dry-run first, as usual).
+
+### `frustration_free_score` — was the experience frustration-free?
+
+1–5 score for user-visible friction: rephrasing, repeated corrections, complaints, giving up.
+Complements `helpfulness` — helpfulness judges the answers, this judges the user's experience
+across the whole conversation. Part of the **baseline pack** — propose it for every agent.
+
+```json
+{
+    "function": "custom_prompt",
+    "alias": "frustration_free_score",
+    "prompt": "Read this conversation between a user and <AGENT_NAME>: {{conversation}}. Rate from 1 to 5 how frustration-free the user's experience was. 5 = no sign of frustration; the user got what they needed without friction. 4 = minor friction (one clarification or retry) but the user stayed satisfied. 3 = noticeable friction; the user had to rephrase or repeat themselves to get a useful answer. 2 = clear frustration; the user complained, corrected the agent repeatedly, or expressed annoyance. 1 = severe frustration; the user gave up, abandoned the task, or ended the conversation visibly dissatisfied. Answer with only the number.",
+    "outputType": "number"
+}
+```
+
+Recommended alert: `{"metric": "NUMERIC_MEAN", "operator": "LT", "fields": ["frustration_free_score"], "thresholdValue": 4}`
+
+### `answer_attempt_score` — did the agent attempt a real answer?
+
+1–5 score for whether the agent actually attempted to answer the user's data questions, versus
+deflecting, refusing, asking clarifying questions without ever answering, or erroring out.
+Part of the **analytics pack** (Cortex/Genie — see below), where deflection is the dominant
+failure mode of NL2SQL/analytics agents.
+
+```json
+{
+    "function": "custom_prompt",
+    "alias": "answer_attempt_score",
+    "prompt": "Read this conversation between a user and <AGENT_NAME>, an analytics agent that answers data questions: {{conversation}}. Rate from 1 to 5 how fully the agent attempted to answer the user's data questions. 5 = every question got a direct, substantive answer attempt (a query, a result, or a concrete data answer). 4 = answered with minor gaps or hedging. 3 = partial; some questions were deflected or met only with clarifying questions. 2 = mostly deflected, refused, or answered a different question than asked. 1 = no real answer attempt at all. Answer with only the number.",
+    "outputType": "number"
+}
+```
+
+Recommended alert: `{"metric": "NUMERIC_MEAN", "operator": "LT", "fields": ["answer_attempt_score"], "thresholdValue": 4}`
+
+### `user_correction` — did the user have to correct the agent?
+
+Boolean detector for follow-up-turn corrections — the user saying an answer was wrong, restating
+what they actually meant, or re-asking the same question. A correction is the strongest observable
+ground-truth signal that an earlier answer missed. Part of the **analytics pack** (Cortex/Genie —
+see below). Framed so `true` = a correction occurred, making `TRUE_RATE` the correction rate.
+
+```json
+{
+    "function": "custom_prompt",
+    "alias": "user_correction",
+    "prompt": "Read this conversation between a user and <AGENT_NAME>: {{conversation}}. Did the user correct the agent in a follow-up turn - for example saying a previous answer was wrong, restating what they actually meant, or re-asking the same question because the answer missed it? A clarifying question from the agent does not count as a correction. Answer true if at least one correction occurred, false otherwise.",
+    "outputType": "boolean"
+}
+```
+
+Recommended alert: `{"metric": "TRUE_RATE", "operator": "GT", "fields": ["user_correction"], "thresholdValue": 0.2}` —
+0.2 is a conservative starting point, not a calibrated one. Tune it to the agent's observed
+correction rate after the first week of results, or switch the operator to `AUTO_HIGH` once
+enough history has accumulated for anomaly detection.
+
+## Output-pillar eval packs
+
+When setting up evaluation coverage for an agent (the Output pillar of agent observability),
+propose these packs rather than inventing a one-off list. Shared defaults for every pack monitor:
+
+- **Schedule:** daily — `interval_minutes=1440`
+- **Sampling:** `{"count": 100}` (100 conversations per run; the conversation-grain cap is 500)
+- **Tags:** `[{"name": "agent", "value": "<AGENT_NAME>"}]` — tag every monitor with its agent so
+  one agent's monitors can be filtered as a group
+- **Grain:** conversation (`is_agent_conversation_aggregation=True`) where the agent supports it;
+  span grain with `{{completions}}` / span judges otherwise
+
+### Baseline pack — every agent
+
+| Monitor | Transform | Alert |
+|---------|-----------|-------|
+| Helpfulness | predefined `helpfulness_conversation` (plain `helpfulness` on span-only agents) | `NUMERIC_MEAN` `LT` 4 on `helpfulness_score` |
+| Frustration | `frustration_free_score` template | `NUMERIC_MEAN` `LT` 4 on `frustration_free_score` |
+
+Start with the fixed `LT 4` floor. `AUTO_LOW` (drift detection) is the alternative once the
+monitor has accumulated a baseline — but not alongside it in the same monitor: duplicate
+`(metric, field)` pairs across conditions are rejected, so moving to drift means changing the
+condition's operator, not adding a second condition.
+
+Full example — the frustration baseline monitor with all pack defaults applied:
+
+```
+create_or_update_agent_evaluation_monitor(
+    description="Support Bot - frustration-free conversations (baseline)",
+    agent="analytics:agents.support_bot",
+    warehouse="Prod Warehouse",
+    is_agent_conversation_aggregation=True,
+    transforms=[
+        {
+            "function": "custom_prompt",
+            "alias": "frustration_free_score",
+            "prompt": "Read this conversation between a user and Support Bot: {{conversation}}. Rate from 1 to 5 how frustration-free the user's experience was. 5 = no sign of frustration; the user got what they needed without friction. 4 = minor friction (one clarification or retry) but the user stayed satisfied. 3 = noticeable friction; the user had to rephrase or repeat themselves to get a useful answer. 2 = clear frustration; the user complained, corrected the agent repeatedly, or expressed annoyance. 1 = severe frustration; the user gave up, abandoned the task, or ended the conversation visibly dissatisfied. Answer with only the number.",
+            "outputType": "number"
+        }
+    ],
+    alert_conditions=[
+        {"metric": "NUMERIC_MEAN", "operator": "LT", "fields": ["frustration_free_score"],
+         "thresholdValue": 4}
+    ],
+    interval_minutes=1440,
+    sampling_config={"count": 100},
+    tags=[{"name": "agent", "value": "Support Bot"}],
+    dry_run=True
+)
+```
+
+### Analytics pack — Cortex and Genie agents only
+
+Propose **only when the agent's `backend_class` is `platform_agent` (Snowflake Cortex) or
+`databricks_genie`** — these are the NL2SQL/analytics agents where deflected answers and
+user-corrected answers are the dominant failure modes. Do not propose this pack for other agents.
+
+| Monitor | Transform | Alert |
+|---------|-----------|-------|
+| Answer attempts | `answer_attempt_score` template | `NUMERIC_MEAN` `LT` 4 on `answer_attempt_score` |
+| User corrections | `user_correction` template | `TRUE_RATE` `GT` 0.2 on `user_correction` (starting point — tune, or move to `AUTO_HIGH` with history) |
+
+Same defaults as the baseline pack: daily, `{"count": 100}` sampling, the `agent` tag, and full
+rendered prompt text shown for approval before creating.
 
 ## Common errors
 

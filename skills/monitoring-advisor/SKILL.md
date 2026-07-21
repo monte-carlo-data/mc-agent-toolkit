@@ -41,7 +41,8 @@ Activate when the user:
 - Wants to add monitoring after new transformation logic (when the prevent skill is not active)
 - Asks about monitoring AI agents, agent latency, agent token usage, or agent quality
 - Wants to set up alerts on agent behavior or execution patterns
-- Says things like "monitor my agent", "track agent latency", "alert on agent errors"
+- Says things like "monitor my agent", "track agent latency", "alert on agent errors",
+  "set up performance monitoring for my agent", or asks for an agent latency SLO
 - Asks about agent evaluation monitors, trajectory monitors, or validation monitors
 - Mentions agent observability or agent monitoring
 
@@ -125,7 +126,7 @@ When the user's request comes in, determine which workflow to follow:
 | --- | --- |
 | Coverage analysis, use-case exploration, "what should I monitor?" | **Coverage workflow** (below) |
 | Create a specific data monitor for a known table | **Read `references/data-monitor-creation.md`** and follow its procedure |
-| Monitor AI agents, agent latency, agent quality, agent traces | **Read `references/agent-monitor-creation.md`** and follow its procedure |
+| Monitor AI agents, agent latency, agent quality, agent traces | **Read `references/agent-monitor-creation.md`** and follow its procedure — propose coverage across the four POBC pillars (Performance, Output, Behavior, Context) |
 | Coverage analysis leads to monitor creation | Complete coverage workflow, then **read `references/data-monitor-creation.md`** for creation |
 
 When reading reference files, always use the **Read tool** with the path relative to this skill file.
