@@ -152,7 +152,7 @@ What each pillar maps to:
 | Pillar | Monitor types | Reference |
 |---|---|---|
 | **Performance** | Metric (validation for hard limits) — latency (`duration_sec`), token cost (`total_tokens`), error rate (`status_code`), volume (`ROW_COUNT_CHANGE`) | `agent-metric-monitor.md` |
-| **Output** | Evaluation — predefined judges (`answer_relevance`, `helpfulness`, `task_completion`, `clarity`, `prompt_adherence`), rule checks (`output_length`, `json_validity`), and one custom eval per recurring user intent or failure mode you observed | `agent-evaluation-monitor.md` |
+| **Output** | Evaluation — lead with the Output-pillar starting packs (see Step 3): baseline pack for every agent, analytics pack for Cortex/Genie. Add predefined judges (`answer_relevance`, `task_completion`, `clarity`, `prompt_adherence`), rule checks (`output_length`, `json_validity`), and one custom eval per recurring user intent or failure mode you observed | `agent-evaluation-monitor.md` |
 | **Behavior** | Trajectory (validation for aggregate assertions) — runaway loops (`SPAN_OCCURRENCE`), missing or mis-ordered steps (`SPAN_RELATION`), token budgets | `agent-trajectory-monitor.md`, `agent-validation-monitor.md` |
 | **Context** | Data-quality monitors on the agent's upstream tables — see below | — |
 
@@ -277,6 +277,23 @@ corresponding reference doc for the detailed creation guide.
 | Detect answer relevance drops | Agent Evaluation | `agent-evaluation-monitor.md` |
 | Catch runaway tool call loops | Agent Trajectory | `agent-trajectory-monitor.md` |
 | Ensure token count stays below threshold | Agent Validation | `agent-validation-monitor.md` |
+
+**Output-pillar starting packs** — for a newly onboarded agent (or one with no eval coverage
+yet), lead with the named packs from `agent-evaluation-monitor.md` rather than inventing a
+one-off list:
+
+- **Baseline pack — every agent:** the predefined `helpfulness_conversation` judge (plain
+  `helpfulness` on span-grain-only backends) plus the `frustration_free_score` template.
+  Defaults: daily schedule (`interval_minutes=1440`), `{"count": 100}` sampling, an `agent`
+  tag (`{"name": "agent", "value": "<AGENT_NAME>"}`) on every monitor.
+- **Analytics pack — only when `backend_class` is `platform_agent` (Snowflake Cortex) or
+  `databricks_genie`:** the `answer_attempt_score` and `user_correction` templates — the
+  dominant NL2SQL/analytics failure modes are deflected answers and user-corrected answers.
+  Do not propose this pack for other agents.
+
+Render each template with the agent's actual name and observed intents (never boilerplate) and
+show the full prompt text for approval — see "Custom-prompt template library" and
+"Output-pillar eval packs" in `agent-evaluation-monitor.md`.
 
 After selecting the monitor type, **read the reference doc** for that type to
 get the detailed parameter guide, examples, constraints, and creation workflow.
