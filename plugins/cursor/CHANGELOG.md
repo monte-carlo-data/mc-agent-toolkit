@@ -5,6 +5,12 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Cursor will be d
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.18.1] - 2026-07-21
+
+### Added
+
+- monitoring-advisor: Behavior pillar (AI-648) — agent-understanding investigation summary before proposing monitors (purpose, dominant tool span, healthy trajectory shape, intents, failure modes); runaway-loop trajectory playbook with thresholds derived from observed trace history (max observed + headroom; zero historical matches by design — a regression guardrail, proven with a pre-create breach preview); ungrounded-in-data pattern created as a draft with a breach preview and an LLM-judge upgrade path; `preview` / `is_draft` documented on the trajectory reference with the `agent:<AGENT_NAME>` tag convention
+
 ## [1.18.0] - 2026-07-21
 
 ### Added

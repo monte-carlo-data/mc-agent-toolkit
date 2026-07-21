@@ -68,6 +68,14 @@ trend a numeric metric (mean latency, token counts) — that's
 | `interval_minutes` | int | No | Default `60`; at least 5 |
 | `monitor_uuid` | string | No | UUID of an existing monitor to update in place (PUT semantics) |
 | `dry_run` | boolean | No | Default `True` — preview YAML; set `False` to deploy |
+| `preview` | boolean | No | Only together with `dry_run=True`: also runs the monitor's query and returns a pre-create breach preview — whether the conditions would fire right now, a small sample of the underlying data, and the sample row count. Ignored on a real create (`dry_run=False`) |
+| `tags` | array | No | Key-value tags, e.g. `[{"name": "agent", "value": "Support Bot"}]`. Tag every agent monitor with its agent's name — `{"name": "agent", "value": "<AGENT_NAME>"}` — so all of one agent's monitors are filterable as a group |
+| `is_draft` | boolean | No | Default `False`. Save the monitor as a draft — visible in the UI but not running. **On edit, omitting this un-drafts an existing draft** — pass `is_draft=True` explicitly to keep a draft a draft |
+
+Because `preview` only works on a dry run, evidence and creation are **two separate
+calls**: first `dry_run=True, preview=True` to show the user what would fire, then
+(after they confirm) `dry_run=False` — with `is_draft=True` if the monitor should
+land as a draft.
 
 ## agent_span_alert_condition structure
 
@@ -149,6 +157,71 @@ Identifies a span by workflow / task / span name. Fill in from coarse to fine.
 `workflow`. If you set `task`, you MUST also set `workflow`. All values use the
 `{"literal": "..."}` format. Discover the real names with `get_agent_segments` and
 `get_agent_trace`.
+
+## Behavior playbooks
+
+Two trajectory-monitor patterns that apply to almost every agent. Both must be
+grounded in what THIS agent actually does — never propose them with stock values.
+
+### Runaway loop — threshold derived from trace history
+
+Flags traces where the agent's dominant tool span repeats more times than any
+healthy run ever needed. Derive the threshold; never hardcode one:
+
+1. **Find the dominant tool span** — the span that does the agent's core work (the
+   SQL execution tool for an analytics agent, retrieval for a RAG agent). Use
+   `get_agent_traces` for per-trace shape and `get_agent_trace` on a few trace ids
+   to see the span tree and which tool span dominates.
+2. **Build its per-trace occurrence distribution** from the sampled traces — e.g.
+   "in 20 recent traces the SQL tool ran 1–3 times per trace; max observed: 3".
+3. **Set the threshold to max observed + headroom** — e.g. max 3 → `MORE_THAN`
+   with `count: 5`. The headroom (roughly max + 2, or ~2× max for very tight
+   distributions) keeps ordinary variance from alerting while still catching a loop.
+4. **Show the evidence** when proposing: the dominant span, the occurrence
+   distribution, and the derived threshold with its headroom rationale.
+5. **Prove zero matches with a preview before creating.** Run `dry_run=True,
+   preview=True` with the derived condition: the preview must report NOT breaching.
+   If it reports breaching traces, your sample missed the heavy tail (long agentic
+   sessions, multi-turn conversations accumulating in one trace) — re-derive from a
+   wider window. Preview probes at increasing counts (e.g. more than 20/30/40 on a
+   7-day `lookbackInHrs`) find the true historical max cheaply without pulling
+   traces.
+
+A well-derived runaway-loop monitor matches **zero historical traces** — that is
+the point, not a defect. It is a regression guardrail: it stays silent until the
+agent's behavior actually regresses. At a design partner, exactly this monitor
+caught a silent-retry regression — a run that looped its dominant tool for ~3
+minutes with zero logged errors — within a week of being created, invisible to
+every error-based monitor.
+
+Create it live (`dry_run=False` after user confirmation), tagged
+`{"name": "agent", "value": "<AGENT_NAME>"}`, on a daily schedule
+(`interval_minutes=1440`, `lookbackInHrs: 24`).
+
+### Ungrounded-in-data — create as a DRAFT with an evidence preview
+
+For agents that answer questions from data (analytics, RAG): flag traces where the
+agent produced an answer **without** executing its data-access tool — it likely
+answered from priors instead of the data. The shape is SPAN_RELATION `occurs_with`
++ `"negated": true` (the answer/LLM span occurs WITHOUT the data-tool span) —
+SPAN_OCCURRENCE cannot express "occurs 0 times".
+
+This naive pattern **also flags legitimate traffic**: generic questions ("what can
+you do?", "help") don't need a data query, so an active version alerts on healthy
+runs. Telling those apart needs an LLM-as-a-judge signal ("was this a data
+question?") combined with the trajectory condition, and that composition is not
+available yet. Therefore:
+
+- Run the evidence call first (`dry_run=True, preview=True`) and show the user
+  what would currently fire and at what rate.
+- Create it as a **draft** (`dry_run=False, is_draft=True`) — same `agent` tag,
+  same daily schedule — so the pattern is captured and reviewable without alerting
+  on healthy runs.
+- Note the upgrade path: when trajectory monitors can be combined with an
+  LLM-as-a-judge filter, add the "user asked a data question" judge and enable the
+  monitor.
+- When later editing the monitor, keep passing `is_draft=True` — omitting it
+  un-drafts.
 
 ## Examples
 
