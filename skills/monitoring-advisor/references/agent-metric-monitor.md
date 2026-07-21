@@ -156,6 +156,8 @@ Shared defaults for every monitor in the set:
   backends use the span-grain default. Monitors 3 and 4 stay span-grain everywhere
   (`SUM` of tokens is the same total either way, and `status_code` is not a
   trace-aggregation field).
+- **Cap-constrained surfaces** — if the consuming surface limits how many monitors may be
+  proposed, keep priority order 1 → 4 → 3 → 2 → 5 and say which monitors were cut for the cap.
 
 The set:
 
