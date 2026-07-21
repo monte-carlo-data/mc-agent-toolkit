@@ -81,6 +81,30 @@ so you can scope a monitor to a real segment. Then pick a trace id and call
 You are identifying **what** to monitor — you don't need exact percentiles up
 front; anomaly-detection operators (`AUTO`) learn the baseline themselves.
 
+### 2c. Summarize the agent before proposing
+
+Condense the investigation into a short agent understanding and show it to the
+user — every monitor you propose should trace back to an item in it:
+
+- **Purpose** — 1–2 sentences on what this agent does, grounded in the sampled
+  transcripts (e.g. "a revenue-analytics assistant that answers questions about
+  bookings").
+- **Conversational?** — multi-turn user conversations (eval-worthy for
+  satisfaction / task completion) vs. a batch / single-shot pipeline where
+  structural and span checks fit better.
+- **Tools and the dominant span** — which tool spans the agent runs, and which
+  one does its core work (the SQL execution tool for an analytics agent,
+  retrieval for a RAG agent).
+- **Healthy trajectory shape** — how many times the dominant span runs per answer
+  in healthy traces (the per-trace distribution and its max), typical turn counts,
+  and latency/token magnitudes. This is the basis for every derived threshold.
+- **Recurring intents** — what users repeatedly ask (from the transcripts) —
+  seeds for custom conversation evals.
+- **Observed failure modes** — what actually went wrong in the sample — seeds for
+  evals and structural monitors.
+- **Existing monitors** — from `get_monitors`, so proposals don't duplicate
+  coverage.
+
 ---
 
 ## The `agent` reference
@@ -181,6 +205,35 @@ corresponding reference doc for the detailed creation guide.
 
 After selecting the monitor type, **read the reference doc** for that type to
 get the detailed parameter guide, examples, constraints, and creation workflow.
+
+### Behavior monitors — two trajectory proposals for (almost) every agent
+
+Grounded in the Step 2c summary, propose these two patterns whenever they apply
+(`agent-trajectory-monitor.md` has the full playbooks and payload shapes):
+
+1. **Runaway loop — create live.** SPAN_OCCURRENCE on the agent's dominant tool
+   span, threshold derived from the observed per-trace occurrence distribution:
+   max observed + headroom, never a stock number. The proposal's evidence must
+   show the dominant span, the distribution, and the derived threshold with its
+   headroom rationale. Zero historical matches is the point — it is a regression
+   guardrail that stays silent until the agent's behavior regresses.
+2. **Ungrounded-in-data — create as a DRAFT** (only for agents that answer
+   questions from data). Negated `occurs_with` SPAN_RELATION: an answer was
+   produced without the agent's data-access tool span. Show a breach `preview`
+   (dry run) as evidence, then create with `is_draft=True` — generic questions
+   legitimately skip the data tool, and the LLM-judge filter needed to separate
+   them from real data questions cannot be combined with a trajectory condition
+   yet.
+
+Tag both with the agent's name (`tags=[{"name": "agent", "value": "<AGENT_NAME>"}]`)
+and schedule them daily (`interval_minutes=1440`).
+
+Beyond these two, propose **agent-tailored behavioral custom prompts** for
+behaviors a span pattern can't see — e.g. "did the agent claim it ran a query it
+never executed?", "did the agent re-ask for information the user already gave?".
+One boolean `custom_prompt` per behavior, alerting on `TRUE_RATE` / `FALSE_RATE`,
+at conversation grain where the backend supports it (see `backend_class` in
+Step 1 and `agent-evaluation-monitor.md`).
 
 ---
 
