@@ -5,6 +5,13 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Copilot CLI will
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.17.0] - 2026-07-21
+
+### Added
+
+- monitoring-advisor: Performance pillar baseline monitor set in the agent-metric-monitor reference — p50+p95 latency anomaly, p50+p95 token anomaly, daily token SUM, status_code error-level anomaly, and a measured-p95 latency SLO threshold, with per-backend gating and shared defaults (daily schedule, agent tag, draft-capable) (AI-646)
+- monitoring-advisor: documented `tags` and `is_draft` (un-draft-on-edit footgun) on create_or_update_agent_metric_monitor; routing rows for performance-coverage asks
+
 ## [1.16.0] - 2026-07-21
 
 ### Changed

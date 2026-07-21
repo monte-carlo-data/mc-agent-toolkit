@@ -60,7 +60,9 @@ Do NOT use this for LLM-evaluated quality (relevance, correctness, tone) — tha
 | `sensitivity` | string | No | Anomaly detection sensitivity for AUTO operators |
 | `schedule_type` | string | No | `fixed` (default) or `manual` |
 | `interval_minutes` | int | No | Default `60`; at least 60 and a multiple of 60 |
+| `tags` | array | No | Key-value tags, e.g. `[{"name": "agent", "value": "<AGENT_NAME>"}]`. Tag every monitor you create for an agent with its name so they're groupable (see Performance pillar) |
 | `monitor_uuid` | string | No | UUID of an existing monitor to update in place (PUT semantics) |
+| `is_draft` | boolean | No | Save as a draft (not active). **On edit, omitting this un-drafts an existing draft** — re-pass `is_draft=True` when updating a draft that should stay a draft |
 | `dry_run` | boolean | No | Default `True` — preview YAML; set `False` to deploy |
 
 ## Alert conditions
@@ -132,6 +134,78 @@ latency (`duration_sec`), volume, and error/outcome metrics instead.
   `spanName` from `agent_span_filters`, since the per-trace result has no such column.
 - Use the trace-aggregation field names (`span_count`, `llm_call_count`, trace-summed
   tokens, total `duration_sec`). See `agent-span-fields.md`.
+
+## Performance pillar (baseline monitor set)
+
+When the user asks for performance monitoring on a named agent — latency, token cost,
+errors, or a latency SLO ("set up performance monitoring for X", "alert me when X gets
+slow or expensive") — propose this exact monitor set rather than inventing one-offs.
+Discover the agent first (`get_agent_metadata` → `agentReference`, `backend_class`,
+`warehouse_uuid`), apply the backend gating below, then present the whole set with
+`dry_run=True` previews.
+
+Shared defaults for every monitor in the set:
+
+- **Daily schedule** — `interval_minutes=1440`.
+- **Tag the agent** — `tags=[{"name": "agent", "value": "<AGENT_NAME>"}]` on every
+  monitor, so the pillar's monitors are groupable per agent.
+- **Draft-first when the user wants review** — pass `is_draft=True` to stage the set
+  without activating it (and remember the un-draft-on-edit footgun in Parameters).
+- **Grain** — on OTel agents create monitors 1, 2, and 5 with
+  `is_agent_trace_aggregation=True` so they track end-to-end interactions; other
+  backends use the span-grain default. Monitors 3 and 4 stay span-grain everywhere
+  (`SUM` of tokens is the same total either way, and `status_code` is not a
+  trace-aggregation field).
+- **Cap-constrained surfaces** — if the consuming surface limits how many monitors may be
+  proposed, keep priority order 1 → 4 → 3 → 2 → 5 and say which monitors were cut for the cap.
+
+The set:
+
+| # | Monitor | `alert_conditions` | Notes |
+|---|---------|--------------------|-------|
+| 1 | Latency anomaly | `NUMERIC_MEDIAN` + `PERCENTILE_95` on `duration_sec`, both `AUTO` | ONE monitor, TWO conditions (do not split) — catches drift in the typical and the worst experience. Distinct metrics on the same field are fine; only duplicate metric+field pairs are rejected. p50 = `NUMERIC_MEDIAN`: there is no `PERCENTILE_50` metric — never substitute `PERCENTILE_40`. |
+| 2 | Token anomaly | `NUMERIC_MEDIAN` + `PERCENTILE_95` on `total_tokens`, both `AUTO` | Per-interaction cost drift; same one-monitor-two-conditions shape. |
+| 3 | Daily token spend | `SUM` on `total_tokens`, `AUTO`, with `aggregate_by="day"` | Aggregate cost creep. `aggregate_by` buckets the datapoints; `interval_minutes` only sets the run cadence — set both. |
+| 4 | Error-level anomaly | `NUMERIC_MEAN` on `status_code`, `AUTO_HIGH` | Error-rate proxy — see rationale below. |
+| 5 | Latency SLO | `PERCENTILE_95` on `duration_sec`, `GT`, `thresholdValue` = measured p95 × 1.2 | Separate monitor, measure-then-propose — see below. |
+
+**Why monitor 4 is `NUMERIC_MEAN` on `status_code`:** `status_code` is the one error
+signal available on every backend (OTel semantics: 0 = unset, 1 = ok, 2 = error).
+Healthy spans sit at 0/1 and errored spans at 2, so the mean rises with the
+errored-span share — `AUTO_HIGH` on the mean fires when errors spike. Say so in the
+proposal: this is a *proxy* for error rate built from built-in metrics, not a true
+rate. Do NOT use `TRUE_RATE` (no backend has a boolean error field) or
+`exception_type` (not available on all backends). Monte Carlo may already have
+auto-created a dedicated error-rate monitor for the agent — check `get_monitors`
+first, and if one exists present it as the error coverage instead of duplicating it.
+
+**Monitor 5 is measure-then-propose — never invent an SLO threshold:**
+
+1. Sample recent traces: `get_agent_traces` for the agent (default 14-day lookback),
+   `first=50`, paging with `after`/`end_cursor` up to ~3 pages (≤150 traces).
+2. Compute the 95th percentile of the sampled `duration_seconds`.
+3. Propose `thresholdValue` = p95 × 1.2 (20% headroom), rounded to a clean number.
+4. Show the evidence: measured p95, sample size and window, and the proposed
+   threshold — stating explicitly that the headroom and threshold are the user's to
+   adjust.
+
+Keep the SLO in its own monitor — adding a second `PERCENTILE_95` + `duration_sec`
+condition to monitor 1 is rejected as a duplicate metric+field pair. Propose it for
+OTel agents only (trace grain, so the trace-level measurement matches the monitored
+metric); on other backends skip it — a span-grain p95 tracks individual steps, not
+end-to-end latency, so a trace-based threshold would never fire — and note that
+monitor 1's anomaly conditions cover latency drift.
+
+**Backend gating** (from `backend_class`; explain each skip in one line in the
+proposal):
+
+| `backend_class` | Monitors | Adjustments |
+|---|---|---|
+| `ao_clickhouse_otel` / `customer_otel_trace_table` | 1–5 | 1, 2, 5 at trace grain |
+| `databricks_mlflow_sdk` | 1–4 | span grain; no trace aggregation, so no SLO monitor |
+| `platform_agent` (Cortex) | 1–4 | span grain; no trace aggregation, so no SLO monitor |
+| `databricks_mlflow_ka` | 1, 4 | token fields are NULL — skip 2–3 |
+| `databricks_genie` | 1 (median only), 4 | no token data — skip 2–3; latency percentiles are not meaningful on Genie's fabricated span tree, so drop the `PERCENTILE_95` condition from 1 and skip 5 |
 
 ## Examples
 
@@ -210,6 +284,25 @@ create_or_update_agent_metric_monitor(
         {"metric": "TRUE_RATE", "operator": "LT", "fields": ["is_tool_call"],
          "thresholdValue": 0.1}
     ],
+    dry_run=True
+)
+```
+
+### Latency SLO threshold (Performance pillar monitor 5 — OTel agent, trace grain, draft)
+
+```
+create_or_update_agent_metric_monitor(
+    description="checkout-agent latency SLO — trace p95 under 42s (measured p95 35s + 20% headroom)",
+    agent="checkout-agent",
+    warehouse="Prod Warehouse",
+    alert_conditions=[
+        {"metric": "PERCENTILE_95", "operator": "GT", "fields": ["duration_sec"],
+         "thresholdValue": 42}
+    ],
+    is_agent_trace_aggregation=True,
+    interval_minutes=1440,
+    tags=[{"name": "agent", "value": "checkout-agent"}],
+    is_draft=True,
     dry_run=True
 )
 ```
