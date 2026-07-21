@@ -215,8 +215,11 @@ Grounded in the Step 2c summary, propose these two patterns whenever they apply
    span, threshold derived from the observed per-trace occurrence distribution:
    max observed + headroom, never a stock number. The proposal's evidence must
    show the dominant span, the distribution, and the derived threshold with its
-   headroom rationale. Zero historical matches is the point — it is a regression
-   guardrail that stays silent until the agent's behavior regresses.
+   headroom rationale — plus a pre-create breach `preview` (dry run) proving zero
+   historical matches; if the preview breaches, the sample missed the heavy tail
+   (e.g. multi-turn accumulation in one trace) — re-derive from a wider window.
+   Zero historical matches is the point — it is a regression guardrail that stays
+   silent until the agent's behavior regresses.
 2. **Ungrounded-in-data — create as a DRAFT** (only for agents that answer
    questions from data). Negated `occurs_with` SPAN_RELATION: an answer was
    produced without the agent's data-access tool span. Show a breach `preview`

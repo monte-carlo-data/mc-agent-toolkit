@@ -179,6 +179,13 @@ healthy run ever needed. Derive the threshold; never hardcode one:
    distributions) keeps ordinary variance from alerting while still catching a loop.
 4. **Show the evidence** when proposing: the dominant span, the occurrence
    distribution, and the derived threshold with its headroom rationale.
+5. **Prove zero matches with a preview before creating.** Run `dry_run=True,
+   preview=True` with the derived condition: the preview must report NOT breaching.
+   If it reports breaching traces, your sample missed the heavy tail (long agentic
+   sessions, multi-turn conversations accumulating in one trace) — re-derive from a
+   wider window. Preview probes at increasing counts (e.g. more than 20/30/40 on a
+   7-day `lookbackInHrs`) find the true historical max cheaply without pulling
+   traces.
 
 A well-derived runaway-loop monitor matches **zero historical traces** — that is
 the point, not a defect. It is a regression guardrail: it stays silent until the
