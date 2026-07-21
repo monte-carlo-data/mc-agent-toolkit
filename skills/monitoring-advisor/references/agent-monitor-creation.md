@@ -183,10 +183,10 @@ corresponding reference doc for the detailed creation guide.
 yet), lead with the named packs from `agent-evaluation-monitor.md` rather than inventing a
 one-off list:
 
-- **Baseline pack — every agent:** the predefined `helpfulness` judge plus the
-  `frustration_free_score` template. Defaults: daily schedule (`interval_minutes=1440`),
-  `{"count": 100}` sampling, an `agent` tag (`{"name": "agent", "value": "<AGENT_NAME>"}`) on
-  every monitor.
+- **Baseline pack — every agent:** the predefined `helpfulness_conversation` judge (plain
+  `helpfulness` on span-grain-only backends) plus the `frustration_free_score` template.
+  Defaults: daily schedule (`interval_minutes=1440`), `{"count": 100}` sampling, an `agent`
+  tag (`{"name": "agent", "value": "<AGENT_NAME>"}`) on every monitor.
 - **Analytics pack — only when `backend_class` is `platform_agent` (Snowflake Cortex) or
   `databricks_genie`:** the `answer_attempt_score` and `user_correction` templates — the
   dominant NL2SQL/analytics failure modes are deflected answers and user-corrected answers.
