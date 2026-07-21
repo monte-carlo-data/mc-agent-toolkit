@@ -5,6 +5,17 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Claude Code will
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.16.0] - 2026-07-21
+
+### Changed
+
+- monitoring-advisor: POBC proposal walkthrough in the agent monitor creation
+  reference — open with the Performance/Output/Behavior/Context framing, walk
+  the user through the plan pillar by pillar (evidence → proposed monitors →
+  confirm), Context as a recommendation-only pillar until lineage wiring
+  lands. Global defaults: daily schedules (`interval_minutes=1440`) and
+  count-based eval sampling (`{"count": 100}`). (AI-645)
+
 ## [1.15.2] - 2026-07-20
 
 ### Changed
