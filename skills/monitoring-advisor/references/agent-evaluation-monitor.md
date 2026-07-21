@@ -198,7 +198,7 @@ create_or_update_agent_evaluation_monitor(
         {"metric": "NUMERIC_MEAN", "operator": "LT", "fields": ["relevance_score"],
          "thresholdValue": 2}
     ],
-    sampling_config={"percentage": 10.0},
+    sampling_config={"count": 100},
     dry_run=True
 )
 ```
@@ -275,7 +275,7 @@ create_or_update_agent_evaluation_monitor(
         {"metric": "NUMERIC_MEAN", "operator": "LT", "fields": ["answer_chars"],
          "thresholdValue": 40}
     ],
-    sampling_config={"percentage": 10.0},
+    sampling_config={"count": 100},
     dry_run=True
 )
 ```
