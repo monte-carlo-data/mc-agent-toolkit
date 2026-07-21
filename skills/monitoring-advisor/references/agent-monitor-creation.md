@@ -142,6 +142,38 @@ adapting the agent's actual name into the prose where it reads naturally:
 >
 > Everything below maps to one of these four. Here's the plan:
 
+### Monitor conventions — every monitor in this playbook
+
+Four conventions apply to EVERY monitor created in this playbook — the agent
+monitors (metric, evaluation, trajectory, validation) AND any warehouse
+data-quality monitor created for the Context pillar (table or field monitors
+on the agent's upstream tables; see `data-monitor-creation.md`):
+
+- **Agent tag on every create.** Pass
+  `tags=[{"name": "agent", "value": "<AGENT_NAME>"}]`, where `<AGENT_NAME>` is
+  the agent's display name exactly as returned by `get_agent_metadata`
+  (trimmed, case preserved — do not slugify or rename). This single tag is the
+  footprint contract: one filter retrieves everything the playbook created for
+  this agent.
+- **Audit / teardown contract.** `get_monitors(tags=["agent:<AGENT_NAME>"])`
+  (or the UI monitors tag filter) returns the agent's full monitoring
+  footprint — use it to audit what exists, tune, or tear down everything for
+  an agent. This is why a create call without the tag is a defect: it silently
+  drops the monitor out of the footprint.
+- **Audience — ask once, apply everywhere.** Before the FIRST create call of
+  the playbook (not per monitor), ask the user once which audiences should be
+  notified when these monitors fire — call `get_audiences` to list the
+  options; the user can pick one, several, or none. Pass the chosen audience
+  **names** (labels, never UUIDs) as `audiences` on EVERY monitor created in
+  the playbook, and set `failure_audiences` to the same selection unless the
+  user asks for a different failure-notification audience. Do not re-ask per
+  pillar or per monitor; if the user declines, omit `audiences`.
+- **Domain — same for every monitor.** If the account uses domains, resolve
+  one domain for the agent's footprint and pass the same `domain_uuids` on
+  every monitor — including the Context-pillar DQ monitors (resolve via the
+  domain-assignment steps in `data-monitor-creation.md`) — so the whole
+  footprint lives in one domain.
+
 ### 2. Walk through the plan pillar by pillar
 
 Present the pillars in order — Performance, Output, Behavior, Context — one
@@ -369,9 +401,14 @@ you want to keep, since omitted fields revert to defaults).
 
 1. **Always start with `dry_run=True`** (the default). Show the user the
    configuration preview (the rendered YAML).
-2. Call `get_audiences` to list available notification audiences. Suggest the
-   most relevant one(s) and ask the user to pick — they can choose one or several.
-   Pass audience **names** (not UUIDs) as the `audiences` list.
+2. **Apply the playbook-level audience selection** (see "Monitor conventions —
+   every monitor in this playbook"): the audience question was already asked
+   once before the playbook's first create — pass that same selection of
+   audience **names** (not UUIDs) as the `audiences` list, and default
+   `failure_audiences` to the same selection. Fall back to asking here (one
+   question, `get_audiences` for options) only when the playbook-level ask has
+   not happened (e.g. the user jumped straight to a single monitor outside the
+   walkthrough).
 3. After showing the preview, offer to create or adjust settings.
 4. Only set `dry_run=False` when the user explicitly confirms creation.
 
