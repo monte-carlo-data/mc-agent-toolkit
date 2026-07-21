@@ -58,6 +58,7 @@ or to alert on span sequences / call counts (use
 | `schedule_type` | string | No | `fixed` (default) or `manual` |
 | `interval_minutes` | int | No | Default `60`; at least 5 |
 | `tags` | array | No | Key-value tags, e.g. `[{"name": "agent", "value": "Support Bot"}]`. Tag every agent monitor with its agent's name — `{"name": "agent", "value": "<AGENT_NAME>"}` — so all of one agent's monitors are filterable as a group |
+| `domain_uuids` | array | No | Domain UUIDs to assign this monitor to — the agent-onboarding playbook passes the footprint's single resolved domain on every create (see agent-monitor-creation.md conventions) |
 | `monitor_uuid` | string | No | UUID of an existing monitor to update in place (PUT semantics) |
 | `dry_run` | boolean | No | Default `True` — preview YAML; set `False` to deploy |
 

@@ -14,7 +14,7 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   monitors) carries the `agent:{AGENT_NAME}` footprint tag; audiences are asked
   once and applied to every create (with `failure_audiences` defaulting to the
   same selection); one domain across the footprint; audit/teardown via
-  `get_monitors(tags=["agent:<AGENT_NAME>"])`
+  `get_monitors(monitor_tags=["agent:<AGENT_NAME>"])`
 - agent-validation-monitor reference: documented the `tags` parameter
 - data-monitor-creation reference: agent-onboarding conditional for tagging
   warehouse DQ monitors created for an agent

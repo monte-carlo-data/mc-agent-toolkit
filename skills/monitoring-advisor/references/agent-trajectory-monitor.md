@@ -70,6 +70,7 @@ trend a numeric metric (mean latency, token counts) — that's
 | `dry_run` | boolean | No | Default `True` — preview YAML; set `False` to deploy |
 | `preview` | boolean | No | Only together with `dry_run=True`: also runs the monitor's query and returns a pre-create breach preview — whether the conditions would fire right now, a small sample of the underlying data, and the sample row count. Ignored on a real create (`dry_run=False`) |
 | `tags` | array | No | Key-value tags, e.g. `[{"name": "agent", "value": "Support Bot"}]`. Tag every agent monitor with its agent's name — `{"name": "agent", "value": "<AGENT_NAME>"}` — so all of one agent's monitors are filterable as a group |
+| `domain_uuids` | array | No | Domain UUIDs to assign this monitor to — the agent-onboarding playbook passes the footprint's single resolved domain on every create (see agent-monitor-creation.md conventions) |
 | `is_draft` | boolean | No | Default `False`. Save the monitor as a draft — visible in the UI but not running. **On edit, omitting this un-drafts an existing draft** — pass `is_draft=True` explicitly to keep a draft a draft |
 
 Because `preview` only works on a dry run, evidence and creation are **two separate

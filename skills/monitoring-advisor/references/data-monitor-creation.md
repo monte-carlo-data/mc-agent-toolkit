@@ -66,7 +66,7 @@ Use the `domains` list on the `get_table` response (each entry has `uuid` and `n
 
 Do NOT present all account domains as options when the table already has domains listed -- prefer domains that contain the table.
 
-**Agent-onboarding context.** If this create is part of an agent-onboarding flow (the table is a customer agent's upstream/golden table and an agent is in scope — e.g. you arrived here from the Context pillar of `agent-monitor-creation.md`), every monitor you create must carry that agent's footprint tag `tags=[{"name": "agent", "value": "<AGENT_NAME>"}]` (display name from the onboarding flow, verbatim) and reuse the same `audiences` and `domain_uuids` the agent's monitors use — this keeps the agent's whole footprint retrievable with a single tag filter (`get_monitors(tags=["agent:<AGENT_NAME>"])`). Outside an agent-onboarding flow, do NOT add an `agent` tag.
+**Agent-onboarding context.** If this create is part of an agent-onboarding flow (the table is a customer agent's upstream/golden table and an agent is in scope — e.g. you arrived here from the Context pillar of `agent-monitor-creation.md`), every monitor you create must carry that agent's footprint tag `tags=[{"name": "agent", "value": "<AGENT_NAME>"}]` (display name from the onboarding flow, verbatim) and reuse the same `audiences` and `domain_uuids` the agent's monitors use — this keeps the agent's whole footprint retrievable with a single tag filter (`get_monitors(monitor_tags=["agent:<AGENT_NAME>"])`). Outside an agent-onboarding flow, do NOT add an `agent` tag.
 
 ### Step 3b: Ground thresholds and predicates in real data (profiling)
 

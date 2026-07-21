@@ -155,11 +155,12 @@ on the agent's upstream tables; see `data-monitor-creation.md`):
   (trimmed, case preserved — do not slugify or rename). This single tag is the
   footprint contract: one filter retrieves everything the playbook created for
   this agent.
-- **Audit / teardown contract.** `get_monitors(tags=["agent:<AGENT_NAME>"])`
-  (or the UI monitors tag filter) returns the agent's full monitoring
-  footprint — use it to audit what exists, tune, or tear down everything for
-  an agent. This is why a create call without the tag is a defect: it silently
-  drops the monitor out of the footprint.
+- **Audit / teardown contract.**
+  `get_monitors(monitor_tags=["agent:<AGENT_NAME>"])` (or the UI monitors tag
+  filter) returns the agent's full monitoring footprint — use it to audit
+  what exists, tune, or tear down everything for an agent. This is why a
+  create call without the tag is a defect: it silently drops the monitor out
+  of the footprint.
 - **Audience — ask once, apply everywhere.** Before the FIRST create call of
   the playbook (not per monitor), ask the user once which audiences should be
   notified when these monitors fire — call `get_audiences` to list the
@@ -200,8 +201,9 @@ otherwise):
 - **Eval sampling** — `sampling_config={"count": 100}` (a fixed 100-sample
   budget per run), not a percentage, so evaluation cost stays predictable as
   traffic grows.
-- **Audience before creation** — never create a monitor without asking which
-  audience(s) should be notified (Step 4).
+- **Audience on every create** — apply the playbook-level audience selection
+  (see "Monitor conventions — every monitor in this playbook" above); never
+  create a monitor without that once-asked selection applied (Step 4).
 
 What each pillar maps to:
 
@@ -229,8 +231,9 @@ agent depends on, and suggest Monte Carlo's standard data-quality monitoring
 ### 3. Create the confirmed monitors
 
 Once the user has confirmed the pillars, continue to Step 3 (pick each
-monitor's reference doc) and Step 4 (dry-run preview, audience selection,
-creation on explicit confirmation) for each approved monitor.
+monitor's reference doc) and Step 4 (dry-run preview, applying the
+already-collected audience selection, creation on explicit confirmation) for
+each approved monitor.
 
 ---
 
