@@ -73,6 +73,7 @@ transforms, which those don't need.
 | `schedule_type` | string | No | `fixed` (default) or `manual` |
 | `interval_minutes` | int | No | Default `60`; at least 60 and a multiple of 60 |
 | `tags` | array | No | Key-value tags on the monitor. Each tag is `{"name": "<key>", "value": "<value>"}` — the key field is `name` (NOT `key`), and unknown fields are rejected. **Default: tag every agent monitor with its agent** — `[{"name": "agent", "value": "<AGENT_NAME>"}]` (the `agentName` from `get_agent_metadata`) — so one agent's monitors can be filtered as a group |
+| `domain_uuids` | array | No | Domain UUIDs to assign this monitor to — the agent-onboarding playbook passes the footprint's single resolved domain on every create (see agent-monitor-creation.md conventions) |
 | `monitor_uuid` | string | No | UUID of an existing monitor to update in place (PUT semantics) |
 | `dry_run` | boolean | No | Default `True` — preview YAML; set `False` to deploy |
 

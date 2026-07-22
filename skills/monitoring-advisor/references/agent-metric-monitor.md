@@ -61,6 +61,7 @@ Do NOT use this for LLM-evaluated quality (relevance, correctness, tone) — tha
 | `schedule_type` | string | No | `fixed` (default) or `manual` |
 | `interval_minutes` | int | No | Default `60`; at least 60 and a multiple of 60 |
 | `tags` | array | No | Key-value tags, e.g. `[{"name": "agent", "value": "<AGENT_NAME>"}]`. Tag every monitor you create for an agent with its name so they're groupable (see Performance pillar) |
+| `domain_uuids` | array | No | Domain UUIDs to assign this monitor to — the agent-onboarding playbook passes the footprint's single resolved domain on every create (see agent-monitor-creation.md conventions) |
 | `monitor_uuid` | string | No | UUID of an existing monitor to update in place (PUT semantics) |
 | `is_draft` | boolean | No | Save as a draft (not active). **On edit, omitting this un-drafts an existing draft** — re-pass `is_draft=True` when updating a draft that should stay a draft |
 | `dry_run` | boolean | No | Default `True` — preview YAML; set `False` to deploy |

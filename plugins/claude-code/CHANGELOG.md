@@ -5,6 +5,20 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Claude Code will
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.19.0] - 2026-07-21
+
+### Changed
+
+- monitoring-advisor: agent-onboarding monitor conventions (AI-651) — every
+  monitor in the POBC playbook (agent monitors and Context-pillar data-quality
+  monitors) carries the `agent:{AGENT_NAME}` footprint tag; audiences are asked
+  once and applied to every create (with `failure_audiences` defaulting to the
+  same selection); one domain across the footprint; audit/teardown via
+  `get_monitors(monitor_tags=["agent:<AGENT_NAME>"])`
+- agent-validation-monitor reference: documented the `tags` parameter
+- data-monitor-creation reference: agent-onboarding conditional for tagging
+  warehouse DQ monitors created for an agent
+
 ## [1.18.1] - 2026-07-21
 
 ### Added
