@@ -56,13 +56,19 @@ says so. If the backend is not `ao_clickhouse_otel`, it is span/trace grain.
 3. **Identify the breaching set** — the items on the BREACHING side of the score inside
    the breach window. Resolve the side from the metric + breach direction first:
    - Quality scores breaching low (the common case): the lowest-scoring items.
-   - Boolean/flag evals (`true_*`/`false_*` aggregations — e.g. `escalation_suggested`
-     breaching on a `true_count`/`true_rate` rise): the items carrying the FAILING
-     value. For a true-family metric breaching high that is the flagged items
-     (score 1.0 / `true`) — the TOP of the score range. "Worst-scoring / bottom 10"
-     selects exactly the wrong side here.
+   - Quality scores breaching high (the score spiked above expected levels): the
+     highest-scoring items.
+   - Boolean/flag evals (`true_*`/`false_*` aggregations): the breaching items carry
+     the value whose share ROSE — the metric's tracked value when breaching high, its
+     complement when breaching low. `true` items sit at the TOP of the score range
+     (score 1.0), `false` items at the BOTTOM (score 0.0). So `escalation_suggested`
+     rising on a `true_count`/`true_rate` breaches at the TOP, while `content_safe`
+     breaching on a rising `false_rate` breaches at the BOTTOM — "worst-scoring /
+     bottom 10" selects exactly the wrong side for the former.
    - Inverted numerics (`mismatch_score`-style, breaching high): the highest scores.
+
    Then pull the items:
+
    - Trace grain: `get_agent_traces` filtered to the agent plus the alert's segment,
      within each anomalous bucket window.
    - Conversation grain: `get_agent_conversations` for the agent over the breach
@@ -71,10 +77,12 @@ says so. If the backend is not `ao_clickhouse_otel`, it is span/trace grain.
 
    > **CRITICAL:** Sampling seams can hand you non-breaching items. Check every item's
    > score against the alert's threshold before treating it as evidence. A known failure
-   > mode: a flag eval breaching on a true-count, sampled score-ascending "worst-first" —
-   > the flagged rows sit at the TOP scores, so the page's limit cut them off and seeded
-   > the investigation with perfectly-scoring conversations; the investigator then
-   > "confirmed normal behavior" while reading the wrong conversations entirely.
+   > mode: a flag eval breaching HIGH on a true-count, sampled score-ascending
+   > "worst-first" — its flagged rows sat at the TOP scores, so the page's limit cut
+   > them off and seeded the investigation with perfectly-scoring conversations; the
+   > investigator then "confirmed normal behavior" while reading the wrong conversations
+   > entirely. Any sample sorted toward the non-breaching side (step 3) fails the same
+   > way.
 
 5. **Read the judge's scores and stored reasoning first.** The persisted judgment is the
    truth for this alert. The stored reasoning (often a paragraph per item) frequently
@@ -123,7 +131,7 @@ evidence timeline. Merge rather than duplicate.
 
 | Mistake | Why it fails / what to do instead |
 |---|---|
-| Assuming breaching = lowest scores | The breaching side follows metric + direction: flag evals breaching on a true-count breach at the TOP scores — resolve the side before sampling |
+| Assuming breaching = lowest scores | The breaching side follows metric + direction (step 3): a flag eval breaching high on a true-count breaches at the TOP scores; a rising `false_rate` (e.g. `content_safe`) breaches at the BOTTOM — resolve the side before sampling |
 | Concluding from one conversation | Cluster several breaching items; one item proves nothing about the population |
 | Treating sampled items as breaching without checking scores | Sampling seams return non-breaching items; verify each score against the threshold |
 | Expecting conversation grain on a platform backend | Conversation-grain evaluation is `ao_clickhouse_otel`-only today |

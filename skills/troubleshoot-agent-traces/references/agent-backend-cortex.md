@@ -51,8 +51,9 @@ config change broke it" question usually does.**
    aggregation. Did the breached metric *step* on a specific day (points at a config
    change that day) or drift? Never describe only the bad window.
 4. **Look at WHAT breached — and rule out a false positive.** Pull the flagged
-   conversations (`get_agent_conversations`, worst-first by the breached dimension) and
-   read them (`get_agent_conversation`). Decide: genuine problem (runaway tool loop,
+   conversations (`get_agent_conversations`, sampled from the breaching side of the score
+   per the metric + breach direction — see `agent-alert-evaluation.md` step 3) and read
+   them (`get_agent_conversation`). Decide: genuine problem (runaway tool loop,
    bloated answer, error spike) vs false positive (a legitimately long-but-correct
    conversation, an expected seasonal spike, a too-tight threshold). A breach the sample
    shows to be benign **is a finding** — say so and recommend adjusting the monitor.

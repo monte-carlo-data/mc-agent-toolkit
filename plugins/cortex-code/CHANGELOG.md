@@ -9,7 +9,7 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- troubleshoot-agent-traces: the agent-alert-evaluation reference is now breaching-side aware (AI-629) — the breaching set follows the monitor's metric polarity + breach direction (flag evals breaching on a true-count sit at the TOP scores), replacing the direction-blind "worst-scoring / bottom 10" guidance; step-4 verification and a new common-mistakes row call out the wrong-side sampling trap.
+- troubleshoot-agent-traces: the agent-alert-evaluation reference is now breaching-side aware (AI-629) — the breaching set follows the monitor's metric polarity + breach direction (a flag eval breaching high on a true-count breaches at the TOP scores; a rising `false_rate` breaches at the BOTTOM), replacing the direction-blind "worst-scoring / bottom 10" guidance; step-4 verification and a new common-mistakes row call out the wrong-side sampling trap; the Cortex backend reference defers to the same side resolution.
 
 ## [1.20.0] - 2026-07-22
 
