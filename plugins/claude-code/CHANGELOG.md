@@ -5,6 +5,12 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Claude Code will
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.20.2] - 2026-07-22
+
+### Changed
+
+- troubleshoot-agent-traces: follow-up to the AI-629 breaching-side guidance — the flag-eval side-resolution rule is now symmetric across `true_*`/`false_*` metrics and both breach directions (a rising `false_rate`, e.g. `content_safe`, breaches at the BOTTOM of the score range), quality scores breaching high are enumerated explicitly, and the Cortex backend reference defers to the shared side resolution instead of "worst-first" sampling.
+
 ## [1.20.1] - 2026-07-22
 
 ### Changed
