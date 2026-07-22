@@ -5,11 +5,17 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Codex will be do
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.19.1] - 2026-07-22
+## [1.20.1] - 2026-07-22
 
 ### Changed
 
 - troubleshoot-agent-traces: the agent-alert-evaluation reference is now breaching-side aware (AI-629) — the breaching set follows the monitor's metric polarity + breach direction (flag evals breaching on a true-count sit at the TOP scores), replacing the direction-blind "worst-scoring / bottom 10" guidance; step-4 verification and a new common-mistakes row call out the wrong-side sampling trap.
+
+## [1.20.0] - 2026-07-22
+
+### Changed
+
+- monitoring-advisor: Context pillar upgraded from a recommendation to an executable flow — user-named upstream tables → tagged freshness/schema/volume table monitors → optional `Context for {AGENT_NAME}` data product wrapper (dry-run footprint preview first; Data Mesh rejection keeps the monitors) → field-level depth via the data-monitor references; `create_or_update_data_product` added to the skill tool tables (AI-650)
 
 ## [1.19.0] - 2026-07-21
 

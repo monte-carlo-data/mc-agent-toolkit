@@ -101,6 +101,12 @@ All five tools follow a **two-call preview-then-confirm pattern**: the first cal
 | `create_or_update_sql_monitor` | Create or update a custom SQL monitor (preview YAML on `dry_run=True`, deploy on `dry_run=False`) |
 | `create_or_update_comparison_monitor` | Create or update a comparison monitor (preview YAML on `dry_run=True`, deploy on `dry_run=False`) |
 
+### Data product tool
+
+| Tool | Purpose |
+| --- | --- |
+| `create_or_update_data_product` | Create or update a data product — a named grouping of warehouse assets with reliability tracking (asset-footprint preview on `dry_run=True`, live create on `dry_run=False`). Used by the agent Context pillar to wrap an agent's upstream tables (see `references/agent-monitor-creation.md`) |
+
 ### Agent monitoring tools
 
 | Tool | Purpose |
