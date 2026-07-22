@@ -30,7 +30,12 @@ Key fields in the response:
 evaluation monitors (`is_agent_conversation_aggregation=True`) are supported for
 `ao_clickhouse_otel`, `platform_agent` (Snowflake Cortex), and `databricks_genie`;
 the MLflow classes are span-only (the backend rejects conversation aggregation for
-them). `databricks_genie` agents emit no token or model data — skip token-usage
+them). At conversation grain, set `includeToolCalls: true` on every eval transform
+by default — it adds the agent's tool calls (name, inputs, outputs, errors) to the
+judged conversation as clearly identifiable TOOL entries, in call order, so evals
+score what the agent did, not just what it said. Omit it only for pure style/tone
+judges; the field is rejected at span grain. `databricks_genie` agents emit no
+token or model data — skip token-usage
 metrics for them (see `agent-metric-monitor.md`). A null `backend_class` means the
 server couldn't classify the agent — default to span-grain proposals.
 
@@ -216,7 +221,9 @@ What each pillar maps to:
 
 Mind the backend caveats from Step 1 (`backend_class`): no token or model
 metrics for Genie / Knowledge Assistant agents, and conversation-grain evals
-only on OTel/ClickHouse, Snowflake Cortex, and Genie. Aggregate (per-trace)
+only on OTel/ClickHouse, Snowflake Cortex, and Genie — with
+`includeToolCalls: true` on every conversation-grain eval transform by default
+(rejected at span grain; see Step 1). Aggregate (per-trace)
 validation assertions require `is_agent_trace_aggregation=True`, supported
 only on `ao_clickhouse_otel` / `customer_otel_trace_table` agents — on other
 backends, use per-span assertions instead.
@@ -381,7 +388,9 @@ one-off list:
 - **Baseline pack — every agent:** the predefined `helpfulness_conversation` judge (plain
   `helpfulness` on span-grain-only backends) plus the `frustration_free_score` template.
   Defaults: daily schedule (`interval_minutes=1440`), `{"count": 100}` sampling, an `agent`
-  tag (`{"name": "agent", "value": "<AGENT_NAME>"}`) on every monitor.
+  tag (`{"name": "agent", "value": "<AGENT_NAME>"}`) on every monitor, and
+  `includeToolCalls: true` on every conversation-grain transform (see the `backend_class`
+  capabilities in Step 1).
 - **Analytics pack — only when `backend_class` is `platform_agent` (Snowflake Cortex) or
   `databricks_genie`:** the `answer_attempt_score` and `user_correction` templates — the
   dominant NL2SQL/analytics failure modes are deflected answers and user-corrected answers.
@@ -426,7 +435,8 @@ behaviors a span pattern can't see — e.g. "did the agent claim it ran a query 
 never executed?", "did the agent re-ask for information the user already gave?".
 One boolean `custom_prompt` per behavior, alerting on `TRUE_RATE` / `FALSE_RATE`,
 at conversation grain where the backend supports it (see `backend_class` in
-Step 1 and `agent-evaluation-monitor.md`).
+Step 1 and `agent-evaluation-monitor.md`) — keep `includeToolCalls: true` on
+these so the judge can see the tool calls it is judging.
 
 ---
 
