@@ -243,14 +243,18 @@ tables:
    tables' `mcons` (from `search` / `get_table` — do not guess them) and a
    `description` naming the agent. Keep the default `dry_run=True` to show
    the asset-footprint preview; set `dry_run=False` only on explicit
-   confirmation. Two caveats: data products take `audience_ids` — UUIDs
-   from `get_audiences` — unlike monitors, which take audience names; and
-   the data product itself carries no `agent` tag (the footprint contract
-   rides on the monitors). If the live create is rejected because the
-   account lacks the Data Mesh module, that is terminal for the wrapper:
-   say so in one line (their Monte Carlo representative can enable it) and
-   keep the table monitors — the data product is packaging; the monitors
-   are the pillar.
+   confirmation. The preview's asset count can exceed the tables you
+   named — the tool's backend automatically expands the footprint to
+   include their upstream dependencies. When the count is notably larger
+   than the named set, explain to the user what is being added before
+   asking them to confirm the live create. Two caveats: data products
+   take `audience_ids` — UUIDs from `get_audiences` — unlike monitors,
+   which take audience names; and the data product itself carries no
+   `agent` tag (the footprint contract rides on the monitors). If the
+   live create is rejected because the account lacks the Data Mesh
+   module, that is terminal for the wrapper: say so in one line (their
+   Monte Carlo representative can enable it) and keep the table monitors
+   — the data product is packaging; the monitors are the pillar.
 3. **Add field-level depth** where the user wants specific field checks
    (null rates, distributions, custom rules) on an upstream table: use the
    data-monitor workflow's field-level references (`data-metric-monitor.md`,
