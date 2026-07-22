@@ -5,6 +5,12 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Snowflake Cortex
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.20.3] - 2026-07-22
+
+### Changed
+
+- troubleshoot-agent-traces: platform-agent conversation clustering (AI-677) — backend references updated for the server's Cortex/Genie clustering coverage: ClickHouse "only backend with conversation-grain eval monitors" drift fixed, clustering signal bullets + cluster-first localization steps added to Cortex/Genie, customer-OTel/MLflow-SDK "managed-store-only" claims rescoped, eval-alert grain rules now name Cortex/Genie as conversation-grain capable
+
 ## [1.20.2] - 2026-07-22
 
 ### Changed
