@@ -33,7 +33,7 @@ table yourself.**
 - **Eval scores are not in the spans** — quality scores are Monte Carlo–computed and
   live on the monitor/alert, not in trace data.
 - **Conversation clustering and conversation-grain eval breaches** exist only on the
-  Monte Carlo–managed OTel store.
+  Monte Carlo–managed OTel store and the Cortex/Genie platform backends.
 - **Raw content is consent-gated** — without the account's data-sampling consent,
   reason from span taxonomy, status, token distribution, and per-node latency.
 

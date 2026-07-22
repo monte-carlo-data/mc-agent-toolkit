@@ -18,6 +18,14 @@ findings.**
   shows this shape — it is the whole story for a turn.
 - **Native conversation grouping** — every span carries a real conversation id;
   `get_agent_conversations` / `get_agent_conversation` reconstruct multi-turn threads.
+  **Conversation-grain evaluation monitors** run on this backend, so a breached eval
+  alert may name whole conversations.
+- **Conversation clustering** — when the account has clustering enabled for this space,
+  Monte Carlo groups its conversations into an intent-cluster taxonomy, shown alongside
+  the space's conversations in the Monte Carlo UI. No toolkit tool reads clusters
+  directly: point the user at the cluster view to see which *kind* of questions a
+  regression concentrates in, or hand off to `run_troubleshooting_agent`, which uses
+  cluster-share shifts as evidence.
 - **Per-turn failure status**, and for failed turns the **recorded Genie error** (a real
   error type and message captured by the collector) surfaced in the span's attributes —
   not just a generic failure wrapper.
@@ -57,7 +65,10 @@ findings.**
    flagged conversation's question / answer / generated SQL with
    `get_agent_conversation` (content is consent-gated). Genuine problem (wrong NL2SQL
    translation, unfiltered scan, error spike) vs false positive (a legitimately hard
-   question, an expected spike, a too-tight threshold).
+   question, an expected spike, a too-tight threshold). When clustering is enabled for
+   the space, localize first: a cluster whose share moved in the breach window tells
+   you which kind of questions to sample (cluster view in the UI, or the automated
+   run's cluster evidence).
 5. **For FAILED turns, read the recorded error before hypothesizing.** The recorded
    error type/message in the failed turn's span attributes IS the literal root-cause
    signal (e.g. a schema-access error). Fall back to structural reasoning only when no

@@ -21,7 +21,14 @@ config change broke it" question usually does.**
   history and the primary change-correlation signal.
 - **Conversations** — `get_agent_conversations` (rank by tokens/duration/errors to find
   the expensive or failing ones) and `get_agent_conversation` for a full thread.
-  Transcript content is consent-gated (see Gotchas).
+  Transcript content is consent-gated (see Gotchas). **Conversation-grain evaluation
+  monitors** run on this backend, so a breached eval alert may name whole conversations.
+- **Conversation clustering** — when the account has clustering enabled for this agent,
+  Monte Carlo groups its conversations into an intent-cluster taxonomy, shown alongside
+  the agent's conversations in the Monte Carlo UI. No toolkit tool reads clusters
+  directly: point the user at the cluster view to see which *kind* of conversations a
+  regression concentrates in, or hand off to `run_troubleshooting_agent`, which uses
+  cluster-share shifts as evidence.
 - **Data lineage bridge** — the agent's generated SQL queries real source tables; a
   freshness/volume/schema incident on a source table (check `get_alerts`) is a data
   root cause only Monte Carlo can surface.
@@ -57,6 +64,9 @@ config change broke it" question usually does.**
    bloated answer, error spike) vs false positive (a legitimately long-but-correct
    conversation, an expected seasonal spike, a too-tight threshold). A breach the sample
    shows to be benign **is a finding** — say so and recommend adjusting the monitor.
+   When clustering is enabled for the agent, localize first: a cluster whose share moved
+   in the breach window tells you which kind of conversations to sample (cluster view in
+   the UI, or the automated run's cluster evidence).
 5. **Bridge to the data.** Identify the source tables the agent queried and check
    `get_alerts` for incidents on them — a data incident upstream explains a quality drop
    better than anything in the agent itself.

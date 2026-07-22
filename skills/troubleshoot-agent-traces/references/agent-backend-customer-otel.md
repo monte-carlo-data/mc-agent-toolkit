@@ -30,7 +30,8 @@ regressions. Rule out a feed gap before calling anything an agent problem.**
 - **Nothing structural vs the managed OTel store** — the normalized vocabulary is the
   same; the difference is the store, not the signal.
 - **Conversation-grain eval breaches and conversation clustering** exist only on the
-  Monte Carlo–managed store — eval alerts here resolve at trace/span grain.
+  Monte Carlo–managed store and the Cortex/Genie platform backends — eval alerts here
+  resolve at trace/span grain.
 - **No built-in previous-period baseline** — construct your own before/after comparison
   window, exactly as on the managed store.
 
