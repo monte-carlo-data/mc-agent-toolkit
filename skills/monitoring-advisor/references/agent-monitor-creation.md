@@ -212,7 +212,7 @@ What each pillar maps to:
 | **Performance** | Metric (validation for hard limits) — latency (`duration_sec`), token cost (`total_tokens`), error rate (`status_code`), volume (`ROW_COUNT_CHANGE`) | `agent-metric-monitor.md` |
 | **Output** | Evaluation — lead with the Output-pillar starting packs (see Step 3): baseline pack for every agent, analytics pack for Cortex/Genie. Add predefined judges (`answer_relevance`, `task_completion`, `clarity`, `prompt_adherence`), rule checks (`output_length`, `json_validity`), and one custom eval per recurring user intent or failure mode you observed | `agent-evaluation-monitor.md` |
 | **Behavior** | Trajectory (validation for aggregate assertions) — runaway loops (`SPAN_OCCURRENCE`), missing or mis-ordered steps (`SPAN_RELATION`), token budgets | `agent-trajectory-monitor.md`, `agent-validation-monitor.md` |
-| **Context** | Data-quality monitors on the agent's upstream tables — see below | — |
+| **Context** | Table monitors (freshness / schema changes / volume) on the agent's upstream tables, plus an optional `Context for {AGENT_NAME}` data product wrapper — see below | `data-table-monitor.md` |
 
 Mind the backend caveats from Step 1 (`backend_class`): no token or model
 metrics for Genie / Knowledge Assistant agents, and conversation-grain evals
@@ -221,12 +221,45 @@ validation assertions require `is_agent_trace_aggregation=True`, supported
 only on `ao_clickhouse_otel` / `customer_otel_trace_table` agents — on other
 backends, use per-span assertions instead.
 
-**Context is a recommendation for now** — creating data-quality monitors from
-the agent's lineage is not wired into this flow yet. Present the pillar rather
-than skipping it: name it in the plan, ask the user which upstream tables the
-agent depends on, and suggest Monte Carlo's standard data-quality monitoring
-(freshness, volume, schema changes, anomalies) on those tables as a follow-up
-(the data-monitor workflow in this skill covers them).
+**Context — monitor the tables the agent reads.** Unlike the other pillars,
+Context coverage lives on warehouse tables, not spans. Automatic
+lineage-derived table discovery is not available on this surface, so ask the
+user which upstream tables the agent depends on (the tables its SQL tools
+query, its knowledge bases are built from, or its features are loaded from) —
+never guess table names, and never drop the pillar silently. On the named
+tables:
+
+1. **Create the table monitors** with `create_or_update_table_monitor`,
+   following `data-table-monitor.md` for warehouse resolution and asset
+   selection (scope as narrowly as that reference allows). The tool's
+   default alert conditions are exactly the Context coverage — freshness,
+   schema changes, and volume — so omit `alert_conditions` unless the user
+   asks for more. Apply the Monitor conventions above on every create: the
+   `agent` tag, the playbook `audiences`, and `domain_uuids`. Dry-run
+   preview first, deploy on explicit confirmation, like every other create
+   in this playbook.
+2. **Optionally wrap the tables in a data product** named
+   `Context for {AGENT_NAME}` via `create_or_update_data_product`: pass the
+   tables' `mcons` (from `search` / `get_table` — do not guess them) and a
+   `description` naming the agent. Keep the default `dry_run=True` to show
+   the asset-footprint preview; set `dry_run=False` only on explicit
+   confirmation. Two caveats: data products take `audience_ids` — UUIDs
+   from `get_audiences` — unlike monitors, which take audience names; and
+   the data product itself carries no `agent` tag (the footprint contract
+   rides on the monitors). If the live create is rejected because the
+   account lacks the Data Mesh module, that is terminal for the wrapper:
+   say so in one line (their Monte Carlo representative can enable it) and
+   keep the table monitors — the data product is packaging; the monitors
+   are the pillar.
+3. **Add field-level depth** where the user wants specific field checks
+   (null rates, distributions, custom rules) on an upstream table: use the
+   data-monitor workflow's field-level references (`data-metric-monitor.md`,
+   `data-validation-monitor.md`, `data-custom-sql-monitor.md`), carrying
+   the same tag, audiences, and domain on every create.
+
+If the user cannot name any upstream tables, present the pillar as a
+recommendation — name what you would monitor and why — rather than failing
+or silently dropping it.
 
 ### 3. Create the confirmed monitors
 
