@@ -5,6 +5,12 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Snowflake Cortex
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.21.0] - 2026-07-22
+
+### Changed
+
+- monitoring-advisor: conversation evals can now see tool calls — `includeToolCalls` (default ON at conversation grain) documented across the eval reference: TOOL entries in the judged `{{conversation}}`, action-aware checks (right tool, right config, did it error; query-before-answer), template library and Output-pillar packs updated, span-grain rejection noted
+
 ## [1.20.3] - 2026-07-22
 
 ### Changed
