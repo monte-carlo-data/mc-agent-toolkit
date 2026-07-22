@@ -36,14 +36,16 @@ dimension you are investigating (e.g. `helpfulness_score`).
   depends on the metric and breach direction (step 3) — it is NOT always the lowest
   scores.
 
-> **CRITICAL:** Conversation-grain evaluation currently exists only for agents on Monte
-> Carlo's managed trace store (backend class `ao_clickhouse_otel`). On every other
-> backend, evaluation alerts are span/trace grain — do not go looking for breaching
+> **CRITICAL:** Conversation-grain evaluation exists for agents on Monte Carlo's managed
+> trace store (backend class `ao_clickhouse_otel`) and on the Snowflake Cortex /
+> Databricks Genie platform backends. On the other backends (MLflow SDK/KA, customer
+> OTel tables), evaluation alerts are span/trace grain — do not go looking for breaching
 > conversations there.
 
 To tell the grains apart: the monitor definition uses `*_conversation` judge variants
 and conversation aggregation at conversation grain, and the monitor description usually
-says so. If the backend is not `ao_clickhouse_otel`, it is span/trace grain.
+says so. If the backend is MLflow SDK/KA or a customer OTel table, it is span/trace
+grain.
 
 ## Investigation playbook
 
@@ -134,7 +136,7 @@ evidence timeline. Merge rather than duplicate.
 | Assuming breaching = lowest scores | The breaching side follows metric + direction (step 3): a flag eval breaching high on a true-count breaches at the TOP scores; a rising `false_rate` (e.g. `content_safe`) breaches at the BOTTOM — resolve the side before sampling |
 | Concluding from one conversation | Cluster several breaching items; one item proves nothing about the population |
 | Treating sampled items as breaching without checking scores | Sampling seams return non-breaching items; verify each score against the threshold |
-| Expecting conversation grain on a platform backend | Conversation-grain evaluation is `ao_clickhouse_otel`-only today |
+| Expecting conversation grain on MLflow or customer-OTel backends | Conversation-grain evaluation runs on the managed store and Cortex/Genie only — elsewhere alerts are span/trace grain |
 | Selecting an eval score from trace data on Genie/MLflow | The score lives on the alert/monitor, not in the spans |
 | Misreading `mismatch_score` | It is inverted — higher is worse |
 | Only reading breaching items | Always compare against pre-onset healthy items to isolate what changed |

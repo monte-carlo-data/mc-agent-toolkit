@@ -22,9 +22,16 @@ a regression.**
 - **Workflow / task / model segmentation** — enumerate real segment values with
   `get_agent_segments`; group and sort traces with `get_agent_traces`.
 - **Conversations** — `get_agent_conversations` / `get_agent_conversation`, with
-  transcripts when the account's data-sampling settings allow content. This is the only
-  backend that supports **conversation-grain evaluation monitors**, so a breached eval
-  alert here may name whole conversations rather than traces.
+  transcripts when the account's data-sampling settings allow content.
+  **Conversation-grain evaluation monitors** run here (and on the Snowflake Cortex and
+  Databricks Genie platform backends), so a breached eval alert may name whole
+  conversations rather than traces.
+- **Conversation clustering** — when the account has clustering enabled for this agent,
+  Monte Carlo groups its conversations into an intent-cluster taxonomy, shown alongside
+  the agent's conversations in the Monte Carlo UI. No toolkit tool reads clusters
+  directly: point the user at the cluster view to see which *kind* of conversations a
+  regression concentrates in, or hand off to `run_troubleshooting_agent`, which uses
+  cluster-share shifts as evidence.
 - **Change correlation** — this is a code agent: when the customer has GitHub connected,
   correlate the onset with merged PRs and deploys.
 
