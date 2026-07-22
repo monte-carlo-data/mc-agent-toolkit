@@ -5,6 +5,12 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Codex will be do
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.22.0] - 2026-07-22
+
+### Added
+
+- reinforce-agent: new skill that turns an AI agent's Monte Carlo agent-health diagnosis into code fixes — ranks diagnosed issues per workflow via `get_agent_health_summaries`, deep-dives a user-chosen workflow via `get_agent_health`, proposes fixes, and opens a PR. User-gated at each fan-out (which workflow, which issue, and before pushing).
+
 ## [1.21.0] - 2026-07-22
 
 ### Changed
