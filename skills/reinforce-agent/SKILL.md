@@ -11,9 +11,9 @@ description: |
 when_to_use: |
   Use when the user wants to act on an AI agent's diagnosed health problems and land fixes:
   "fix my agent", "reinforce my agent", "improve my agent's health", "what should I fix in
-  <agent>", "open a PR for my agent's top issue". The flow is user-gated: it surfaces the
-  health diagnosis and asks the user which workflow to dig into and which issue to fix before
-  writing any code.
+  <agent>", "open a PR for my agent's top issue". Expects the user to name the agent; if they
+  don't, it lists available agents and asks. The flow is user-gated: it surfaces the health
+  diagnosis and asks which workflow to dig into and which issue to fix before writing any code.
   Do NOT use for:
   - investigating a single agent alert or trace (eval drop, latency spike, one trace id) —
     use monte-carlo-troubleshoot-agent-traces
@@ -67,7 +67,7 @@ Activate when the user:
 
 | Tool | Purpose |
 |------|---------|
-| `get_agent_metadata` | List AI agents — names, trace tables, source types, warehouses. Supplies the `agent_name` + `trace_table_mcon` pair every downstream call needs |
+| `get_agent_metadata` | List AI agents with their canonical `agentName`, friendly `displayName`, `traceTableMcon`, source type, and warehouse. Used to **resolve the agent the user named** to the exact `agent_name` + `trace_table_mcon` the health tools require (match on canonical name *or* display name; disambiguate when several match) |
 | `get_agent_health_summaries` | Per-workflow health rollups for one agent — `issue_count` + worst-severity `health` + `detection_time` per workflow. The cheap triage layer; rank on this before expanding anything |
 | `get_agent_health` | The latest health report for **one** workflow, as a single actionable markdown brief — diagnosed issues with evidence (trace deep-links), recommended fixes, any existing Linear ticket, and any proposed monitor. The expensive call; fetch only for workflows the user chose |
 
@@ -76,11 +76,22 @@ Activate when the user:
 The flow is **user-gated at every fan-out** — never expand or act autonomously. The number of
 `get_agent_health` calls is bounded by what the user picks, not by how many workflows exist.
 
-### Step 1: Identify the agent
+### Step 1: Resolve the agent
 
-Call `get_agent_metadata` and pick the agent the user named. Use its `agentName` and
-`traceTableMcon` together for every later call — the trace table disambiguates agents that share a
-name. If the user's phrasing matches more than one agent, list the candidates and ask which one.
+The user triggers this skill **with a specific agent in mind** — expect them to name it ("reinforce
+the chat agent", "fix `ai-agent`"). This step's job is to turn that name into the exact identifiers
+the health tools need.
+
+Call `get_agent_metadata` and match the user's name against each entry's `agentName` **and**
+`displayName` (users often use the friendly display name, not the canonical one). Use the matched
+entry's `agentName` + `traceTableMcon` **together** for every later call — the trace table
+disambiguates agents that share a name.
+
+- **No agent named:** list the available agents (canonical name + display name) and ask which one.
+- **Ambiguous match** (same name across trace tables, or a substring matching several): list the
+  candidates with their trace tables / warehouses and ask the user to pick — never guess the
+  `trace_table_mcon`.
+- **No match:** tell the user and show the available agents.
 
 ### Step 2: Triage the workflows (health overview)
 
