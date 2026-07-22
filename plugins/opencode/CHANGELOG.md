@@ -5,6 +5,12 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for OpenCode will be
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.19.1] - 2026-07-22
+
+### Changed
+
+- troubleshoot-agent-traces: the agent-alert-evaluation reference is now breaching-side aware (AI-629) — the breaching set follows the monitor's metric polarity + breach direction (flag evals breaching on a true-count sit at the TOP scores), replacing the direction-blind "worst-scoring / bottom 10" guidance; step-4 verification and a new common-mistakes row call out the wrong-side sampling trap.
+
 ## [1.19.0] - 2026-07-21
 
 ### Changed

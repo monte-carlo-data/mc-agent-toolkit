@@ -32,7 +32,9 @@ dimension you are investigating (e.g. `helpfulness_score`).
   bucket(s), matching the monitor's segment filter (e.g. a specific workflow or task).
 - **Conversation grain:** the judge scores a whole multi-turn conversation as one unit.
   The alert payload does not carry conversation IDs — the breaching conversations are
-  the worst-scoring samples from the evaluation run that fired the alert.
+  the evaluation-run samples on the BREACHING side of the score. Which side that is
+  depends on the metric and breach direction (step 3) — it is NOT always the lowest
+  scores.
 
 > **CRITICAL:** Conversation-grain evaluation currently exists only for agents on Monte
 > Carlo's managed trace store (backend class `ao_clickhouse_otel`). On every other
@@ -51,17 +53,27 @@ says so. If the backend is not `ao_clickhouse_otel`, it is span/trace grain.
 2. **Pull the alert details** via `get_alerts`: the judge dimension, the threshold and
    direction, the anomalous time bucket(s), and any segment condition. The segment
    condition scopes everything that follows.
-3. **Identify the breaching set** — the worst-scoring items inside the breach window:
+3. **Identify the breaching set** — the items on the BREACHING side of the score inside
+   the breach window. Resolve the side from the metric + breach direction first:
+   - Quality scores breaching low (the common case): the lowest-scoring items.
+   - Boolean/flag evals (`true_*`/`false_*` aggregations — e.g. `escalation_suggested`
+     breaching on a `true_count`/`true_rate` rise): the items carrying the FAILING
+     value. For a true-family metric breaching high that is the flagged items
+     (score 1.0 / `true`) — the TOP of the score range. "Worst-scoring / bottom 10"
+     selects exactly the wrong side here.
+   - Inverted numerics (`mismatch_score`-style, breaching high): the highest scores.
+   Then pull the items:
    - Trace grain: `get_agent_traces` filtered to the agent plus the alert's segment,
      within each anomalous bucket window.
    - Conversation grain: `get_agent_conversations` for the agent over the breach
-     window; work from the worst-scoring conversations (roughly the bottom 10).
+     window; work from the ~10 most extreme conversations on the breaching side.
 4. **Verify the items actually breach.**
 
    > **CRITICAL:** Sampling seams can hand you non-breaching items. Check every item's
    > score against the alert's threshold before treating it as evidence. A known failure
-   > mode: a "worst-first" sample whose limit cut off the truly breaching rows, seeding
-   > the investigation with perfectly-scoring conversations — the investigator then
+   > mode: a flag eval breaching on a true-count, sampled score-ascending "worst-first" —
+   > the flagged rows sit at the TOP scores, so the page's limit cut them off and seeded
+   > the investigation with perfectly-scoring conversations; the investigator then
    > "confirmed normal behavior" while reading the wrong conversations entirely.
 
 5. **Read the judge's scores and stored reasoning first.** The persisted judgment is the
@@ -111,6 +123,7 @@ evidence timeline. Merge rather than duplicate.
 
 | Mistake | Why it fails / what to do instead |
 |---|---|
+| Assuming breaching = lowest scores | The breaching side follows metric + direction: flag evals breaching on a true-count breach at the TOP scores — resolve the side before sampling |
 | Concluding from one conversation | Cluster several breaching items; one item proves nothing about the population |
 | Treating sampled items as breaching without checking scores | Sampling seams return non-breaching items; verify each score against the threshold |
 | Expecting conversation grain on a platform backend | Conversation-grain evaluation is `ao_clickhouse_otel`-only today |
