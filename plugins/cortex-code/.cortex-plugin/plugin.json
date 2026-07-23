@@ -31,8 +31,7 @@
     "./commands/incident-response/",
     "./commands/proactive-monitoring/",
     "./commands/instrument-agent/",
-    "./commands/troubleshoot-agent-traces/",
-    "./commands/reinforce-agent/"
+    "./commands/troubleshoot-agent-traces/"
   ],
   "hooks": ["./hooks/prevent/hooks.json", "./hooks/telemetry/hooks.json"]
 }
