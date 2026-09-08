@@ -5,6 +5,14 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Claude Code will
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.24.2] - 2026-09-08
+
+### Fixed
+
+- performance-diagnosis: replace the hallucinated `get_top_slow_queries` tool with the real `get_query_perf_profile` and its actual parameters (`start_time` required, `query_type` read/write)
+- asset-health, prevent: call `get_asset_lineage` with the published `mcons` list parameter and uppercase `direction` values; the singular/lowercase forms fail schema validation
+- monitoring-advisor: document metric and custom-SQL monitor alert-condition fields in their real camelCase form (`thresholdValue`, `baselineAggFunction`, ...); the snake_case names previously shown are rejected with `extra_forbidden` validation errors
+
 ## [1.24.1] - 2026-08-10
 
 ### Changed

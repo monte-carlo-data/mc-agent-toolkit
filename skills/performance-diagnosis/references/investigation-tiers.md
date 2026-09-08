@@ -21,19 +21,22 @@ Find slow or failing jobs across all connected platforms.
 - Jobs with high `failureRate` (>10%)
 - Jobs with high `avgDuration` relative to peers
 
-### `get_top_slow_queries`
+### `get_query_perf_profile`
 
 Find the slowest query groups by total runtime.
 
 **When to use:** Finding which queries consume the most compute.
 
 **Key parameters:**
+- `start_time` (required): ISO 8601 start of the window to profile
+- `end_time` (optional): ISO 8601 end of the window
 - `warehouse_id` (optional): Scope to a specific warehouse
 - `query_type` (optional): "read" for SELECT queries, "write" for INSERT/CREATE/MERGE
+- `sort_field` (optional): defaults to `sum_runtime` (total execution time); also `avg_runtime`, `max_runtime`, `query_count`
 
 **What to look for:**
-- Queries with high total runtime (total = avg runtime x run count)
-- Queries with high individual execution time (p95 >> p50 means outliers)
+- Query groups with high `sum_runtime` (total compute consumed)
+- Query groups with high `max_runtime` relative to `avg_runtime` (outlier executions)
 
 ## Bridge -- Job to Tables
 

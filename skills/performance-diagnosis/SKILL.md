@@ -53,7 +53,7 @@ The following MCP tools must be available (connect to Monte Carlo's MCP server):
 
 **Discovery tools (Tier 1):**
 - `get_jobs_performance` -- find slow/failing jobs across Airflow, dbt, Databricks
-- `get_top_slow_queries` -- find slowest query groups by total runtime
+- `get_query_perf_profile` -- find slowest query groups by total runtime
 
 **Bridge tool:**
 - `get_tables_for_job` -- convert job MCONs to table MCONs
@@ -87,8 +87,8 @@ If you don't have specific MCONs to investigate, start with discovery:
    - Results include: job name, average duration, trend (7-day), run count, failure rate
    - Look for: high `avgDuration`, negative `runDurationTrend7d`, high failure rates
 
-2. **Find expensive queries**: Call `get_top_slow_queries` with optional `warehouse_id` and `query_type` ("read" for SELECTs, "write" for INSERT/CREATE/MERGE).
-   - Results include: query hash, total runtime, average runtime, run count
+2. **Find expensive queries**: Call `get_query_perf_profile` with `start_time` (ISO 8601, required) and optional `end_time`, `warehouse_id`, and `query_type` ("read" for SELECTs, "write" for INSERT/CREATE/MERGE).
+   - Results include: query group hash, sum_runtime (total), avg_runtime, max_runtime, query_count
    - Look for: queries with high total runtime or high individual execution time
 
 Present the top findings to the user before drilling deeper. A typical investigation needs only 3-7 tool calls.

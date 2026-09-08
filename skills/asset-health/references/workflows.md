@@ -50,7 +50,7 @@ get_alerts(created_after="<7 days ago>", created_before="<now>", table_mcons=["<
 get_monitors(mcons=["<mcon>"])
 → monitor configs — check status field for paused vs active
 
-get_asset_lineage(mcon="<mcon>", direction="upstream")
+get_asset_lineage(mcons=["<mcon>"], direction="UPSTREAM", hops=1)
 → 1-hop upstream parent assets
 ```
 
@@ -111,7 +111,7 @@ When the user requests deeper upstream investigation for a specific parent:
 ### Phase 1 — Get upstream of the specified parent
 
 ```
-get_asset_lineage(mcon="<parent_mcon>", direction="upstream")
+get_asset_lineage(mcons=["<parent_mcon>"], direction="UPSTREAM", hops=1)
 → 1-hop upstream of the parent (grandparents of the original asset)
 ```
 

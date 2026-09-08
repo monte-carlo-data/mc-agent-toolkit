@@ -17,7 +17,7 @@ Connect to Monte Carlo's MCP server (`integrations.getmontecarlo.com/mcp`). The 
 | Tool | Tier | Purpose |
 |------|------|---------|
 | `get_jobs_performance` | Discovery | Find slow/failing jobs |
-| `get_top_slow_queries` | Discovery | Find most expensive queries |
+| `get_query_perf_profile` | Discovery | Find most expensive queries |
 | `get_tables_for_job` | Bridge | Convert job MCONs to table MCONs |
 | `get_tasks_performance` | Diagnosis | Find bottleneck tasks within a job |
 | `get_change_timeline` | Diagnosis | Unified "what changed?" timeline |
@@ -42,7 +42,7 @@ Tier 1: Discovery          Tier 2: Diagnosis
 
 get_jobs_performance ──┐
                        ├──► get_tables_for_job ──► get_tasks_performance
-get_top_slow_queries ──┘                           get_change_timeline
+get_query_perf_profile ──┘                           get_change_timeline
                                                    get_query_rca
                                                    get_query_latency_distribution
                                                    get_asset_lineage

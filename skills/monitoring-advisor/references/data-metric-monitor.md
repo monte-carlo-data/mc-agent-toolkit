@@ -144,13 +144,15 @@ If the metric you want isn't in the compatibility matrix above, it doesn't exist
 
 ## Alert Conditions
 
+Alert-condition field names are camelCase (`thresholdValue`, not `threshold_value` or `threshold`) — snake_case keys are rejected with an `extra_forbidden` validation error.
+
 Each alert condition has:
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `metric` | string | Yes | The metric to monitor (see Metrics Reference below). |
 | `operator` | string | Yes | `"AUTO"` (anomaly detection), `"GT"`, `"LT"`, `"EQ"`, `"GTE"`, `"LTE"`, `"NEQ"`. Note: the inequality operator is `NEQ`, not `NE`. |
-| `threshold` | number | For explicit operators | The threshold value. Required when using `GT`, `LT`, `EQ`, `GTE`, `LTE`, or `NEQ`. Not used with `AUTO`. |
+| `thresholdValue` | number | For explicit operators | The threshold value. Required when using `GT`, `LT`, `EQ`, `GTE`, `LTE`, or `NEQ`. Not used with `AUTO`. |
 | `fields` | array of string | Depends | Column names to apply the metric to. Required for field-level metrics. Not needed for table-level metrics. |
 
 ---
@@ -167,7 +169,7 @@ Each alert condition has:
 
 - Use when there is a known business rule or data contract (e.g., "null rate on `email` should never exceed 5%", "order amount must always be greater than 0").
 - Provides deterministic alerting -- no training period needed, alerts fire immediately when the condition is met.
-- Requires a `threshold` value in the alert condition.
+- Requires a `thresholdValue` in the alert condition.
 
 ### Operator restrictions by metric
 
@@ -264,7 +266,7 @@ Each alert condition has:
     {
       "metric": "NULL_COUNT",
       "operator": "GT",
-      "threshold": 50,
+      "thresholdValue": 50,
       "fields": ["email", "user_id"]
     }
   ]
@@ -329,7 +331,7 @@ Each alert condition has:
     {
       "metric": "NULL_RATE",
       "operator": "GT",
-      "threshold": 0.01,
+      "thresholdValue": 0.01,
       "fields": ["transaction_id"]
     }
   ]
