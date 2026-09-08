@@ -6,7 +6,7 @@ Use this when a table hasn't updated on its expected schedule.
 
 ### 1. Confirm the freshness delay
 
-Call `get_table_freshness` with the table's `full_table_id` and `resource_id`. Check:
+Call `get_table_freshness` with the table's `full_table_id` and `resource_id`. Also call `get_table` with the same `full_table_id` — its response includes the table's `mcon`, which the lineage and query tools below need. Check:
 - When was the last successful update?
 - What's the normal update cadence? (hourly, daily, etc.)
 - How long has the delay been?

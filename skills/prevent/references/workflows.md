@@ -41,7 +41,7 @@ artifact.
    Workflow 2's blast-radius synthesis, make one additional direct call:
 
    ```
-   get_asset_lineage(mcon="<mcon resolved by asset-health>", direction="DOWNSTREAM")
+   get_asset_lineage(mcons=["<mcon resolved by asset-health>"], direction="DOWNSTREAM")
    ```
 
    Use the MCON asset-health already resolved — do **not** re-call `search()`.
