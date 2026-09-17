@@ -7,7 +7,7 @@ set -e
 # 3. Writes hooks to <repo>/.codex/hooks.json (project-level)
 # 4. Creates .agents/plugins/marketplace.json
 # 5. Adds Monte Carlo MCP server to ~/.codex/config.toml
-# 6. Enables codex_hooks
+# 6. Enables hooks (migrating legacy codex_hooks)
 # 7. Triggers OAuth login
 
 PLUGIN_NAME="mc-agent-toolkit"
@@ -247,15 +247,20 @@ echo "  Configured monte-carlo MCP server in $CONFIG_FILE"
 
 echo "[6/7] Enabling codex hooks..."
 
-if [ -f "$CONFIG_FILE" ] && grep -q "codex_hooks" "$CONFIG_FILE" 2>/dev/null; then
-  echo "  Hooks already enabled — skipping."
+if [ -f "$CONFIG_FILE" ] && grep -q "^codex_hooks" "$CONFIG_FILE" 2>/dev/null; then
+  sed -i '' 's/^codex_hooks/hooks/' "$CONFIG_FILE"
+  echo "  Migrated deprecated codex_hooks to hooks in $CONFIG_FILE"
+fi
+
+if [ -f "$CONFIG_FILE" ] && grep -q "^hooks *=" "$CONFIG_FILE" 2>/dev/null; then
+  echo "  Hooks setting already present — skipping."
 else
   cat >> "$CONFIG_FILE" << EOF
 
 [features]
-codex_hooks = true
+hooks = true
 EOF
-  echo "  Enabled codex_hooks in $CONFIG_FILE"
+  echo "  Enabled hooks in $CONFIG_FILE"
 fi
 
 # ============================================================
