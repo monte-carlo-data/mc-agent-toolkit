@@ -24,7 +24,7 @@ The script handles everything:
 3. Writes hooks to `<repo>/.codex/hooks.json` (project-level)
 4. Creates `.agents/plugins/marketplace.json` for Codex plugin discovery
 5. Adds (and, on reinstall, refreshes) the Monte Carlo MCP server block in `~/.codex/config.toml` with `http_headers`: the required `User-Agent` (workaround for [codex#12859](https://github.com/openai/codex/issues/12859)) plus anonymous toolkit telemetry headers (`x-mcd-toolkit-install-id`, `x-mcd-toolkit-version`) baked in at install time. Opt out with `MC_AGENT_TOOLKIT_TELEMETRY_DISABLED=1` (see Telemetry below).
-6. Enables `codex_hooks` in your config
+6. Enables `hooks` in your config (migrating a legacy `codex_hooks` entry if present)
 7. Opens a browser for OAuth login with your Monte Carlo account
 
 After installation, restart Codex in your project. You should see "Installed mc-agent-toolkit plugin" on startup.
