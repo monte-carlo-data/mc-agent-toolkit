@@ -80,7 +80,7 @@ Present results in this structure:
 
 | Metric        | Value                          | Signal |
 |---------------|--------------------------------|--------|
-| Last Activity | Apr 6, 2025                    | 🟢 Recent    |
+| Last Updated | Apr 6, 2025                    | 🟢 Recent    |
 | Alerts        | 2 active                       | 🔴 Has alerts |
 | Monitoring    | 3 active monitors              | 🟢 Monitored  |
 | Upstream      | 1/3 sources unhealthy          | 🔴 Issues     |
@@ -151,7 +151,7 @@ embellish values beyond what the tool returns.
 
 | Metric | Data source | What to show | Signal |
 |--------|------------|-------------|--------|
-| **Last Activity** | `get_table` → `last_activity` | Date of last activity (e.g., "Apr 6, 2025") | 🟢 Recent (within 7 days) / 🟡 Stale (older than 7 days) |
+| **Last Updated** | `get_table` → `last_updated_on` | Date of last data update (e.g., "Apr 6, 2025") | 🟢 Recent (within 7 days) / 🟡 Stale (older than 7 days) |
 | **Alerts** | `get_alerts` → count | "N active" or "No active alerts" | 🔴 Has alerts / 🟢 No alerts |
 | **Monitoring** | `get_monitors` → count where `is_paused` is false | "N active monitors" or "0 active monitors (M paused)". Include relevant details from monitor fields (incident counts, error counts, types). | 🟢 Monitored (≥1 active) / 🔴 Unmonitored (0 active) |
 | **Upstream** | `get_asset_lineage` (upstream) + Phase 3 checks | "N/M sources unhealthy" or "All N sources healthy" | 🔴 Issues (any unhealthy) / 🟢 Healthy (all healthy) |

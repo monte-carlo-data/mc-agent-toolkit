@@ -55,7 +55,7 @@ The `properties` field contains tags (key-value pairs) associated with the asset
 Pass the MCON as: `mcon="<mcon>"` (single string, not an array).
 
 Key response fields used by this skill:
-- `last_activity` — timestamp of last activity (for Last Activity metric)
+- `last_updated_on` — timestamp of the most recent data update (for Last Updated metric)
 - `importance_score` — float 0-1 (for Importance in header)
 - `is_important` — boolean, true if key asset (for ⭐️ indicator)
 - `table_stats.avg_reads_per_active_day` — average reads per active day

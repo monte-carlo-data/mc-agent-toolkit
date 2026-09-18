@@ -56,7 +56,7 @@ Stale data usually means the pipeline that feeds this table has either failed or
 
 After triggering the pipeline:
 - Wait for the job to complete (check status via the orchestrator MCP)
-- Re-check table freshness: `getTable(mcon="<table_mcon>")` — has `last_activity` updated?
+- Re-check table freshness: `getTable(mcon="<table_mcon>")` — has `last_updated_on` moved forward?
 - Re-check the alert: `getAlerts(alert_ids=["<alert_id>"])` — has it resolved?
 
 ---
