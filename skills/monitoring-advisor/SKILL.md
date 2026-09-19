@@ -283,7 +283,7 @@ Example for a use-case tag monitor:
 Some tables show 0 rows when queried directly but have recent write activity in Monte Carlo metadata. These are **transient tables** -- fully replaced on each pipeline run (truncate-and-reload pattern). Recognize this pattern early to avoid wasting time querying empty tables.
 
 Signs of a transient table:
-- `get_table` shows recent `last_write` timestamp and high read/write activity
+- `get_table` shows a recent `last_updated_on` and high read/write activity
 - Direct SQL query returns 0 rows or all-NULL timestamp columns
 - Monte Carlo detected freshness anomalies (the table stayed empty longer than expected between loads)
 
