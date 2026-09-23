@@ -17,6 +17,7 @@ Monte Carlo **REST API v2** MCP tools. The flow is always the same five steps, a
 the one the model does not know on its own: **every connection runs through a deployment**, so the
 deployment is chosen or provisioned before anything else.
 
+<!-- plugin-only:start -->
 > **Monte Carlo tool routing (required):** Always call Monte Carlo MCP tools through this plugin's
 > bundled server, whose fully-qualified tool names are
 > `mcp__plugin_mc-agent-toolkit_monte-carlo-mcp__<tool>` (e.g.
@@ -24,6 +25,7 @@ deployment is chosen or provisioned before anything else.
 > (`list_deployments`, `create_warehouse`, `create_connection`, …) refer to that bundled server. If the session also has a
 > separately-configured `monte-carlo-mcp` server, do **not** route to it — it may point at a
 > different endpoint or credentials.
+<!-- plugin-only:end -->
 
 <!-- plugin-only:start -->
 Reference files live next to this file. **Use the Read tool** to open them when a step points at one:
@@ -212,7 +214,7 @@ Ask **where the secret lives or should live**, and take the first path that fits
 
 | Where | Tool | Notes |
 |---|---|---|
-| AWS Secrets Manager | `create_aws_secrets_manager_credentials(connection_type, aws_secret, aws_region?, assumable_role?, external_id?)` | The agent reads the secret at query time; its execution role needs `secretsmanager:GetSecretValue` on that secret (snippet in output-modes). |
+| AWS Secrets Manager | `create_aws_secrets_manager_credentials(connection_type, aws_secret, aws_region?, assumable_role?, external_id?)` | The agent reads the secret at query time. Direct read: grant its execution role `secretsmanager:GetSecretValue` on that secret. With `assumable_role`: the agent assumes that role instead, so the grant and the trust policy (`sts:AssumeRole`, trusting the agent's execution role, plus the `external_id` it requires) belong on the assumed role (snippet in the output-modes reference). |
 | GCP Secret Manager | `create_gcp_secret_manager_credentials(connection_type, gcp_secret)` | Same idea: the agent's service account must read it. |
 | Azure Key Vault | `create_azure_key_vault_credentials(connection_type, akv_secret, akv_vault_name and/or akv_vault_url)` | |
 | Environment variable on the agent | `create_env_var_credentials(connection_type, env_var_name (MCD_…), kms_key_id?)` | Only with a collection agent the customer runs; the cloud node has no customer-set variables. |
@@ -222,8 +224,10 @@ Ask **where the secret lives or should live**, and take the first path that fits
 The secret's *contents* follow the connection type's schema
 (https://docs.getmontecarlo.com/docs/self-hosted-credentials): for Snowflake a JSON
 `{"connect_args": {"user", "private_key", "account", "warehouse"}}` where `private_key` is the
-unencrypted PKCS#8 key as a base64 body without BEGIN/END lines. Say what the schema is, never ask
-for the values. The v2 API stores only key-pair Snowflake credentials; password or external OAuth
+unencrypted PKCS#8 key as a base64 body without BEGIN/END lines. That base64 form is only for the
+secret your agent reads; the `create_snowflake_credentials` API (CLI `--private-key @key.p8` or
+Terraform `file(...)`) takes the PEM text with its BEGIN/END lines. Say what the schema is, never
+ask for the values. The v2 API stores only key-pair Snowflake credentials; password or external OAuth
 Snowflake connections are set up in the UI. Add `bq_project_id` for BigQuery and
 `databricks_warehouse_id` for Databricks SQL warehouse types. Carry the `credentials_id` forward.
 

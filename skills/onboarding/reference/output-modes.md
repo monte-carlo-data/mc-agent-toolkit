@@ -83,7 +83,10 @@ module "mcd_agent" {
   source  = "monte-carlo-data/mcd-k8s-agent/aws"
   version = "~> 0.1"
   backend_service_url = var.backend_service_url   # Account information → Agent Service → Public endpoint
-  # token or oauth_credentials from the resource above, see the module docs
+  # This example wires the OAuth client. For the token variant, create the
+  # montecarlo_generic_collection_agent_token resource instead and feed its
+  # mcd_id / mcd_token to the module's credential input (see the module docs)
+  # or mount the token file on the agent directly.
 }
 
 # Enables the agent once it has connected; 503 (retried) until then.
@@ -197,6 +200,9 @@ resource "montecarlo_warehouse" "snowflake" {
 resource "montecarlo_connection" "snowflake" {
   name           = "snowflake-prod"
   warehouse_id   = montecarlo_warehouse.snowflake.id
+  # Point credentials_id at whichever credentials resource you created above:
+  # the self-hosted reference, or montecarlo_snowflake_credentials.snowflake.id
+  # when Monte Carlo stores the key pair.
   credentials_id = montecarlo_self_hosted_aws_credentials.snowflake.id
   # job_types omitted: the type's defaults
 }
@@ -271,8 +277,11 @@ warehouses = montecarlo.WarehousesApi(client)
 connections = montecarlo.ConnectionsApi(client)
 
 created: dict[str, str] = {}
+reused: dict[str, str] = {}
+# Reuse before creating: set MCD_DEPLOYMENT_ID / MCD_CREDENTIALS_ID to existing ids
+# (the skill lists deployments and credentials with the read tools and picks these).
 try:
-    # 1. deployment (reuse when the id is known)
+    # 1. deployment (reuse an existing enabled one by setting MCD_DEPLOYMENT_ID)
     deployment_id = os.environ.get("MCD_DEPLOYMENT_ID")
     if not deployment_id:
         # run 1: create the deployment, hand off the agent deploy, and stop
@@ -303,20 +312,26 @@ try:
         )
         created["agent"] = agent.id
 
-    # 2. credentials: a reference to the customer's store …
-    creds = credentials.create_aws_secrets_manager_credentials(
-        montecarlo.AwsSecretsManagerCredentialsIn(connection_type="snowflake", aws_secret=os.environ["SNOWFLAKE_SECRET_ARN"])
-    )
+    # 2. credentials: a reference to the customer's store … (reuse by setting MCD_CREDENTIALS_ID)
+    creds_id = os.environ.get("MCD_CREDENTIALS_ID")
+    if creds_id:
+        reused["credentials"] = creds_id
+        creds = credentials.get_aws_secrets_manager_credentials(creds_id)
+    else:
+        creds = credentials.create_aws_secrets_manager_credentials(
+            montecarlo.AwsSecretsManagerCredentialsIn(connection_type="snowflake", aws_secret=os.environ["SNOWFLAKE_SECRET_ARN"])
+        )
+    created["credentials"] = creds.id
     # … or a key pair Monte Carlo stores, read from a file:
     # creds = credentials.create_snowflake_credentials(montecarlo.SnowflakeCredentialsIn(
     #     account="xy12345.us-east-1", user="MONTE_CARLO", warehouse="MONTE_CARLO_WH",
     #     private_key=open(os.environ["SNOWFLAKE_KEY_PATH"]).read()))
-    created["credentials"] = creds.id
 
     # 3. warehouse: reuse one of the right type on this deployment, else create
     existing = [w for w in paginate(warehouses.list_warehouses) if w.type == "snowflake" and w.deployment_id == deployment_id]
     if existing:
         warehouse_id = existing[0].id
+        reused["warehouse"] = warehouse_id
     else:
         wh = warehouses.create_warehouse(montecarlo.WarehouseIn(name="Snowflake prod", deployment_id=deployment_id, type="snowflake"))
         created["warehouse"] = warehouse_id = wh.id
@@ -331,7 +346,9 @@ except montecarlo.ApiException as e:
 finally:
     # 6. summary, whatever happened
     for kind, id_ in created.items():
-        print(f"{kind:12} {id_}")
+        print(f"created {kind:11} {id_}")
+    for kind, id_ in reused.items():
+        print(f"reused   {kind:11} {id_}")
     print("validate in the UI: Settings → Integrations → snowflake-prod → Test connection")
 ```
 
