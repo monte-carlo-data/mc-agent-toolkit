@@ -10,6 +10,7 @@ List all available Monte Carlo skills and workflows. Present them grouped by cat
 |---------|-------------|
 | `/monte-carlo-incident-response` | Triage, investigate, fix, and prevent data incidents. Sequences automated-triage, root cause analysis, remediation, and monitor creation. |
 | `/monte-carlo-proactive-monitoring` | Assess coverage gaps and create monitors. Sequences asset-health, coverage analysis, and monitor creation. |
+| `/monte-carlo-onboarding` | Connect a warehouse to Monte Carlo: pick or provision the deployment (cloud node, collection agent, data store), reference credentials, create the warehouse and connection. Act via tools, or emit Terraform or an SDK/CLI script. |
 
 ## Skills
 
