@@ -96,29 +96,51 @@ Gather, from the request or by asking once:
   Do not default to Terraform; it is one of three. Reads (`list_*`) are still run in this session
   in every mode, so the emitted artifact reuses what already exists instead of duplicating it.
 - **Which account**: `get_current_user` once, and show the account name in the summary. Stop if
-  `account_frozen` is true.
+  `account_frozen` is true. Provisioning a deployment needs the Account Owner role in Monte Carlo.
+- **Warehouse-side prerequisites**, which this skill does not perform: the connector's setup
+  script (service user, role, grants) from `https://docs.getmontecarlo.com/docs/<connector>`,
+  e.g. `/docs/snowflake` creates `MONTE_CARLO` with key-pair auth. Point the user at it and ask
+  whether it has run; a connection created before the grants exist fails validation.
 
 ## Step 1: The deployment
+
+The product offers three shapes (Settings → Deployments in the UI), and every connection runs
+through one of them:
+
+- **Monte Carlo hosted cloud deployment.** Collection runs in Monte Carlo's environment and
+  reaches the warehouse over the public internet: the customer allowlists Monte Carlo's dedicated
+  collection IPs (Account information page, or from their account team) or sets up PrivateLink.
+  Temporary query output and troubleshooting samples land in Monte Carlo's storage.
+- **Cloud deployment with a customer-hosted data store.** Same direct reach, but the temporary
+  and troubleshooting data (query results, sampled rows, RCA samples) is written to a bucket the
+  customer owns and Monte Carlo accesses through a role trusting the deployment's external id.
+- **Customer-hosted collection agent.** A container Monte Carlo invokes (AWS Lambda, GCP Cloud
+  Run, Azure Functions) or that connects out (generic agent, Kubernetes/Docker) inside the
+  customer's network, with its own storage bucket. Nothing has to be reachable from the internet
+  and warehouse credentials can stay in the customer's secret store. An agent always includes its
+  data store, so an agent never needs a separate one.
 
 Call `list_deployments` first, always. Read the rows:
 
 | Row | Meaning | Reusable? |
 |---|---|---|
-| `runtime_platform: null` (type `CLOUD` or `null`) | The cloud node Monte Carlo hosts for the account | Yes, when Monte Carlo may reach the warehouse over the public internet and may store sampled rows |
+| `runtime_platform: null` (type `CLOUD` or `null`) | The cloud node Monte Carlo hosts for the account | Yes, when Monte Carlo may reach the warehouse over the public internet and may hold temporary query output and sampled rows |
 | `type: COLLECTION_AGENT`, `enabled: true` | A collection agent already running in the customer's network | Yes, when the agent can reach the new warehouse |
-| `type: COLLECTION_DATA_STORE`, `enabled: true` | Direct connection with sampled rows kept in customer storage | Yes, for a warehouse Monte Carlo can reach directly |
+| `type: COLLECTION_DATA_STORE`, `enabled: true` | Direct connection with temporary query output and sampled rows kept in customer storage | Yes, for a warehouse Monte Carlo can reach directly |
 | `enabled: false` with a type | Provisioned, agent or store not registered yet | Resume its registration instead of creating another |
 | `runtime_platform: null`, `enabled: false` | A cloud node that is not provisioned for this account | No; the agent or data-store path is the only option |
 
 Then ask **two independent questions, only when the request does not already answer them**:
 
 - **a. Can Monte Carlo reach the warehouse over the public internet?**
-  Yes → the cloud node is fine. No (private network, IP allowlist, PrivateLink, on-prem) → a
-  **collection agent** inside the customer's network.
-- **b. May sampled rows be stored in Monte Carlo?**
+  Yes, with Monte Carlo's IPs allowlisted or PrivateLink → the cloud node is fine. No (private
+  network, no allowlisting possible, on-prem) → a **collection agent** inside the customer's
+  network. Also pick an agent when the credentials must stay in the customer's secret store
+  (Step 2): only an agent can read one.
+- **b. May temporary query output and sampled rows be stored in Monte Carlo?**
   Yes → nothing extra. No (row-level data must stay on the customer's side) → a **customer-owned
-  data store**. A data store fits when the answer to (a) is yes; an agent already keeps sampled
-  data on the customer's side, so an agent never needs a data store too.
+  data store**. A data store fits when the answer to (a) is yes; an agent already keeps that data
+  on the customer's side, so an agent never needs a data store too.
 
 Resolve to exactly one of:
 
@@ -129,7 +151,9 @@ Pick the existing `deployment_id` and move to Step 2. Say which deployment and w
 ### 1b. Provision a deployment for a collection agent
 
 1. Ask the platform: `AWS`, `GCP`, `AZURE` or `GENERIC` (Kubernetes, Docker, anything that can
-   run the container and connect out to Monte Carlo).
+   run the container and connect out to Monte Carlo). Prefer the native cloud agent when the
+   customer is on that cloud; the generic agent is in preview and needs an Enterprise plan with
+   the Advanced Networking add-on.
 2. `create_deployment(type="COLLECTION_AGENT", runtime_platform=<platform>, name=<optional>)`.
    Note the returned `id`. On AWS, `get_deployment` returns `aws_external_id` (it can be null for
    a moment right after creation; call again).
@@ -174,11 +198,20 @@ Whatever the branch, carry one `deployment_id` into Step 2.
 `list_credentials` first: an entry with the right `connection_type` may be reusable (its
 `storage_type` says where the secret lives).
 
-Otherwise ask **where the secret lives or should live**, and take the first path that fits:
+Otherwise the deployment from Step 1 decides what is possible:
+
+- **Collection agent** → credentials can stay in the customer's store (self-hosted, below). The
+  agent reads the secret at query time, so its role or identity needs read access to that secret.
+- **Hosted cloud node or data-store deployment** → nothing on the customer's side can be read, so
+  the credentials are Monte Carlo managed. Through the v2 API that is the Snowflake key pair
+  (CLI or Terraform step, last row below). Any other connection type on these deployments is
+  onboarded in the UI today; say so, and still finish the deployment and warehouse steps.
+
+Ask **where the secret lives or should live**, and take the first path that fits:
 
 | Where | Tool | Notes |
 |---|---|---|
-| AWS Secrets Manager | `create_aws_secrets_manager_credentials(connection_type, aws_secret, aws_region?, assumable_role?, external_id?)` | The deployment reads the secret at query time. With an agent, its execution role needs `secretsmanager:GetSecretValue` on that secret (snippet in output-modes). |
+| AWS Secrets Manager | `create_aws_secrets_manager_credentials(connection_type, aws_secret, aws_region?, assumable_role?, external_id?)` | The agent reads the secret at query time; its execution role needs `secretsmanager:GetSecretValue` on that secret (snippet in output-modes). |
 | GCP Secret Manager | `create_gcp_secret_manager_credentials(connection_type, gcp_secret)` | Same idea: the agent's service account must read it. |
 | Azure Key Vault | `create_azure_key_vault_credentials(connection_type, akv_secret, akv_vault_name and/or akv_vault_url)` | |
 | Environment variable on the agent | `create_env_var_credentials(connection_type, env_var_name (MCD_…), kms_key_id?)` | Only with a collection agent the customer runs; the cloud node has no customer-set variables. |
@@ -186,9 +219,12 @@ Otherwise ask **where the secret lives or should live**, and take the first path
 | Monte Carlo stores it (Snowflake key pair) | **not a tool** | Emit `montecarlo credentials create snowflake --account … --user … --warehouse … --private-key @key.p8` or the `montecarlo_snowflake_credentials` resource with `file(...)`. The user runs it and gives back the `id`. |
 
 The secret's *contents* follow the connection type's schema
-(https://docs.getmontecarlo.com/docs/self-hosted-credentials); say what the schema is, never ask
-for the values. Add `bq_project_id` for BigQuery and `databricks_warehouse_id` for Databricks SQL
-warehouse types. Carry the `credentials_id` forward.
+(https://docs.getmontecarlo.com/docs/self-hosted-credentials): for Snowflake a JSON
+`{"connect_args": {"user", "private_key", "account", "warehouse"}}` where `private_key` is the
+unencrypted PKCS#8 key as a base64 body without BEGIN/END lines. Say what the schema is, never ask
+for the values. The v2 API stores only key-pair Snowflake credentials; password or external OAuth
+Snowflake connections are set up in the UI. Add `bq_project_id` for BigQuery and
+`databricks_warehouse_id` for Databricks SQL warehouse types. Carry the `credentials_id` forward.
 
 ## Step 3: The warehouse
 
@@ -209,13 +245,14 @@ the app does). Note the returned `id`, `connection_type`, `deployment_id` and `j
 There is no v2 validation tool yet (it arrives with the validations API and a
 `wait_for_validation_run` tool). Do **not** substitute any other tool for it. End with:
 
-> Validate the connection in the Monte Carlo UI: Settings → Integrations → the new connection →
-> **Test connection**. Collection starts on its own once the connection exists; the first metadata
+> Validate the connection in the Monte Carlo UI: Settings → Integrations → the integration → the
+> new connection → **Test**. Collection starts on its own once the connection exists; the first metadata
 > appears within about an hour.
 
-If validation fails there, the usual causes are, in order: the agent or data store cannot reach the
-secret store; the warehouse user lacks the grants in the connector's docs page; a network path
-(allowlist, PrivateLink) is missing. Fix, then `update_connection` is not needed: re-test in the UI.
+If validation fails there, the usual causes are, in order: the agent cannot read the secret (IAM
+grant, service-account role or Key Vault policy missing); the warehouse user lacks the grants in
+the connector's docs page; the network path is missing (Monte Carlo's IPs not allowlisted for the
+cloud node, or the agent's VPC has no route to the warehouse). Fix, then `update_connection` is not needed: re-test in the UI.
 
 ## Step 6: Summary (always)
 
@@ -237,7 +274,7 @@ Reused
 
 Pending on your side
   - <deploy/register/credential step still to run, with the exact command or file>
-  - Validate in the UI (Settings → Integrations → <connection name> → Test connection)
+  - Validate in the UI (Settings → Integrations → <integration> → <connection name> → Test)
 
 Cleanup if you abandon this: delete_connection → delete_warehouse → delete_<kind>_credentials →
 delete_<platform>_collection_agent|data_store → delete_deployment, in that order.
@@ -251,6 +288,8 @@ ids it will print; the reused ids are real.
 - Tool errors arrive as `"<operation> failed: <detail>"` with field-level messages and a request
   id. Quote the detail, fix the argument, retry. Include the request id in the summary when a
   call failed for a reason you could not fix.
+- `create_deployment` refused with an account limit reached: the per-account deployment cap is
+  raised by Monte Carlo support; do not delete a working deployment to make room.
 - A conflict on `create_*` usually means the name exists (warehouse names are unique per type,
   connection names per warehouse) or the deployment cannot take that resource. `list_*` and reuse.
 - `register_*` that fails its check registers nothing; the same call can be repeated after the fix.
@@ -271,8 +310,8 @@ User: "Connect our Snowflake account to Monte Carlo. The warehouse is only reach
    applies it and pastes `mcd_agent_function_arn` and `mcd_agent_invoker_role_arn`.
 5. `register_aws_collection_agent(deployment_id, lambda_function_arn, role_arn)` → agent `id`,
    `enabled: true`.
-6. Credentials: user keeps the key pair in Secrets Manager → say the secret JSON shape, the IAM
-   grant for the agent's execution role, then
+6. Credentials: an agent is in play, so the key pair can stay in Secrets Manager → say the secret
+   JSON shape, the IAM grant for the agent's execution role, then
    `create_aws_secrets_manager_credentials(connection_type="snowflake", aws_secret=<arn>)`.
    (Had they wanted Monte Carlo to hold the key: emit the `montecarlo credentials create snowflake`
    command instead and wait for the id.)

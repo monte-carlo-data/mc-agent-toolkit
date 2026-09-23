@@ -12,12 +12,14 @@ When you ask to connect Snowflake, BigQuery, Redshift, Databricks or any other s
 the skill:
 
 1. Lists your deployments and asks two questions only when your request leaves them open: can Monte
-   Carlo reach the warehouse over the public internet, and may sampled rows be stored in Monte Carlo.
+   Carlo reach the warehouse over the public internet (IP allowlist or PrivateLink), and may
+   temporary query output and sampled rows be stored in Monte Carlo.
 2. Reuses an existing deployment, or provisions one for a collection agent or a data store and hands
    you the deploy step (Terraform module, CLI) to run in your cloud, then registers it.
 3. Stores a *reference* to your credentials (AWS Secrets Manager, GCP Secret Manager, Azure Key
-   Vault, an environment variable or a file on the agent). A Snowflake key pair that Monte Carlo
-   should hold is created by a CLI or Terraform command you run yourself. **No secret ever passes
+   Vault, an environment variable or a file) when a collection agent will read them. On the hosted
+   cloud node the credentials are Monte Carlo managed: a Snowflake key pair is created by a CLI or
+   Terraform command you run yourself. **No secret ever passes
    through the chat.**
 4. Creates the warehouse and the connection.
 5. Ends with a summary of every id it created, and the cleanup order if you abandon the setup.
