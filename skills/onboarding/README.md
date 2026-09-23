@@ -11,26 +11,27 @@ Monte Carlo MCP server.
 When you ask to connect Snowflake, BigQuery, Redshift, Databricks or any other supported platform,
 the skill:
 
-1. Lists your deployments and asks two questions only when your request leaves them open: can Monte
-   Carlo reach the warehouse over the public internet (IP allowlist or PrivateLink), and may
-   temporary query output and sampled rows be stored in Monte Carlo.
-2. Reuses an existing deployment, or provisions one for a collection agent or a data store and hands
-   you the deploy step (Terraform module, CLI) to run in your cloud, then registers it.
-3. Stores a *reference* to your credentials (AWS Secrets Manager, GCP Secret Manager, Azure Key
-   Vault, an environment variable or a file) when a collection agent will read them. On the hosted
-   cloud node the credentials are Monte Carlo managed: a Snowflake key pair is created by a CLI or
-   Terraform command you run yourself. **No secret ever passes
-   through the chat.**
-4. Creates the warehouse and the connection.
-5. Ends with a summary of every id it created, and the cleanup order if you abandon the setup.
+1. Discovers existing deployments and connections, identifies the target platform/cloud/region,
+   and asks only for missing requirements: connection origin, credential custody and sample storage.
+2. Reuses a suitable Cloud Deployment, Cloud with Customer-hosted Data Store Deployment, or
+   Customer-hosted Agent & Data Store Deployment. Where an agent is needed, distinguishes
+   cloud-native inbound agents from the outbound Generic Agent (Docker/Kubernetes, preview).
+   PrivateLink may support direct Cloud or an agent's connection to the integration; support
+   depends on the integration, cloud and region, and the customer's origin policy still applies.
+3. References self-hosted credentials or hands over a local CLI/Terraform step for a managed
+   Snowflake key pair. **No secret passes through chat.**
+4. Reconciles the intended warehouse and connection before creating anything missing.
+5. Ends with created/reused IDs, a scoped cleanup order and the next pending step. Connection
+   validation remains a UI handoff; creation alone is not a completed onboarding.
 
-Three output modes, asked up front: act through the MCP tools now, emit Terraform
-(`terraform-provider-montecarlo` plus the `monte-carlo-data/mcd-agent/*` modules), or emit a script
-over the `montecarlo` SDK or CLI.
+The assistant guides the requested connection by default and honors Terraform or SDK/CLI output
+when requested. Missing MCP operations use an available v2 local-client handoff, with non-secret
+results reconciled before continuing. Sample storage choices do not relocate metadata, metrics
+or query logs from Monte Carlo.
 
 ## Prerequisites
 
-- Claude Code or any MCP-capable editor with the Monte Carlo MCP server (bundled by the plugin).
+- An assistant environment with access to the Monte Carlo MCP server.
 - A Monte Carlo account whose user may manage integrations. The tools that write need a token with
   the `mcp/edit` scope.
 - Cloud credentials **on your machine** for the agent, data store or secret-store steps the skill
@@ -40,14 +41,14 @@ over the `montecarlo` SDK or CLI.
 
 ### Via the mc-agent-toolkit plugin (recommended)
 
-Install the plugin for your editor — see the [main README](../../README.md). The skill is bundled;
-invoke it with `/monte-carlo-onboarding connect Snowflake` or just describe what you want.
+Install the toolkit adapter for your environment — see the [main README](../../README.md).
+Describe the platform you want to connect.
 
 ### Standalone
 
-```bash
-cp -r skills/onboarding ~/.claude/skills/onboarding
-```
+Load the `onboarding` directory, including `SKILL.md` and its `reference` directory, using the
+skill or resource mechanism supported by your environment. Configure the Monte Carlo MCP
+connection for the intended account. The workflow requires no particular assistant provider.
 
 ## Files
 
@@ -55,6 +56,7 @@ cp -r skills/onboarding ~/.claude/skills/onboarding
 |---|---|
 | `SKILL.md` | The workflow (hand-written) |
 | `reference/api/<tag>.md` | One file per API tag with every tool's arguments, responses and failure modes. **Generated** by [api-codegen](https://github.com/monte-carlo-data/api-codegen) from the API spec; edit the spec, not these files. Until that generator mode ships (YET-2891) they are stubs, with `deployments` and `warehouses` hand-filled from the live tools. |
+| `reference/deployment-guide.md` | Cloud-specific prerequisites, network paths and official setup guides |
 | `reference/output-modes.md` | Terraform, CLI and SDK snippets for each step |
 
 ## Not yet

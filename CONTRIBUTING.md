@@ -171,7 +171,7 @@ Rules:
 - Everything outside the markers must stand alone without the plugin: name MCP tools by their bare names, not slash commands; refer to reference files by what they contain ("the per-tag API reference") so a renderer can inline them.
 - Keep the marked block short. If most of a skill is plugin-only, the skill is a plugin feature, not a portable skill.
 
-`skills/onboarding/SKILL.md` is the reference example. The renderer lives in the MCP server (ai-agent, YET-2894); this repo only defines the contract.
+New fully portable skills should keep host conventions in adapters outside the skill directory and use standard `name`, `description` and optional `metadata` frontmatter. Put catalog hints under `metadata` (for example, `metadata.bucket`), and activation guidance in `description` and the body. `skills/onboarding/SKILL.md` is the fully portable example; it does not require stripping marked sections. The renderer lives in the MCP server (ai-agent, YET-2894); this repo only defines the contract.
 
 ### Naming
 

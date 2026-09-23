@@ -4,7 +4,7 @@
   "cases": [
     {"id": "should-01", "prompt": "Connect our Snowflake account to Monte Carlo.", "expected": "trigger", "rationale": "Core intent: connect a warehouse"},
     {"id": "should-02", "prompt": "Add a BigQuery connection to Monte Carlo for the analytics project.", "expected": "trigger", "rationale": "Add connection = onboarding"},
-    {"id": "should-03", "prompt": "Our Redshift cluster is only reachable inside the VPC. How do we get Monte Carlo monitoring it?", "expected": "trigger", "rationale": "Private network implies a collection agent, the skill's deployment branch"},
+    {"id": "should-03", "prompt": "Our Redshift cluster is only reachable inside the VPC. How do we get Monte Carlo monitoring it?", "expected": "trigger", "rationale": "Private connectivity needs discovery; it does not by itself require an agent"},
     {"id": "should-04", "prompt": "We need a Monte Carlo collection agent in our AWS account.", "expected": "trigger", "rationale": "Agent deployment is step 1 of onboarding"},
     {"id": "should-05", "prompt": "Set up a data store so Monte Carlo never keeps sampled rows on its side, then connect Databricks.", "expected": "trigger", "rationale": "Data store deployment plus connection"},
     {"id": "should-06", "prompt": "Generate the Terraform to onboard our Snowflake warehouse to Monte Carlo through an agent.", "expected": "trigger", "rationale": "Terraform output mode of the onboarding flow"},

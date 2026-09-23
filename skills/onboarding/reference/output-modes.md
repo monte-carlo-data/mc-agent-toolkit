@@ -1,10 +1,16 @@
 # Output modes: Terraform, SDK script, CLI
 
-The skill produces the same five steps in three shapes. Reads (`list_deployments`,
-`list_warehouses`, `list_credentials`) always run through the MCP tools so the artifact reuses what
-exists. Secrets never appear in an artifact: Terraform reads them with `file(...)` or a variable
+The skill produces the selected onboarding path as tools, Terraform or a v2 CLI/SDK script.
+Discover deployments, warehouses, credentials and connections first, using MCP or the available
+v2 CLI/SDK fallback. Carry verified IDs into the artifact; do not recreate them. Secret values
+are not embedded in generated source: Terraform reads them with `file(...)` or a variable
 from an uncommitted `*.tfvars`; the CLI reads them with `@<path>` or a `--<flag>-prompt`; a script
 reads them from the environment or a file the customer names.
+
+These are composable examples: emit only the selected deployment and credential variant,
+fill non-secret inputs from discovery, and keep references/dependencies consistent. Protect
+Terraform state with an encrypted backend and restricted access; reading a secret from a file
+does not keep it out of state.
 
 Names below are the API's: `type` is `COLLECTION_AGENT` or `COLLECTION_DATA_STORE`,
 `runtime_platform` is `AWS`, `GCP`, `AZURE` or `GENERIC`. Tool name = `operationId` = the
@@ -33,6 +39,11 @@ provider "montecarlo" {
 The deployment comes first because it generates the external id the agent's role must trust.
 
 ```hcl
+variable "aws_region" { type = string }
+# Account information → Collection → AWS account ID, not the customer's account ID.
+variable "monte_carlo_collection_account_id" { type = string }
+provider "aws" { region = var.aws_region }
+
 resource "montecarlo_deployment" "agent" {
   name             = "prod-vpc-agent"
   type             = "COLLECTION_AGENT"
@@ -42,10 +53,11 @@ resource "montecarlo_deployment" "agent" {
 # https://registry.terraform.io/modules/monte-carlo-data/mcd-agent/aws
 module "mcd_agent" {
   source  = "monte-carlo-data/mcd-agent/aws"
-  version = "~> 1.0"
+  version = "1.0.7"
 
-  region      = "us-east-1"
-  external_id = montecarlo_deployment.agent.aws_external_id
+  region           = var.aws_region
+  cloud_account_id = var.monte_carlo_collection_account_id
+  external_id      = montecarlo_deployment.agent.aws_external_id
   # private_subnets = ["subnet-…", "subnet-…"]   # to reach a warehouse inside the VPC
 }
 
@@ -63,38 +75,62 @@ Azure: module `monte-carlo-data/mcd-agent/azurerm` (outputs `mcd_agent_function_
 principal ids) and `montecarlo_azure_collection_agent`. Both keep the agent credential inside
 Terraform state, which is why they are not MCP tools.
 
-### Deployment + generic collection agent (Kubernetes, Docker)
+### Deployment + generic collection agent (AWS EKS example)
+
+This example creates an EKS cluster, storage and agent; use the official Docker Compose or
+existing-cluster guide instead when that is the chosen runtime. Requires Terraform >= 1.12,
+AWS authentication and a pinned compatible chart version. Reuse the provider setup above;
+configure the root AWS provider as below. This is the token variant; for OAuth, use the
+`montecarlo_generic_collection_agent_oauth_client` resource and the module's `oauth_credentials`
+instead. Do not configure both authentication methods.
 
 ```hcl
+variable "aws_region" { type = string }
+variable "backend_service_url" { type = string }
+variable "agent_chart_version" { type = string }
+
+provider "aws" { region = var.aws_region }
+
 resource "montecarlo_deployment" "agent" {
   name             = "prod-k8s-agent"
   type             = "COLLECTION_AGENT"
   runtime_platform = "GENERIC"
 }
 
-# The credential the agent presents. Returned once; held in state.
+# Returned once; held in protected Terraform state, never copied into chat.
 resource "montecarlo_generic_collection_agent_token" "agent" {
   deployment_id = montecarlo_deployment.agent.id
 }
 
-# One way to run it: https://registry.terraform.io/modules/monte-carlo-data/mcd-k8s-agent/aws
-# (azurerm and google variants take the same inputs). Or Helm/Docker with the same token.
 module "mcd_agent" {
   source  = "monte-carlo-data/mcd-k8s-agent/aws"
-  version = "~> 0.1"
-  backend_service_url = var.backend_service_url   # Account information → Agent Service → Public endpoint
-  # This example wires the OAuth client. For the token variant, create the
-  # montecarlo_generic_collection_agent_token resource instead and feed its
-  # mcd_id / mcd_token to the module's credential input (see the module docs)
-  # or mount the token file on the agent directly.
-}
-
-# Enables the agent once it has connected; 503 (retried) until then.
-resource "montecarlo_generic_collection_agent" "agent" {
-  deployment_id = montecarlo_deployment.agent.id
-  depends_on    = [module.mcd_agent]
+  version = "0.1.10"
+  # Account information → Agent Service; use the endpoint for this account/region.
+  backend_service_url = var.backend_service_url
+  token_credentials = {
+    mcd_id    = montecarlo_generic_collection_agent_token.agent.mcd_id
+    mcd_token = montecarlo_generic_collection_agent_token.agent.mcd_token
+  }
+  helm = {
+    chart_version = var.agent_chart_version
+  }
 }
 ```
+
+After the module has applied and the agent is connected, add/apply the registration below.
+This explicit second phase avoids a plan-time module dependency on a module with nested providers
+and an unbounded wait for the agent. If connectivity is still pending, fix it before retrying.
+
+```hcl
+resource "montecarlo_generic_collection_agent" "agent" {
+  deployment_id = montecarlo_deployment.agent.id
+}
+```
+
+The module populates the agent-auth secret; integration secrets and permissions remain a
+separate step. For existing networking/cluster/identity, use the module's documented inputs
+instead of its new-cluster defaults. See the [module](https://registry.terraform.io/modules/monte-carlo-data/mcd-k8s-agent/aws/0.1.10)
+and the [Generic guide](https://docs.getmontecarlo.com/docs/generic-agent-platforms).
 
 ### Deployment + AWS data store
 
@@ -102,6 +138,10 @@ No published module. Bucket, role trusting the external id, and the registration
 is the Monte Carlo collection account shown under Account information → Collection.
 
 ```hcl
+variable "aws_region" { type = string }
+variable "mcd_account_id" { type = string } # Collection AWS account ID
+provider "aws" { region = var.aws_region }
+
 resource "montecarlo_deployment" "store" {
   name             = "prod-data-store"
   type             = "COLLECTION_DATA_STORE"
@@ -109,6 +149,31 @@ resource "montecarlo_deployment" "store" {
 }
 
 resource "aws_s3_bucket" "store" { bucket_prefix = "mcd-data-store-" }
+
+resource "aws_s3_bucket_public_access_block" "store" {
+  bucket                  = aws_s3_bucket.store.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+resource "aws_s3_bucket_server_side_encryption_configuration" "store" {
+  bucket = aws_s3_bucket.store.id
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+resource "aws_s3_bucket_lifecycle_configuration" "store" {
+  bucket = aws_s3_bucket.store.id
+  rule {
+    id     = "expire-temporary-data"
+    status = "Enabled"
+    filter { prefix = "" }
+    expiration { days = 90 }
+  }
+}
 
 resource "aws_iam_role" "store" {
   name_prefix = "mcd-data-store-"
@@ -128,9 +193,9 @@ resource "aws_iam_role_policy" "store" {
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
-      Effect   = "Allow"
-      Action   = ["s3:PutObject", "s3:GetObject", "s3:DeleteObject", "s3:ListBucket",
-                  "s3:GetBucketPublicAccessBlock", "s3:GetBucketPolicyStatus", "s3:GetBucketAcl"]
+      Effect = "Allow"
+      Action = ["s3:PutObject", "s3:GetObject", "s3:DeleteObject", "s3:ListBucket",
+      "s3:GetBucketPublicAccessBlock", "s3:GetBucketPolicyStatus", "s3:GetBucketAcl"]
       Resource = [aws_s3_bucket.store.arn, "${aws_s3_bucket.store.arn}/*"]
     }]
   })
@@ -140,24 +205,31 @@ resource "montecarlo_aws_collection_data_store" "store" {
   deployment_id = montecarlo_deployment.store.id
   bucket_name   = aws_s3_bucket.store.bucket
   role_arn      = aws_iam_role.store.arn
-  depends_on    = [aws_iam_role_policy.store]
+  depends_on    = [aws_iam_role_policy.store, aws_s3_bucket_public_access_block.store]
 }
 ```
 
-Add public-access block, encryption and 90-day lifecycle rules on the bucket as the provider's
-`examples/resources/montecarlo_aws_collection_data_store` shows. GCP and Azure stores use
+The dedicated bucket above blocks public access, uses encryption and expires objects after 90 days.
+Adjust retention to the approved policy. GCP and Azure stores use
 `montecarlo_gcp_collection_data_store` / `montecarlo_azure_collection_data_store`.
 
 ### Credentials
 
-Self-hosted, the secret stays in the customer's store. With an agent, grant its execution role
-read access first.
+Self-hosted direct-access example: the agent execution role reads the secret. If using
+`assumable_role`, grant secret access to that target role instead, allow the caller to use
+`sts:AssumeRole`, and configure the target trust policy (including its External ID condition
+when required). With a customer-managed KMS key, also grant the reading identity the necessary
+decrypt permission and key-policy access. Do not attach the direct-access policy below to the
+wrong principal. This policy example uses the native AWS module; for Generic EKS, use the
+agent identity from that module's guide (`agent_role_arn`), not the native module's output.
 
 ```hcl
+variable "snowflake_secret_arn" { type = string }
+
 resource "aws_iam_role_policy" "agent_read_secret" {
   role = module.mcd_agent.mcd_agent_execution_role.name
   policy = jsonencode({
-    Version = "2012-10-17"
+    Version   = "2012-10-17"
     Statement = [{ Effect = "Allow", Action = "secretsmanager:GetSecretValue", Resource = var.snowflake_secret_arn }]
   })
 }
@@ -178,21 +250,43 @@ Monte Carlo managed Snowflake key pair (the key is read from a file kept out of 
 
 ```hcl
 resource "montecarlo_snowflake_credentials" "snowflake" {
-  account     = "xy12345.us-east-1"
-  user        = "MONTE_CARLO"
-  warehouse   = "MONTE_CARLO_WH"
+  account   = "xy12345.us-east-1"
+  user      = "MONTE_CARLO"
+  warehouse = "MONTE_CARLO_WH"
   # Stored in Terraform state in plaintext: use an encrypted remote backend and restrict who can read state.
-  private_key = file("${path.module}/snowflake_key.p8")   # PEM text, BEGIN/END lines included
+  private_key = file("${path.module}/snowflake_key.p8") # PEM text, BEGIN/END lines included
   # private_key_passphrase = var.snowflake_key_passphrase  # only for an encrypted key
 }
 ```
 
 ### Warehouse and connection
 
+Choose exactly one credential variant and set `local.snowflake_credentials_id` accordingly.
+The rest of the connection and summary refer only to that local:
+
+```hcl
+# Self-hosted AWS variant (keep the self-hosted credential resource above):
+locals {
+  snowflake_credentials_id = montecarlo_self_hosted_aws_credentials.snowflake.id
+}
+```
+
+For the managed key-pair variant, replace that locals block with:
+
+```hcl
+locals {
+  snowflake_credentials_id = montecarlo_snowflake_credentials.snowflake.id
+}
+```
+
+The following uses the AWS agent selected above. For a different or reused deployment, replace
+its ID and registration dependency with that selected route; do not leave references to omitted
+agent resources. For a reused credential, set the local to its verified ID instead.
+
 ```hcl
 resource "montecarlo_warehouse" "snowflake" {
   name          = "Snowflake prod"
-  type          = "snowflake"                 # or connection_type = "snowflake"; never both
+  type          = "snowflake" # or connection_type = "snowflake"; never both
   deployment_id = montecarlo_deployment.agent.id
   depends_on    = [montecarlo_aws_collection_agent.agent]
 }
@@ -200,10 +294,7 @@ resource "montecarlo_warehouse" "snowflake" {
 resource "montecarlo_connection" "snowflake" {
   name           = "snowflake-prod"
   warehouse_id   = montecarlo_warehouse.snowflake.id
-  # Point credentials_id at whichever credentials resource you created above:
-  # the self-hosted reference, or montecarlo_snowflake_credentials.snowflake.id
-  # when Monte Carlo stores the key pair.
-  credentials_id = montecarlo_self_hosted_aws_credentials.snowflake.id
+  credentials_id = local.snowflake_credentials_id
   # job_types omitted: the type's defaults
 }
 
@@ -211,15 +302,16 @@ output "created_ids" {
   value = {
     deployment  = montecarlo_deployment.agent.id
     agent       = montecarlo_aws_collection_agent.agent.id
-    credentials = montecarlo_self_hosted_aws_credentials.snowflake.id
+    credentials = local.snowflake_credentials_id
     warehouse   = montecarlo_warehouse.snowflake.id
     connection  = montecarlo_connection.snowflake.id
   }
 }
 ```
 
-Reusing an existing deployment: drop the `montecarlo_deployment` and agent blocks and set
-`deployment_id = "<id from list_deployments>"`.
+Reusing an existing deployment: omit creation/registration blocks and their `depends_on` and
+outputs; use the verified deployment ID. Likewise omit reused warehouse/credential resources
+and pass their IDs. Never destroy a shared reused resource as part of cleanup.
 
 ## CLI (`montecarlo`, the REST API CLI)
 
@@ -247,12 +339,18 @@ montecarlo collection-agents register generic --deployment-id <id>
 montecarlo collection-data-stores register aws --deployment-id <id> --bucket-name <bucket> --role-arn <arn>
 
 # credentials: self-hosted reference …
+montecarlo credentials list --output json
+# Create only if discovery found no matching reference:
 montecarlo credentials create aws-secrets-manager --connection-type snowflake --aws-secret <arn-or-name>
 # … or a key pair Monte Carlo stores (the key is read from a file, never typed into a chat)
 montecarlo credentials create snowflake --account xy12345.us-east-1 --user MONTE_CARLO \
   --warehouse MONTE_CARLO_WH --private-key @snowflake_key.p8
 
+montecarlo warehouses list --output json
+# Reuse the intended warehouse or create it if absent:
 montecarlo warehouses create --name "Snowflake prod" --type snowflake --deployment-id <deployment_id> --output json
+montecarlo connections list --warehouse-id <warehouse_id> --output json
+# Create only if the target connection is absent:
 montecarlo connections create --name snowflake-prod --warehouse-id <warehouse_id> --credentials-id <credentials_id> --output json
 ```
 
@@ -264,92 +362,152 @@ Every operation is a method on its tag's `*Api` class with the same name as the 
 models are `<Schema>In`. Operations the MCP server does not expose (the Snowflake key pair) are
 plain SDK calls here, with the secret read from a file the customer names.
 
+This AWS/Snowflake direct-secret-access example takes `MCD_DEPLOYMENT_NAME`,
+`MCD_WAREHOUSE_NAME`, `MCD_CONNECTION_NAME` and `SNOWFLAKE_SECRET_ARN` from the approved target.
+Populate existing `MCD_DEPLOYMENT_ID`, `MCD_CREDENTIALS_ID`, `MCD_WAREHOUSE_ID` and
+`MCD_CONNECTION_ID` when discovery identified them. It never selects an arbitrary compatible
+warehouse. Set `MCD_CREATE_DEPLOYMENT=1` only after discovery confirms a new deployment is needed;
+otherwise it stops rather than provisioning one. Names/ARNs in this example are identity keys,
+not a substitute for resolving the customer's intended account/environment before generation.
+
+The first run of a new deployment stops for infrastructure. Subsequent runs reconcile existing
+resources and register a pending agent before continuing. A null External ID or failed enable
+stops the connection steps. The script prints created/reused IDs and the pending stage on exit.
+It does not read secret contents; MCP-managed key pairs use the separate local CLI/Terraform path.
+
 ```python
-import os, sys
+import os
+import sys
 import montecarlo
 from montecarlo.paging import paginate
 
-client = montecarlo.new_client(montecarlo.Options(endpoint="https://api.getmontecarlo.com"))
-deployments = montecarlo.DeploymentsApi(client)
-agents = montecarlo.CollectionAgentsApi(client)
-credentials = montecarlo.CredentialsApi(client)
-warehouses = montecarlo.WarehousesApi(client)
-connections = montecarlo.ConnectionsApi(client)
 
-created: dict[str, str] = {}
-reused: dict[str, str] = {}
-# Reuse before creating: set MCD_DEPLOYMENT_ID / MCD_CREDENTIALS_ID to existing ids
-# (the skill lists deployments and credentials with the read tools and picks these).
-try:
-    # 1. deployment (reuse an existing enabled one by setting MCD_DEPLOYMENT_ID)
-    deployment_id = os.environ.get("MCD_DEPLOYMENT_ID")
-    if not deployment_id:
-        # run 1: create the deployment, hand off the agent deploy, and stop
-        dep = deployments.create_deployment(
-            montecarlo.DeploymentIn(type="COLLECTION_AGENT", runtime_platform="AWS", name="prod-vpc-agent")
-        )
-        created["deployment"] = deployment_id = dep.id
-        external_id = deployments.get_deployment(deployment_id).aws_external_id
-        print(
-            f"deploy the agent with external_id={external_id}, then re-run with "
-            f"MCD_DEPLOYMENT_ID={deployment_id} LAMBDA_ARN=<arn> ROLE_ARN=<arn>",
-            file=sys.stderr,
-        )
-        sys.exit(0)  # the finally summary still prints the created deployment id
-    if not deployments.get_deployment(deployment_id).enabled:
-        # run 2 (or a reused deployment without an agent): register it
-        lambda_arn = os.environ.get("LAMBDA_ARN")
-        role_arn = os.environ.get("ROLE_ARN")
-        if not lambda_arn or not role_arn:
-            print("deployment has no enabled agent: set LAMBDA_ARN and ROLE_ARN", file=sys.stderr)
-            sys.exit(1)
-        agent = agents.register_aws_collection_agent(
-            montecarlo.AwsCollectionAgentIn(
-                deployment_id=deployment_id,
-                lambda_function_arn=lambda_arn,
-                role_arn=role_arn,
-            )
-        )
-        created["agent"] = agent.id
+def main():
+    client = montecarlo.new_client(montecarlo.Options(endpoint="https://api.getmontecarlo.com"))
+    deployments = montecarlo.DeploymentsApi(client)
+    agents = montecarlo.CollectionAgentsApi(client)
+    credentials = montecarlo.CredentialsApi(client)
+    warehouses = montecarlo.WarehousesApi(client)
+    connections = montecarlo.ConnectionsApi(client)
+    created, reused = {}, {}
+    pending = "Resolve inputs; no connection has been verified."
 
-    # 2. credentials: a reference to the customer's store … (reuse by setting MCD_CREDENTIALS_ID)
-    creds_id = os.environ.get("MCD_CREDENTIALS_ID")
-    if creds_id:
-        reused["credentials"] = creds_id
-        creds = credentials.get_aws_secrets_manager_credentials(creds_id)
-    else:
-        creds = credentials.create_aws_secrets_manager_credentials(
-            montecarlo.AwsSecretsManagerCredentialsIn(connection_type="snowflake", aws_secret=os.environ["SNOWFLAKE_SECRET_ARN"])
-        )
-    created["credentials"] = creds.id
-    # … or a key pair Monte Carlo stores, read from a file:
-    # creds = credentials.create_snowflake_credentials(montecarlo.SnowflakeCredentialsIn(
-    #     account="xy12345.us-east-1", user="MONTE_CARLO", warehouse="MONTE_CARLO_WH",
-    #     private_key=open(os.environ["SNOWFLAKE_KEY_PATH"]).read()))
+    def select(items, selected_id, label):
+        matches = [x for x in items if not selected_id or x.id == selected_id]
+        if selected_id and not matches:
+            raise ValueError(f"{label} ID does not match the selected target")
+        if len(matches) > 1:
+            raise ValueError(f"Several {label} entries match; select a verified ID")
+        return matches[0] if matches else None
 
-    # 3. warehouse: reuse one of the right type on this deployment, else create
-    existing = [w for w in paginate(warehouses.list_warehouses) if w.type == "snowflake" and w.deployment_id == deployment_id]
-    if existing:
-        warehouse_id = existing[0].id
-        reused["warehouse"] = warehouse_id
-    else:
-        wh = warehouses.create_warehouse(montecarlo.WarehouseIn(name="Snowflake prod", deployment_id=deployment_id, type="snowflake"))
-        created["warehouse"] = warehouse_id = wh.id
+    try:
+        identity = montecarlo.UsersApi(client).get_current_user()
+        print(f"Account: {identity.account_name} ({identity.account_id})")
+        if identity.account_frozen:
+            raise ValueError("Account is paused")
+        # These non-secret inputs/IDs come from the skill's discovery and approved plan.
+        secret_arn = os.environ["SNOWFLAKE_SECRET_ARN"]
+        if not secret_arn.startswith("arn:") or ":secretsmanager:" not in secret_arn:
+            raise ValueError("Use the full secret ARN to avoid matching names across regions/accounts")
+        dep_name = os.environ["MCD_DEPLOYMENT_NAME"]
+        warehouse_name = os.environ["MCD_WAREHOUSE_NAME"]
+        connection_name = os.environ["MCD_CONNECTION_NAME"]
+        dep_id = os.environ.get("MCD_DEPLOYMENT_ID")
+        inventory = deployments.list_deployments()
+        dep = select(inventory if dep_id else [d for d in inventory if d.name == dep_name],
+                     dep_id, "deployment")
+        if dep is None:
+            if os.environ.get("MCD_CREATE_DEPLOYMENT") != "1":
+                raise ValueError("Select an existing deployment or approve a new one before setting MCD_CREATE_DEPLOYMENT=1")
+            dep = deployments.create_deployment(montecarlo.DeploymentIn(
+                type="COLLECTION_AGENT", runtime_platform="AWS", name=dep_name))
+            created["deployment"] = dep.id
+        else:
+            reused["deployment"] = dep.id
+        dep = deployments.get_deployment(dep.id)
+        if dep.type != "COLLECTION_AGENT" or dep.runtime_platform != "AWS":
+            raise ValueError("This script requires the selected AWS collection-agent deployment")
+        if not dep.enabled:
+            pending = f"Resume with MCD_DEPLOYMENT_ID={dep.id}; deploy/register the AWS agent."
+            if not dep.aws_external_id:
+                print("External ID not available yet; retry this read or resolve permissions/status.")
+                return 1
+            print(f"Deployment External ID: {dep.aws_external_id}")
+            if "deployment" in created:
+                print("Deploy with the Collection AWS account ID and this External ID, then return LAMBDA_ARN and ROLE_ARN.")
+                return 0
+            if not os.environ.get("LAMBDA_ARN") or not os.environ.get("ROLE_ARN"):
+                print("Set LAMBDA_ARN and ROLE_ARN after deploying the agent.")
+                return 1
+            agent = agents.register_aws_collection_agent(montecarlo.AwsCollectionAgentIn(
+                deployment_id=dep.id, lambda_function_arn=os.environ["LAMBDA_ARN"],
+                role_arn=os.environ["ROLE_ARN"]))
+            created["agent"] = agent.id
+            if not deployments.get_deployment(dep.id).enabled:
+                raise ValueError("Registration is not enabled; stop before creating credentials or connection")
 
-    # 4. connection
-    conn = connections.create_connection(
-        montecarlo.ConnectionIn(name="snowflake-prod", warehouse_id=warehouse_id, credentials_id=creds.id)
-    )
-    created["connection"] = conn.id
-except montecarlo.ApiException as e:
-    print(f"failed: {e.status} {e.body}", file=sys.stderr)
-finally:
-    # 6. summary, whatever happened
-    for kind, id_ in created.items():
-        print(f"created {kind:11} {id_}")
-    for kind, id_ in reused.items():
-        print(f"reused   {kind:11} {id_}")
-    print("validate in the UI: Settings → Integrations → snowflake-prod → Test connection")
+        # Direct execution-role access only; an assumed-role variant must match that role too.
+        pending = "Reconcile credentials, warehouse and connection; do not retry uncertain creates blindly."
+        candidates = []
+        for row in paginate(credentials.list_credentials):
+            if row.connection_type == "snowflake" and row.storage_type == "aws_secrets_manager":
+                detail = credentials.get_aws_secrets_manager_credentials(row.id)
+                if detail.aws_secret == secret_arn and not detail.assumable_role:
+                    candidates.append(detail)
+        creds = select(candidates, os.environ.get("MCD_CREDENTIALS_ID"), "credentials")
+        if creds is None:
+            creds = credentials.create_aws_secrets_manager_credentials(
+                montecarlo.AwsSecretsManagerCredentialsIn(connection_type="snowflake", aws_secret=secret_arn))
+            created["credentials"] = creds.id
+        else:
+            reused["credentials"] = creds.id
+
+        # Names are supplied for the target discovered by the skill, not guessed from type.
+        warehouse_id = os.environ.get("MCD_WAREHOUSE_ID")
+        inventory = list(paginate(warehouses.list_warehouses))
+        wh = select(inventory if warehouse_id else
+                    [w for w in inventory if w.name == warehouse_name and w.type == "snowflake"],
+                    warehouse_id, "warehouse")
+        if wh is not None:
+            if wh.type != "snowflake" or wh.deployment_id != dep.id:
+                raise ValueError("Selected warehouse belongs to a different type/deployment")
+            reused["warehouse"] = wh.id
+        else:
+            wh = warehouses.create_warehouse(montecarlo.WarehouseIn(
+                name=warehouse_name, deployment_id=dep.id, type="snowflake"))
+            created["warehouse"] = wh.id
+
+        existing = list(paginate(connections.list_connections, warehouse_id=wh.id))
+        conn = select([c for c in existing if c.credentials_id == creds.id and
+                       c.connection_type == "snowflake"], os.environ.get("MCD_CONNECTION_ID"), "connection")
+        if conn is not None:
+            if conn.deployment_id != dep.id:
+                raise ValueError("Connection deployment does not match the selected route")
+            reused["connection"] = conn.id
+        else:
+            if any(c.name == connection_name for c in existing):
+                raise ValueError("Connection name exists with another credential; verify identity before proceeding")
+            conn = connections.create_connection(montecarlo.ConnectionIn(
+                name=connection_name, warehouse_id=wh.id, credentials_id=creds.id))
+            created["connection"] = conn.id
+        pending = f"Validate connection {conn.id} in the UI and confirm initial collection."
+        return 0
+    except (ValueError, KeyError) as error:
+        print(f"Stopped: {error}", file=sys.stderr)
+        return 1
+    except montecarlo.ApiException as error:
+        print(f"API call failed (HTTP {error.status}); reconcile state before retrying.", file=sys.stderr)
+        return 1
+    finally:
+        for label, resources in (("Created this run", created), ("Reused; excluded from cleanup", reused)):
+            print(label)
+            for kind, resource_id in resources.items():
+                print(f"  {kind:12} {resource_id}")
+        print(f"Pending: {pending}")
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
 ```
 
 The legacy `montecarlodata` Python CLI is not part of this flow: it speaks a different API and its

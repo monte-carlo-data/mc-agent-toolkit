@@ -57,7 +57,9 @@ The toolkit bundles an MCP server named `monte-carlo-mcp`. When loaded through t
 
 This cannot be hard-blocked per skill: `allowed-tools` frontmatter only *pre-approves* tools (suppresses prompts) — it does **not** restrict which tools are callable, so listing only the plugin tool does not block a same-named server. Soft enforcement via skill prose is the realistic ceiling.
 
-**Rule:** Every `SKILL.md` that calls Monte Carlo MCP tools must include the routing block below **verbatim**, placed near the top of the router (right after the intro paragraph, or as a note under the "MCP Tools Used" heading). This file is the single source of truth for both the block text and the namespace string.
+**Portable skills:** Keep host-specific routing in the plugin command adapter, outside the shared skill and references. The onboarding skill uses this arrangement; its shared content verifies the intended account and uses operation names without host prefixes.
+
+**Rule for legacy plugin-specific skills:** Every `SKILL.md` that calls Monte Carlo MCP tools must include the routing block below **verbatim**, placed near the top of the router (right after the intro paragraph, or as a note under the "MCP Tools Used" heading). This file is the single source of truth for both the block text and the namespace string.
 
 ```markdown
 > **Monte Carlo tool routing (required):** Always call Monte Carlo MCP tools through this plugin's

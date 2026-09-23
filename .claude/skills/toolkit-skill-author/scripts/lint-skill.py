@@ -56,7 +56,14 @@ def parse_frontmatter(text: str) -> dict[str, str]:
             i += 1
             continue
         key, rest = km.group(1), km.group(2).rstrip()
-        if rest in ("|", ">", "|-", "|+", ">-", ">+"):
+        if key == "metadata" and not rest:
+            i += 1
+            while i < len(lines) and (lines[i].startswith("  ") or not lines[i].strip()):
+                nested = re.match(r"^  bucket:\s*(.*?)\s*$", lines[i])
+                if nested:
+                    result["metadata.bucket"] = nested.group(1).strip("\"'")
+                i += 1
+        elif rest in ("|", ">", "|-", "|+", ">-", ">+"):
             i += 1
             block: list[str] = []
             while i < len(lines):
@@ -159,7 +166,7 @@ def lint(name: str, skills_root: Path) -> tuple[list[str], list[str]]:
             errors.append(f"description opens with first-person phrasing (\"{desc[:40]}...\")")
 
     wtu = fm.get("when_to_use", "")
-    if not wtu:
+    if not wtu and "metadata.bucket" not in fm:
         warnings.append("when_to_use is missing (strongly recommended per CONTRIBUTING)")
 
     combined = len(desc) + len(wtu)
@@ -169,7 +176,7 @@ def lint(name: str, skills_root: Path) -> tuple[list[str], list[str]]:
             f"(max {MAX_COMBINED} for headroom under 1536 truncation)"
         )
 
-    bucket = fm.get("bucket", "").strip()
+    bucket = fm.get("metadata.bucket", fm.get("bucket", "")).strip()
     if not bucket:
         errors.append(
             f"bucket is missing (required; one of: {', '.join(sorted(VALID_BUCKETS))})"
