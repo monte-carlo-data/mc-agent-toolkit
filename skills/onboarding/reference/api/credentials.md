@@ -17,12 +17,12 @@ List the credentials in your account, of every kind, a page at a time.
 | Argument | Type | Required | Description |
 |---|---|---|---|
 | `cursor` | `str` | no | Position to continue from, as returned in `next_cursor` by the previous page. |
-| `limit` | `int` | no | Maximum number of items to return, between 1 and 100.. |
+| `limit` | `int` | no | Maximum number of items to return, between 1 and 100. |
 | `with_count` | `bool` | no | Whether to also return the total number of items across every page, in `count`. |
 
 ### Response
 
-Returns `items`, `next_cursor`, `has_more`, `count`; one page per call.
+Returns `items` (response fields per item: id, connection_type, storage_type, created_time), `next_cursor`, `has_more`, `count`; one page per call. `storage_type` is one of `mc_managed`, `aws_secrets_manager`, `gcp_secret_manager`, `azure_key_vault`, `env_var`, `file`.
 
 ## `create_snowflake_credentials`: Create Snowflake credentials
 

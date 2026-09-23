@@ -178,6 +178,7 @@ resource "montecarlo_snowflake_credentials" "snowflake" {
   account     = "xy12345.us-east-1"
   user        = "MONTE_CARLO"
   warehouse   = "MONTE_CARLO_WH"
+  # Stored in Terraform state in plaintext: use an encrypted remote backend and restrict who can read state.
   private_key = file("${path.module}/snowflake_key.p8")   # PEM text, BEGIN/END lines included
   # private_key_passphrase = var.snowflake_key_passphrase  # only for an encrypted key
 }
@@ -274,17 +275,30 @@ try:
     # 1. deployment (reuse when the id is known)
     deployment_id = os.environ.get("MCD_DEPLOYMENT_ID")
     if not deployment_id:
+        # run 1: create the deployment, hand off the agent deploy, and stop
         dep = deployments.create_deployment(
             montecarlo.DeploymentIn(type="COLLECTION_AGENT", runtime_platform="AWS", name="prod-vpc-agent")
         )
         created["deployment"] = deployment_id = dep.id
         external_id = deployments.get_deployment(deployment_id).aws_external_id
-        print(f"deploy the agent with external_id={external_id}, then set LAMBDA_ARN and ROLE_ARN", file=sys.stderr)
+        print(
+            f"deploy the agent with external_id={external_id}, then re-run with "
+            f"MCD_DEPLOYMENT_ID={deployment_id} LAMBDA_ARN=<arn> ROLE_ARN=<arn>",
+            file=sys.stderr,
+        )
+        sys.exit(0)  # the finally summary still prints the created deployment id
+    if not deployments.get_deployment(deployment_id).enabled:
+        # run 2 (or a reused deployment without an agent): register it
+        lambda_arn = os.environ.get("LAMBDA_ARN")
+        role_arn = os.environ.get("ROLE_ARN")
+        if not lambda_arn or not role_arn:
+            print("deployment has no enabled agent: set LAMBDA_ARN and ROLE_ARN", file=sys.stderr)
+            sys.exit(1)
         agent = agents.register_aws_collection_agent(
             montecarlo.AwsCollectionAgentIn(
                 deployment_id=deployment_id,
-                lambda_function_arn=os.environ["LAMBDA_ARN"],
-                role_arn=os.environ["ROLE_ARN"],
+                lambda_function_arn=lambda_arn,
+                role_arn=role_arn,
             )
         )
         created["agent"] = agent.id
@@ -321,7 +335,6 @@ finally:
     print("validate in the UI: Settings → Integrations → snowflake-prod → Test connection")
 ```
 
-The legacy Python CLI (`pip install montecarlodata`) can still onboard Snowflake in one command,
-`montecarlo integrations add-snowflake --private-key <file> …`, but it does not speak the v2 API and
-its ids are not the ones the tools above return; prefer the v2 CLI or SDK so the summary is
-consistent.
+The legacy `montecarlodata` Python CLI is not part of this flow: it speaks a different API and its
+ids are not the ids the tools above return. Use the `montecarlo` CLI or the SDK so the summary of
+created ids stays consistent.

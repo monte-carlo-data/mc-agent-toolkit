@@ -18,7 +18,7 @@ List the connections in your account, a page at a time.
 |---|---|---|---|
 | `warehouse_id` | `str` | no | Only list connections on this warehouse. |
 | `cursor` | `str` | no | Position to continue from, as returned in `next_cursor` by the previous page. |
-| `limit` | `int` | no | Maximum number of items to return, between 1 and 100.. |
+| `limit` | `int` | no | Maximum number of items to return, between 1 and 100. |
 | `with_count` | `bool` | no | Whether to also return the total number of items across every page, in `count`. |
 
 ### Response

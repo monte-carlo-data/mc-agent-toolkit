@@ -69,6 +69,10 @@ This cannot be hard-blocked per skill: `allowed-tools` frontmatter only *pre-app
 > different endpoint or credentials.
 ```
 
+The two example tool names inside the block (`get_alerts` in the fully-qualified example and the
+`(get_alerts, search, get_table, …)` list) may be replaced with tools the skill calls, so a skill
+never names a tool it must not use; everything else stays verbatim.
+
 When the plugin name or server name changes, update the prefix **here and in every skill carrying the block in the same change**. To find them: `grep -rl 'Monte Carlo tool routing (required)' skills/*/SKILL.md`.
 
 ## Mark plugin-only sections with portability markers

@@ -2,7 +2,7 @@
 
 <!-- GENERATED STUB (YET-2891): api-codegen's `-mcp-reference` mode will replace this file whole from the
      REST API v2 OpenAPI document; do not hand-edit once that lands. Until then this copy is hand-filled
-     from the ten v2 tools the Monte Carlo MCP server already serves, so the onboarding skill can run. -->
+     from the live v2 tools the Monte Carlo MCP server already serves, so the onboarding skill can run. -->
 
 Monte Carlo REST API v2 tools of the `warehouses` tag, as the Monte Carlo MCP server exposes
 them. Each section is one tool; its name is the tool to call.

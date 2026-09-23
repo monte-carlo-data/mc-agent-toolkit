@@ -20,8 +20,8 @@ deployment is chosen or provisioned before anything else.
 > **Monte Carlo tool routing (required):** Always call Monte Carlo MCP tools through this plugin's
 > bundled server, whose fully-qualified tool names are
 > `mcp__plugin_mc-agent-toolkit_monte-carlo-mcp__<tool>` (e.g.
-> `mcp__plugin_mc-agent-toolkit_monte-carlo-mcp__get_alerts`). Bare tool names used in this skill
-> (`get_alerts`, `search`, `get_table`, …) refer to that bundled server. If the session also has a
+> `mcp__plugin_mc-agent-toolkit_monte-carlo-mcp__list_deployments`). Bare tool names used in this skill
+> (`list_deployments`, `create_warehouse`, `create_connection`, …) refer to that bundled server. If the session also has a
 > separately-configured `monte-carlo-mcp` server, do **not** route to it — it may point at a
 > different endpoint or credentials.
 
@@ -38,8 +38,9 @@ Invoke explicitly with `/monte-carlo-onboarding [what to connect]`.
 
 ## Rules that hold for the whole run
 
-1. **v2 tools only.** Use the tools listed under *Tools* below and nothing else for reads or
-   writes about deployments, agents, data stores, credentials, warehouses and connections. Other
+1. **v2 tools only.** Use the tools listed under *Tools* below, and the per-tag API reference for
+   any other v2 operation, and nothing else for reads or writes about deployments, agents, data
+   stores, credentials, warehouses and connections. Other
    Monte Carlo tools that list warehouses, integrations or platform services, or that test an
    integration, are a different API with different ids and fields. Never mix them into this flow,
    even to "double-check".
@@ -63,9 +64,9 @@ Invoke explicitly with `/monte-carlo-onboarding [what to connect]`.
 | Step | Tools (REST API v2) |
 |---|---|
 | Deployment | `list_deployments`, `get_deployment`, `create_deployment`, `update_deployment`, `delete_deployment` |
-| Agent | `list_collection_agents`, `register_aws_collection_agent`, `register_generic_collection_agent`, `get_aws_collection_agent`, `get_gcp_collection_agent`, `get_azure_collection_agent`, `get_generic_collection_agent` |
-| Data store | `list_collection_data_stores`, `register_aws_collection_data_store`, `get_aws_collection_data_store`, `get_gcp_collection_data_store`, `get_azure_collection_data_store` |
-| Credentials | `list_credentials`, `create_aws_secrets_manager_credentials`, `create_gcp_secret_manager_credentials`, `create_azure_key_vault_credentials`, `create_env_var_credentials`, `create_file_credentials`, `get_snowflake_credentials` |
+| Agent | `list_collection_agents`, `register_aws_collection_agent`, `register_generic_collection_agent`, `get_aws_collection_agent`, `get_gcp_collection_agent`, `get_azure_collection_agent`, `get_generic_collection_agent`, `update_aws_collection_agent`, `update_generic_collection_agent`, `delete_aws_collection_agent`, `delete_gcp_collection_agent`, `delete_azure_collection_agent`, `delete_generic_collection_agent` |
+| Data store | `list_collection_data_stores`, `register_aws_collection_data_store`, `get_aws_collection_data_store`, `get_gcp_collection_data_store`, `get_azure_collection_data_store`, `update_aws_collection_data_store`, `delete_aws_collection_data_store`, `delete_gcp_collection_data_store`, `delete_azure_collection_data_store` |
+| Credentials | `list_credentials`, `create_aws_secrets_manager_credentials`, `create_gcp_secret_manager_credentials`, `create_azure_key_vault_credentials`, `create_env_var_credentials`, `create_file_credentials`, `get_snowflake_credentials`, `update_aws_secrets_manager_credentials`, `update_gcp_secret_manager_credentials`, `update_azure_key_vault_credentials`, `update_env_var_credentials`, `update_file_credentials`, `delete_snowflake_credentials`, `delete_aws_secrets_manager_credentials`, `delete_gcp_secret_manager_credentials`, `delete_azure_key_vault_credentials`, `delete_env_var_credentials`, `delete_file_credentials` |
 | Warehouse | `list_warehouses`, `get_warehouse`, `create_warehouse`, `update_warehouse`, `delete_warehouse` |
 | Connection | `list_connections`, `get_connection`, `create_connection`, `update_connection`, `delete_connection` |
 | Identity | `get_current_user` (which account you are in, and whether it is paused) |
@@ -76,8 +77,8 @@ data-store registrations, `create_generic_collection_agent_token` and
 `create_generic_collection_agent_oauth_client`. The reference files mark them.
 
 A tool that is not available in the session (the server is still rolling them out) is handled the
-same way: emit the equivalent CLI or Terraform step from `reference/output-modes.md` instead of
-guessing another tool.
+same way: emit the equivalent CLI or Terraform step from the output-modes reference (Terraform,
+CLI and SDK snippets per step) instead of guessing another tool.
 
 ## Step 0: Frame the run
 
@@ -124,11 +125,11 @@ Call `list_deployments` first, always. Read the rows:
 
 | Row | Meaning | Reusable? |
 |---|---|---|
-| `runtime_platform: null` (type `CLOUD` or `null`) | The cloud node Monte Carlo hosts for the account | Yes, when Monte Carlo may reach the warehouse over the public internet and may hold temporary query output and sampled rows |
+| `type: CLOUD`, `runtime_platform: null`, `enabled: true` | The cloud deployment Monte Carlo hosts for the account | Yes, when Monte Carlo may reach the warehouse over the public internet and may hold temporary query output and sampled rows |
 | `type: COLLECTION_AGENT`, `enabled: true` | A collection agent already running in the customer's network | Yes, when the agent can reach the new warehouse |
 | `type: COLLECTION_DATA_STORE`, `enabled: true` | Direct connection with temporary query output and sampled rows kept in customer storage | Yes, for a warehouse Monte Carlo can reach directly |
 | `enabled: false` with a type | Provisioned, agent or store not registered yet | Resume its registration instead of creating another |
-| `runtime_platform: null`, `enabled: false` | A cloud node that is not provisioned for this account | No; the agent or data-store path is the only option |
+| `type: null` or `enabled: false` with `runtime_platform: null` | A hosted cloud deployment that is not provisioned or not enabled for this account | No; the agent or data-store path is the only option |
 
 Then ask **two independent questions, only when the request does not already answer them**:
 
@@ -158,7 +159,7 @@ Pick the existing `deployment_id` and move to Step 2. Say which deployment and w
    Note the returned `id`. On AWS, `get_deployment` returns `aws_external_id` (it can be null for
    a moment right after creation; call again).
 3. **Hand over the deploy step.** The customer runs it where their cloud credentials are; this
-   session cannot. Per platform, from `reference/output-modes.md`:
+   session cannot. Per platform, from the output-modes reference:
    - AWS: Terraform module `monte-carlo-data/mcd-agent/aws` with `external_id = <aws_external_id>`
      (or the CloudFormation template from the docs). Outputs: Lambda function ARN, invoker role ARN.
    - GCP: module `monte-carlo-data/mcd-agent/google`. Outputs: Cloud Run URL, invoker key.
@@ -184,8 +185,8 @@ Pick the existing `deployment_id` and move to Step 2. Say which deployment and w
 2. `create_deployment(type="COLLECTION_DATA_STORE", runtime_platform=<platform>)`; on AWS read
    `aws_external_id` with `get_deployment`.
 3. **Hand over the storage step**: bucket or container plus the role or identity Monte Carlo uses,
-   trusting the external id. There is no published module; the Terraform is in
-   `reference/output-modes.md`.
+   trusting the external id. There is no published module; the Terraform is in the output-modes
+   reference.
 4. **Register**: AWS → `register_aws_collection_data_store(deployment_id, bucket_name, role_arn,
    name)`. GCP and Azure carry credentials → emit the CLI or Terraform step, then
    `list_collection_data_stores`.

@@ -60,3 +60,78 @@ jobs:
             echo "OK: every plugin's shared libs match plugins/shared"
           fi
           exit $rc
+
+  skill-symlinks-in-sync:
+    name: Every editor plugin symlinks every skill
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check every editor plugin symlinks every skill
+        run: |
+          set -euo pipefail
+          rc=0
+          skills=$(find skills -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort)
+          for editor in claude-code cursor codex opencode cortex-code; do
+            for skill in $skills; do
+              link="plugins/$editor/skills/$skill"
+              if [[ ! -L "$link" ]]; then
+                if [[ -e "$link" ]]; then
+                  echo "::error::$link exists but is not a symlink."
+                else
+                  echo "::error::$link is missing for editor '$editor', skill '$skill'."
+                fi
+                echo "::error::Per .claude/rules/skills.md: create symlinks in all editor"
+                echo "::error::plugins when adding a skill."
+                rc=1
+                continue
+              fi
+              resolved=$(readlink -f "$link")
+              if [[ "$resolved" != "$(pwd)/skills/$skill" ]]; then
+                echo "::error::$link resolves to '$resolved', expected 'skills/$skill'."
+                echo "::error::Per .claude/rules/skills.md: create symlinks in all editor"
+                echo "::error::plugins when adding a skill."
+                rc=1
+              fi
+            done
+          done
+          if [[ "$rc" -eq 0 ]]; then
+            echo "OK: every editor plugin symlinks every skill"
+          fi
+          exit $rc
+
+  plugin-json-valid:
+    name: Plugin manifests and eval files are valid JSON
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate plugin JSON files
+        run: |
+          set -euo pipefail
+          python3 - <<'EOF'
+          import glob
+          import json
+          import sys
+
+          patterns = [
+              "plugins/*/.claude-plugin/plugin.json",
+              "plugins/*/.cursor-plugin/plugin.json",
+              "plugins/*/.codex-plugin/plugin.json",
+              "plugins/*/.cortex-plugin/plugin.json",
+              "plugins/*/plugin.json",
+              "plugins/*/package.json",
+              "plugins/*/.mcp.json",
+              "plugins/*/mcp.json",
+              "plugins/*/hooks/*/hooks.json",
+              "plugins/claude-code/evals/*/trigger-evals.json",
+              "plugins/claude-code/evals/*/*.json",
+          ]
+          files = sorted({f for pattern in patterns for f in glob.glob(pattern)})
+          for path in files:
+              try:
+                  with open(path) as fh:
+                      json.load(fh)
+              except json.JSONDecodeError as e:
+                  print(f"::error::{path}: invalid JSON: {e}")
+                  sys.exit(1)
+          print(f"OK: {len(files)} JSON files are valid")
+          EOF

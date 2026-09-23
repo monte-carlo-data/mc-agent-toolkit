@@ -288,7 +288,7 @@ List the credentials your generic collection agents present, of both kinds.
 
 | Argument | Type | Required | Description |
 |---|---|---|---|
-| `deployment_id` | `str` | no | Only the credentials of this deployment's agent.. |
+| `deployment_id` | `str` | no | Only the credentials of this deployment's agent. |
 
 ### Response
 

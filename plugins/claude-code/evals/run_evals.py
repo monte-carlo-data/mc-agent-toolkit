@@ -65,12 +65,14 @@ def load_skill_metadata(skill_dir: Path) -> tuple[str, str, str]:
 
     fm = frontmatter.group(1)
     name_match = re.search(r"^name:\s*(.+)$", fm, re.MULTILINE)
-    # description may be multi-line (YAML block scalar with > or |)
-    desc_match = re.search(r"^description:\s*[>|]\n((?:  .+\n?)+)", fm, re.MULTILINE)
+    # description may be multi-line (YAML block scalar with > or |);
+    # block scalars may contain blank lines between paragraphs, so accept
+    # indented lines or empty lines and stop at the next top-level key.
+    desc_match = re.search(r"^description:\s*[>|]\n((?:(?:  .*\n)|\n)+)", fm, re.MULTILINE)
     if not desc_match:
         desc_match = re.search(r"^description:\s*(.+)$", fm, re.MULTILINE)
     # when_to_use is typically a |-block; also accept inline single-line form.
-    wtu_match = re.search(r"^when_to_use:\s*[>|]\n((?:  .+\n?)+)", fm, re.MULTILINE)
+    wtu_match = re.search(r"^when_to_use:\s*[>|]\n((?:(?:  .*\n)|\n)+)", fm, re.MULTILINE)
     if not wtu_match:
         wtu_match = re.search(r"^when_to_use:\s*(.+)$", fm, re.MULTILINE)
 

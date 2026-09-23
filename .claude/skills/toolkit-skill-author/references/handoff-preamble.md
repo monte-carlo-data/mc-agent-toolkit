@@ -40,7 +40,7 @@ You are being invoked by mc-agent-toolkit's `/toolkit-skill-author` with pre-col
 
 **Eval artifacts are scratch, not shipped:**
 - Your `skills/{{NAME}}/evals/evals.json` and sibling `skills/{{NAME}}-workspace/` drive the iteration loop but are not the repo's eval format. `toolkit-skill-author` will delete them after you return.
-- mc-agent-toolkit's real evals live at `plugins/claude-code/evals/{{NAME}}/live-evals-dev.yaml` — a YAML schema with `cases: [{ id, turns: [{ prompt, criteria: { must_call, must_not_call } }], criteria: { judge_rubric } }]`. Authoring that file is handled by `toolkit-skill-author` in the registration checklist — don't attempt to write it yourself, and don't produce a `trigger-evals.json` or any JSON variant.
+- mc-agent-toolkit's real evals live at `plugins/claude-code/evals/{{NAME}}/trigger-evals.json` (trigger accuracy) and `plugins/claude-code/evals/{{NAME}}/live-evals-dev.yaml` (flow evals). Authoring both files is handled by `toolkit-skill-author` in the registration checklist — don't attempt to write either yourself.
 
 **When done:** return control to `toolkit-skill-author`. It will lint the generated SKILL.md, clean up scratch artifacts, and walk the registration checklist.
 
