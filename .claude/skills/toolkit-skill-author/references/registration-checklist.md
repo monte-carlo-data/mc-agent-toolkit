@@ -30,7 +30,8 @@ Use when Phase 2b concludes with a scaffolded `skills/<name>/SKILL.md`.
    ```
    plugins/<editor>/skills/<name> -> ../../../skills/<name>
    ```
-5. **Claude Code commands entry.** Create `plugins/claude-code/commands/<name>/` with at least one `.md` command file. Add the directory name to the `commands` array in `plugins/claude-code/.claude-plugin/plugin.json`.
+5. **Portability markers.** Confirm every plugin-only passage in the new `SKILL.md` (slash commands, hooks, `Read` instructions) sits inside `<!-- plugin-only:start -->` / `<!-- plugin-only:end -->` per `CONTRIBUTING.md § Portability markers for plugin-only sections`.
+6. **Claude Code commands entry.** Create `plugins/claude-code/commands/<name>/` with at least one `.md` command file. Add the directory name to the `commands` array in `plugins/claude-code/.claude-plugin/plugin.json`.
 
 ## Partial checklist (extend)
 

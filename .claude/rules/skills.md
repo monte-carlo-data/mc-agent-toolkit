@@ -71,6 +71,18 @@ This cannot be hard-blocked per skill: `allowed-tools` frontmatter only *pre-app
 
 When the plugin name or server name changes, update the prefix **here and in every skill carrying the block in the same change**. To find them: `grep -rl 'Monte Carlo tool routing (required)' skills/*/SKILL.md`.
 
+## Mark plugin-only sections with portability markers
+
+Slash commands, hook behaviour and "use the Read tool on `references/…`" instructions only work inside an editor plugin. The MCP server renders prompts from the same `SKILL.md` for clients without the plugin, so wrap those passages in a line-anchored, non-nesting HTML comment pair:
+
+```markdown
+<!-- plugin-only:start -->
+…plugin-only text…
+<!-- plugin-only:end -->
+```
+
+Text outside the markers must stand alone: bare MCP tool names, no slash commands, reference files named by content. Full contract: `CONTRIBUTING.md § Portability markers for plugin-only sections`.
+
 ## Create symlinks in all editor plugins when adding a skill
 
 Every skill in `skills/` must have a corresponding symlink in **every** editor plugin's `skills/` directory:

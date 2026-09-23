@@ -35,6 +35,9 @@ You are being invoked by mc-agent-toolkit's `/toolkit-skill-author` with pre-col
 - `bucket`: `{{BUCKET}}` — one of Trust / Incident Response / Monitoring / Prevent / Optimize / Setup. Tracks which capability bucket the skill belongs to in the public docs.
 - Do **not** emit a `version` field. Versions live in the plugin manifests (`plugins/*/.*-plugin/plugin.json`), not in SKILL.md. `toolkit-skill-author` will bump them separately via `scripts/bump-version.sh` after you return.
 
+**Portability markers (required when applicable):**
+- Wrap every plugin-only passage — slash-command mentions, hook behaviour, "use the Read tool on `references/…`" instructions — in `<!-- plugin-only:start -->` / `<!-- plugin-only:end -->` on their own lines, so the MCP prompt renderer can drop it. Everything else must read correctly without the plugin. See `CONTRIBUTING.md § Portability markers for plugin-only sections`.
+
 **Eval artifacts are scratch, not shipped:**
 - Your `skills/{{NAME}}/evals/evals.json` and sibling `skills/{{NAME}}-workspace/` drive the iteration loop but are not the repo's eval format. `toolkit-skill-author` will delete them after you return.
 - mc-agent-toolkit's real evals live at `plugins/claude-code/evals/{{NAME}}/live-evals-dev.yaml` — a YAML schema with `cases: [{ id, turns: [{ prompt, criteria: { must_call, must_not_call } }], criteria: { judge_rubric } }]`. Authoring that file is handled by `toolkit-skill-author` in the registration checklist — don't attempt to write it yourself, and don't produce a `trigger-evals.json` or any JSON variant.
