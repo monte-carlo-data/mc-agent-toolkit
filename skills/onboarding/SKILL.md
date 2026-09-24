@@ -68,6 +68,7 @@ instrument-agent; for an already-connected warehouse's monitoring use monitoring
 | Warehouse | `list_warehouses`, `get_warehouse`, `create_warehouse`, `update_warehouse`, `delete_warehouse` |
 | Connection | `list_connections`, `get_connection`, `create_connection`, `update_connection`, `delete_connection` |
 | Identity | `get_current_user` (which account you are in, and whether it is paused) |
+| Validation | `validate_connection`, `get_validation_run` (Step 5; when the session serves them) |
 
 Operations whose request or response carries a secret are **not MCP tools** and are handed to the
 customer as a CLI or Terraform step: `create_snowflake_credentials`, the Azure and GCP agent and
@@ -274,8 +275,12 @@ warehouse/deployment association and record `id`, `connection_type`, `deployment
 
 ## Step 5: Validate
 
-There is no v2 validation tool yet (it arrives with the validations API and a
-`wait_for_validation_run` tool). Do **not** substitute any other tool for it. End with:
+The validations API is live: `validate_connection` starts a run for a connection (202, with the
+run id) and `get_validation_run` reads it — poll until `status` is `completed`, honoring the
+`Retry-After` the response carries, then read each validation's own `passed` verdict. Use those
+tools when the session serves them (they reach the MCP server as the generator ships). A dedicated
+waiter tool that polls for you is planned; until one of these is available, end with UI validation.
+Do **not** substitute any other tool for validation. End with:
 
 > Validate the connection in the Monte Carlo UI: Settings → Integrations → the integration → the
 > new connection → **Test**. Collection starts on its own once the connection exists; the first metadata

@@ -78,7 +78,7 @@ mc-agent-toolkit/
 │   ├── incident-response/
 │   ├── instrument-agent/                # Walk through instrumenting a new AI agent in a Python codebase
 │   ├── monitoring-advisor/              # Unified: coverage + data monitors + agent monitors
-│   ├── onboarding/                      # Connect a warehouse over the REST API v2 tools (reference/api/ is stubbed until api-codegen generates it, YET-2891)
+│   ├── onboarding/                      # Connect a warehouse over the REST API v2 tools (reference/api/ is stubbed until api-codegen generates it)
 │   ├── performance-diagnosis/
 │   ├── prevent/
 │   ├── proactive-monitoring/

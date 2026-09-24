@@ -42,7 +42,7 @@ Use when Phase 2b concludes with a scaffolded `skills/<name>/SKILL.md`.
            <free-form description of desired behavior>
    ```
 
-   Seed with the Q4 phrasings plus 2–3 should-not-trigger near-misses. The `live-evals-dev.yaml` may be deferred to a follow-up ticket when the flow needs credentials or tools not yet available — in that case, name the deferral in the PR.
+   Seed with the Q4 phrasings plus 2–3 should-not-trigger near-misses. The `live-evals-dev.yaml` may be deferred when the flow needs credentials or tools not yet available, but only with a ticket that exists first: create the follow-up ticket, name it in the PR, and land the evals there. Never leave text in the repo saying something "needs a ticket".
 4. **Editor plugin symlinks.** For each editor in `plugins/` (claude-code, cursor, opencode, codex), add a relative symlink:
    ```
    plugins/<editor>/skills/<name> -> ../../../skills/<name>

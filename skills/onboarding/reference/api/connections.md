@@ -1,6 +1,6 @@
 # `connections` tools
 
-<!-- GENERATED STUB (YET-2891): api-codegen's `-mcp-reference` mode will replace this file whole from the
+<!-- GENERATED STUB: api-codegen's `-mcp-reference` mode will replace this file whole from the
      REST API v2 OpenAPI document; do not hand-edit once that lands. Until then this stub lists the operations
      of the tag by `operationId`, which is the MCP tool name, with the arguments the spec declares. -->
 
@@ -84,3 +84,23 @@ Delete a connection. Its warehouse and its credentials are left in place, but it
 ### Response
 
 Returns the path id and `deleted: true`.
+
+## `validate_connection`: Validate a connection
+
+Check whether an existing connection can still reach the system it reads from, using the credentials it already has. Changes nothing. Returns a run that is still going: poll `get_validation_run` with its id until the status is `completed`, then read each validation's own verdict.
+
+### Arguments
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `connection_id` | `str` | yes | Id of the connection, as returned by list_connections. |
+
+### Response
+
+202 with a validation run. Response fields: id, status, target_type, target_id, validations_passed, validations_total, started_at, finished_at, expires_at, validations.
+
+### What can fail
+
+- The connection does not exist, or is not visible to the caller (404).
+- The change conflicts with the current state of the connection (409).
+- Too many validation runs are in flight for the account; the `Retry-After` header says when to retry (429).

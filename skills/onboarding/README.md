@@ -55,14 +55,15 @@ connection for the intended account. The workflow requires no particular assista
 | Path | Role |
 |---|---|
 | `SKILL.md` | The workflow (hand-written) |
-| `reference/api/<tag>.md` | One file per API tag with every tool's arguments, responses and failure modes. **Generated** by [api-codegen](https://github.com/monte-carlo-data/api-codegen) from the API spec; edit the spec, not these files. Until that generator mode ships (YET-2891) they are stubs, with `deployments` and `warehouses` hand-filled from the live tools. |
+| `reference/api/<tag>.md` | One file per API tag with every tool's arguments, responses and failure modes. **Generated** by [api-codegen](https://github.com/monte-carlo-data/api-codegen) from the API spec; edit the spec, not these files. Until that generator mode ships they are stubs, with `deployments` and `warehouses` hand-filled from the live tools. |
 | `reference/deployment-guide.md` | Cloud-specific prerequisites, network paths and official setup guides |
 | `reference/output-modes.md` | Terraform, CLI and SDK snippets for each step |
 
 ## Not yet
 
-- **Validation.** There is no v2 validation tool yet; the skill ends with "validate in the UI" until
-  the validations API and its `wait_for_validation_run` tool ship.
+- **Validation.** The validations API is live (`validate_connection` + `get_validation_run`, 202 +
+  polling) and the skill uses it when the tools are served; a waiter tool that polls for you is
+  planned, and until then the skill ends with "validate in the UI".
 - **Azure and GCP agent/data-store registration, generic agent credentials, Snowflake key pair.**
   Their requests carry a secret, so they are CLI/Terraform steps rather than MCP tools.
 

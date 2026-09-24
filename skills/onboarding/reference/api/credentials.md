@@ -1,6 +1,6 @@
 # `credentials` tools
 
-<!-- GENERATED STUB (YET-2891): api-codegen's `-mcp-reference` mode will replace this file whole from the
+<!-- GENERATED STUB: api-codegen's `-mcp-reference` mode will replace this file whole from the
      REST API v2 OpenAPI document; do not hand-edit once that lands. Until then this stub lists the operations
      of the tag by `operationId`, which is the MCP tool name, with the arguments the spec declares. -->
 
