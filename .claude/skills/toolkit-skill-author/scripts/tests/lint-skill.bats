@@ -220,3 +220,98 @@ EOF
   [ "$status" -eq 0 ]
   [[ "$output" == *"defroot"* ]]
 }
+
+@test "errors on unclosed plugin-only start marker" {
+  mkdir -p "$TMP/unclosed"
+  cat > "$TMP/unclosed/SKILL.md" <<'EOF'
+---
+name: monte-carlo-unclosed
+description: Does a thing.
+bucket: Monitoring
+---
+
+Body content.
+
+<!-- plugin-only:start -->
+Plugin-only content that is never closed.
+EOF
+  run python3 "$SCRIPT" unclosed "$TMP"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"plugin-only:start never closed"* ]]
+}
+
+@test "errors on orphan plugin-only end marker" {
+  mkdir -p "$TMP/orphan-end"
+  cat > "$TMP/orphan-end/SKILL.md" <<'EOF'
+---
+name: monte-carlo-orphan-end
+description: Does a thing.
+bucket: Monitoring
+---
+
+Body content.
+
+<!-- plugin-only:end -->
+EOF
+  run python3 "$SCRIPT" orphan-end "$TMP"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"plugin-only:end without an open"* ]]
+}
+
+@test "errors on nested plugin-only start marker" {
+  mkdir -p "$TMP/nested"
+  cat > "$TMP/nested/SKILL.md" <<'EOF'
+---
+name: monte-carlo-nested
+description: Does a thing.
+bucket: Monitoring
+---
+
+<!-- plugin-only:start -->
+Outer block.
+<!-- plugin-only:start -->
+Inner block.
+<!-- plugin-only:end -->
+EOF
+  run python3 "$SCRIPT" nested "$TMP"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"nested plugin-only:start"* ]]
+}
+
+@test "errors when a plugin-only marker shares a line with other text" {
+  mkdir -p "$TMP/shared"
+  cat > "$TMP/shared/SKILL.md" <<'EOF'
+---
+name: monte-carlo-shared
+description: Does a thing.
+bucket: Monitoring
+---
+
+Body content. <!-- plugin-only:start --> trailing text.
+EOF
+  run python3 "$SCRIPT" shared "$TMP"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"not line-anchored"* ]]
+}
+
+@test "passes with a correctly paired plugin-only block" {
+  mkdir -p "$TMP/paired"
+  cat > "$TMP/paired/SKILL.md" <<'EOF'
+---
+name: monte-carlo-paired
+description: Does a thing.
+bucket: Monitoring
+---
+
+Body content.
+
+<!-- plugin-only:start -->
+/run-a-command and read references/foo.md
+<!-- plugin-only:end -->
+
+Portable content again.
+EOF
+  run python3 "$SCRIPT" paired "$TMP"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"ERROR"* ]]
+}

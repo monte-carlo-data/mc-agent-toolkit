@@ -5,6 +5,13 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Claude Code will
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.25.0] - 2026-09-22
+
+### Added
+
+- onboarding: new Setup skill that connects a warehouse to Monte Carlo over the REST API v2 MCP tools — discover existing resources and resolve connection origin, credential custody and sample storage, then reuse a suitable deployment or provision one for a collection agent or a customer-owned data store (never one with nothing behind it), credentials by reference (no secret through the chat; Snowflake key pairs and generic-agent tokens become a CLI/Terraform step), warehouse, connection, "validate in the UI", and a summary of created ids on every run. Guided tool/local-handoff execution by default, or requested Terraform (`terraform-provider-montecarlo` + `mcd-agent` modules), or an SDK/CLI script. Registered as `/monte-carlo-onboarding` with trigger evals
+- skills: `<!-- plugin-only:start -->` / `<!-- plugin-only:end -->` portability markers for plugin-only sections, so the MCP server can render prompts from the same SKILL.md (documented in CONTRIBUTING and the skill-author guidance)
+
 ## [1.24.2] - 2026-09-08
 
 ### Fixed

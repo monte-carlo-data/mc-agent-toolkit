@@ -57,7 +57,9 @@ The toolkit bundles an MCP server named `monte-carlo-mcp`. When loaded through t
 
 This cannot be hard-blocked per skill: `allowed-tools` frontmatter only *pre-approves* tools (suppresses prompts) — it does **not** restrict which tools are callable, so listing only the plugin tool does not block a same-named server. Soft enforcement via skill prose is the realistic ceiling.
 
-**Rule:** Every `SKILL.md` that calls Monte Carlo MCP tools must include the routing block below **verbatim**, placed near the top of the router (right after the intro paragraph, or as a note under the "MCP Tools Used" heading). This file is the single source of truth for both the block text and the namespace string.
+**Portable skills:** Keep host-specific routing in the plugin command adapter, outside the shared skill and references. The onboarding skill uses this arrangement; its shared content verifies the intended account and uses operation names without host prefixes.
+
+**Rule for legacy plugin-specific skills:** Every `SKILL.md` that calls Monte Carlo MCP tools must include the routing block below **verbatim**, placed near the top of the router (right after the intro paragraph, or as a note under the "MCP Tools Used" heading). This file is the single source of truth for both the block text and the namespace string.
 
 ```markdown
 > **Monte Carlo tool routing (required):** Always call Monte Carlo MCP tools through this plugin's
@@ -69,7 +71,23 @@ This cannot be hard-blocked per skill: `allowed-tools` frontmatter only *pre-app
 > different endpoint or credentials.
 ```
 
+The two example tool names inside the block (`get_alerts` in the fully-qualified example and the
+`(get_alerts, search, get_table, …)` list) may be replaced with tools the skill calls, so a skill
+never names a tool it must not use; everything else stays verbatim.
+
 When the plugin name or server name changes, update the prefix **here and in every skill carrying the block in the same change**. To find them: `grep -rl 'Monte Carlo tool routing (required)' skills/*/SKILL.md`.
+
+## Mark plugin-only sections with portability markers
+
+Slash commands, hook behaviour and "use the Read tool on `references/…`" instructions only work inside an editor plugin. The MCP server renders prompts from the same `SKILL.md` for clients without the plugin, so wrap those passages in a line-anchored, non-nesting HTML comment pair:
+
+```markdown
+<!-- plugin-only:start -->
+…plugin-only text…
+<!-- plugin-only:end -->
+```
+
+Text outside the markers must stand alone: bare MCP tool names, no slash commands, reference files named by content. Full contract: `CONTRIBUTING.md § Portability markers for plugin-only sections`.
 
 ## Create symlinks in all editor plugins when adding a skill
 

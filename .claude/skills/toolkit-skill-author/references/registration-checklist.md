@@ -10,7 +10,24 @@ Use when Phase 2b concludes with a scaffolded `skills/<name>/SKILL.md`.
    *Skipped if bucket = Setup (after user confirmation).*
 2. **`/mc` catalog entry.** Append a row to `plugins/claude-code/commands/catalog/mc.md`.
    *Skipped if bucket = Setup (after user confirmation).*
-3. **Eval scaffold.** Create `plugins/claude-code/evals/<name>/live-evals-dev.yaml` using the YAML schema the repo already ships for every other skill. Read `plugins/claude-code/evals/monitoring-advisor/live-evals-dev.yaml` or `plugins/claude-code/evals/context-detection/live-evals-dev.yaml` as templates before writing. Schema:
+3. **Eval scaffold.** Create both eval artifacts under `plugins/claude-code/evals/<name>/`:
+
+   **(a) `plugins/claude-code/evals/<name>/trigger-evals.json`** — trigger accuracy. Read `plugins/claude-code/evals/onboarding/trigger-evals.json` as a template. Schema:
+
+   ```json
+   {
+     "skill": "monte-carlo-<name>",
+     "description": "<one-line description of the trigger eval suite>",
+     "cases": [
+       {"id": "should-01", "prompt": "<realistic user prompt>", "expected": "trigger", "rationale": "<why it should trigger>"},
+       {"id": "should-not-01", "prompt": "<near-miss prompt>", "expected": "no-trigger", "rationale": "<why it should not>"}
+     ]
+   }
+   ```
+
+   Seed with the Q4 phrasings plus 2–3 should-not-trigger near-misses. Run with `make trigger-evals SKILL=<name>`; validate cheaply with `make dry-run SKILL=<name>`, which needs no API key.
+
+   **(b) `plugins/claude-code/evals/<name>/live-evals-dev.yaml`** — flow evals. Use the YAML schema the repo already ships for every other skill. Read `plugins/claude-code/evals/monitoring-advisor/live-evals-dev.yaml` or `plugins/claude-code/evals/context-detection/live-evals-dev.yaml` as templates before writing. Schema:
 
    ```yaml
    cases:
@@ -25,12 +42,13 @@ Use when Phase 2b concludes with a scaffolded `skills/<name>/SKILL.md`.
            <free-form description of desired behavior>
    ```
 
-   Seed with the Q4 phrasings plus 2–3 should-not-trigger near-misses. Do **not** create `trigger-evals.json` or any other JSON variant — YAML is the canonical format.
+   Seed with the Q4 phrasings plus 2–3 should-not-trigger near-misses. The `live-evals-dev.yaml` may be deferred when the flow needs credentials or tools not yet available, but only with a ticket that exists first: create the follow-up ticket, name it in the PR, and land the evals there. Never leave text in the repo saying something "needs a ticket".
 4. **Editor plugin symlinks.** For each editor in `plugins/` (claude-code, cursor, opencode, codex), add a relative symlink:
    ```
    plugins/<editor>/skills/<name> -> ../../../skills/<name>
    ```
-5. **Claude Code commands entry.** Create `plugins/claude-code/commands/<name>/` with at least one `.md` command file. Add the directory name to the `commands` array in `plugins/claude-code/.claude-plugin/plugin.json`.
+5. **Portability markers.** Confirm every plugin-only passage in the new `SKILL.md` (slash commands, hooks, `Read` instructions) sits inside `<!-- plugin-only:start -->` / `<!-- plugin-only:end -->` per `CONTRIBUTING.md § Portability markers for plugin-only sections`.
+6. **Claude Code commands entry.** Create `plugins/claude-code/commands/<name>/` with at least one `.md` command file. Add the directory name to the `commands` array in `plugins/claude-code/.claude-plugin/plugin.json`.
 
 ## Partial checklist (extend)
 

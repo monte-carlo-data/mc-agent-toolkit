@@ -54,6 +54,7 @@ The data is stored in Mixpanel and Datadog and is used only for product-developm
 | **Generate Validation Notebook** | Generates SQL validation notebooks for dbt model changes from a PR or local repo. | [Skill README](../../skills/generate-validation-notebook/README.md) |
 | **Push Ingestion** | Generates warehouse-specific collection scripts for pushing metadata, lineage, and query logs to Monte Carlo. Includes 10 `/mc-*` slash commands. | [Skill README](../../skills/push-ingestion/README.md) |
 | **Automated Triage** | Guides you through automated alert triage — scoring, deep troubleshooting, classification, and actions. Requires extended MCP toolset. | [SKILL](../../skills/automated-triage/SKILL.md) |
+| **Onboarding** | Connects a warehouse to Monte Carlo through the REST API v2 tools: deployment choice, credential references, warehouse and connection; Terraform or SDK/CLI script output on request. `/monte-carlo-onboarding`. | [Skill README](../../skills/onboarding/README.md) |
 
 The Prevent feature includes **PreToolUse hooks that can block edits to dbt SQL files** until an impact assessment runs. The hooks only fire on `.sql` files inside dbt model, macro, or snapshot directories — they do not affect non-dbt files.
 

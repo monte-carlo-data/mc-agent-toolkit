@@ -152,6 +152,27 @@ If a new skill's scope overlaps a peer skill, the `description` or `when_to_use`
 
 Example: if adding a skill that acts on alerts, explicitly call out how it differs from `analyze-root-cause` and `remediation` — investigation vs. action.
 
+### Portability markers for plugin-only sections
+
+A `SKILL.md` is the single source for every surface that renders the skill: the editor plugins read the file as-is, and the Monte Carlo MCP server renders its prompts from the same file for clients that have no plugin (the claude.ai connector, Cursor without the toolkit). Anything that only makes sense inside a plugin — slash commands, hook behaviour, instructions to `Read` a sibling file — has to be droppable by that renderer.
+
+Wrap such sections in an HTML comment pair, on their own lines:
+
+```markdown
+<!-- plugin-only:start -->
+Reference files live next to this file. **Use the Read tool** to open them.
+Invoke explicitly with `/monte-carlo-example`.
+<!-- plugin-only:end -->
+```
+
+Rules:
+
+- Markers are line-anchored and never nest. A renderer drops everything between a `start` and the next `end`, inclusive.
+- Everything outside the markers must stand alone without the plugin: name MCP tools by their bare names, not slash commands; refer to reference files by what they contain ("the per-tag API reference") so a renderer can inline them.
+- Keep the marked block short. If most of a skill is plugin-only, the skill is a plugin feature, not a portable skill.
+
+New fully portable skills should keep host conventions in adapters outside the skill directory and use standard `name`, `description` and optional `metadata` frontmatter. Put catalog hints under `metadata` (for example, `metadata.bucket`), and activation guidance in `description` and the body. `skills/onboarding/SKILL.md` is the fully portable example; it does not require stripping marked sections. The renderer lives in the MCP server (ai-agent); this repo only defines the contract.
+
 ### Naming
 
 Applies to customer-facing skills under `skills/`. Dev-only skills under `.claude/skills/` (e.g., `toolkit-skill-author`) are out of scope — they aren't shipped to customers and don't need the prefix.

@@ -11,6 +11,7 @@ Parses YAML frontmatter (handles scalar, block, and folded forms), then checks:
 - when_to_use present (strongly recommended per CONTRIBUTING)
 - combined description + when_to_use <= 1400 chars (headroom under 1536 truncation)
 - bucket present and is one of the canonical capability buckets
+- plugin-only portability markers: line-anchored, never nested, balanced start/end pairs
 - `version` field WARN (ignored by Claude — plugin versions live in manifests —
   but many legacy skills carry it; don't fail lint on that).
 
@@ -55,7 +56,14 @@ def parse_frontmatter(text: str) -> dict[str, str]:
             i += 1
             continue
         key, rest = km.group(1), km.group(2).rstrip()
-        if rest in ("|", ">", "|-", "|+", ">-", ">+"):
+        if key == "metadata" and not rest:
+            i += 1
+            while i < len(lines) and (lines[i].startswith("  ") or not lines[i].strip()):
+                nested = re.match(r"^  bucket:\s*(.*?)\s*$", lines[i])
+                if nested:
+                    result["metadata.bucket"] = nested.group(1).strip("\"'")
+                i += 1
+        elif rest in ("|", ">", "|-", "|+", ">-", ">+"):
             i += 1
             block: list[str] = []
             while i < len(lines):
@@ -81,6 +89,51 @@ def parse_frontmatter(text: str) -> dict[str, str]:
     return result
 
 
+def check_plugin_only_markers(text: str) -> list[str]:
+    """Check `plugin-only` portability markers for balance and line anchoring.
+
+    Contract (`.claude/rules/skills.md` § "Mark plugin-only sections with
+    portability markers"): markers sit alone on their own line, never nest,
+    and every start pairs with the next end — an unbalanced marker makes the
+    MCP prompt renderer silently drop the rest of the file.
+    """
+    errors: list[str] = []
+    open_line: int | None = None
+    for lineno, line in enumerate(text.splitlines(), start=1):
+        stripped = line.strip()
+        if "plugin-only:start" in line:
+            if stripped != "<!-- plugin-only:start -->":
+                errors.append(
+                    f"line {lineno}: plugin-only:start marker is not line-anchored "
+                    "(must be alone on its own line)"
+                )
+            elif open_line is not None:
+                errors.append(
+                    f"line {lineno}: nested plugin-only:start "
+                    f"(a block opened on line {open_line} is still open)"
+                )
+            else:
+                open_line = lineno
+        if "plugin-only:end" in line:
+            if stripped != "<!-- plugin-only:end -->":
+                errors.append(
+                    f"line {lineno}: plugin-only:end marker is not line-anchored "
+                    "(must be alone on its own line)"
+                )
+            elif open_line is None:
+                errors.append(
+                    f"line {lineno}: plugin-only:end without an open plugin-only:start"
+                )
+            else:
+                open_line = None
+    if open_line is not None:
+        errors.append(
+            f"line {open_line}: plugin-only:start never closed "
+            "(plugin-only:end missing before end of file)"
+        )
+    return errors
+
+
 def lint(name: str, skills_root: Path) -> tuple[list[str], list[str]]:
     path = skills_root / name / "SKILL.md"
     if not path.is_file():
@@ -91,6 +144,7 @@ def lint(name: str, skills_root: Path) -> tuple[list[str], list[str]]:
 
     errors: list[str] = []
     warnings: list[str] = []
+    errors.extend(check_plugin_only_markers(text))
 
     actual_name = fm.get("name", "")
     expected = f"monte-carlo-{name}"
@@ -112,7 +166,7 @@ def lint(name: str, skills_root: Path) -> tuple[list[str], list[str]]:
             errors.append(f"description opens with first-person phrasing (\"{desc[:40]}...\")")
 
     wtu = fm.get("when_to_use", "")
-    if not wtu:
+    if not wtu and "metadata.bucket" not in fm:
         warnings.append("when_to_use is missing (strongly recommended per CONTRIBUTING)")
 
     combined = len(desc) + len(wtu)
@@ -122,7 +176,7 @@ def lint(name: str, skills_root: Path) -> tuple[list[str], list[str]]:
             f"(max {MAX_COMBINED} for headroom under 1536 truncation)"
         )
 
-    bucket = fm.get("bucket", "").strip()
+    bucket = fm.get("metadata.bucket", fm.get("bucket", "")).strip()
     if not bucket:
         errors.append(
             f"bucket is missing (required; one of: {', '.join(sorted(VALID_BUCKETS))})"

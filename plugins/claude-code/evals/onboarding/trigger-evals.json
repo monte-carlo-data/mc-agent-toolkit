@@ -1,0 +1,23 @@
+{
+  "skill": "monte-carlo-onboarding",
+  "description": "Trigger accuracy evals for the monte-carlo-onboarding skill. Each case tests whether a single prompt should activate the skill.",
+  "cases": [
+    {"id": "should-01", "prompt": "Connect our Snowflake account to Monte Carlo.", "expected": "trigger", "rationale": "Core intent: connect a warehouse"},
+    {"id": "should-02", "prompt": "Add a BigQuery connection to Monte Carlo for the analytics project.", "expected": "trigger", "rationale": "Add connection = onboarding"},
+    {"id": "should-03", "prompt": "Our Redshift cluster is only reachable inside the VPC. How do we get Monte Carlo monitoring it?", "expected": "trigger", "rationale": "Private connectivity needs discovery; it does not by itself require an agent"},
+    {"id": "should-04", "prompt": "We need a Monte Carlo collection agent in our AWS account.", "expected": "trigger", "rationale": "Agent deployment is step 1 of onboarding"},
+    {"id": "should-05", "prompt": "Set up a data store so Monte Carlo never keeps sampled rows on its side, then connect Databricks.", "expected": "trigger", "rationale": "Data store deployment plus connection"},
+    {"id": "should-06", "prompt": "Generate the Terraform to onboard our Snowflake warehouse to Monte Carlo through an agent.", "expected": "trigger", "rationale": "Terraform output mode of the onboarding flow"},
+    {"id": "should-07", "prompt": "Write a Python script that creates the Monte Carlo warehouse and connection for our Oracle database.", "expected": "trigger", "rationale": "SDK script output mode"},
+    {"id": "should-08", "prompt": "Which Monte Carlo deployment should the new Starburst connection run through?", "expected": "trigger", "rationale": "Deployment choice question the skill answers"},
+    {"id": "should-09", "prompt": "How should we give Monte Carlo the credentials for Snowflake? We keep secrets in AWS Secrets Manager.", "expected": "trigger", "rationale": "Credential strategy for a connection"},
+    {"id": "should-10", "prompt": "Onboard our warehouse to Monte Carlo.", "expected": "trigger", "rationale": "Literal onboarding phrasing"},
+    {"id": "should-not-01", "prompt": "Push metadata and lineage from our homegrown catalog into Monte Carlo.", "expected": "no-trigger", "rationale": "Push ingestion, no connector: push-ingestion skill"},
+    {"id": "should-not-02", "prompt": "Build the Connection Auth Rules JSON for our Postgres connector.", "expected": "no-trigger", "rationale": "connection-auth-rules skill"},
+    {"id": "should-not-03", "prompt": "Instrument our LangChain agent for Monte Carlo Agent Observability.", "expected": "no-trigger", "rationale": "instrument-agent skill"},
+    {"id": "should-not-04", "prompt": "What should I monitor in our Snowflake warehouse? Where are the coverage gaps?", "expected": "no-trigger", "rationale": "Warehouse already connected; monitoring-advisor / proactive-monitoring"},
+    {"id": "should-not-05", "prompt": "Why is orders_daily stale since this morning?", "expected": "no-trigger", "rationale": "Incident investigation"},
+    {"id": "should-not-06", "prompt": "Connect to the Snowflake database with SQLAlchemy in this Python service.", "expected": "no-trigger", "rationale": "Application database connection, nothing to do with Monte Carlo"},
+    {"id": "should-not-07", "prompt": "Create a freshness monitor on analytics.orders in Monte Carlo.", "expected": "no-trigger", "rationale": "Monitor creation on a connected table"}
+  ]
+}
