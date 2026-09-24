@@ -62,16 +62,16 @@ instrument-agent; for an already-connected warehouse's monitoring use monitoring
 | Step | Tools (REST API v2) |
 |---|---|
 | Deployment | `list_deployments`, `get_deployment`, `create_deployment`, `update_deployment`, `delete_deployment` |
-| Agent | `list_collection_agents`, `register_aws_collection_agent`, `register_generic_collection_agent`, `get_aws_collection_agent`, `get_gcp_collection_agent`, `get_azure_collection_agent`, `get_generic_collection_agent`, `update_aws_collection_agent`, `update_generic_collection_agent`, `delete_aws_collection_agent`, `delete_gcp_collection_agent`, `delete_azure_collection_agent`, `delete_generic_collection_agent` |
+| Agent | `list_collection_agents`, `register_aws_collection_agent`, `register_generic_collection_agent`, `get_aws_collection_agent`, `get_gcp_collection_agent`, `get_azure_collection_agent`, `get_generic_collection_agent`, `update_aws_collection_agent`, `update_generic_collection_agent`, `delete_aws_collection_agent`, `delete_gcp_collection_agent`, `delete_azure_collection_agent`, `delete_generic_collection_agent`, `delete_generic_collection_agent_token`, `delete_generic_collection_agent_oauth_client` |
 | Data store | `list_collection_data_stores`, `register_aws_collection_data_store`, `get_aws_collection_data_store`, `get_gcp_collection_data_store`, `get_azure_collection_data_store`, `update_aws_collection_data_store`, `delete_aws_collection_data_store`, `delete_gcp_collection_data_store`, `delete_azure_collection_data_store` |
-| Credentials | `list_credentials`, `create_aws_secrets_manager_credentials`, `create_gcp_secret_manager_credentials`, `create_azure_key_vault_credentials`, `create_env_var_credentials`, `create_file_credentials`, `get_snowflake_credentials`, `update_aws_secrets_manager_credentials`, `update_gcp_secret_manager_credentials`, `update_azure_key_vault_credentials`, `update_env_var_credentials`, `update_file_credentials`, `delete_snowflake_credentials`, `delete_aws_secrets_manager_credentials`, `delete_gcp_secret_manager_credentials`, `delete_azure_key_vault_credentials`, `delete_env_var_credentials`, `delete_file_credentials` |
+| Credentials | `list_credentials`, `create_aws_secrets_manager_credentials`, `create_gcp_secret_manager_credentials`, `create_azure_key_vault_credentials`, `create_env_var_credentials`, `create_file_credentials`, `get_snowflake_credentials`, `update_aws_secrets_manager_credentials`, `update_gcp_secret_manager_credentials`, `update_azure_key_vault_credentials`, `update_env_var_credentials`, `update_file_credentials`, `delete_snowflake_credentials`, `delete_aws_secrets_manager_credentials`, `delete_gcp_secret_manager_credentials`, `delete_azure_key_vault_credentials`, `delete_env_var_credentials`, `delete_file_credentials`, `validate_aws_secrets_manager_credentials`, `validate_gcp_secret_manager_credentials`, `validate_azure_key_vault_credentials`, `validate_env_var_credentials`, `validate_file_credentials` |
 | Warehouse | `list_warehouses`, `get_warehouse`, `create_warehouse`, `update_warehouse`, `delete_warehouse` |
 | Connection | `list_connections`, `get_connection`, `create_connection`, `update_connection`, `delete_connection` |
 | Identity | `get_current_user` (which account you are in, and whether it is paused) |
 | Validation | `validate_connection`, `get_validation_run` (Step 5; when the session serves them) |
 
 Operations whose request or response carries a secret are **not MCP tools** and are handed to the
-customer as a CLI or Terraform step: `create_snowflake_credentials`, the Azure and GCP agent and
+customer as a CLI or Terraform step: `create_snowflake_credentials`, `validate_snowflake_credentials`, the Azure and GCP agent and
 data-store registrations, `create_generic_collection_agent_token` and
 `create_generic_collection_agent_oauth_client`. The reference files mark them.
 
@@ -238,6 +238,17 @@ authentication details. If it changes, revisit the deployment choice before writ
 | File on the agent | `create_file_credentials(connection_type, file_path)` | Generic Kubernetes/Docker: mount the JSON file into the agent; use its container path. |
 | Monte Carlo stores it (Snowflake key pair) | **not a tool** | Emit `montecarlo credentials create snowflake --account … --user … --warehouse … --private-key @key.p8` or the `montecarlo_snowflake_credentials` resource with `file(...)`. The user runs it and gives back the `id`. |
 
+**Validate before creating.** Each self-hosted create has a matching validate that takes the same
+arguments plus `deployment_id`: `validate_aws_secrets_manager_credentials`, `validate_gcp_secret_manager_credentials`, `validate_azure_key_vault_credentials`, `validate_env_var_credentials`, `validate_file_credentials`. It creates nothing and
+returns a run: poll `get_validation_run` until `status` is `completed`, honoring `Retry-After`, and
+create only once every validation has `passed`. A failure here is almost always the agent's access
+to the secret (IAM grant, trust policy, service-account role, Key Vault policy), and it is cheapest
+to fix now, before a warehouse or connection exists. For a Snowflake key pair Monte Carlo will
+store, emit the validate step beside the create step:
+`montecarlo credentials validate-snowflake-credentials --deployment-id … --account … --user … --private-key @key.p8`
+(not an MCP tool: the key travels in the request). When the session does not serve these tools,
+skip this check; Step 5 still validates the connection.
+
 Two Snowflake key formats belong to different paths; do not interchange them:
 
 - **Self-hosted secret contents**, following https://docs.getmontecarlo.com/docs/self-hosted-credentials:
@@ -312,10 +323,12 @@ Reused (excluded from cleanup)
 
 Pending on your side
   - <deploy/register/credential step still to run, with the exact command or file>
-  - Validate in the UI (Settings → Integrations → <integration> → <connection name> → Test)
+  - Validate the connection (Step 5: validate_connection, or in the UI under Settings → Integrations → <integration> → <connection name> → Test)
 
 Cleanup if you abandon this: delete_connection → delete_warehouse → delete_<kind>_credentials →
-delete_<platform>_collection_agent|data_store → delete_deployment, in that order.
+delete_<platform>_collection_agent|data_store → delete_deployment, in that order. On the generic
+agent path, also delete the token or OAuth client this run minted (delete_generic_collection_agent_token /
+delete_generic_collection_agent_oauth_client).
 ```
 
 In artifact mode label resources as **planned**, not created. Record IDs only after execution.

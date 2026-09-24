@@ -414,3 +414,120 @@ Delete file credentials no connection uses. The file on the deployment is untouc
 ### Response
 
 Returns the path id and `deleted: true`.
+
+## `validate_aws_secrets_manager_credentials`: Validate AWS Secrets Manager credentials
+
+Check whether AWS Secrets Manager credentials work before creating them. Nothing is created and no credentials resource is written. Returns a run that is still going: poll `get_validation_run` with its id until the status is `completed`, then read each validation's own verdict.
+
+### Arguments
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `deployment_id` | `str` | yes | Deployment that runs the validations. |
+| `connection_type` | `str` | yes | What the credentials are for, hyphenated, such as `snowflake` or `bigquery`. |
+| `bq_project_id` | `str` | no | BigQuery project the connection reads from. |
+| `databricks_warehouse_id` | `str` | no | Databricks SQL warehouse the connection runs queries on. |
+| `aws_secret` | `str` | yes | Name or ARN of the AWS Secrets Manager secret holding the connection's credentials. |
+| `aws_region` | `str` | no | AWS region of the secret. |
+| `assumable_role` | `str` | no | ARN of a role the deployment assumes to read the secret. |
+| `external_id` | `str` | no | External id the assumed role's trust policy requires, if it requires one. |
+
+### Response
+
+202 with a validation run; poll `get_validation_run` with its id. Response fields: id, status, target_type, target_id, validations_passed, validations_total, started_at, finished_at, expires_at, validations.
+
+## `validate_gcp_secret_manager_credentials`: Validate GCP Secret Manager credentials
+
+Check whether GCP Secret Manager credentials work before creating them. Nothing is created and no credentials resource is written. Returns a run that is still going: poll `get_validation_run` with its id until the status is `completed`, then read each validation's own verdict.
+
+### Arguments
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `deployment_id` | `str` | yes | Deployment that runs the validations. |
+| `connection_type` | `str` | yes | What the credentials are for, hyphenated, such as `snowflake` or `bigquery`. |
+| `bq_project_id` | `str` | no | BigQuery project the connection reads from. |
+| `databricks_warehouse_id` | `str` | no | Databricks SQL warehouse the connection runs queries on. |
+| `gcp_secret` | `str` | yes | Name of the GCP Secret Manager secret holding the connection's credentials. |
+
+### Response
+
+202 with a validation run; poll `get_validation_run` with its id. Response fields: id, status, target_type, target_id, validations_passed, validations_total, started_at, finished_at, expires_at, validations.
+
+## `validate_azure_key_vault_credentials`: Validate Azure Key Vault credentials
+
+Check whether Azure Key Vault credentials work before creating them. Nothing is created and no credentials resource is written. Returns a run that is still going: poll `get_validation_run` with its id until the status is `completed`, then read each validation's own verdict.
+
+### Arguments
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `deployment_id` | `str` | yes | Deployment that runs the validations. |
+| `connection_type` | `str` | yes | What the credentials are for, hyphenated, such as `snowflake` or `bigquery`. |
+| `bq_project_id` | `str` | no | BigQuery project the connection reads from. |
+| `databricks_warehouse_id` | `str` | no | Databricks SQL warehouse the connection runs queries on. |
+| `akv_secret` | `str` | yes | Name of the Azure Key Vault secret holding the connection's credentials. |
+| `akv_vault_name` | `str` | no | Name of the key vault. |
+| `akv_vault_url` | `str` | no | URL of the key vault. |
+
+### Response
+
+202 with a validation run; poll `get_validation_run` with its id. Response fields: id, status, target_type, target_id, validations_passed, validations_total, started_at, finished_at, expires_at, validations.
+
+## `validate_env_var_credentials`: Validate environment variable credentials
+
+Check whether environment variable credentials work before creating them. Nothing is created and no credentials resource is written. Returns a run that is still going: poll `get_validation_run` with its id until the status is `completed`, then read each validation's own verdict.
+
+### Arguments
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `deployment_id` | `str` | yes | Deployment that runs the validations. |
+| `connection_type` | `str` | yes | What the credentials are for, hyphenated, such as `snowflake` or `bigquery`. |
+| `bq_project_id` | `str` | no | BigQuery project the connection reads from. |
+| `databricks_warehouse_id` | `str` | no | Databricks SQL warehouse the connection runs queries on. |
+| `env_var_name` | `str` | yes | Name of the environment variable on the deployment that holds the connection's credentials. |
+| `kms_key_id` | `str` | no | AWS KMS key the variable's value is encrypted with. |
+
+### Response
+
+202 with a validation run; poll `get_validation_run` with its id. Response fields: id, status, target_type, target_id, validations_passed, validations_total, started_at, finished_at, expires_at, validations.
+
+## `validate_file_credentials`: Validate file credentials
+
+Check whether file credentials work before creating them. Nothing is created and no credentials resource is written. Returns a run that is still going: poll `get_validation_run` with its id until the status is `completed`, then read each validation's own verdict.
+
+### Arguments
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `deployment_id` | `str` | yes | Deployment that runs the validations. |
+| `connection_type` | `str` | yes | What the credentials are for, hyphenated, such as `snowflake` or `bigquery`. |
+| `bq_project_id` | `str` | no | BigQuery project the connection reads from. |
+| `databricks_warehouse_id` | `str` | no | Databricks SQL warehouse the connection runs queries on. |
+| `file_path` | `str` | yes | Path of the file on the deployment that holds the connection's credentials. |
+
+### Response
+
+202 with a validation run; poll `get_validation_run` with its id. Response fields: id, status, target_type, target_id, validations_passed, validations_total, started_at, finished_at, expires_at, validations.
+
+## `validate_snowflake_credentials`: Validate Snowflake credentials
+
+**Not an MCP tool.** Use the CLI (`montecarlo credentials validate-snowflake-credentials`); the key travels in the request.
+
+Check a candidate Snowflake key pair against Snowflake.
+
+### Arguments
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `deployment_id` | `str` | yes | Deployment that runs the validations. |
+| `account` | `str` | yes | Snowflake account identifier, such as `xy12345.us-east-1`. |
+| `user` | `str` | yes | Snowflake user the key pair belongs to. |
+| `private_key` | `str` | yes | The private key of the pair, as PEM text including its BEGIN and END lines. |
+| `private_key_passphrase` | `str` | no | Passphrase the private key is encrypted with. |
+| `warehouse` | `str` | no | Snowflake virtual warehouse to run queries in. |
+
+### Response
+
+202 with a validation run; poll `get_validation_run` with its id. Response fields: id, status, target_type, target_id, validations_passed, validations_total, started_at, finished_at, expires_at, validations.
