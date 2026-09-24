@@ -5,6 +5,13 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Copilot CLI will
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.25.1] - 2026-09-24
+
+### Changed
+
+- Onboarding skill: the per-tag API reference is marked plugin-only, so the Monte Carlo MCP server's `mc-onboarding` prompt no longer inlines a restatement of the tools' own schemas.
+- Portability contract (CONTRIBUTING): mention reference files by relative path; the MCP prompt renderer inlines those mentioned outside plugin-only blocks.
+
 ## [1.25.0] - 2026-09-22
 
 ### Added

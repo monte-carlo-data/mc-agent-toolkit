@@ -21,7 +21,9 @@ match them to the tools and schemas exposed by the current environment.
 
 Read the supporting references with the environment's available file or resource capability:
 
+<!-- plugin-only:start -->
 - API references in `reference/api/<tag>.md`: per-tag arguments, responses and failure modes.
+<!-- plugin-only:end -->
 - [Deployment guide](reference/deployment-guide.md): prerequisites, networking and handoffs.
 - [Output modes](reference/output-modes.md): Terraform, SDK and CLI examples.
 
@@ -36,8 +38,8 @@ instrument-agent; for an already-connected warehouse's monitoring use monitoring
 
 ## Rules that hold for the whole run
 
-1. **v2 tools only.** Use the tools listed under *Tools* below, and the per-tag API reference for
-   any other v2 operation, and nothing else for reads or writes about deployments, agents, data
+1. **v2 tools only.** Use the tools listed under *Tools* below, and the tool schema or the per-tag
+   API reference for any other v2 operation, and nothing else for reads or writes about deployments, agents, data
    stores, credentials, warehouses and connections. Other
    Monte Carlo tools that list warehouses, integrations or platform services, or that test an
    integration, are a different API with different ids and fields. Never mix them into this flow,
@@ -255,7 +257,7 @@ Two Snowflake key formats belong to different paths; do not interchange them:
   JSON `connect_args` with `user`, `account`, optional `warehouse`, and `private_key` as the
   decrypted PKCS#8 base64 body (no PEM BEGIN/END lines). The customer prepares this locally.
 - **Monte Carlo-managed v2 Snowflake credentials**: the CLI/provider reads the full PEM text,
-  including BEGIN/END lines, with a passphrase if encrypted. The per-tag API reference describes
+  including BEGIN/END lines, with a passphrase if encrypted. The output-modes reference shows
   this request, not the contents of a self-hosted secret.
 
 Describe schemas without asking for values. For other types follow their self-hosted schema;

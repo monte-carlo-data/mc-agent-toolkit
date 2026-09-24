@@ -63,7 +63,7 @@ both paths; it is not a guarantee of no internet exposure on every cloud.
 | [GCP](https://docs.getmontecarlo.com/docs/create-and-register-a-gcp-agent) | Provision, choose project/region and deploy the Cloud Run agent/storage; establish invoker credentials and network access. Complete registration locally and confirm enabled. The general matrix lists no Private Link for GCP **classic ingress**; it does not describe Generic's outbound path. |
 
 The v2 CLI/SDK/provider registrations are separate from the historical CLI commands in public
-product docs. Use the per-tag API reference and output-modes for v2 syntax/IDs. Do not substitute
+product docs. Use the v2 tool schemas (or the per-tag API reference) and output-modes for v2 syntax/IDs. Do not substitute
 an older command into a v2 resource chain without verifying how its result is reconciled.
 
 ## Customer-hosted data store without an agent
