@@ -70,6 +70,44 @@ def _read_peer_skills(eval_file: Path) -> list[str]:
     return peers
 
 
+def _first_index(tool: str, tools_called: list[str]) -> int | None:
+    return next((i for i, called in enumerate(tools_called) if tool in called), None)
+
+
+def check_deterministic(criteria: TurnCriteria, trace: ConversationTrace) -> tuple[bool, list[str]]:
+    """Run deterministic checks against a trace. Returns (passed, failures).
+
+    Tool names match by substring against the full MCP tool name.
+    """
+    failures: list[str] = []
+
+    for tool in criteria.must_call:
+        if _first_index(tool, trace.tools_called) is None:
+            failures.append(f"must_call: {tool} not found in trace")
+
+    for tool in criteria.must_not_call:
+        if _first_index(tool, trace.tools_called) is not None:
+            failures.append(f"must_not_call: {tool} was called")
+
+    for substring in criteria.output_must_not_contain:
+        if substring.lower() in trace.final_text.lower():
+            failures.append(f"output_must_not_contain: found '{substring}'")
+
+    for substring in criteria.tool_input_must_not_contain:
+        for detail in trace.tool_details:
+            if substring.lower() in json.dumps(detail["input"], default=str).lower():
+                failures.append(f"tool_input_must_not_contain: '{substring}' in {detail['name']} input")
+
+    for earlier, later_tools in criteria.must_call_before.items():
+        earlier_at = _first_index(earlier, trace.tools_called)
+        for later in later_tools:
+            later_at = _first_index(later, trace.tools_called)
+            if later_at is not None and (earlier_at is None or earlier_at > later_at):
+                failures.append(f"must_call_before: {later} was called before {earlier}")
+
+    return len(failures) == 0, failures
+
+
 # ---------------------------------------------------------------------------
 # AgentRunner — wraps claude-agent-sdk, runs prompts, returns traces
 # ---------------------------------------------------------------------------
@@ -81,14 +119,21 @@ class AgentRunner:
         self._skill_content = skill_content
         self._mcp_servers = mcp_servers
 
-    async def run(self, turns: list[Turn]) -> tuple[ConversationTrace, list[ConversationTrace]]:
-        """Run a conversation (1+ turns). Returns (accumulated, per_turn) traces."""
+    async def run(
+        self, turns: list[Turn], surface: str = "skill",
+    ) -> tuple[ConversationTrace, list[ConversationTrace]]:
+        """Run a conversation (1+ turns). Returns (accumulated, per_turn) traces.
+
+        surface="connector" omits the skill content, so the agent only has what the
+        MCP server itself provides (tool descriptions, prompts).
+        """
         accumulated = ConversationTrace()
         per_turn_traces: list[ConversationTrace] = []
+        append = self._skill_content if surface == "skill" else ""
 
         for i, turn in enumerate(turns):
             options = ClaudeAgentOptions(
-                system_prompt={"type": "preset", "preset": "claude_code", "append": self._skill_content},
+                system_prompt={"type": "preset", "preset": "claude_code", "append": append},
                 permission_mode="bypassPermissions",
                 max_turns=self._max_turns,
                 model=self._model,
@@ -205,12 +250,12 @@ class Scorer:
         # Per-turn deterministic checks
         turn_failures: list[str] = []
         for i, turn in enumerate(case.turns):
-            passed, failures = self._check_deterministic(turn.criteria, per_turn[i])
+            passed, failures = check_deterministic(turn.criteria, per_turn[i])
             if not passed:
                 turn_failures.extend([f"turn-{i+1}: {f}" for f in failures])
 
         # Case-level deterministic checks
-        case_passed, case_failures = self._check_deterministic(case.criteria, accumulated)
+        case_passed, case_failures = check_deterministic(case.criteria, accumulated)
         all_failures = case_failures + turn_failures
         det_passed = case_passed and len(turn_failures) == 0
 
@@ -239,24 +284,6 @@ class Scorer:
             messages=accumulated.messages,
             stderr=accumulated.stderr,
         )
-
-    def _check_deterministic(self, criteria: TurnCriteria, trace: ConversationTrace) -> tuple[bool, list[str]]:
-        """Run deterministic checks against a trace. Returns (passed, failures)."""
-        failures: list[str] = []
-
-        for tool in criteria.must_call:
-            if not any(tool in called for called in trace.tools_called):
-                failures.append(f"must_call: {tool} not found in trace")
-
-        for tool in criteria.must_not_call:
-            if any(tool in called for called in trace.tools_called):
-                failures.append(f"must_not_call: {tool} was called")
-
-        for substring in criteria.output_must_not_contain:
-            if substring.lower() in trace.final_text.lower():
-                failures.append(f"output_must_not_contain: found '{substring}'")
-
-        return len(failures) == 0, failures
 
     def _judge(self, prompt: str, trace: ConversationTrace, rubric: str) -> tuple[float, str]:
         """Score a conversation trace with the LLM judge. Returns (score, reason)."""
@@ -393,7 +420,7 @@ class EvalRunner:
 
     async def _run_and_score(self, case: EvalCase) -> CaseResult:
         started_at = datetime.now(timezone.utc)
-        accumulated, per_turn = await self._agent.run(case.turns)
+        accumulated, per_turn = await self._agent.run(case.turns, surface=case.surface)
         result = self._scorer.score_case(case, accumulated, per_turn)
         result.started_at = started_at
         result.finished_at = datetime.now(timezone.utc)
@@ -452,7 +479,7 @@ class EvalRunner:
         print(f"\n[dry-run] Loaded {len(cases)} cases from {self._eval_file.name}")
         for case in cases:
             n = len(case.turns)
-            label = f"{n} turn{'s' if n > 1 else ''}"
+            label = f"{n} turn{'s' if n > 1 else ''}, {case.surface}"
             print(f"  [{case.id}] ({label}) {case.turns[0].prompt[:75]}")
 
     def _print_result(self, result: CaseResult, result_path: Path, verbose: bool) -> None:
@@ -519,7 +546,8 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    mcp_servers = get_mcp_server_config(args.env)
+    # Dry runs only validate the YAML, so they need no Monte Carlo credentials.
+    mcp_servers = {} if args.dry_run else get_mcp_server_config(args.env)
     eval_file = _resolve_eval_file(args.skill, args.env)
     peer_skills = _read_peer_skills(eval_file)
     skill_content = load_combined_skill_content(

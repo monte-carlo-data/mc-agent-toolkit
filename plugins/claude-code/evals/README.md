@@ -90,7 +90,9 @@ Peer skill SKILL.md files come first in the system prompt; the main skill's
 content comes last (so its instructions are most salient). A typo in a peer
 name is a hard error.
 
-Edit `<skill>/live-evals-<env>.yaml`. All cases use the `turns` format:
+Edit `<skill>/live-evals-<env>.yaml`, or `<skill>/live-evals.yaml` when the same cases run on
+every environment (the runner prefers the env-specific file and falls back to the generic one).
+All cases use the `turns` format:
 
 ```yaml
 # Single-turn
@@ -123,13 +125,40 @@ Edit `<skill>/live-evals-<env>.yaml`. All cases use the `turns` format:
 
 Each case is scored in two layers:
 
-1. **Deterministic checks** (pass/fail): `must_call`, `must_not_call`, `output_must_not_contain`
+1. **Deterministic checks** (pass/fail), per turn or per case:
+   - `must_call`, `must_not_call`: tool names that must / must not appear in the trace
+   - `output_must_not_contain`: substrings that must not appear in the final reply
+   - `tool_input_must_not_contain`: substrings that must not appear in any tool call's input
+     (plant a fake secret in the prompt to prove it never reaches a tool argument)
+   - `must_call_before`: `{earlier_tool: [later_tool, ...]}`; each later tool, if called, must come
+     after the first call to the earlier one
 2. **LLM judge** (0.0-1.0): Scores against the `judge_rubric`
 
-A case passes if all deterministic checks pass AND judge score >= 0.7. Tool names in YAML use short names (e.g. `get_warehouses`); the runner matches via substring against full MCP tool names.
+A case passes if all deterministic checks pass AND judge score >= 0.7. Tool names in YAML use short names (e.g. `get_warehouses`); the runner matches via substring against full MCP tool names, so a prefix such as `create_` matches every create tool.
+
+### Guidance surfaces
+
+A case can set `surface`:
+
+- `skill` (default): the skill's SKILL.md is appended to the system prompt, as when the plugin is installed.
+- `connector`: no skill content. The agent only has what the MCP server provides (tool descriptions,
+  prompts), as in the claude.ai connector without the plugin. Use it to check that a flow does not
+  depend on the skill's instructions.
+
+YAML anchors keep shared lists (for example, tools a flow must never call) in one place; the runner
+only reads `peer_skills` and `cases`, so other top-level keys are free for anchors. See
+`onboarding/live-evals.yaml`.
+
+### Testing the runner
+
+```bash
+uv run python -m unittest test_live_eval_scoring
+```
+
+`make dry-run` validates the YAML without calling any API and needs no Monte Carlo credentials.
 
 ## Adding evals for a new skill
 
-1. Create `<skill-name>/live-evals-dev.yaml` following the format above
+1. Create `<skill-name>/live-evals-dev.yaml` (or `live-evals.yaml` for every env) following the format above
 2. Run `make dry-run SKILL=<skill-name>` to validate
 3. Run `make live-evals SKILL=<skill-name>` to confirm pass rate meets threshold
