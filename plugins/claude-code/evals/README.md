@@ -3,7 +3,7 @@
 Trigger accuracy and live behavior evals for mc-agent-toolkit skills.
 
 - **Trigger evals** verify a skill's description correctly activates (or not) for realistic prompts
-- **Live evals** run prompts through the real Claude Code harness via `claude-agent-sdk`, then score with deterministic checks and an LLM judge
+- **Live evals** run prompts through the real Claude Code harness via `claude-agent-sdk`, then score with deterministic checks and an LLM judge (also through `claude-agent-sdk`)
 
 ## Setup
 
@@ -21,7 +21,8 @@ cp .env.example .env
 - `claude` CLI installed and on PATH
 - Python >= 3.11
 - `uv` package manager
-- `ANTHROPIC_API_KEY` — for both agent and judge
+- A logged-in `claude` CLI — the agent and both judges (trigger and live) run through it, so no
+  Anthropic API key is needed
 - `MCD_ID_DEV`, `MCD_TOKEN_DEV` — Monte Carlo API credentials for dev (live evals)
 - `MCD_ID`, `MCD_TOKEN` — Monte Carlo API credentials for prod (live evals)
 
@@ -152,7 +153,7 @@ only reads `peer_skills` and `cases`, so other top-level keys are free for ancho
 ### Testing the runner
 
 ```bash
-uv run python -m unittest test_live_eval_scoring
+uv run python -m unittest test_live_eval_scoring test_claude_judge
 ```
 
 `make dry-run` validates the YAML without calling any API and needs no Monte Carlo credentials.

@@ -26,7 +26,6 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
 
-import anthropic
 import yaml
 
 from claude_agent_sdk import (
@@ -40,6 +39,7 @@ from claude_agent_sdk import (
     query,
 )
 
+from claude_judge import ask
 from constants import EVALS_DIR, get_mcp_server_config, load_combined_skill_content
 from models import CaseResult, ConversationTrace, EvalCase, Turn, TurnCriteria
 
@@ -68,6 +68,16 @@ def _read_peer_skills(eval_file: Path) -> list[str]:
         print(f"Error: peer_skills in {eval_file} must be a list of strings")
         sys.exit(1)
     return peers
+
+
+def parse_judge_score(raw: str) -> tuple[float, str]:
+    """Parse the judge's {"score", "reason"} JSON, tolerating a code fence around it."""
+    start, end = raw.find("{"), raw.rfind("}")
+    try:
+        result = json.loads(raw[start:end + 1]) if start != -1 else {}
+        return float(result["score"]), result.get("reason", "")
+    except (json.JSONDecodeError, KeyError, ValueError, TypeError):
+        return 0.0, f"Judge returned invalid JSON: {raw}"
 
 
 def _first_index(tool: str, tools_called: list[str]) -> int | None:
@@ -241,9 +251,8 @@ class Scorer:
     def __init__(self, judge_model: str, judge_threshold: float = 0.7) -> None:
         self._judge_model = judge_model
         self._judge_threshold = judge_threshold
-        self._client = anthropic.Anthropic()
 
-    def score_case(
+    async def score_case(
         self, case: EvalCase, accumulated: ConversationTrace, per_turn: list[ConversationTrace],
     ) -> CaseResult:
         """Run all checks and return a structured result."""
@@ -263,7 +272,7 @@ class Scorer:
         judge_score = 1.0
         judge_reason = ""
         if case.criteria.judge_rubric:
-            judge_score, judge_reason = self._judge(
+            judge_score, judge_reason = await self._judge(
                 case.turns[-1].prompt, accumulated, case.criteria.judge_rubric,
             )
 
@@ -285,31 +294,19 @@ class Scorer:
             stderr=accumulated.stderr,
         )
 
-    def _judge(self, prompt: str, trace: ConversationTrace, rubric: str) -> tuple[float, str]:
+    async def _judge(self, prompt: str, trace: ConversationTrace, rubric: str) -> tuple[float, str]:
         """Score a conversation trace with the LLM judge. Returns (score, reason)."""
         trace_summary = f"Tools called: {trace.tools_called}\n\nFinal output:\n{trace.final_text}"
 
-        message = self._client.messages.create(
-            model=self._judge_model,
-            max_tokens=256,
-            system=self.JUDGE_SYSTEM_PROMPT,
-            messages=[{
-                "role": "user",
-                "content": (
-                    f"## User prompt\n{prompt}\n\n"
-                    f"## Conversation trace\n{trace_summary}\n\n"
-                    f"## Rubric\n{rubric}\n\n"
-                    "Score as JSON:"
-                ),
-            }],
+        raw = await ask(
+            self.JUDGE_SYSTEM_PROMPT,
+            f"## User prompt\n{prompt}\n\n"
+            f"## Conversation trace\n{trace_summary}\n\n"
+            f"## Rubric\n{rubric}\n\n"
+            "Score as JSON:",
+            self._judge_model,
         )
-
-        raw = message.content[0].text.strip()
-        try:
-            result = json.loads(raw)
-            return float(result["score"]), result.get("reason", "")
-        except (json.JSONDecodeError, KeyError, ValueError):
-            return 0.0, f"Judge returned invalid JSON: {raw}"
+        return parse_judge_score(raw)
 
 
 # ---------------------------------------------------------------------------
@@ -421,7 +418,7 @@ class EvalRunner:
     async def _run_and_score(self, case: EvalCase) -> CaseResult:
         started_at = datetime.now(timezone.utc)
         accumulated, per_turn = await self._agent.run(case.turns, surface=case.surface)
-        result = self._scorer.score_case(case, accumulated, per_turn)
+        result = await self._scorer.score_case(case, accumulated, per_turn)
         result.started_at = started_at
         result.finished_at = datetime.now(timezone.utc)
         result.elapsed_seconds = (result.finished_at - result.started_at).total_seconds()

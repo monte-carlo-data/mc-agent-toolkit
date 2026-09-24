@@ -4,13 +4,12 @@
 Trigger accuracy eval runner for mc-agent-toolkit skills.
 
 Loads the skill description from SKILL.md and runs each case from trigger-evals.json
-through the Claude API to check whether the skill would be triggered.
+through a judge model to check whether the skill would be triggered. The judge runs
+through the local `claude` CLI login; no API key is needed.
 
 Usage:
-    pip install anthropic
-    export ANTHROPIC_API_KEY=sk-ant-...
-    python run_evals.py --skill prevent
-    python run_evals.py --skill push-ingestion [--model claude-sonnet-4-6] [--threshold 0.85]
+    uv run python run_evals.py --skill prevent
+    uv run python run_evals.py --skill push-ingestion [--model claude-sonnet-4-6] [--threshold 0.85]
 
 Exit codes:
     0 — pass rate meets threshold
@@ -23,7 +22,7 @@ import re
 import sys
 from pathlib import Path
 
-import anthropic
+from claude_judge import ask_sync
 
 EVALS_DIR = Path(__file__).parent
 PLUGIN_DIR = EVALS_DIR.parent
@@ -92,8 +91,12 @@ def load_skill_description(skill_dir: Path) -> tuple[str, str]:
     return name, description
 
 
+def parse_verdict(raw: str) -> str:
+    raw = raw.strip().upper()
+    return "trigger" if "TRIGGER" in raw and "NO" not in raw else "no-trigger"
+
+
 def judge(
-    client: anthropic.Anthropic,
     model: str,
     skill_name: str,
     skill_description: str,
@@ -102,24 +105,13 @@ def judge(
 ) -> str:
     """Ask the judge model whether the skill should trigger. Returns 'trigger' or 'no-trigger'."""
     when_to_use_block = f"\nWhen to use guidance:\n{when_to_use}\n" if when_to_use else ""
-    message = client.messages.create(
-        model=model,
-        max_tokens=10,
-        system=JUDGE_SYSTEM_PROMPT,
-        messages=[
-            {
-                "role": "user",
-                "content": JUDGE_USER_TEMPLATE.format(
-                    skill_name=skill_name,
-                    skill_description=skill_description,
-                    when_to_use_block=when_to_use_block,
-                    prompt=prompt,
-                ),
-            }
-        ],
+    user_message = JUDGE_USER_TEMPLATE.format(
+        skill_name=skill_name,
+        skill_description=skill_description,
+        when_to_use_block=when_to_use_block,
+        prompt=prompt,
     )
-    raw = message.content[0].text.strip().upper()
-    return "trigger" if "TRIGGER" in raw and "NO" not in raw else "no-trigger"
+    return parse_verdict(ask_sync(JUDGE_SYSTEM_PROMPT, user_message, model))
 
 
 def main():
@@ -159,11 +151,10 @@ def main():
         sys.exit(0)
 
     print()
-    client = anthropic.Anthropic()
 
     results = []
     for case in cases:
-        actual = judge(client, args.model, skill_name, skill_description, when_to_use, case["prompt"])
+        actual = judge(args.model, skill_name, skill_description, when_to_use, case["prompt"])
         passed = actual == case["expected"]
         results.append({"id": case["id"], "expected": case["expected"], "actual": actual, "passed": passed})
 
