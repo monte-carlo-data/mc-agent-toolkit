@@ -11,14 +11,24 @@ class TurnCriteria:
     must_call: list[str] = field(default_factory=list)
     must_not_call: list[str] = field(default_factory=list)
     output_must_not_contain: list[str] = field(default_factory=list)
+    # Substrings that must not appear in any tool call's input (e.g. a planted secret).
+    tool_input_must_not_contain: list[str] = field(default_factory=list)
+    # {earlier_tool: [later_tool, ...]}: each later tool, if called, must come after earlier_tool.
+    must_call_before: dict[str, list[str]] = field(default_factory=dict)
+
+    @classmethod
+    def _fields_from_dict(cls, data: dict) -> dict:
+        return {
+            "must_call": data.get("must_call", []),
+            "must_not_call": data.get("must_not_call", []),
+            "output_must_not_contain": data.get("output_must_not_contain", []),
+            "tool_input_must_not_contain": data.get("tool_input_must_not_contain", []),
+            "must_call_before": data.get("must_call_before", {}),
+        }
 
     @classmethod
     def from_dict(cls, data: dict) -> "TurnCriteria":
-        return cls(
-            must_call=data.get("must_call", []),
-            must_not_call=data.get("must_not_call", []),
-            output_must_not_contain=data.get("output_must_not_contain", []),
-        )
+        return cls(**cls._fields_from_dict(data))
 
 
 @dataclass
@@ -29,12 +39,7 @@ class CaseCriteria(TurnCriteria):
 
     @classmethod
     def from_dict(cls, data: dict) -> "CaseCriteria":
-        return cls(
-            must_call=data.get("must_call", []),
-            must_not_call=data.get("must_not_call", []),
-            output_must_not_contain=data.get("output_must_not_contain", []),
-            judge_rubric=data.get("judge_rubric", ""),
-        )
+        return cls(**cls._fields_from_dict(data), judge_rubric=data.get("judge_rubric", ""))
 
 
 @dataclass
@@ -50,19 +55,29 @@ class Turn:
         )
 
 
+SURFACES = ("skill", "connector")
+
+
 @dataclass
 class EvalCase:
     id: str
     turns: list[Turn]
     criteria: CaseCriteria = field(default_factory=CaseCriteria)
+    # "skill": SKILL.md is appended to the system prompt (plugin installed).
+    # "connector": no skill content; guidance comes only from the MCP server.
+    surface: str = "skill"
 
     @classmethod
     def from_dict(cls, data: dict) -> "EvalCase":
         turns = [Turn.from_dict(t) for t in data["turns"]]
+        surface = data.get("surface", "skill")
+        if surface not in SURFACES:
+            raise ValueError(f"case {data['id']}: surface must be one of {SURFACES}, got {surface!r}")
         return cls(
             id=data["id"],
             turns=turns,
             criteria=CaseCriteria.from_dict(data.get("criteria", {})),
+            surface=surface,
         )
 
 

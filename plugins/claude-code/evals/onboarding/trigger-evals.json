@@ -12,12 +12,20 @@
     {"id": "should-08", "prompt": "Which Monte Carlo deployment should the new Starburst connection run through?", "expected": "trigger", "rationale": "Deployment choice question the skill answers"},
     {"id": "should-09", "prompt": "How should we give Monte Carlo the credentials for Snowflake? We keep secrets in AWS Secrets Manager.", "expected": "trigger", "rationale": "Credential strategy for a connection"},
     {"id": "should-10", "prompt": "Onboard our warehouse to Monte Carlo.", "expected": "trigger", "rationale": "Literal onboarding phrasing"},
+    {"id": "should-11", "prompt": "Connect Snowflake to Monte Carlo through an AWS agent.", "expected": "trigger", "rationale": "The M3 demo scenario: warehouse plus agent deployment"},
+    {"id": "should-12", "prompt": "Onboard BigQuery to Monte Carlo.", "expected": "trigger", "rationale": "Onboarding phrasing with a named platform"},
+    {"id": "should-13", "prompt": "Set up an agent for Monte Carlo in our AWS account so it can reach our warehouse.", "expected": "trigger", "rationale": "Collection agent setup, phrased without the word 'collection'"},
+    {"id": "should-14", "prompt": "We just signed up for Monte Carlo. How do we get our Databricks workspace connected?", "expected": "trigger", "rationale": "New account, first connection"},
     {"id": "should-not-01", "prompt": "Push metadata and lineage from our homegrown catalog into Monte Carlo.", "expected": "no-trigger", "rationale": "Push ingestion, no connector: push-ingestion skill"},
     {"id": "should-not-02", "prompt": "Build the Connection Auth Rules JSON for our Postgres connector.", "expected": "no-trigger", "rationale": "connection-auth-rules skill"},
     {"id": "should-not-03", "prompt": "Instrument our LangChain agent for Monte Carlo Agent Observability.", "expected": "no-trigger", "rationale": "instrument-agent skill"},
     {"id": "should-not-04", "prompt": "What should I monitor in our Snowflake warehouse? Where are the coverage gaps?", "expected": "no-trigger", "rationale": "Warehouse already connected; monitoring-advisor / proactive-monitoring"},
     {"id": "should-not-05", "prompt": "Why is orders_daily stale since this morning?", "expected": "no-trigger", "rationale": "Incident investigation"},
     {"id": "should-not-06", "prompt": "Connect to the Snowflake database with SQLAlchemy in this Python service.", "expected": "no-trigger", "rationale": "Application database connection, nothing to do with Monte Carlo"},
-    {"id": "should-not-07", "prompt": "Create a freshness monitor on analytics.orders in Monte Carlo.", "expected": "no-trigger", "rationale": "Monitor creation on a connected table"}
+    {"id": "should-not-07", "prompt": "Create a freshness monitor on analytics.orders in Monte Carlo.", "expected": "no-trigger", "rationale": "Monitor creation on a connected table"},
+    {"id": "should-not-08", "prompt": "Triage last night's Monte Carlo alerts and tell me which ones are real incidents.", "expected": "no-trigger", "rationale": "Alert triage"},
+    {"id": "should-not-09", "prompt": "What is the root cause of the volume drop on fct_orders?", "expected": "no-trigger", "rationale": "Incident root cause"},
+    {"id": "should-not-10", "prompt": "Set up monitoring for the new tables in our analytics schema.", "expected": "no-trigger", "rationale": "Monitoring coverage on already-connected tables"},
+    {"id": "should-not-11", "prompt": "Our Snowflake metadata in Monte Carlo stopped updating this morning. What broke?", "expected": "no-trigger", "rationale": "Incident on an existing connection, not onboarding"}
   ]
 }
