@@ -1,6 +1,6 @@
 ---
 name: monte-carlo-onboarding
-description: Connect a warehouse to Monte Carlo using API v2 tools. Discover or provision deployments, reference credentials, reuse or create the connection, and validate it. Use when asked to connect a platform or onboard a warehouse.
+description: Connect a warehouse to Monte Carlo using API v2 tools. Discover or provision deployments, reference credentials, reuse or create the connection, and validate it. Use when asked to connect a platform or onboard a warehouse, including generating the Terraform or a script for it.
 metadata:
   bucket: Setup
 ---
