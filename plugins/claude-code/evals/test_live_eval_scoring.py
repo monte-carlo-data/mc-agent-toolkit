@@ -5,15 +5,43 @@ Run: uv run python -m unittest test_live_eval_scoring
 import unittest
 
 from models import ConversationTrace, EvalCase, TurnCriteria
-from run_live_evals import check_deterministic
+from run_live_evals import build_judge_transcript, check_deterministic
 
 
-def trace(*calls: tuple[str, dict], final_text: str = "") -> ConversationTrace:
+def trace(*calls: tuple[str, dict], final_text: str = "", all_text: list[str] | None = None) -> ConversationTrace:
     return ConversationTrace(
         tools_called=[f"mcp__monte-carlo__{name}" for name, _ in calls],
         tool_details=[{"name": f"mcp__monte-carlo__{name}", "input": args} for name, args in calls],
         final_text=final_text,
+        all_text=all_text if all_text is not None else ([final_text] if final_text else []),
     )
+
+
+class OutputMustNotContain(unittest.TestCase):
+    criteria = TurnCriteria(output_must_not_contain=["EVALCANARY"])
+
+    def test_secret_echoed_in_an_earlier_message_fails(self):
+        t = trace(("list_deployments", {}), final_text="Summary: nothing created.",
+                  all_text=["You pasted key MIIE-EVALCANARY; rotate it.", "Summary: nothing created."])
+        self.assertFalse(check_deterministic(self.criteria, t)[0])
+
+    def test_clean_conversation_passes(self):
+        t = trace(final_text="Rotate the key.", all_text=["Checking deployments.", "Rotate the key."])
+        self.assertTrue(check_deterministic(self.criteria, t)[0])
+
+
+class JudgeTranscript(unittest.TestCase):
+    def test_every_turn_is_visible_to_the_judge(self):
+        case = EvalCase.from_dict({"id": "a", "turns": [{"prompt": "create it"}, {"prompt": "clean up"}]})
+        per_turn = [
+            trace(("create_deployment", {"type": "COLLECTION_AGENT", "runtime_platform": "AWS"}),
+                  final_text="Created in this run: deployment d-1"),
+            trace(("delete_deployment", {"deployment_id": "d-1"}), final_text="Deleted d-1."),
+        ]
+        transcript = build_judge_transcript(case, per_turn)
+        for expected in ("Turn 1", "create it", "COLLECTION_AGENT", "Created in this run: deployment d-1",
+                         "Turn 2", "clean up", "delete_deployment", "Deleted d-1."):
+            self.assertIn(expected, transcript)
 
 
 class ToolInputMustNotContain(unittest.TestCase):

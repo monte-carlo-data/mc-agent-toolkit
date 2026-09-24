@@ -22,7 +22,7 @@ import re
 import sys
 from pathlib import Path
 
-from claude_judge import ask_sync
+from claude_judge import JudgeError, ask_sync
 
 EVALS_DIR = Path(__file__).parent
 PLUGIN_DIR = EVALS_DIR.parent
@@ -92,8 +92,14 @@ def load_skill_description(skill_dir: Path) -> tuple[str, str]:
 
 
 def parse_verdict(raw: str) -> str:
-    raw = raw.strip().upper()
-    return "trigger" if "TRIGGER" in raw and "NO" not in raw else "no-trigger"
+    """Map the judge's reply to 'trigger' / 'no-trigger' from its first word only."""
+    words = re.findall(r"[A-Z_-]+", raw.upper())
+    first = words[0].replace("-", "_") if words else ""
+    if first == "TRIGGER":
+        return "trigger"
+    if first in ("NO_TRIGGER", "NOTRIGGER", "NO"):
+        return "no-trigger"
+    raise JudgeError(f"unparseable judge verdict: {raw!r}")
 
 
 def judge(
@@ -154,7 +160,11 @@ def main():
 
     results = []
     for case in cases:
-        actual = judge(args.model, skill_name, skill_description, when_to_use, case["prompt"])
+        try:
+            actual = judge(args.model, skill_name, skill_description, when_to_use, case["prompt"])
+        except JudgeError as e:
+            # A broken judge is a failed case, never a silent "no-trigger".
+            actual = f"judge-error: {e}"
         passed = actual == case["expected"]
         results.append({"id": case["id"], "expected": case["expected"], "actual": actual, "passed": passed})
 

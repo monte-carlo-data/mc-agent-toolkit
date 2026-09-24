@@ -6,7 +6,11 @@ The judge authenticates the same way the live-eval agent does: with the local
 
 import asyncio
 
-from claude_agent_sdk import AssistantMessage, ClaudeAgentOptions, TextBlock, query
+from claude_agent_sdk import AssistantMessage, ClaudeAgentOptions, ResultMessage, TextBlock, query
+
+
+class JudgeError(RuntimeError):
+    """The judge produced no usable verdict (CLI error, empty or unparseable reply)."""
 
 
 def judge_options(system: str, model: str) -> ClaudeAgentOptions:
@@ -22,12 +26,21 @@ def judge_options(system: str, model: str) -> ClaudeAgentOptions:
 
 
 async def ask(system: str, prompt: str, model: str) -> str:
-    """Return the judge's reply text for one prompt."""
+    """Return the judge's reply text for one prompt.
+
+    Raises JudgeError when the CLI reports an error (not logged in, rate limit, ...)
+    or returns no text, so a broken judge fails the run instead of being scored.
+    """
     parts: list[str] = []
     async for message in query(prompt=prompt, options=judge_options(system, model)):
         if isinstance(message, AssistantMessage):
             parts.extend(block.text for block in message.content if isinstance(block, TextBlock))
-    return "\n".join(parts).strip()
+        elif isinstance(message, ResultMessage) and message.is_error:
+            raise JudgeError(f"judge CLI error ({message.subtype}): {message.result or ' '.join(parts)}")
+    reply = "\n".join(parts).strip()
+    if not reply:
+        raise JudgeError("judge returned an empty reply")
+    return reply
 
 
 def ask_sync(system: str, prompt: str, model: str) -> str:

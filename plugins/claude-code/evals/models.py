@@ -90,6 +90,8 @@ class ConversationTrace:
     messages: list[dict] = field(default_factory=list)
     stderr: list[str] = field(default_factory=list)
     final_text: str = ""
+    # Every assistant text block, in order; final_text is only the last message.
+    all_text: list[str] = field(default_factory=list)
     num_turns: int = 0
     total_cost_usd: float = 0.0
     session_id: str | None = None

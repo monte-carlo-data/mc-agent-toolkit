@@ -80,6 +80,19 @@ def parse_judge_score(raw: str) -> tuple[float, str]:
         return 0.0, f"Judge returned invalid JSON: {raw}"
 
 
+def build_judge_transcript(case: EvalCase, per_turn: list[ConversationTrace]) -> str:
+    """Every turn's prompt, tool calls (with truncated inputs) and final reply, for the judge."""
+    sections = []
+    for i, (turn, t) in enumerate(zip(case.turns, per_turn), start=1):
+        calls = "\n".join(
+            f"- {d['name']}({json.dumps(d['input'], default=str)[:300]})" for d in t.tool_details
+        ) or "- (none)"
+        sections.append(
+            f"### Turn {i}\nUser: {turn.prompt}\n\nTool calls:\n{calls}\n\nFinal reply:\n{t.final_text}"
+        )
+    return "\n\n".join(sections)
+
+
 def _first_index(tool: str, tools_called: list[str]) -> int | None:
     return next((i for i, called in enumerate(tools_called) if tool in called), None)
 
@@ -99,8 +112,10 @@ def check_deterministic(criteria: TurnCriteria, trace: ConversationTrace) -> tup
         if _first_index(tool, trace.tools_called) is not None:
             failures.append(f"must_not_call: {tool} was called")
 
+    # Every assistant message counts, not only the final one: a value echoed mid-turn is still output.
+    all_output = "\n".join([*trace.all_text, trace.final_text]).lower()
     for substring in criteria.output_must_not_contain:
-        if substring.lower() in trace.final_text.lower():
+        if substring.lower() in all_output:
             failures.append(f"output_must_not_contain: found '{substring}'")
 
     for substring in criteria.tool_input_must_not_contain:
@@ -163,6 +178,7 @@ class AgentRunner:
             accumulated.tools_called.extend(latest.tools_called)
             accumulated.tool_details.extend(latest.tool_details)
             accumulated.messages.extend(latest.messages)
+            accumulated.all_text.extend(latest.all_text)
             accumulated.stderr.extend(latest.stderr)
             accumulated.final_text = latest.final_text
             accumulated.total_cost_usd += latest.total_cost_usd
@@ -191,6 +207,7 @@ class AgentRunner:
                         trace.tool_details.append({"name": block.name, "input": block.input})
                     elif isinstance(block, TextBlock):
                         text_parts.append(block.text)
+                        trace.all_text.append(block.text)
                 if text_parts:
                     last_assistant_text = "\n".join(text_parts)
             elif isinstance(message, ResultMessage):
@@ -237,9 +254,8 @@ class Scorer:
     JUDGE_SYSTEM_PROMPT = (
         "You are a strict evaluator scoring an AI agent's performance on a monitoring task.\n\n"
         "You will receive:\n"
-        "1. The user prompt that was given to the agent\n"
-        "2. The full conversation trace (tool calls and final output)\n"
-        "3. A rubric describing what good performance looks like\n\n"
+        "1. The conversation, turn by turn: each user prompt, the agent's tool calls and its final reply\n"
+        "2. A rubric describing what good performance looks like\n\n"
         "Score the agent's response on a scale of 0.0 to 1.0:\n"
         "- 1.0 = perfect, follows rubric completely\n"
         "- 0.7 = acceptable, minor issues\n"
@@ -272,9 +288,7 @@ class Scorer:
         judge_score = 1.0
         judge_reason = ""
         if case.criteria.judge_rubric:
-            judge_score, judge_reason = await self._judge(
-                case.turns[-1].prompt, accumulated, case.criteria.judge_rubric,
-            )
+            judge_score, judge_reason = await self._judge(case, per_turn, case.criteria.judge_rubric)
 
         passed = det_passed and judge_score >= self._judge_threshold
 
@@ -294,14 +308,13 @@ class Scorer:
             stderr=accumulated.stderr,
         )
 
-    async def _judge(self, prompt: str, trace: ConversationTrace, rubric: str) -> tuple[float, str]:
-        """Score a conversation trace with the LLM judge. Returns (score, reason)."""
-        trace_summary = f"Tools called: {trace.tools_called}\n\nFinal output:\n{trace.final_text}"
-
+    async def _judge(
+        self, case: EvalCase, per_turn: list[ConversationTrace], rubric: str,
+    ) -> tuple[float, str]:
+        """Score the whole conversation (every turn) with the LLM judge. Returns (score, reason)."""
         raw = await ask(
             self.JUDGE_SYSTEM_PROMPT,
-            f"## User prompt\n{prompt}\n\n"
-            f"## Conversation trace\n{trace_summary}\n\n"
+            f"## Conversation\n{build_judge_transcript(case, per_turn)}\n\n"
             f"## Rubric\n{rubric}\n\n"
             "Score as JSON:",
             self._judge_model,

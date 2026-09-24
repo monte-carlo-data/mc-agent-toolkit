@@ -128,12 +128,15 @@ Each case is scored in two layers:
 
 1. **Deterministic checks** (pass/fail), per turn or per case:
    - `must_call`, `must_not_call`: tool names that must / must not appear in the trace
-   - `output_must_not_contain`: substrings that must not appear in the final reply
+   - `output_must_not_contain`: substrings that must not appear in any assistant message, not only
+     the final reply
    - `tool_input_must_not_contain`: substrings that must not appear in any tool call's input
      (plant a fake secret in the prompt to prove it never reaches a tool argument)
    - `must_call_before`: `{earlier_tool: [later_tool, ...]}`; each later tool, if called, must come
      after the first call to the earlier one
-2. **LLM judge** (0.0-1.0): Scores against the `judge_rubric`
+2. **LLM judge** (0.0-1.0): Scores against the `judge_rubric`. It sees every turn: each prompt, the
+   tool calls with their inputs (truncated), and each turn's final reply. A judge that errors or returns
+   no parseable verdict fails the case instead of being scored.
 
 A case passes if all deterministic checks pass AND judge score >= 0.7. Tool names in YAML use short names (e.g. `get_warehouses`); the runner matches via substring against full MCP tool names, so a prefix such as `create_` matches every create tool.
 
