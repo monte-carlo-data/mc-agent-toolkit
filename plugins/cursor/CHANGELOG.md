@@ -5,6 +5,12 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Cursor will be d
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.25.1] - 2026-09-24
+
+### Changed
+
+- onboarding: the final step now validates the connection over MCP — `validate_connection`, then `wait_for_validation_run` for the verdict — and reports each validation's result, with what to do on a failure, a timeout or the per-account limit on concurrent runs; the pre-create credentials check uses the same waiter. The UI test remains only as a fallback when the session does not serve the validation tools
+
 ## [1.25.0] - 2026-09-22
 
 ### Added

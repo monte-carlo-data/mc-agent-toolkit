@@ -61,9 +61,6 @@ connection for the intended account. The workflow requires no particular assista
 
 ## Not yet
 
-- **Validation.** The validations API is live (`validate_connection` + `get_validation_run`, 202 +
-  polling) and the skill uses it when the tools are served; a waiter tool that polls for you is
-  planned, and until then the skill ends with "validate in the UI".
 - **Azure and GCP agent/data-store registration, generic agent credentials, Snowflake key pair.**
   Their requests carry a secret, so they are CLI/Terraform steps rather than MCP tools.
 

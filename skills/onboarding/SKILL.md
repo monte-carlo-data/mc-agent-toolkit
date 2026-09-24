@@ -1,6 +1,6 @@
 ---
 name: monte-carlo-onboarding
-description: Connect a warehouse to Monte Carlo using API v2 tools. Discover or provision deployments, reference credentials, reuse or create the connection, and guide validation. Use when asked to connect a platform or onboard a warehouse.
+description: Connect a warehouse to Monte Carlo using API v2 tools. Discover or provision deployments, reference credentials, reuse or create the connection, and validate it. Use when asked to connect a platform or onboard a warehouse.
 metadata:
   bucket: Setup
 ---
@@ -68,7 +68,7 @@ instrument-agent; for an already-connected warehouse's monitoring use monitoring
 | Warehouse | `list_warehouses`, `get_warehouse`, `create_warehouse`, `update_warehouse`, `delete_warehouse` |
 | Connection | `list_connections`, `get_connection`, `create_connection`, `update_connection`, `delete_connection` |
 | Identity | `get_current_user` (which account you are in, and whether it is paused) |
-| Validation | `validate_connection`, `get_validation_run` (Step 5; when the session serves them) |
+| Validation | `validate_connection`, `wait_for_validation_run`, `get_validation_run` (Steps 2 and 5) |
 
 Operations whose request or response carries a secret are **not MCP tools** and are handed to the
 customer as a CLI or Terraform step: `create_snowflake_credentials`, `validate_snowflake_credentials`, the Azure and GCP agent and
@@ -240,8 +240,9 @@ authentication details. If it changes, revisit the deployment choice before writ
 
 **Validate before creating.** Each self-hosted create has a matching validate that takes the same
 arguments plus `deployment_id`: `validate_aws_secrets_manager_credentials`, `validate_gcp_secret_manager_credentials`, `validate_azure_key_vault_credentials`, `validate_env_var_credentials`, `validate_file_credentials`. It creates nothing and
-returns a run: poll `get_validation_run` until `status` is `completed`, honoring `Retry-After`, and
-create only once every validation has `passed`. A failure here is almost always the agent's access
+returns a run: pass its `id` to `wait_for_validation_run` and create only when the `verdict` is
+`passed`. On `failed`, relay each error's `friendly_message` and `resolution` and stop before
+creating anything. A failure here is almost always the agent's access
 to the secret (IAM grant, trust policy, service-account role, Key Vault policy), and it is cheapest
 to fix now, before a warehouse or connection exists. For a Snowflake key pair Monte Carlo will
 store, emit the validate step beside the create step:
@@ -286,22 +287,36 @@ warehouse/deployment association and record `id`, `connection_type`, `deployment
 
 ## Step 5: Validate
 
-The validations API is live: `validate_connection` starts a run for a connection (202, with the
-run id) and `get_validation_run` reads it — poll until `status` is `completed`, honoring the
-`Retry-After` the response carries, then read each validation's own `passed` verdict. Use those
-tools when the session serves them (they reach the MCP server as the generator ships). A dedicated
-waiter tool that polls for you is planned; until one of these is available, end with UI validation.
-Do **not** substitute any other tool for validation. End with:
+Run this for every connection created or reused in this run:
+
+1. `validate_connection(connection_id)` starts a run and returns at once with its `id`.
+2. `wait_for_validation_run(run_id=<id>)` waits for the run and returns a `verdict` and one entry per
+   validation. It paces itself; do not poll `get_validation_run` in a loop.
+
+Report the result from `verdict` and each validation's `passed`, never from its `status` (which only
+says whether the check ran):
+
+- **`passed`**: the connection works. Warnings are non-blocking; list them. Collection starts on its
+  own, and the first metadata appears within about an hour.
+- **`failed`**: for each validation that did not pass, give its `name`, then its errors'
+  `friendly_message` and `resolution` verbatim. A `skipped` validation waited on a prerequisite that
+  failed; fix that one first. The usual causes, in order: the agent cannot read the secret (IAM
+  grant, service-account role or Key Vault policy missing); the warehouse user lacks the grants in
+  the connector's docs page; the network path is missing (Monte Carlo's IPs not allowlisted for the
+  cloud node, or the agent's VPC has no route to the warehouse). After the fix, call
+  `validate_connection` again; a new run is needed, and the connection itself does not change.
+- **`timed_out: true`**: the run is still going. Call `wait_for_validation_run` again with the same
+  `run_id`; the run stays readable until its `expires_at`.
+- **Validate call refused as rate limited**: the account already has the maximum of 10 validation runs in
+  progress. Do not start more. Wait for the runs this session started, then retry after the delay
+  the error states.
+
+Do **not** substitute any other tool for validation. If the session does not serve
+`validate_connection` and `wait_for_validation_run`, end with:
 
 > Validate the connection in the Monte Carlo UI: Settings → Integrations → the integration → the
-> new connection → **Test**. Collection starts on its own once the connection exists; the first metadata
-> appears within about an hour. Until the test and initial collection are confirmed, report
+> new connection → **Test**. Until the test and initial collection are confirmed, report
 > **connection created, validation pending**, not a completed onboarding.
-
-If validation fails there, the usual causes are, in order: the agent cannot read the secret (IAM
-grant, service-account role or Key Vault policy missing); the warehouse user lacks the grants in
-the connector's docs page; the network path is missing (Monte Carlo's IPs not allowlisted for the
-cloud node, or the agent's VPC has no route to the warehouse). Fix, then `update_connection` is not needed: re-test in the UI.
 
 ## Step 6: Summary (always)
 
@@ -317,13 +332,14 @@ Created in this run
   credentials   <id>  <connection_type>  <storage_type>  (or: CLI/Terraform step handed over)
   warehouse     <id>  <name>  <type>
   connection    <id>  <name>  <connection_type>  job_types=<…>
+  validation    <run id>  <verdict>  <validations_passed>/<validations_total> passed  (or: pending, validate in the UI)
 
 Reused (excluded from cleanup)
   deployment / agent|store / credentials / warehouse / connection  <ids and names>
 
 Pending on your side
   - <deploy/register/credential step still to run, with the exact command or file>
-  - Validate the connection (Step 5: validate_connection, or in the UI under Settings → Integrations → <integration> → <connection name> → Test)
+  - Unless validation passed: fix what it reported and re-run Step 5, or test in the UI under Settings → Integrations → <integration> → <connection name> → Test
 
 Cleanup if you abandon this: delete_connection → delete_warehouse → delete_<kind>_credentials →
 delete_<platform>_collection_agent|data_store → delete_deployment, in that order. On the generic
