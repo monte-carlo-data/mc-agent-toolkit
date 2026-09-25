@@ -46,8 +46,10 @@ systems in between. So the skill works with credentials in one of two ways:
 - **Run a local step.** Credentials Monte Carlo must hold, such as a Snowflake key pair or a
   generic agent token, are created by a CLI command or a Terraform resource that the skill writes
   for you. You run it on your machine; it reads the secret from a file and sends it to Monte
-  Carlo directly, and you give back only the resulting id. Terraform takes the secret as a
-  write-only argument (Terraform 1.11 or later), so it is never stored in state or a plan.
+  Carlo directly, and you give back only the resulting id. Terraform takes a secret you supply,
+  such as the key pair, as a write-only argument (Terraform 1.11 or later), so it is never stored
+  in state or a plan. A secret Monte Carlo generates, such as the agent token, is returned once and
+  stays in that resource's state, so keep state encrypted and access-limited.
 
 The operations this rules out as MCP tools are listed under *Not yet*. If you paste a secret into
 the chat anyway, the skill stops, asks you to rotate it, and continues with one of the paths above.

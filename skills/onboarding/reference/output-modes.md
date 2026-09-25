@@ -173,8 +173,8 @@ resource "montecarlo_generic_collection_agent" "agent" {
 }
 ```
 
-The module populates the agent-auth secret; integration secrets and permissions remain a
-separate step. For existing networking/cluster/identity, use the module's documented inputs
+The agent reads its credential from the secret written above; integration secrets and
+permissions remain a separate step. For existing networking/cluster/identity, use the module's documented inputs
 instead of its new-cluster defaults. See the [module](https://registry.terraform.io/modules/monte-carlo-data/mcd-k8s-agent/aws/0.1.10)
 and the [Generic guide](https://docs.getmontecarlo.com/docs/generic-agent-platforms).
 
@@ -431,12 +431,15 @@ not a substitute for resolving the customer's intended account/environment befor
 
 The first run of a new deployment stops for infrastructure. Subsequent runs reconcile existing
 resources and register a pending agent before continuing. A null External ID or failed enable
-stops the connection steps. The script prints created/reused IDs and the pending stage on exit.
+stops the connection steps. Before creating a credential reference it validates it from the
+deployment and stops, creating nothing, unless every validation passed. The script prints
+created/reused IDs and the pending stage on exit.
 It does not read secret contents; MCP-managed key pairs use the separate local CLI/Terraform path.
 
 ```python
 import os
 import sys
+import time
 import montecarlo
 from montecarlo.paging import paginate
 
@@ -448,6 +451,7 @@ def main():
     credentials = montecarlo.CredentialsApi(client)
     warehouses = montecarlo.WarehousesApi(client)
     connections = montecarlo.ConnectionsApi(client)
+    validations = montecarlo.ValidationsApi(client)
     created, reused = {}, {}
     pending = "Resolve inputs; no connection has been verified."
 
@@ -458,6 +462,20 @@ def main():
         if len(matches) > 1:
             raise ValueError(f"Several {label} entries match; select a verified ID")
         return matches[0] if matches else None
+
+    def check(run, label):
+        # A run takes seconds to a few minutes; each validation carries its own verdict.
+        deadline = time.monotonic() + 300
+        while run.status != "completed":
+            if time.monotonic() > deadline:
+                raise ValueError(f"{label} validation {run.id} is still running; read it again later")
+            time.sleep(10)
+            run = validations.get_validation_run(run.id)
+        failed = [v for v in run.validations if v.passed is not True]
+        if failed:
+            problems = "; ".join(f"{e.friendly_message} {e.resolution or ''}".strip()
+                                 for v in failed for e in v.errors) or "see the validation run"
+            raise ValueError(f"{label} validation {run.id} failed: {problems}")
 
     try:
         identity = montecarlo.UsersApi(client).get_current_user()
@@ -515,6 +533,11 @@ def main():
                     candidates.append(detail)
         creds = select(candidates, os.environ.get("MCD_CREDENTIALS_ID"), "credentials")
         if creds is None:
+            # Check the reference from this deployment before storing it; the check creates nothing.
+            check(credentials.validate_aws_secrets_manager_credentials(
+                montecarlo.AwsSecretsManagerCredentialsValidateIn(
+                    deployment_id=dep.id, connection_type="snowflake", aws_secret=secret_arn)),
+                "Credentials")
             creds = credentials.create_aws_secrets_manager_credentials(
                 montecarlo.AwsSecretsManagerCredentialsIn(connection_type="snowflake", aws_secret=secret_arn))
             created["credentials"] = creds.id
