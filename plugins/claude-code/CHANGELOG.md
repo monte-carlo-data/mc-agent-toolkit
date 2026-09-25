@@ -5,11 +5,18 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Claude Code will
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.25.2] - 2026-09-24
+## [1.25.3] - 2026-09-25
 
 ### Changed
 
 - onboarding: the final step now validates the connection over MCP — `validate_connection`, then `wait_for_validation_run` for the verdict — and reports each validation's result, with what to do on a failure, a timeout or the per-account limit on concurrent runs; the pre-create credentials check uses the same waiter. The UI test remains only as a fallback when the session does not serve the validation tools
+
+## [1.25.2] - 2026-09-24
+
+### Changed
+
+- Onboarding skill: the per-tag API reference is marked plugin-only, so the Monte Carlo MCP server's `mc-onboarding` prompt no longer inlines a restatement of the tools' own schemas.
+- Portability contract (CONTRIBUTING): mention reference files by relative path; the MCP prompt renderer inlines those mentioned outside plugin-only blocks.
 
 ## [1.25.1] - 2026-09-24
 

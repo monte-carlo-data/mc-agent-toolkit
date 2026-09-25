@@ -87,7 +87,7 @@ Slash commands, hook behaviour and "use the Read tool on `references/…`" instr
 <!-- plugin-only:end -->
 ```
 
-Text outside the markers must stand alone: bare MCP tool names, no slash commands, reference files named by content. Full contract: `CONTRIBUTING.md § Portability markers for plugin-only sections`.
+Text outside the markers must stand alone: bare MCP tool names, no slash commands, reference files mentioned by relative path (the renderer inlines those mentioned outside the markers). Full contract: `CONTRIBUTING.md § Portability markers for plugin-only sections`.
 
 ## Create symlinks in all editor plugins when adding a skill
 

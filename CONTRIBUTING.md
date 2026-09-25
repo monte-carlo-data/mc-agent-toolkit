@@ -168,10 +168,11 @@ Invoke explicitly with `/monte-carlo-example`.
 Rules:
 
 - Markers are line-anchored and never nest. A renderer drops everything between a `start` and the next `end`, inclusive.
-- Everything outside the markers must stand alone without the plugin: name MCP tools by their bare names, not slash commands; refer to reference files by what they contain ("the per-tag API reference") so a renderer can inline them.
+- Everything outside the markers must stand alone without the plugin: name MCP tools by their bare names, not slash commands.
+- Mention reference files by relative path, as a Markdown link or a code span; a `<placeholder>` segment, as in `reference/api/<tag>.md`, matches every file there. A prompt cannot read files, so the renderer inlines each file mentioned outside the markers, and the files those mention. To keep a file out of the prompt, mention it only inside a marked block — for example a reference that restates the MCP tools' own schemas.
 - Keep the marked block short. If most of a skill is plugin-only, the skill is a plugin feature, not a portable skill.
 
-New fully portable skills should keep host conventions in adapters outside the skill directory and use standard `name`, `description` and optional `metadata` frontmatter. Put catalog hints under `metadata` (for example, `metadata.bucket`), and activation guidance in `description` and the body. `skills/onboarding/SKILL.md` is the fully portable example; it does not require stripping marked sections. The renderer lives in the MCP server (ai-agent); this repo only defines the contract.
+New fully portable skills should keep host conventions in adapters outside the skill directory and use standard `name`, `description` and optional `metadata` frontmatter. Put catalog hints under `metadata` (for example, `metadata.bucket`), and activation guidance in `description` and the body. `skills/onboarding/SKILL.md` is the portable example: its one marked block keeps the per-tag API reference, which restates the tool schemas, out of the MCP prompt. The renderer is `mcp-server/mcp_server/prompt_renderer.py` in [ai-agent](https://github.com/monte-carlo-data/ai-agent); this repo only defines the contract.
 
 ### Naming
 
