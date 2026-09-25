@@ -9,7 +9,7 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- onboarding: Terraform examples pass every secret as a write-only argument (`<name>_wo` with `<name>_wo_version`), so it is never stored in state or a plan, and require Terraform 1.11 or later. The generic agent example writes its OAuth client secret to Secrets Manager write-only and points the EKS module at it (`oauth_secret`, `token_secret = { create = false }`) instead of passing it through `oauth_credentials`/`token_credentials`, which stored it a second time. Follows terraform-provider-montecarlo#23.
+- onboarding: a new rule in the skill has Terraform artifacts take every secret write-only and never output generated ones; the Terraform examples pass every secret as a write-only argument (`<name>_wo` with `<name>_wo_version`), so it is never stored in state or a plan, and require Terraform 1.11 or later. The generic agent example writes its OAuth client secret to Secrets Manager write-only and points the EKS module at it (`oauth_secret`, `token_secret = { create = false }`) instead of passing it through `oauth_credentials`/`token_credentials`, which stored it a second time. Follows terraform-provider-montecarlo#23.
 
 ## [1.25.3] - 2026-09-25
 

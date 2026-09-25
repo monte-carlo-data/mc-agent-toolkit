@@ -75,6 +75,15 @@ instrument-agent; for an already-connected warehouse's monitoring use monitoring
    `montecarlo deployments --help` that the REST API CLI is the one on their path; and the
    profile is set by the customer with `montecarlo profile set … --api-token-prompt`, never by
    pasting a token here.
+7. **Terraform takes secrets write-only.** In a Terraform artifact, pass every secret as the
+   resource's write-only argument, `<name>_wo` with `<name>_wo_version = 1` (for example
+   `private_key_wo` on `montecarlo_snowflake_credentials`), read from a file or an uncommitted
+   variable, and set `required_version = ">= 1.11"`. Tell the customer that changing a secret
+   alone plans nothing, so they bump its version with it. Secrets Monte Carlo generates (a generic
+   agent's token or OAuth client secret) are returned once and stay in that resource's state:
+   hand them on write-only, for example to Secrets Manager with `secret_string_wo` as the
+   output-modes reference shows, and never through an `output`, which state stores too. Either
+   way, recommend a state backend that encrypts state and limits who can read it.
 
 ## Tools
 
