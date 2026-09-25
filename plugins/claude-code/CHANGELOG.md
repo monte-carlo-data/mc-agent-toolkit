@@ -5,6 +5,12 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Claude Code will
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.25.4] - 2026-09-25
+
+### Changed
+
+- onboarding: Terraform examples pass every secret as a write-only argument (`<name>_wo` with `<name>_wo_version`), so it is never stored in state or a plan, and require Terraform 1.11 or later. The generic agent example writes its OAuth client secret to Secrets Manager write-only and points the EKS module at it (`oauth_secret`, `token_secret = { create = false }`) instead of passing it through `oauth_credentials`/`token_credentials`, which stored it a second time. Follows terraform-provider-montecarlo#23.
+
 ## [1.25.3] - 2026-09-25
 
 ### Changed
