@@ -322,7 +322,7 @@ Run this for every connection created or reused in this run:
 2. `get_validation_run(run_id=<id>)` reads the run. Read it again until its `status` is `completed`.
    A run usually takes from a few seconds to a few minutes. If you can pause between calls, wait
    about 3 seconds between reads; do not read it more often than that. If it is still running after
-   about 5 minutes, stop and report it as pending with its `id`, which can be read again until its
+   about 5 minutes, stop and report it as still running with its `id`, which can be read again until its
    `expires_at`.
 
 Judge each validation by `passed` only, never by its `status`. `status` only says whether the check
@@ -363,14 +363,16 @@ Created in this run
   credentials   <id>  <connection_type>  <storage_type>  (or: CLI/Terraform step handed over)
   warehouse     <id>  <name>  <type>
   connection    <id>  <name>  <connection_type>  job_types=<…>
-  validation    <run id>  passed | failed | pending  <validations_passed>/<validations_total> passed  (or: validate in the UI)
+  validation    <run id>  passed | failed | running  <validations_passed>/<validations_total> passed  (or: not available in this session)
 
 Reused (excluded from cleanup)
   deployment / agent|store / credentials / warehouse / connection  <ids and names>
 
 Pending on your side
   - <deploy/register/credential step still to run, with the exact command or file>
-  - Unless validation passed: fix what it reported and re-run Step 5, or test in the UI under Settings → Integrations → <integration> → <connection name> → Test
+  - Validation still running: read it again with get_validation_run(run_id=<run id>) before its expires_at; do not start a new one
+  - Validation failed: fix what it reported, then re-run Step 5 (a new validate_connection)
+  - Validation tools not available in this session: test in the UI under Settings → Integrations → <integration> → <connection name> → Test
 
 Cleanup if you abandon this: delete_connection → delete_warehouse → delete_<kind>_credentials →
 delete_<platform>_collection_agent|data_store → delete_deployment, in that order. On the generic
