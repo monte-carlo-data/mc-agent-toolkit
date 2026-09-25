@@ -48,8 +48,14 @@ instrument-agent; for an already-connected warehouse's monitoring use monitoring
    service-account key, token, or passphrase. Credentials the customer hosts are *referenced*
    (secret name, ARN, vault, variable name, file path). Credentials Monte Carlo must hold (a
    Snowflake key pair, a generic agent token) are created by a CLI or Terraform step the customer
-   runs on their own machine. If the user pastes a secret into the chat, stop, tell them it is now
-   in the transcript and should be rotated, and continue with the reference or CLI path.
+   runs on their own machine. The reason is structural, not a preference: whatever a tool receives
+   the model has to write into the call, and whatever a tool returns the model reads, so a secret
+   in either direction lands in the model's context, the transcript and the logs of every system
+   in between. That is why Monte Carlo exposes **no MCP tool that accepts or returns a secret**;
+   the operations that do are CLI or Terraform steps. Tell the user this the first time the flow
+   reaches a credential, so a local step reads as a safeguard rather than a gap. If the user
+   pastes a secret into the chat, stop, tell them it is now in the transcript and should be
+   rotated, and continue with the reference or CLI path.
 3. **Never create a deployment with nothing behind it.** A deployment exists to host a collection
    agent or a data store. It is provisioned only when one of those will be registered on it, in
    the same run or in a follow-up the user commits to.
@@ -72,8 +78,10 @@ instrument-agent; for an already-connected warehouse's monitoring use monitoring
 | Identity | `get_current_user` (which account you are in, and whether it is paused) |
 | Validation | `validate_connection`, `get_validation_run` (Steps 2 and 5) |
 
-Operations whose request or response carries a secret are **not MCP tools** and are handed to the
-customer as a CLI or Terraform step: `create_snowflake_credentials`, `validate_snowflake_credentials`, the Azure and GCP agent and
+By design, no MCP tool accepts or returns a secret (rule 2). Operations whose request or response
+carries one are **not MCP tools** and are handed to the customer as a CLI or Terraform step, which
+reads the secret from a file on their machine and sends it to Monte Carlo directly:
+`create_snowflake_credentials`, `validate_snowflake_credentials`, the Azure and GCP agent and
 data-store registrations, `create_generic_collection_agent_token` and
 `create_generic_collection_agent_oauth_client`. The reference files mark them.
 
@@ -217,6 +225,13 @@ Whatever the branch, carry one `deployment_id` into Step 2.
 just `connection_type`. Use the appropriate non-secret getter to inspect the secret reference,
 region and assumed role, or ask for a known credentials ID. Do not read secret contents to make
 this choice; if identity remains ambiguous, ask. Record reused IDs as well as created ones.
+
+Before asking anything about credentials, and unless the run already covered it (rule 2), tell
+the user how they are handled in one or two sentences of your own. For example: "Monte Carlo never passes a credential through this chat or
+through a tool: anything a tool receives or returns is visible to the model. So I will either
+reference a secret you keep in your own secret store, or give you a command to run on your
+machine that sends it to Monte Carlo directly." Then ask only for the reference or the non-secret
+details.
 
 Otherwise the deployment from Step 1 decides what is possible:
 

@@ -10,6 +10,7 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Changed
 
 - onboarding: the final step now validates the connection over MCP — `validate_connection`, then `get_validation_run` until the run completes — and reports each validation's result judged by `passed`, with what to do on a failure, a run that is still going or the per-account limit on concurrent runs; the pre-create credentials check reads its run the same way. The UI test remains only as a fallback when the session does not serve the validation tools
+- onboarding: the skill now explains to the user, the first time the flow reaches a credential, that Monte Carlo exposes no MCP tool that accepts or returns a secret, because anything a tool receives or returns is visible to the model; credentials are referenced from the customer's own secret store or created by a local CLI/Terraform step. The README gains a *How credentials are handled* section, and its intro no longer describes validation as a UI step
 
 ## [1.25.2] - 2026-09-24
 
