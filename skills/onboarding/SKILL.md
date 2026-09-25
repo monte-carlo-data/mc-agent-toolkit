@@ -64,6 +64,17 @@ instrument-agent; for an already-connected warehouse's monitoring use monitoring
    again for each call. Confirm a change of scope or a destructive action separately.
 5. **Every run ends with the summary** in *Step 6*, whether it completed, stopped early, or hit an
    error. Ids created by this run are the customer's cleanup list.
+6. **Local steps use mc-cli.** Every step the customer runs themselves, including the operations
+   that are not MCP tools, is written for [mc-cli](https://github.com/monte-carlo-data/mc-cli), the
+   `montecarlo` command for the REST API v2. It covers every operation the tools here do, plus the
+   ones that carry a secret, and returns the same ids, so the summary stays consistent. Recommend it by default; emit Terraform
+   instead when the customer asks for it or already manages this infrastructure with Terraform,
+   and a Python script over the SDK only when they ask for one. Setup and commands are in the
+   output-modes reference. Two cautions to pass on: the legacy `montecarlodata` Python CLI
+   installs a command with the same name, so have the customer confirm with
+   `montecarlo deployments --help` that the REST API CLI is the one on their path; and the
+   profile is set by the customer with `montecarlo profile set … --api-token-prompt`, never by
+   pasting a token here.
 
 ## Tools
 
@@ -86,9 +97,9 @@ data-store registrations, `create_generic_collection_agent_token` and
 `create_generic_collection_agent_oauth_client`. The reference files mark them.
 
 Check which v2 tools are actually available before promising an automated run. Missing tools,
-read-only mode and a missing `mcp/edit` scope are different conditions. Use the equivalent v2
-CLI/SDK/Terraform operation from the output-modes reference when needed; request only its
-non-secret result/IDs and reconcile them before continuing. If neither the tool nor a usable
+read-only mode and a missing `mcp/edit` scope are different conditions. Use the equivalent mc-cli
+command (rule 6), or the SDK or Terraform equivalent, from the output-modes reference when needed;
+request only its non-secret result/IDs and reconcile them before continuing. If neither the tool nor a usable
 local-client path is available, explain the pending step and who can complete it. A reference
 entry or an open implementation PR is not evidence that a tool is deployed in this session.
 
@@ -344,7 +355,7 @@ Finish every run, including an aborted one, with:
 
 ```
 Account: <account_name> (<account_id>)
-Output mode: act now | terraform | script
+Output mode: act now | mc-cli | terraform | script
 
 Created in this run
   deployment    <id>  <name>  <type>/<runtime_platform>  enabled=<bool>

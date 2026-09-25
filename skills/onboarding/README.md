@@ -3,8 +3,8 @@
 Connect a data platform to Monte Carlo from your editor: choose or provision the **deployment** the
 connection runs through (the Monte Carlo hosted cloud node, a collection agent in your network, or
 a customer-owned data store), reference the **credentials**, create the **warehouse** and the
-**connection**, then validate the connection. Built on the Monte Carlo REST API v2 tools served by the
-Monte Carlo MCP server.
+**connection**, then validate the connection. Built on the Monte Carlo REST API v2 tools served by
+the Monte Carlo MCP server.
 
 ## What it does
 
@@ -26,9 +26,10 @@ the skill:
 6. Ends with created/reused IDs, the validation result, a scoped cleanup order and the next
    pending step. Creation alone is not a completed onboarding.
 
-The assistant guides the requested connection by default and honors Terraform or SDK/CLI output
-when requested. Missing MCP operations use an available v2 local-client handoff, with non-secret
-results reconciled before continuing. Sample storage choices do not relocate metadata, metrics
+The assistant guides the requested connection by default. Steps you run yourself use
+[mc-cli](https://github.com/monte-carlo-data/mc-cli), the `montecarlo` command for the REST API
+v2, unless you ask for Terraform or an SDK script instead. Missing MCP operations use the same
+local handoff, with non-secret results reconciled before continuing. Sample storage choices do not relocate metadata, metrics
 or query logs from Monte Carlo.
 
 ## How credentials are handled
@@ -57,6 +58,11 @@ the chat anyway, the skill stops, asks you to rotate it, and continues with one 
   the `mcp/edit` scope.
 - Cloud credentials **on your machine** for the agent, data store or secret-store steps the skill
   hands over; the skill never asks for them.
+- [mc-cli](https://github.com/monte-carlo-data/mc-cli) for the steps you run locally. Until its
+  first release, build it from source (`go build -o . ./cmd/montecarlo` in a clone), then set a
+  profile with `montecarlo profile set default --api-id <id> --api-token-prompt`. The legacy
+  `montecarlodata` Python CLI installs a command with the same name but speaks a different API;
+  `montecarlo deployments --help` confirms you are running mc-cli.
 
 ## Setup
 
