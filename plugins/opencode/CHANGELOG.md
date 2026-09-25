@@ -9,7 +9,7 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- onboarding: the final step now validates the connection over MCP — `validate_connection`, then `wait_for_validation_run` for the verdict — and reports each validation's result, with what to do on a failure, a timeout or the per-account limit on concurrent runs; the pre-create credentials check uses the same waiter. The UI test remains only as a fallback when the session does not serve the validation tools
+- onboarding: the final step now validates the connection over MCP — `validate_connection`, then `get_validation_run` until the run completes — and reports each validation's result judged by `passed`, with what to do on a failure, a run that is still going or the per-account limit on concurrent runs; the pre-create credentials check reads its run the same way. The UI test remains only as a fallback when the session does not serve the validation tools
 
 ## [1.25.2] - 2026-09-24
 

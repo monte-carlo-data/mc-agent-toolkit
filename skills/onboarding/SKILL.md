@@ -70,7 +70,7 @@ instrument-agent; for an already-connected warehouse's monitoring use monitoring
 | Warehouse | `list_warehouses`, `get_warehouse`, `create_warehouse`, `update_warehouse`, `delete_warehouse` |
 | Connection | `list_connections`, `get_connection`, `create_connection`, `update_connection`, `delete_connection` |
 | Identity | `get_current_user` (which account you are in, and whether it is paused) |
-| Validation | `validate_connection`, `wait_for_validation_run`, `get_validation_run` (Steps 2 and 5) |
+| Validation | `validate_connection`, `get_validation_run` (Steps 2 and 5) |
 
 Operations whose request or response carries a secret are **not MCP tools** and are handed to the
 customer as a CLI or Terraform step: `create_snowflake_credentials`, `validate_snowflake_credentials`, the Azure and GCP agent and
@@ -242,9 +242,9 @@ authentication details. If it changes, revisit the deployment choice before writ
 
 **Validate before creating.** Each self-hosted create has a matching validate that takes the same
 arguments plus `deployment_id`: `validate_aws_secrets_manager_credentials`, `validate_gcp_secret_manager_credentials`, `validate_azure_key_vault_credentials`, `validate_env_var_credentials`, `validate_file_credentials`. It creates nothing and
-returns a run: pass its `id` to `wait_for_validation_run` and create only when the `verdict` is
-`passed`. On `failed`, relay each error's `friendly_message` and `resolution` and stop before
-creating anything. A failure here is almost always the agent's access
+returns a run: read it with `get_validation_run` as in Step 5, and create only when every validation
+has `passed: true`. If any has `passed: false`, relay its errors' `friendly_message` and
+`resolution` and stop before creating anything. A failure here is almost always the agent's access
 to the secret (IAM grant, trust policy, service-account role, Key Vault policy), and it is cheapest
 to fix now, before a warehouse or connection exists. For a Snowflake key pair Monte Carlo will
 store, emit the validate step beside the create step:
@@ -291,30 +291,33 @@ warehouse/deployment association and record `id`, `connection_type`, `deployment
 
 Run this for every connection created or reused in this run:
 
-1. `validate_connection(connection_id)` starts a run and returns at once with its `id`.
-2. `wait_for_validation_run(run_id=<id>)` waits for the run and returns a `verdict` and one entry per
-   validation. It paces itself; do not poll `get_validation_run` in a loop.
+1. `validate_connection(connection_id)` starts a run and returns at once. Its response is the run
+   itself, still in progress; keep its `id`.
+2. `get_validation_run(run_id=<id>)` reads the run. Read it again until its `status` is `completed`.
+   A run usually takes from a few seconds to a few minutes. If you can pause between calls, wait
+   about 3 seconds between reads; do not read it more often than that. If it is still running after
+   about 5 minutes, stop and report it as pending with its `id`, which can be read again until its
+   `expires_at`.
 
-Report the result from `verdict` and each validation's `passed`, never from its `status` (which only
-says whether the check ran):
+Judge each validation by `passed` only, never by its `status`. `status` only says whether the check
+ran: a validation can be `completed` and still have failed. The connection works when every
+validation has `passed: true`; it does not when any has `passed: false`.
 
-- **`passed`**: the connection works. Warnings are non-blocking; list them. Collection starts on its
-  own, and the first metadata appears within about an hour.
-- **`failed`**: for each validation that did not pass, give its `name`, then its errors'
+- **Every validation passed**: the connection works. `warnings` are non-blocking; list them.
+  Collection starts on its own, and the first metadata appears within about an hour.
+- **Any validation did not pass**: for each one, give its `name`, then its errors'
   `friendly_message` and `resolution` verbatim. A `skipped` validation waited on a prerequisite that
-  failed; fix that one first. The usual causes, in order: the agent cannot read the secret (IAM
+  did not pass; fix that one first. The usual causes, in order: the agent cannot read the secret (IAM
   grant, service-account role or Key Vault policy missing); the warehouse user lacks the grants in
   the connector's docs page; the network path is missing (Monte Carlo's IPs not allowlisted for the
   cloud node, or the agent's VPC has no route to the warehouse). After the fix, call
   `validate_connection` again; a new run is needed, and the connection itself does not change.
-- **`timed_out: true`**: the run is still going. Call `wait_for_validation_run` again with the same
-  `run_id`; the run stays readable until its `expires_at`.
 - **Validate call refused as rate limited**: the account already has the maximum of 10 validation runs in
-  progress. Do not start more. Wait for the runs this session started, then retry after the delay
-  the error states.
+  progress. Do not start more. Finish reading the runs this session started, then try again a
+  minute later.
 
 Do **not** substitute any other tool for validation. If the session does not serve
-`validate_connection` and `wait_for_validation_run`, end with:
+`validate_connection` and `get_validation_run`, end with:
 
 > Validate the connection in the Monte Carlo UI: Settings → Integrations → the integration → the
 > new connection → **Test**. Until the test and initial collection are confirmed, report
@@ -334,7 +337,7 @@ Created in this run
   credentials   <id>  <connection_type>  <storage_type>  (or: CLI/Terraform step handed over)
   warehouse     <id>  <name>  <type>
   connection    <id>  <name>  <connection_type>  job_types=<…>
-  validation    <run id>  <verdict>  <validations_passed>/<validations_total> passed  (or: pending, validate in the UI)
+  validation    <run id>  passed | failed | pending  <validations_passed>/<validations_total> passed  (or: validate in the UI)
 
 Reused (excluded from cleanup)
   deployment / agent|store / credentials / warehouse / connection  <ids and names>
