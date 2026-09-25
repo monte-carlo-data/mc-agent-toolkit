@@ -313,10 +313,13 @@ Reusing an existing deployment: omit creation/registration blocks and their `dep
 outputs; use the verified deployment ID. Likewise omit reused warehouse/credential resources
 and pass their IDs. Never destroy a shared reused resource as part of cleanup.
 
-## CLI (`montecarlo`, the REST API CLI)
+## CLI (mc-cli, the `montecarlo` command for the REST API v2) — recommended for local steps
 
-Install: `go install github.com/monte-carlo-data/mc-cli/cmd/montecarlo@latest` (or build from
-source until the first release). Profile once:
+Source: https://github.com/monte-carlo-data/mc-cli. Until its first release, build from source:
+`git clone https://github.com/monte-carlo-data/mc-cli.git && cd mc-cli && go build -o . ./cmd/montecarlo`.
+After the release, `go install github.com/monte-carlo-data/mc-cli/cmd/montecarlo@latest`. The
+legacy `montecarlodata` Python CLI installs a `montecarlo` command too; `montecarlo deployments
+--help` succeeds only with mc-cli. Profile once (the customer types the token at the prompt):
 `montecarlo profile set default --api-id <id> --api-token-prompt`. Every resource is a command
 group and every operation a verb; `--output json` for machine-readable ids; a secret flag takes
 `@<path>` or has a `--<flag>-prompt` companion.
@@ -516,6 +519,6 @@ if __name__ == "__main__":
     raise SystemExit(main())
 ```
 
-The legacy `montecarlodata` Python CLI is not part of this flow: it speaks a different API and its
-ids are not the ids the tools above return. Use the `montecarlo` CLI or the SDK so the summary of
-created ids stays consistent.
+The legacy `montecarlodata` Python CLI is not part of this flow, even though its command is also
+named `montecarlo`: it speaks a different API and its ids are not the ids the tools above return.
+Use mc-cli or the SDK so the summary of created ids stays consistent.

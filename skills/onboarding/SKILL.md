@@ -1,6 +1,6 @@
 ---
 name: monte-carlo-onboarding
-description: Connect a warehouse to Monte Carlo using API v2 tools. Discover or provision deployments, reference credentials, reuse or create the connection, and guide validation. Use when asked to connect a platform or onboard a warehouse, including generating the Terraform or a script for it.
+description: Connect a warehouse to Monte Carlo using API v2 tools. Discover or provision deployments, reference credentials, reuse or create the connection, and validate it. Use when asked to connect a platform or onboard a warehouse, including generating the Terraform or a script for it.
 metadata:
   bucket: Setup
 ---
@@ -48,8 +48,14 @@ instrument-agent; for an already-connected warehouse's monitoring use monitoring
    service-account key, token, or passphrase. Credentials the customer hosts are *referenced*
    (secret name, ARN, vault, variable name, file path). Credentials Monte Carlo must hold (a
    Snowflake key pair, a generic agent token) are created by a CLI or Terraform step the customer
-   runs on their own machine. If the user pastes a secret into the chat, stop, tell them it is now
-   in the transcript and should be rotated, and continue with the reference or CLI path.
+   runs on their own machine. The reason is structural, not a preference: whatever a tool receives
+   the model has to write into the call, and whatever a tool returns the model reads, so a secret
+   in either direction lands in the model's context, the transcript and the logs of every system
+   in between. That is why Monte Carlo exposes **no MCP tool that accepts or returns a secret**;
+   the operations that do are CLI or Terraform steps. Tell the user this the first time the flow
+   reaches a credential, so a local step reads as a safeguard rather than a gap. If the user
+   pastes a secret into the chat, stop, tell them it is now in the transcript and should be
+   rotated, and continue with the reference or CLI path.
 3. **Never create a deployment with nothing behind it.** A deployment exists to host a collection
    agent or a data store. It is provisioned only when one of those will be registered on it, in
    the same run or in a follow-up the user commits to.
@@ -58,6 +64,17 @@ instrument-agent; for an already-connected warehouse's monitoring use monitoring
    again for each call. Confirm a change of scope or a destructive action separately.
 5. **Every run ends with the summary** in *Step 6*, whether it completed, stopped early, or hit an
    error. Ids created by this run are the customer's cleanup list.
+6. **Local steps use mc-cli.** Every step the customer runs themselves, including the operations
+   that are not MCP tools, is written for [mc-cli](https://github.com/monte-carlo-data/mc-cli), the
+   `montecarlo` command for the REST API v2. It covers every operation the tools here do, plus the
+   ones that carry a secret, and returns the same ids, so the summary stays consistent. Recommend it by default; emit Terraform
+   instead when the customer asks for it or already manages this infrastructure with Terraform,
+   and a Python script over the SDK only when they ask for one. Setup and commands are in the
+   output-modes reference. Two cautions to pass on: the legacy `montecarlodata` Python CLI
+   installs a command with the same name, so have the customer confirm with
+   `montecarlo deployments --help` that the REST API CLI is the one on their path; and the
+   profile is set by the customer with `montecarlo profile set … --api-token-prompt`, never by
+   pasting a token here.
 
 ## Tools
 
@@ -70,17 +87,19 @@ instrument-agent; for an already-connected warehouse's monitoring use monitoring
 | Warehouse | `list_warehouses`, `get_warehouse`, `create_warehouse`, `update_warehouse`, `delete_warehouse` |
 | Connection | `list_connections`, `get_connection`, `create_connection`, `update_connection`, `delete_connection` |
 | Identity | `get_current_user` (which account you are in, and whether it is paused) |
-| Validation | `validate_connection`, `get_validation_run` (Step 5; when the session serves them) |
+| Validation | `validate_connection`, `get_validation_run` (Steps 2 and 5) |
 
-Operations whose request or response carries a secret are **not MCP tools** and are handed to the
-customer as a CLI or Terraform step: `create_snowflake_credentials`, `validate_snowflake_credentials`, the Azure and GCP agent and
+By design, no MCP tool accepts or returns a secret (rule 2). Operations whose request or response
+carries one are **not MCP tools** and are handed to the customer as a CLI or Terraform step, which
+reads the secret from a file on their machine and sends it to Monte Carlo directly:
+`create_snowflake_credentials`, `validate_snowflake_credentials`, the Azure and GCP agent and
 data-store registrations, `create_generic_collection_agent_token` and
 `create_generic_collection_agent_oauth_client`. The reference files mark them.
 
 Check which v2 tools are actually available before promising an automated run. Missing tools,
-read-only mode and a missing `mcp/edit` scope are different conditions. Use the equivalent v2
-CLI/SDK/Terraform operation from the output-modes reference when needed; request only its
-non-secret result/IDs and reconcile them before continuing. If neither the tool nor a usable
+read-only mode and a missing `mcp/edit` scope are different conditions. Use the equivalent mc-cli
+command (rule 6), or the SDK or Terraform equivalent, from the output-modes reference when needed;
+request only its non-secret result/IDs and reconcile them before continuing. If neither the tool nor a usable
 local-client path is available, explain the pending step and who can complete it. A reference
 entry or an open implementation PR is not evidence that a tool is deployed in this session.
 
@@ -218,6 +237,13 @@ just `connection_type`. Use the appropriate non-secret getter to inspect the sec
 region and assumed role, or ask for a known credentials ID. Do not read secret contents to make
 this choice; if identity remains ambiguous, ask. Record reused IDs as well as created ones.
 
+Before asking anything about credentials, and unless the run already covered it (rule 2), tell
+the user how they are handled in one or two sentences of your own. For example: "Monte Carlo never passes a credential through this chat or
+through a tool: anything a tool receives or returns is visible to the model. So I will either
+reference a secret you keep in your own secret store, or give you a command to run on your
+machine that sends it to Monte Carlo directly." Then ask only for the reference or the non-secret
+details.
+
 Otherwise the deployment from Step 1 decides what is possible:
 
 - **Collection agent** → credentials can stay in the customer's store (self-hosted, below). The
@@ -242,8 +268,9 @@ authentication details. If it changes, revisit the deployment choice before writ
 
 **Validate before creating.** Each self-hosted create has a matching validate that takes the same
 arguments plus `deployment_id`: `validate_aws_secrets_manager_credentials`, `validate_gcp_secret_manager_credentials`, `validate_azure_key_vault_credentials`, `validate_env_var_credentials`, `validate_file_credentials`. It creates nothing and
-returns a run: poll `get_validation_run` until `status` is `completed`, honoring `Retry-After`, and
-create only once every validation has `passed`. A failure here is almost always the agent's access
+returns a run: read it with `get_validation_run` as in Step 5, and create only when every validation
+has `passed: true`. If any has `passed: false`, relay its errors' `friendly_message` and
+`resolution` and stop before creating anything. A failure here is almost always the agent's access
 to the secret (IAM grant, trust policy, service-account role, Key Vault policy), and it is cheapest
 to fix now, before a warehouse or connection exists. For a Snowflake key pair Monte Carlo will
 store, emit the validate step beside the create step:
@@ -288,22 +315,39 @@ warehouse/deployment association and record `id`, `connection_type`, `deployment
 
 ## Step 5: Validate
 
-The validations API is live: `validate_connection` starts a run for a connection (202, with the
-run id) and `get_validation_run` reads it — poll until `status` is `completed`, honoring the
-`Retry-After` the response carries, then read each validation's own `passed` verdict. Use those
-tools when the session serves them (they reach the MCP server as the generator ships). A dedicated
-waiter tool that polls for you is planned; until one of these is available, end with UI validation.
-Do **not** substitute any other tool for validation. End with:
+Run this for every connection created or reused in this run:
+
+1. `validate_connection(connection_id)` starts a run and returns at once. Its response is the run
+   itself, still in progress; keep its `id`.
+2. `get_validation_run(run_id=<id>)` reads the run. Read it again until its `status` is `completed`.
+   A run usually takes from a few seconds to a few minutes. If you can pause between calls, wait
+   about 3 seconds between reads; do not read it more often than that. If it is still running after
+   about 5 minutes, stop and report it as still running with its `id`, which can be read again until its
+   `expires_at`.
+
+Judge each validation by `passed` only, never by its `status`. `status` only says whether the check
+ran: a validation can be `completed` and still have failed. The connection works when every
+validation has `passed: true`; it does not when any has `passed: false`.
+
+- **Every validation passed**: the connection works. `warnings` are non-blocking; list them.
+  Collection starts on its own, and the first metadata appears within about an hour.
+- **Any validation did not pass**: for each one, give its `name`, then its errors'
+  `friendly_message` and `resolution` verbatim. A `skipped` validation waited on a prerequisite that
+  did not pass; fix that one first. The usual causes, in order: the agent cannot read the secret (IAM
+  grant, service-account role or Key Vault policy missing); the warehouse user lacks the grants in
+  the connector's docs page; the network path is missing (Monte Carlo's IPs not allowlisted for the
+  cloud node, or the agent's VPC has no route to the warehouse). After the fix, call
+  `validate_connection` again; a new run is needed, and the connection itself does not change.
+- **Validate call refused as rate limited**: the account already has the maximum of 10 validation runs in
+  progress. Do not start more. Finish reading the runs this session started, then try again a
+  minute later.
+
+Do **not** substitute any other tool for validation. If the session does not serve
+`validate_connection` and `get_validation_run`, end with:
 
 > Validate the connection in the Monte Carlo UI: Settings → Integrations → the integration → the
-> new connection → **Test**. Collection starts on its own once the connection exists; the first metadata
-> appears within about an hour. Until the test and initial collection are confirmed, report
+> new connection → **Test**. Until the test and initial collection are confirmed, report
 > **connection created, validation pending**, not a completed onboarding.
-
-If validation fails there, the usual causes are, in order: the agent cannot read the secret (IAM
-grant, service-account role or Key Vault policy missing); the warehouse user lacks the grants in
-the connector's docs page; the network path is missing (Monte Carlo's IPs not allowlisted for the
-cloud node, or the agent's VPC has no route to the warehouse). Fix, then `update_connection` is not needed: re-test in the UI.
 
 ## Step 6: Summary (always)
 
@@ -311,7 +355,7 @@ Finish every run, including an aborted one, with:
 
 ```
 Account: <account_name> (<account_id>)
-Output mode: act now | terraform | script
+Output mode: act now | mc-cli | terraform | script
 
 Created in this run
   deployment    <id>  <name>  <type>/<runtime_platform>  enabled=<bool>
@@ -319,13 +363,16 @@ Created in this run
   credentials   <id>  <connection_type>  <storage_type>  (or: CLI/Terraform step handed over)
   warehouse     <id>  <name>  <type>
   connection    <id>  <name>  <connection_type>  job_types=<…>
+  validation    <run id>  passed | failed | running  <validations_passed>/<validations_total> passed  (or: not available in this session)
 
 Reused (excluded from cleanup)
   deployment / agent|store / credentials / warehouse / connection  <ids and names>
 
 Pending on your side
   - <deploy/register/credential step still to run, with the exact command or file>
-  - Validate the connection (Step 5: validate_connection, or in the UI under Settings → Integrations → <integration> → <connection name> → Test)
+  - Validation still running: read it again with get_validation_run(run_id=<run id>) before its expires_at; do not start a new one
+  - Validation failed: fix what it reported, then re-run Step 5 (a new validate_connection)
+  - Validation tools not available in this session: test in the UI under Settings → Integrations → <integration> → <connection name> → Test
 
 Cleanup if you abandon this: delete_connection → delete_warehouse → delete_<kind>_credentials →
 delete_<platform>_collection_agent|data_store → delete_deployment, in that order. On the generic

@@ -5,6 +5,14 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Cursor will be d
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.25.3] - 2026-09-25
+
+### Changed
+
+- onboarding: the final step now validates the connection over MCP — `validate_connection`, then `get_validation_run` until the run completes — and reports each validation's result judged by `passed`, with what to do on a failure, a run that is still going or the per-account limit on concurrent runs; the pre-create credentials check reads its run the same way. The UI test remains only as a fallback when the session does not serve the validation tools
+- onboarding: the skill now explains to the user, the first time the flow reaches a credential, that Monte Carlo exposes no MCP tool that accepts or returns a secret, because anything a tool receives or returns is visible to the model; credentials are referenced from the customer's own secret store or created by a local CLI/Terraform step. The README gains a *How credentials are handled* section, and its intro no longer describes validation as a UI step
+- onboarding: local steps and non-MCP operations are now written for mc-cli (https://github.com/monte-carlo-data/mc-cli, the `montecarlo` command for the REST API v2) by default, with Terraform or an SDK script only on request; the skill tells the user to confirm with `montecarlo deployments --help` that mc-cli, not the legacy `montecarlodata` CLI of the same name, is on their path, and to set the profile token at the prompt. Install steps match mc-cli's README
+
 ## [1.25.2] - 2026-09-24
 
 ### Changed
