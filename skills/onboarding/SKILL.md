@@ -8,7 +8,7 @@ metadata:
 # Monte Carlo Onboarding
 
 Walk a customer from "connect `<warehouse>` to Monte Carlo" to a working connection, using the
-Monte Carlo **REST API v2** MCP tools. Discover what already exists, resolve only the missing
+Monte Carlo MCP tools for deployments, credentials, warehouses and connections. Discover what already exists, resolve only the missing
 customer decisions, and reuse or provision
 the deployment before creating a connection. A request to connect Snowflake does not imply that
 the customer knows which deployment or collection agent they need.
@@ -78,7 +78,7 @@ instrument-agent; for an already-connected warehouse's monitoring use monitoring
 
 ## Tools
 
-| Step | Tools (REST API v2) |
+| Step | Tools |
 |---|---|
 | Deployment | `list_deployments`, `get_deployment`, `create_deployment`, `update_deployment`, `delete_deployment` |
 | Agent | `list_collection_agents`, `register_aws_collection_agent`, `register_generic_collection_agent`, `get_aws_collection_agent`, `get_gcp_collection_agent`, `get_azure_collection_agent`, `get_generic_collection_agent`, `update_aws_collection_agent`, `update_generic_collection_agent`, `delete_aws_collection_agent`, `delete_gcp_collection_agent`, `delete_azure_collection_agent`, `delete_generic_collection_agent`, `delete_generic_collection_agent_token`, `delete_generic_collection_agent_oauth_client` |
