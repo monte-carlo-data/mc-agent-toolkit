@@ -27,6 +27,7 @@ class Backend:
         self.connections = []
         self.calls = []
         self.enable_on_register = True
+        self.validation_passes = True
 
     def __getattr__(self, name):
         def call(*args, **kwargs):
@@ -46,6 +47,12 @@ class Backend:
                 return Row(id="agent")
             if name == "get_aws_secrets_manager_credentials":
                 return next(x for x in self.credentials if x.id == args[0])
+            if name == "validate_aws_secrets_manager_credentials":
+                return Row(id="run", status="running", validations=[])
+            if name == "get_validation_run":
+                error = Row(friendly_message="The agent cannot read the secret.", resolution="Grant secretsmanager:GetSecretValue.")
+                check = Row(name="secret_access", passed=self.validation_passes, errors=[] if self.validation_passes else [error])
+                return Row(id=args[0], status="completed", validations=[check])
             if name == "create_aws_secrets_manager_credentials":
                 row = Row(**vars(args[0]), id="cred", storage_type="aws_secrets_manager", assumable_role=None)
                 self.credentials.append(row)
@@ -82,14 +89,14 @@ class ExampleTests(unittest.TestCase):
         sdk.Options = Row
         sdk.new_client = lambda options: None
         sdk.ApiException = ApiError
-        for name in ["UsersApi", "DeploymentsApi", "CollectionAgentsApi", "CredentialsApi", "WarehousesApi", "ConnectionsApi"]:
+        for name in ["UsersApi", "DeploymentsApi", "CollectionAgentsApi", "CredentialsApi", "WarehousesApi", "ConnectionsApi", "ValidationsApi"]:
             setattr(sdk, name, lambda client: self.backend)
-        for name in ["DeploymentIn", "AwsCollectionAgentIn", "AwsSecretsManagerCredentialsIn", "WarehouseIn", "ConnectionIn"]:
+        for name in ["DeploymentIn", "AwsCollectionAgentIn", "AwsSecretsManagerCredentialsIn", "AwsSecretsManagerCredentialsValidateIn", "WarehouseIn", "ConnectionIn"]:
             setattr(sdk, name, Row)
         paging = ModuleType("montecarlo.paging")
         paging.paginate = lambda method, **kwargs: iter(method(**kwargs))
         out = io.StringIO()
-        with patch.dict(sys.modules, {"montecarlo": sdk, "montecarlo.paging": paging}), patch.dict(os.environ, self.env, clear=True), contextlib.redirect_stdout(out), contextlib.redirect_stderr(out):
+        with patch.dict(sys.modules, {"montecarlo": sdk, "montecarlo.paging": paging}), patch.dict(os.environ, self.env, clear=True), contextlib.redirect_stdout(out), contextlib.redirect_stderr(out), patch("time.sleep"):
             namespace = {"__name__": "onboarding_example"}
             exec(compile(EXAMPLE, "output-modes.md", "exec"), namespace)
             status = namespace["main"]()
@@ -119,6 +126,24 @@ class ExampleTests(unittest.TestCase):
         status, _ = self.run_example()
         self.assertEqual(status, 0)
         self.assertLess(self.backend.calls.index("register_aws_collection_agent"), self.backend.calls.index("create_aws_secrets_manager_credentials"))
+
+    def test_credentials_validated_before_create(self):
+        self.existing_deployment()
+        status, _ = self.run_example()
+        self.assertEqual(status, 0)
+        calls = self.backend.calls
+        self.assertLess(calls.index("validate_aws_secrets_manager_credentials"), calls.index("get_validation_run"))
+        self.assertLess(calls.index("get_validation_run"), calls.index("create_aws_secrets_manager_credentials"))
+
+    def test_failed_validation_creates_nothing(self):
+        self.existing_deployment()
+        self.backend.validation_passes = False
+        status, output = self.run_example()
+        self.assertEqual(status, 1)
+        self.assertNotIn("create_aws_secrets_manager_credentials", self.backend.calls)
+        self.assertNotIn("create_warehouse", self.backend.calls)
+        self.assertIn("The agent cannot read the secret.", output)
+        self.assertIn("Grant secretsmanager:GetSecretValue.", output)
 
     def test_failed_enable_stops_connection_work(self):
         self.existing_deployment(enabled=False)

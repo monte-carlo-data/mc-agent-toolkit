@@ -4,13 +4,11 @@ The skill produces the selected onboarding path as tools, Terraform or a v2 CLI/
 Discover deployments, warehouses, credentials and connections first, using MCP or the available
 v2 CLI/SDK fallback. Carry verified IDs into the artifact; do not recreate them. Secret values
 are not embedded in generated source: Terraform reads them with `file(...)` or a variable
-from an uncommitted `*.tfvars`; the CLI reads them with `@<path>` or a `--<flag>-prompt`; a script
+from an uncommitted `*.tfvars` into a write-only argument; the CLI reads them with `@<path>` or a `--<flag>-prompt`; a script
 reads them from the environment or a file the customer names.
 
 These are composable examples: emit only the selected deployment and credential variant,
-fill non-secret inputs from discovery, and keep references/dependencies consistent. Protect
-Terraform state with an encrypted backend and restricted access; reading a secret from a file
-does not keep it out of state.
+fill non-secret inputs from discovery, and keep references/dependencies consistent.
 
 Names below are the API's: `type` is `COLLECTION_AGENT` or `COLLECTION_DATA_STORE`,
 `runtime_platform` is `AWS`, `GCP`, `AZURE` or `GENERIC`. Tool name = `operationId` = the
@@ -22,8 +20,24 @@ Provider `monte-carlo-data/montecarlo` (generated from the same API). Credential
 come from the environment (`MCD_DEFAULT_API_ID` / `MCD_DEFAULT_API_TOKEN`) or the CLI profile in
 `~/.mcd/profiles.ini`; never literals in a `.tf` file.
 
+**Secrets are write-only arguments.** Every secret a resource sends to Monte Carlo is
+`<name>_wo`, with a required `<name>_wo_version`. Terraform sends it on apply and never stores it
+in state or in a plan, which needs Terraform 1.11 or later (an older one errors rather than
+storing it). Changing a secret alone plans nothing: bump its version with it. Two copies still
+end up in state, so keep state in a backend that encrypts it and limits who can read it:
+
+- Secrets Monte Carlo generates, the generic agent's token and its OAuth client secret. They are
+  returned once and held by their resource. Hand them on through a write-only argument, for
+  example `aws_secretsmanager_secret_version.secret_string_wo`, never through an output: an
+  output, even a sensitive one, is stored in state too.
+- Secrets an upstream module or resource returns, such as the GCP agent module's invoker key,
+  which that module keeps in its own state.
+
 ```hcl
 terraform {
+  # Write-only arguments need Terraform 1.11 or later.
+  required_version = ">= 1.11"
+
   required_providers {
     montecarlo = { source = "monte-carlo-data/montecarlo" }
   }
@@ -68,21 +82,33 @@ resource "montecarlo_aws_collection_agent" "agent" {
 }
 ```
 
-GCP: module `monte-carlo-data/mcd-agent/google` (outputs `mcd_agent_uri`, `mcd_agent_invoker_key`)
-and `montecarlo_gcp_collection_agent { deployment_id, cloud_run_url, authentication_type =
-"GCP_JSON_SERVICE_ACCOUNT_KEY", service_account_key = module.….mcd_agent_invoker_key }`.
+GCP: module `monte-carlo-data/mcd-agent/google` with `generate_key = true` (outputs
+`mcd_agent_uri`, `mcd_agent_invoker_key`) and `montecarlo_gcp_collection_agent { deployment_id,
+cloud_run_url, authentication_type = "GCP_JSON_SERVICE_ACCOUNT_KEY", service_account_key_wo =
+base64decode(module.….mcd_agent_invoker_key[0]), service_account_key_wo_version = 1 }`: the
+module returns the key base64-encoded and the API takes the key file's contents.
 Azure: module `monte-carlo-data/mcd-agent/azurerm` (outputs `mcd_agent_function_url`, service
-principal ids) and `montecarlo_azure_collection_agent`. Both keep the agent credential inside
-Terraform state, which is why they are not MCP tools.
+principal ids) and `montecarlo_azure_collection_agent { …, function_app_key = { app_key_wo,
+app_key_wo_version } }`, or a `service_principal` block with `client_secret_wo` /
+`client_secret_wo_version`. Both registrations send a secret, which is why they are not MCP tools;
+the provider takes it write-only, but the module still holds it in its own state.
 
 ### Deployment + generic collection agent (AWS EKS example)
 
 This example creates an EKS cluster, storage and agent; use the official Docker Compose or
-existing-cluster guide instead when that is the chosen runtime. Requires Terraform >= 1.12,
-AWS authentication and a pinned compatible chart version. Reuse the provider setup above;
-configure the root AWS provider as below. This is the token variant; for OAuth, use the
-`montecarlo_generic_collection_agent_oauth_client` resource and the module's `oauth_credentials`
-instead. Do not configure both authentication methods.
+existing-cluster guide instead when that is the chosen runtime. Requires Terraform >= 1.12 (the
+module's floor, above the provider's 1.11), AWS authentication and a pinned compatible chart
+version. Reuse the provider setup above, adding `aws = { source = "hashicorp/aws", version =
+">= 6.50" }` (the floor the provider's examples pin for `secret_string_wo`); configure the root
+AWS provider as below.
+
+The agent's credential goes to Secrets Manager through a write-only argument and the module
+reads that secret (`create = false`), so the only other copy is the credential resource's own.
+Passing it to the module's `oauth_credentials` or `token_credentials` instead would store it a
+second time. This is the OAuth variant. For a token, use
+`montecarlo_generic_collection_agent_token`, write `{ mcd_id, mcd_token }` to the secret, and
+point `token_secret = { create = false, name = … }` at it instead of `oauth_secret`. Do not
+configure both authentication methods.
 
 ```hcl
 variable "aws_region" { type = string }
@@ -97,19 +123,39 @@ resource "montecarlo_deployment" "agent" {
   runtime_platform = "GENERIC"
 }
 
-# Returned once; held in protected Terraform state, never copied into chat.
-resource "montecarlo_generic_collection_agent_token" "agent" {
+# Returned once and held in this resource's state; never copied into chat.
+resource "montecarlo_generic_collection_agent_oauth_client" "agent" {
   deployment_id = montecarlo_deployment.agent.id
+}
+
+# Named per deployment: with `create = false` the module grants the agent read access to every
+# secret whose name starts with `name`.
+resource "aws_secretsmanager_secret" "mcd_agent_oauth" {
+  name = "mcd/agent/${montecarlo_deployment.agent.name}/oauth"
+}
+
+resource "aws_secretsmanager_secret_version" "mcd_agent_oauth" {
+  secret_id = aws_secretsmanager_secret.mcd_agent_oauth.id
+  secret_string_wo = jsonencode({
+    client_id     = montecarlo_generic_collection_agent_oauth_client.agent.client_id
+    client_secret = montecarlo_generic_collection_agent_oauth_client.agent.client_secret
+  })
+  # Bump when the client is replaced, so the new secret is written.
+  secret_string_wo_version = 1
 }
 
 module "mcd_agent" {
   source  = "monte-carlo-data/mcd-k8s-agent/aws"
-  version = "0.1.10"
+  version = "0.1.10" # 0.1.4 is the first that reads an existing secret
   # Account information → Agent Service; use the endpoint for this account/region.
   backend_service_url = var.backend_service_url
-  token_credentials = {
-    mcd_id    = montecarlo_generic_collection_agent_token.agent.mcd_id
-    mcd_token = montecarlo_generic_collection_agent_token.agent.mcd_token
+  oauth_secret = {
+    create = false
+    name   = aws_secretsmanager_secret.mcd_agent_oauth.name
+  }
+  # Required alongside `oauth_secret`: without it the module asks for token credentials.
+  token_secret = {
+    create = false
   }
   helm = {
     chart_version = var.agent_chart_version
@@ -127,8 +173,8 @@ resource "montecarlo_generic_collection_agent" "agent" {
 }
 ```
 
-The module populates the agent-auth secret; integration secrets and permissions remain a
-separate step. For existing networking/cluster/identity, use the module's documented inputs
+The agent reads its credential from the secret written above; integration secrets and
+permissions remain a separate step. For existing networking/cluster/identity, use the module's documented inputs
 instead of its new-cluster defaults. See the [module](https://registry.terraform.io/modules/monte-carlo-data/mcd-k8s-agent/aws/0.1.10)
 and the [Generic guide](https://docs.getmontecarlo.com/docs/generic-agent-platforms).
 
@@ -253,9 +299,13 @@ resource "montecarlo_snowflake_credentials" "snowflake" {
   account   = "xy12345.us-east-1"
   user      = "MONTE_CARLO"
   warehouse = "MONTE_CARLO_WH"
-  # Stored in Terraform state in plaintext: use an encrypted remote backend and restrict who can read state.
-  private_key = file("${path.module}/snowflake_key.p8") # PEM text, BEGIN/END lines included
-  # private_key_passphrase = var.snowflake_key_passphrase  # only for an encrypted key
+  # Write-only: never stored in state or a plan. Changing the key alone plans nothing; bump the
+  # version with it. Bumping either version sends the key and the passphrase together.
+  private_key_wo         = file("${path.module}/snowflake_key.p8") # PEM text, BEGIN/END lines included
+  private_key_wo_version = 1
+  # Only for an encrypted key; omit both otherwise.
+  # private_key_passphrase_wo         = var.snowflake_key_passphrase
+  # private_key_passphrase_wo_version = 1
 }
 ```
 
@@ -381,12 +431,15 @@ not a substitute for resolving the customer's intended account/environment befor
 
 The first run of a new deployment stops for infrastructure. Subsequent runs reconcile existing
 resources and register a pending agent before continuing. A null External ID or failed enable
-stops the connection steps. The script prints created/reused IDs and the pending stage on exit.
+stops the connection steps. Before creating a credential reference it validates it from the
+deployment and stops, creating nothing, unless every validation passed. The script prints
+created/reused IDs and the pending stage on exit.
 It does not read secret contents; MCP-managed key pairs use the separate local CLI/Terraform path.
 
 ```python
 import os
 import sys
+import time
 import montecarlo
 from montecarlo.paging import paginate
 
@@ -398,6 +451,7 @@ def main():
     credentials = montecarlo.CredentialsApi(client)
     warehouses = montecarlo.WarehousesApi(client)
     connections = montecarlo.ConnectionsApi(client)
+    validations = montecarlo.ValidationsApi(client)
     created, reused = {}, {}
     pending = "Resolve inputs; no connection has been verified."
 
@@ -408,6 +462,20 @@ def main():
         if len(matches) > 1:
             raise ValueError(f"Several {label} entries match; select a verified ID")
         return matches[0] if matches else None
+
+    def check(run, label):
+        # A run takes seconds to a few minutes; each validation carries its own verdict.
+        deadline = time.monotonic() + 300
+        while run.status != "completed":
+            if time.monotonic() > deadline:
+                raise ValueError(f"{label} validation {run.id} is still running; read it again later")
+            time.sleep(10)
+            run = validations.get_validation_run(run.id)
+        failed = [v for v in run.validations if v.passed is not True]
+        if failed:
+            problems = "; ".join(f"{e.friendly_message} {e.resolution or ''}".strip()
+                                 for v in failed for e in v.errors) or "see the validation run"
+            raise ValueError(f"{label} validation {run.id} failed: {problems}")
 
     try:
         identity = montecarlo.UsersApi(client).get_current_user()
@@ -465,6 +533,11 @@ def main():
                     candidates.append(detail)
         creds = select(candidates, os.environ.get("MCD_CREDENTIALS_ID"), "credentials")
         if creds is None:
+            # Check the reference from this deployment before storing it; the check creates nothing.
+            check(credentials.validate_aws_secrets_manager_credentials(
+                montecarlo.AwsSecretsManagerCredentialsValidateIn(
+                    deployment_id=dep.id, connection_type="snowflake", aws_secret=secret_arn)),
+                "Credentials")
             creds = credentials.create_aws_secrets_manager_credentials(
                 montecarlo.AwsSecretsManagerCredentialsIn(connection_type="snowflake", aws_secret=secret_arn))
             created["credentials"] = creds.id
