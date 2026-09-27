@@ -23,8 +23,9 @@ come from the environment (`MCD_DEFAULT_API_ID` / `MCD_DEFAULT_API_TOKEN`) or th
 **Secrets are write-only arguments.** Every secret a resource sends to Monte Carlo is
 `<name>_wo`, with a required `<name>_wo_version`. Terraform sends it on apply and never stores it
 in state or in a plan, which needs Terraform 1.11 or later (an older one errors rather than
-storing it). Changing a secret alone plans nothing: bump its version with it. Two copies still
-end up in state, so keep state in a backend that encrypts it and limits who can read it:
+storing it). Changing a secret alone plans nothing: bump its version with it. A secret can still
+reach state from another source, in these two cases, so keep state in a backend that encrypts it
+and limits who can read it:
 
 - Secrets Monte Carlo generates, the generic agent's token and its OAuth client secret. They are
   returned once and held by their resource. Hand them on through a write-only argument, for
@@ -40,6 +41,8 @@ terraform {
 
   required_providers {
     montecarlo = { source = "monte-carlo-data/montecarlo" }
+    # For the AWS examples; 6.50 is the first with `secret_string_wo`. Omit when no AWS resource is used.
+    aws = { source = "hashicorp/aws", version = ">= 6.50" }
   }
 }
 
@@ -98,9 +101,8 @@ the provider takes it write-only, but the module still holds it in its own state
 This example creates an EKS cluster, storage and agent; use the official Docker Compose or
 existing-cluster guide instead when that is the chosen runtime. Requires Terraform >= 1.12 (the
 module's floor, above the provider's 1.11), AWS authentication and a pinned compatible chart
-version. Reuse the provider setup above, adding `aws = { source = "hashicorp/aws", version =
-">= 6.50" }` (the floor the provider's examples pin for `secret_string_wo`); configure the root
-AWS provider as below.
+version. Reuse the provider setup above, keeping its `aws >= 6.50` constraint, which
+`secret_string_wo` needs; configure the root AWS provider as below.
 
 The agent's credential goes to Secrets Manager through a write-only argument and the module
 reads that secret (`create = false`), so the only other copy is the credential resource's own.
@@ -473,8 +475,11 @@ def main():
             run = validations.get_validation_run(run.id)
         failed = [v for v in run.validations if v.passed is not True]
         if failed:
-            problems = "; ".join(f"{e.friendly_message} {e.resolution or ''}".strip()
-                                 for v in failed for e in v.errors) or "see the validation run"
+            problems = "; ".join(
+                f"{v.name}: " + (" ".join(f"{e.friendly_message} {e.resolution or ''}".strip()
+                                          for e in v.errors)
+                                 or ("failed" if v.passed is False else "no verdict"))
+                for v in failed)
             raise ValueError(f"{label} validation {run.id} failed: {problems}")
 
     try:

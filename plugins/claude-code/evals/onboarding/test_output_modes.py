@@ -142,7 +142,7 @@ class ExampleTests(unittest.TestCase):
         self.assertEqual(status, 1)
         self.assertNotIn("create_aws_secrets_manager_credentials", self.backend.calls)
         self.assertNotIn("create_warehouse", self.backend.calls)
-        self.assertIn("The agent cannot read the secret.", output)
+        self.assertIn("secret_access: The agent cannot read the secret.", output)
         self.assertIn("Grant secretsmanager:GetSecretValue.", output)
 
     def test_failed_enable_stops_connection_work(self):
