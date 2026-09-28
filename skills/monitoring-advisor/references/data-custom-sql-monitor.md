@@ -66,34 +66,34 @@ If you find yourself contorting another monitor type to fit the user's intent, s
 
 ## Alert Conditions
 
-Field names inside `alert_condition` are camelCase (`thresholdValue`, `thresholdSensitivity`, `baselineAggFunction`, ...) — NOT snake_case. Snake_case keys like `threshold_value` are rejected with an `extra_forbidden` validation error.
+Field names inside `alert_condition` are snake_case (`threshold_value`, `threshold_sensitivity`, `baseline_agg_function`, ...).
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `operator` | string | Yes | One of: `EQ`, `NEQ`, `LT`, `LTE`, `GT`, `GTE`, `OUTSIDE_RANGE`, `INSIDE_RANGE`, `AUTO`, `AUTO_HIGH`, `AUTO_LOW`, `NOOP`. Note: the inequality operator is `NEQ` (not `NE`). |
-| `thresholdValue` | number | For explicit operators | Numeric threshold to compare the query result against. Pair with `GT`, `GTE`, `LT`, `LTE`, `EQ`, `NEQ`. |
+| `threshold_value` | number | For explicit operators | Numeric threshold to compare the query result against. Pair with `GT`, `GTE`, `LT`, `LTE`, `EQ`, `NEQ`. |
 | `type` | string | No | Comparison semantics — see Threshold types below. Default: `threshold`. |
 
 ### Threshold types
 
 | `type` | Behavior | Fields (in addition to `operator`) |
 |---|---|---|
-| `threshold` (default) | Compare the query result directly against a fixed value. | `thresholdValue` |
-| `dynamic_threshold` | ML anomaly detection on the query result. | `operator` = `AUTO` / `AUTO_HIGH` / `AUTO_LOW`; optional `thresholdSensitivity` (`low` / `medium` / `high`, default `medium`) |
-| `change` | Compare the query result against a recent baseline (e.g. 2-day rolling MAX). | `thresholdValue`, `baselineAggFunction`, `baselineIntervalMinutes`, `isThresholdRelative` |
+| `threshold` (default) | Compare the query result directly against a fixed value. | `threshold_value` |
+| `dynamic_threshold` | ML anomaly detection on the query result. | `operator` = `AUTO` / `AUTO_HIGH` / `AUTO_LOW`; optional `threshold_sensitivity` (`low` / `medium` / `high`, default `medium`) |
+| `change` | Compare the query result against a recent baseline (e.g. 2-day rolling MAX). | `threshold_value`, `baseline_agg_function`, `baseline_interval_minutes`, `is_threshold_relative` |
 | `noop` | Collect data without alerting. | `operator` = `NOOP`, no threshold |
 
 **`change`-type fields:**
 
-- `baselineAggFunction` — how to aggregate baseline samples. One of: `AVG`, `MIN`, `MAX`. Backend rejects anything else: `Must be one of: AVG, MIN, MAX.`
-- `baselineIntervalMinutes` — lookback window for the baseline, in minutes (e.g. `1440` = last 24h). Required with `type="change"`; the backend accepts up to `129600` (90 days).
-- `isThresholdRelative` — `true` if `thresholdValue` is a percentage (relative to baseline), `false` if it is an absolute delta. Defaults to `false`.
+- `baseline_agg_function` — how to aggregate baseline samples. One of: `AVG`, `MIN`, `MAX`. Backend rejects anything else: `Must be one of: AVG, MIN, MAX.`
+- `baseline_interval_minutes` — lookback window for the baseline, in minutes (e.g. `1440` = last 24h). Required with `type="change"`; the backend accepts up to `129600` (90 days).
+- `is_threshold_relative` — `true` if `threshold_value` is a percentage (relative to baseline), `false` if it is an absolute delta. Defaults to `false`.
 
 Omitting these on a `change`-type condition produces stacked `required` / `Aggregate function is required` / `Lookback Interval in minutes should be between 0 and 129600` backend errors.
 
 ### Operator and type pairing
 
-Not every operator is accepted for every threshold type. The default `threshold` type only supports: `EQ`, `NEQ`, `LT`, `LTE`, `GT`, `GTE`, `OUTSIDE_RANGE`, `INSIDE_RANGE`. Pair `INSIDE_RANGE` / `OUTSIDE_RANGE` with `lowerThreshold` + `upperThreshold` instead of `thresholdValue`.
+Not every operator is accepted for every threshold type. The default `threshold` type only supports: `EQ`, `NEQ`, `LT`, `LTE`, `GT`, `GTE`, `OUTSIDE_RANGE`, `INSIDE_RANGE`. Pair `INSIDE_RANGE` / `OUTSIDE_RANGE` with `lower_threshold` + `upper_threshold` instead of `threshold_value`.
 
 If the user is unsure what threshold to set, help them reason about it: "What value would indicate a problem? If the query returns X, should that fire an alert?"
 
@@ -156,7 +156,7 @@ Alert when orders reference customers that don't exist.
   "sql": "SELECT COUNT(*) FROM analytics.core.orders o LEFT JOIN analytics.core.customers c ON o.customer_id = c.id WHERE c.id IS NULL",
   "alert_condition": {
     "operator": "GT",
-    "thresholdValue": 0
+    "threshold_value": 0
   }
 }
 ```
@@ -173,7 +173,7 @@ Alert when total revenue for the past 24 hours drops below a minimum.
   "sql": "SELECT COALESCE(SUM(amount), 0) FROM analytics.billing.transactions WHERE created_at >= DATEADD(day, -1, CURRENT_TIMESTAMP())",
   "alert_condition": {
     "operator": "LT",
-    "thresholdValue": 10000
+    "threshold_value": 10000
   }
 }
 ```
@@ -190,14 +190,14 @@ Alert when the duplicate rate on a key field exceeds 1%.
   "sql": "SELECT COALESCE(1.0 - (COUNT(DISTINCT order_id) * 1.0 / NULLIF(COUNT(*), 0)), 0) FROM analytics.core.orders WHERE created_at >= DATEADD(day, -1, CURRENT_TIMESTAMP())",
   "alert_condition": {
     "operator": "GT",
-    "thresholdValue": 0.01
+    "threshold_value": 0.01
   }
 }
 ```
 
 ### Range check (OUTSIDE_RANGE)
 
-Alert when a value falls outside an acceptable range. A two-sided range is a single condition with `lowerThreshold` + `upperThreshold`, not two separate conditions.
+Alert when a value falls outside an acceptable range. A two-sided range is a single condition with `lower_threshold` + `upper_threshold`, not two separate conditions.
 
 ```json
 {
@@ -207,8 +207,8 @@ Alert when a value falls outside an acceptable range. A two-sided range is a sin
   "sql": "SELECT COALESCE(AVG(amount), 0) FROM analytics.core.orders WHERE created_at >= DATEADD(day, -1, CURRENT_TIMESTAMP()) AND status = 'completed'",
   "alert_condition": {
     "operator": "OUTSIDE_RANGE",
-    "lowerThreshold": 20,
-    "upperThreshold": 500
+    "lower_threshold": 20,
+    "upper_threshold": 500
   }
 }
 ```
@@ -225,7 +225,7 @@ Alert when the latest row in a downstream table is more than 2 hours behind the 
   "sql": "SELECT COALESCE(TIMESTAMP_DIFF(s.max_ts, t.max_ts, MINUTE), 9999) FROM (SELECT MAX(event_timestamp) AS max_ts FROM project.raw.events) s CROSS JOIN (SELECT MAX(processed_at) AS max_ts FROM project.analytics.events_processed) t",
   "alert_condition": {
     "operator": "GT",
-    "thresholdValue": 120
+    "threshold_value": 120
   }
 }
 ```

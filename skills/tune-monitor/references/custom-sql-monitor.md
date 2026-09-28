@@ -8,7 +8,7 @@ Read this file after determining the monitor type in Phase 1.5.
 Extract these from the `get_monitors` config response for your Phase 2 analysis:
 
 - SQL query text (`sql` or `custom_sql`)
-- Alert conditions — each has an `operator` and either a `thresholdValue` (explicit) or ML
+- Alert conditions — each has an `operator` and either a `threshold_value` (explicit) or ML
   threshold configuration
 - Warehouse name
 - Schedule interval
@@ -42,12 +42,12 @@ recommend raising the threshold to a reasonable floor based on observed values.
 # Before: fires on any bad row
 alert_conditions:
   - operator: GT
-    thresholdValue: 0
+    threshold_value: 0
 
 # After: tolerates up to 5 (based on observed noise floor of 1-3)
 alert_conditions:
   - operator: GT
-    thresholdValue: 5
+    threshold_value: 5
 ```
 
 **NEVER** recommend a threshold change without citing the observed anomaly values from the report.

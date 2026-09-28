@@ -248,8 +248,8 @@ The most common output of coverage analysis is a **table monitor scoped by use-c
   "filters": [
     {
       "type": "TABLE_TAG",
-      "tableTags": ["<tag_key>:<criticality>"],
-      "tableTagsOperator": "HAS_ANY"
+      "table_tags": ["<tag_key>:<criticality>"],
+      "table_tags_operator": "HAS_ANY"
     }
   ]
 }
@@ -257,8 +257,8 @@ The most common output of coverage analysis is a **table monitor scoped by use-c
 
 Rules:
 - Filter `type` is **always** `TABLE_TAG` for use-case monitors.
-- `tableTagsOperator` should be `HAS_ANY`.
-- Each entry in `tableTags` is `"<tag_key>:<value>"` where the tag key is the precomputed tag name from `get_use_cases` output and the value is the criticality level in lowercase (`high`, `medium`, `low`).
+- `table_tags_operator` should be `HAS_ANY`.
+- Each entry in `table_tags` is `"<tag_key>:<value>"` where the tag key is the precomputed tag name from `get_use_cases` output and the value is the criticality level in lowercase (`high`, `medium`, `low`).
 - To monitor only HIGH-criticality tables: `["tag_name:high"]`
 - To monitor MEDIUM + HIGH: `["tag_name:high", "tag_name:medium"]`
 - To monitor ALL: `["tag_name:high", "tag_name:medium", "tag_name:low"]`

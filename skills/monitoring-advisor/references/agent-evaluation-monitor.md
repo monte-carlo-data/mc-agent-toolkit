@@ -44,7 +44,7 @@ transforms, which those don't need.
 > column is not added to the evaluated schema, so no `alert_conditions` field can
 > reference it — the monitor can't alert on the result (you get "Field `<alias>`
 > doesn't exist"). To bucket or pass/fail a response, use a `custom_prompt` with
-> `outputType: "boolean"` (a check) or `"string"`.
+> `output_type: "boolean"` (a check) or `"string"`.
 
 ## Key characteristics
 
@@ -67,7 +67,7 @@ transforms, which those don't need.
 | `transforms` | array | No | Evaluation transforms (predefined or custom); top-level |
 | `is_agent_conversation_aggregation` | boolean | No | Aggregate evaluation per conversation (OTel/ClickHouse, Cortex, and Genie agents; MLflow agents are span-only) |
 | `trace_table` | string | No | Explicit trace table — only for non-ClickHouse OTel agents |
-| `agent_span_filters` | array | No | Optional span-scope refinement; at most ONE filter object. At conversation grain (`is_agent_conversation_aggregation=True`) only `agent`/`workflow` are allowed — not `task`/`spanName` |
+| `agent_span_filters` | array | No | Optional span-scope refinement; at most ONE filter object. At conversation grain (`is_agent_conversation_aggregation=True`) only `agent`/`workflow` are allowed — not `task`/`span_name` |
 | `sensitivity` | string | No | Anomaly detection sensitivity for AUTO operators (`low`/`medium`/`high`) |
 | `aggregate_by` | string | No | Time-window bucketing (`hour`/`day`/`week`/`month`) |
 | `schedule_type` | string | No | `fixed` (default) or `manual` |
@@ -79,9 +79,9 @@ transforms, which those don't need.
 
 ## Predefined LLM transforms
 
-Pass only `function` (plus an optional `alias`, an optional `modelName` to pin the
-judge model — see **Judge model selection** below — and `modelConnectionId` on
-BigQuery only). Do NOT set `prompt`, `sqlExpression`, `outputType`, or `field` — the
+Pass only `function` (plus an optional `alias`, an optional `model_name` to pin the
+judge model — see **Judge model selection** below — and `model_connection_id` on
+BigQuery only). Do NOT set `prompt`, `sql_expression`, `output_type`, or `field` — the
 tool rejects them. Each writes a numeric score (1–5, except `semantic_similarity`
 which is 0–5) to its built-in output field:
 
@@ -98,7 +98,7 @@ which is 0–5) to its built-in output field:
 ## Predefined SQL transforms (rule-based, no LLM needed)
 
 Same rule: pass only `function` (and an optional `alias`); do NOT set `prompt`,
-`sqlExpression`, `outputType`, `modelConnectionId`, `modelName`, or `field`.
+`sql_expression`, `output_type`, `model_connection_id`, `model_name`, or `field`.
 
 | Transform function | Output field | Output type | Description |
 |-------------------|-------------|-------------|-------------|
@@ -109,28 +109,28 @@ Same rule: pass only `function` (and an optional `alias`); do NOT set `prompt`,
 ## Custom transforms
 
 Each writes an output column named by its `alias`, and that alias is what
-`alert_conditions.fields` references. `outputType` is **camelCase** and one of
+`alert_conditions.fields` references. `output_type` is one of
 `"number"`, `"string"`, `"boolean"`.
 
 | Function | Set these | Do NOT set | Output type |
 |----------|-----------|------------|-------------|
-| `custom_prompt` | `prompt` (with a `{{variable}}`), `alias`, `outputType`, + optional `modelName` (see Judge model selection) | `field`, `sqlExpression` | number / string / boolean |
-| `custom_sql` | `sqlExpression`, `alias`, `outputType` | `field`, `prompt`, `modelConnectionId`, `modelName` | number / string / boolean |
+| `custom_prompt` | `prompt` (with a `{{variable}}`), `alias`, `output_type`, + optional `model_name` (see Judge model selection) | `field`, `sql_expression` | number / string / boolean |
+| `custom_sql` | `sql_expression`, `alias`, `output_type` | `field`, `prompt`, `model_connection_id`, `model_name` | number / string / boolean |
 
 - **`custom_prompt` prompts MUST reference at least one template variable** —
   `{{prompts}}`, `{{completions}}`, or `{{expected_output}}` for a per-span monitor,
   or `{{conversation}}` for a conversation-level monitor. A prompt with no variable,
   an unknown variable, or the wrong variable for the grain is rejected. With
-  `"includeToolCalls": true` on the transform, `{{conversation}}` also carries the
+  `"include_tool_calls": true` on the transform, `{{conversation}}` also carries the
   agent's tool calls as clearly identifiable TOOL entries (see Conversation-grain
   judges below).
 - **`custom_sql` runs against warehouse columns.** On Snowflake Cortex agents,
   `prompts`/`completions` are arrays — reference the string columns
   `first_completion` / `full_completion` / `first_prompt` instead. The dry-run does
   not evaluate the SQL, so a bad column surfaces only at run time.
-## Judge model selection (`modelName`)
+## Judge model selection (`model_name`)
 
-**`modelName`** pins the judge model for LLM-based transforms (predefined judges and
+**`model_name`** pins the judge model for LLM-based transforms (predefined judges and
 `custom_prompt`). Optional — omit it to use the warehouse default. **Models are
 warehouse-specific** because the judge runs inside the warehouse hosting the agent's
 **trace table** — never offer models from the wrong pool:
@@ -162,12 +162,12 @@ exists. Prefer a listed model; if the user insists on an unlisted one, pin it bu
 tell them it could not be verified and to check that the monitor's first run
 produced scores.
 
-**`modelConnectionId`** is **BigQuery-only** (and required there) — the BigQuery
+**`model_connection_id`** is **BigQuery-only** (and required there) — the BigQuery
 Cloud resource connection in the customer's own GCP project that runs the judge. It
 is NOT a Monte Carlo setting or integration and Monte Carlo cannot list it; on
 BigQuery, ask the user for their BigQuery connection ID. **On every other warehouse,
 omit it entirely and never ask the user for it.** To choose the judge model, use
-`modelName` — there is no "model connection" to configure outside BigQuery.
+`model_name` — there is no "model connection" to configure outside BigQuery.
 
 ## Conversation-grain judges
 
@@ -187,40 +187,40 @@ The output/score column is not always the span judge's name:
 | `language_match_conversation` | `match_score` |
 | `satisfaction_conversation` | `satisfaction_score` (no per-span counterpart) |
 
-**`includeToolCalls` — default ON at conversation grain.** Every conversation-grain
-transform (judge or custom) accepts an optional `includeToolCalls` boolean. When
+**`include_tool_calls` — default ON at conversation grain.** Every conversation-grain
+transform (judge or custom) accepts an optional `include_tool_calls` boolean. When
 `true`, the agent's tool calls (name, inputs, outputs, and errors) are included in
 the judged conversation as clearly identifiable TOOL entries between the messages
 that triggered them — in call order, autonomous agent steps included — so the judge
-scores what the agent did, not just what it said. **Set `"includeToolCalls": true`
+scores what the agent did, not just what it said. **Set `"include_tool_calls": true`
 on every conversation-grain transform by default.** Omit it only for pure style/tone
 judges — `clarity_conversation`, `language_match_conversation`, or a wording-only
 custom prompt — where the transcript's wording alone is judged and tool noise
 dilutes the judge. The field is invalid at span grain: the tool rejects
-`includeToolCalls: true` on a monitor without
+`include_tool_calls: true` on a monitor without
 `is_agent_conversation_aggregation=True`.
 
 At conversation grain, a `custom_prompt` may only reference `{{conversation}}`, and
 the predefined SQL checks and `custom_sql` are not supported. At span grain,
-`{{conversation}}` is not available. With `"includeToolCalls": true` on the
+`{{conversation}}` is not available. With `"include_tool_calls": true` on the
 transform, `{{conversation}}` also carries the agent's tool calls (name, inputs,
 outputs, errors) as clearly identifiable TOOL entries between the messages that
 triggered them, in call order, autonomous steps included — write conversation
 prompts that judge actions with that visibility in mind. `agent_span_filters` at
-conversation grain may scope only by `agent`/`workflow` — `task`/`spanName` are
+conversation grain may scope only by `agent`/`workflow` — `task`/`span_name` are
 span-level and are rejected.
 
 ## Alert conditions
 
-Use `thresholdValue` (camelCase) for threshold operators — NOT `threshold_value`
-(snake_case). Each condition names one or more transform output fields in `fields`.
+Use `threshold_value` for threshold operators. Each condition names one or more
+transform output fields in `fields`.
 
 ```json
 {
     "metric": "NUMERIC_MEAN",
     "operator": "LT",
     "fields": ["relevance_score"],
-    "thresholdValue": 2
+    "threshold_value": 2
 }
 ```
 
@@ -257,7 +257,7 @@ create_or_update_agent_evaluation_monitor(
     ],
     alert_conditions=[
         {"metric": "NUMERIC_MEAN", "operator": "LT", "fields": ["relevance_score"],
-         "thresholdValue": 2}
+         "threshold_value": 2}
     ],
     sampling_config={"count": 100},
     dry_run=True
@@ -279,7 +279,7 @@ create_or_update_agent_evaluation_monitor(
     ],
     alert_conditions=[
         {"metric": "FALSE_RATE", "operator": "GT", "fields": ["content_safe"],
-         "thresholdValue": 0.05}
+         "threshold_value": 0.05}
     ],
     sampling_config={"count": 100},
     dry_run=True
@@ -288,7 +288,7 @@ create_or_update_agent_evaluation_monitor(
 
 ### Custom prompt as a pass/fail (boolean) check
 
-The prompt references `{{completions}}`; there is no `field`; `outputType` is
+The prompt references `{{completions}}`; there is no `field`; `output_type` is
 `boolean` so the alert watches the true/false rate. This is the right shape for
 "how often did the agent do X".
 
@@ -302,12 +302,12 @@ create_or_update_agent_evaluation_monitor(
             "function": "custom_prompt",
             "alias": "disambiguated_product",
             "prompt": "Did this response either ask which product the user meant, or state which product it assumed, before answering? Response: {{completions}}. Answer true or false.",
-            "outputType": "boolean"
+            "output_type": "boolean"
         }
     ],
     alert_conditions=[
         {"metric": "FALSE_RATE", "operator": "GT", "fields": ["disambiguated_product"],
-         "thresholdValue": 0.2}
+         "threshold_value": 0.2}
     ],
     sampling_config={"percentage": 20.0},
     dry_run=True
@@ -316,7 +316,7 @@ create_or_update_agent_evaluation_monitor(
 
 ### Custom SQL numeric check
 
-`custom_sql` needs `sqlExpression` + `alias` + `outputType`; alert with a numeric
+`custom_sql` needs `sql_expression` + `alias` + `output_type`; alert with a numeric
 metric on the alias.
 
 ```
@@ -328,13 +328,13 @@ create_or_update_agent_evaluation_monitor(
         {
             "function": "custom_sql",
             "alias": "answer_chars",
-            "sqlExpression": "LENGTH(first_completion)",
-            "outputType": "number"
+            "sql_expression": "LENGTH(first_completion)",
+            "output_type": "number"
         }
     ],
     alert_conditions=[
         {"metric": "NUMERIC_MEAN", "operator": "LT", "fields": ["answer_chars"],
-         "thresholdValue": 40}
+         "threshold_value": 40}
     ],
     sampling_config={"count": 100},
     dry_run=True
@@ -345,7 +345,7 @@ create_or_update_agent_evaluation_monitor(
 
 Set `is_agent_conversation_aggregation=True`, use a `*_conversation` judge, and alert
 on its score field (`task_completion_conversation` → `task_completion_score`).
-Sampling `count` ≤ 500. The transform carries `"includeToolCalls": true` (the
+Sampling `count` ≤ 500. The transform carries `"include_tool_calls": true` (the
 conversation-grain default) so completion is judged against what the agent actually
 did, not just what it said.
 
@@ -356,7 +356,7 @@ create_or_update_agent_evaluation_monitor(
     warehouse="Agent Observability",
     is_agent_conversation_aggregation=True,
     transforms=[
-        {"function": "task_completion_conversation", "includeToolCalls": true}
+        {"function": "task_completion_conversation", "include_tool_calls": true}
     ],
     alert_conditions=[
         {"metric": "NUMERIC_MEAN", "operator": "AUTO", "fields": ["task_completion_score"]}
@@ -371,10 +371,10 @@ create_or_update_agent_evaluation_monitor(
 Named, reusable `custom_prompt` templates for the most common Output-pillar checks. All three are
 **conversation-level**: set `is_agent_conversation_aggregation=True` and reference
 `{{conversation}}` — the only template variable a conversation-grain prompt may use. All three
-carry `"includeToolCalls": true` — the conversation-grain default; none is a pure style/tone
+carry `"include_tool_calls": true` — the conversation-grain default; none is a pure style/tone
 judge (a wording-only check like a clarity- or language-style judge would omit it) — so the judge
 reads the agent's TOOL entries alongside the messages. On a span-only agent (Databricks MLflow),
-adapt the prompt to `{{completions}}` at span grain instead and drop `includeToolCalls` too — it
+adapt the prompt to `{{completions}}` at span grain instead and drop `include_tool_calls` too — it
 is rejected at span grain.
 
 **Render, don't recite.** Before proposing a template, replace every `<AGENT_NAME>` placeholder
@@ -396,19 +396,19 @@ across the whole conversation. Part of the **baseline pack** — propose it for 
     "function": "custom_prompt",
     "alias": "frustration_free_score",
     "prompt": "Read this conversation between a user and <AGENT_NAME>: {{conversation}}. Rate from 1 to 5 how frustration-free the user's experience was. 5 = no sign of frustration; the user got what they needed without friction. 4 = minor friction (one clarification or retry) but the user stayed satisfied. 3 = noticeable friction; the user had to rephrase or repeat themselves to get a useful answer. 2 = clear frustration; the user complained, corrected the agent repeatedly, or expressed annoyance. 1 = severe frustration; the user gave up, abandoned the task, or ended the conversation visibly dissatisfied. Answer with only the number.",
-    "outputType": "number",
-    "includeToolCalls": true
+    "output_type": "number",
+    "include_tool_calls": true
 }
 ```
 
-Recommended alert: `{"metric": "NUMERIC_MEAN", "operator": "LT", "fields": ["frustration_free_score"], "thresholdValue": 4}`
+Recommended alert: `{"metric": "NUMERIC_MEAN", "operator": "LT", "fields": ["frustration_free_score"], "threshold_value": 4}`
 
 ### `answer_attempt_score` — did the agent attempt a real answer?
 
 1–5 score for whether the agent actually attempted to answer the user's data questions, versus
 deflecting, refusing, asking clarifying questions without ever answering, or erroring out.
 Part of the **analytics pack** (Cortex/Genie — see below), where deflection is the dominant
-failure mode of NL2SQL/analytics agents. This judge benefits directly from `includeToolCalls`:
+failure mode of NL2SQL/analytics agents. This judge benefits directly from `include_tool_calls`:
 the TOOL entries show whether a query actually ran, separating a real answer attempt from a
 confident deflection — so the prompt tells the judge to use them.
 
@@ -417,12 +417,12 @@ confident deflection — so the prompt tells the judge to use them.
     "function": "custom_prompt",
     "alias": "answer_attempt_score",
     "prompt": "Read this conversation between a user and <AGENT_NAME>, an analytics agent that answers data questions: {{conversation}}. Rate from 1 to 5 how fully the agent attempted to answer the user's data questions. TOOL entries in the conversation show what the agent actually ran; a substantive answer attempt is normally backed by one. 5 = every question got a direct, substantive answer attempt (a query, a result, or a concrete data answer). 4 = answered with minor gaps or hedging. 3 = partial; some questions were deflected or met only with clarifying questions. 2 = mostly deflected, refused, or answered a different question than asked. 1 = no real answer attempt at all. Answer with only the number.",
-    "outputType": "number",
-    "includeToolCalls": true
+    "output_type": "number",
+    "include_tool_calls": true
 }
 ```
 
-Recommended alert: `{"metric": "NUMERIC_MEAN", "operator": "LT", "fields": ["answer_attempt_score"], "thresholdValue": 4}`
+Recommended alert: `{"metric": "NUMERIC_MEAN", "operator": "LT", "fields": ["answer_attempt_score"], "threshold_value": 4}`
 
 ### `user_correction` — did the user have to correct the agent?
 
@@ -436,19 +436,19 @@ see below). Framed so `true` = a correction occurred, making `TRUE_RATE` the cor
     "function": "custom_prompt",
     "alias": "user_correction",
     "prompt": "Read this conversation between a user and <AGENT_NAME>: {{conversation}}. Did the user correct the agent in a follow-up turn - for example saying a previous answer was wrong, restating what they actually meant, or re-asking the same question because the answer missed it? A clarifying question from the agent does not count as a correction. Answer true if at least one correction occurred, false otherwise.",
-    "outputType": "boolean",
-    "includeToolCalls": true
+    "output_type": "boolean",
+    "include_tool_calls": true
 }
 ```
 
-Recommended alert: `{"metric": "TRUE_RATE", "operator": "GT", "fields": ["user_correction"], "thresholdValue": 0.2}` —
+Recommended alert: `{"metric": "TRUE_RATE", "operator": "GT", "fields": ["user_correction"], "threshold_value": 0.2}` —
 0.2 is a conservative starting point, not a calibrated one. Tune it to the agent's observed
 correction rate after the first week of results, or switch the operator to `AUTO_HIGH` once
 enough history has accumulated for anomaly detection.
 
 ### Action-aware checks — judging what the agent did
 
-With tool calls included (`includeToolCalls: true`), a `custom_prompt` can judge **action
+With tool calls included (`include_tool_calls: true`), a `custom_prompt` can judge **action
 correctness**, not just answer text — the TOOL entries are the evidence the judge reads. Propose
 one when the agent's job is to DO something and you observed the corresponding failure mode:
 
@@ -471,7 +471,7 @@ propose these packs rather than inventing a one-off list. Shared defaults for ev
   one agent's monitors can be filtered as a group
 - **Grain:** conversation (`is_agent_conversation_aggregation=True`) where the agent supports it;
   span grain with `{{completions}}` / span judges otherwise
-- **Tool calls:** `includeToolCalls: true` on every conversation-grain transform (the default —
+- **Tool calls:** `include_tool_calls: true` on every conversation-grain transform (the default —
   omit only for pure style/tone judges); drop it at span grain, where it is rejected
 
 ### Baseline pack — every agent
@@ -499,13 +499,13 @@ create_or_update_agent_evaluation_monitor(
             "function": "custom_prompt",
             "alias": "frustration_free_score",
             "prompt": "Read this conversation between a user and Support Bot: {{conversation}}. Rate from 1 to 5 how frustration-free the user's experience was. 5 = no sign of frustration; the user got what they needed without friction. 4 = minor friction (one clarification or retry) but the user stayed satisfied. 3 = noticeable friction; the user had to rephrase or repeat themselves to get a useful answer. 2 = clear frustration; the user complained, corrected the agent repeatedly, or expressed annoyance. 1 = severe frustration; the user gave up, abandoned the task, or ended the conversation visibly dissatisfied. Answer with only the number.",
-            "outputType": "number",
-            "includeToolCalls": true
+            "output_type": "number",
+            "include_tool_calls": true
         }
     ],
     alert_conditions=[
         {"metric": "NUMERIC_MEAN", "operator": "LT", "fields": ["frustration_free_score"],
-         "thresholdValue": 4}
+         "threshold_value": 4}
     ],
     interval_minutes=1440,
     sampling_config={"count": 100},
@@ -526,7 +526,7 @@ user-corrected answers are the dominant failure modes. Do not propose this pack 
 | User corrections | `user_correction` template | `TRUE_RATE` `GT` 0.2 on `user_correction` (starting point — tune, or move to `AUTO_HIGH` with history) |
 
 Same defaults as the baseline pack: daily, `{"count": 100}` sampling, the `agent` tag,
-`includeToolCalls: true` on each transform, and full rendered prompt text shown for approval
+`include_tool_calls: true` on each transform, and full rendered prompt text shown for approval
 before creating.
 
 ## Common errors
@@ -535,7 +535,7 @@ before creating.
 |--------------|-------|-----|
 | Warehouse not found | `warehouse` omitted or wrong | Pass the agent's `warehouse_uuid` from `get_agent_metadata`; if null, list warehouses via `get_warehouses` |
 | invalid / unresolvable `agent` reference | The `agent` value wasn't taken from `get_agent_metadata` | Use the exact `agentReference` value — do not construct it by hand, and never pass an MCON |
-| "Field X doesn't exist" | Wrong transform output field name, or a `classification`/`sentiment` output that isn't in the schema | Use the documented output field (e.g. `relevance_score`) or a custom transform's `alias`; replace `classification`/`sentiment` with a `custom_prompt` (`outputType` `boolean`/`string`) |
+| "Field X doesn't exist" | Wrong transform output field name, or a `classification`/`sentiment` output that isn't in the schema | Use the documented output field (e.g. `relevance_score`) or a custom transform's `alias`; replace `classification`/`sentiment` with a `custom_prompt` (`output_type` `boolean`/`string`) |
 | metric/output-type mismatch | Numeric metric on a boolean field (or vice versa) | `NUMERIC_MEAN` for numbers, `TRUE_RATE`/`FALSE_RATE` for booleans, `NULL_RATE` for any type |
-| `task`/`spanName` rejected in `agent_span_filters` | Used a span-level filter dimension at conversation grain | At conversation grain (`is_agent_conversation_aggregation=True`), scope only by `agent`/`workflow` — `task`/`spanName` are span-level |
-| `includeToolCalls` rejected | The field was set on a per-span monitor | `includeToolCalls` is conversation-grain only — keep it (default ON) with `is_agent_conversation_aggregation=True`; drop it at span grain |
+| `task`/`span_name` rejected in `agent_span_filters` | Used a span-level filter dimension at conversation grain | At conversation grain (`is_agent_conversation_aggregation=True`), scope only by `agent`/`workflow` — `task`/`span_name` are span-level |
+| `include_tool_calls` rejected | The field was set on a per-span monitor | `include_tool_calls` is conversation-grain only — keep it (default ON) with `is_agent_conversation_aggregation=True`; drop it at span grain |

@@ -30,7 +30,7 @@ Key fields in the response:
 evaluation monitors (`is_agent_conversation_aggregation=True`) are supported for
 `ao_clickhouse_otel`, `platform_agent` (Snowflake Cortex), and `databricks_genie`;
 the MLflow classes are span-only (the backend rejects conversation aggregation for
-them). At conversation grain, set `includeToolCalls: true` on every eval transform
+them). At conversation grain, set `include_tool_calls: true` on every eval transform
 by default — it adds the agent's tool calls (name, inputs, outputs, errors) to the
 judged conversation as clearly identifiable TOOL entries, in call order, so evals
 score what the agent did, not just what it said. Omit it only for pure style/tone
@@ -222,7 +222,7 @@ What each pillar maps to:
 Mind the backend caveats from Step 1 (`backend_class`): no token or model
 metrics for Genie / Knowledge Assistant agents, and conversation-grain evals
 only on OTel/ClickHouse, Snowflake Cortex, and Genie — with
-`includeToolCalls: true` on every conversation-grain eval transform by default
+`include_tool_calls: true` on every conversation-grain eval transform by default
 (rejected at span grain; see Step 1). Aggregate (per-trace)
 validation assertions require `is_agent_trace_aggregation=True`, supported
 only on `ao_clickhouse_otel` / `customer_otel_trace_table` agents — on other
@@ -322,7 +322,7 @@ accepts **at most one** filter object. Each field of the object holds a
 | `agent` | Filter by agent name | `{"agent": {"value": "My Agent"}}` |
 | `workflow` | Filter by workflow name | `{"workflow": {"value": "Chat Agent"}}` |
 | `task` | Filter by task name | `{"task": {"value": "call_model"}}` |
-| `spanName` | Filter by span name | `{"spanName": {"value": "ChatBedrockConverse.chat"}}` |
+| `span_name` | Filter by span name | `{"span_name": {"value": "ChatBedrockConverse.chat"}}` |
 
 Multiple fields can be combined in the single filter object:
 
@@ -355,11 +355,11 @@ the default stays daily unless they opt in.
 
 ## Time filter configuration
 
-Used by trajectory and validation monitors. The `timeField` is an object with
+Used by trajectory and validation monitors. The `time_field` is an object with
 a `field` property — always use `ingest_ts`:
 
 ```json
-{"timeField": {"field": "ingest_ts"}, "lookbackInHrs": 24}
+{"time_field": {"field": "ingest_ts"}, "lookback_in_hrs": 24}
 ```
 
 ---
@@ -389,7 +389,7 @@ one-off list:
   `helpfulness` on span-grain-only backends) plus the `frustration_free_score` template.
   Defaults: daily schedule (`interval_minutes=1440`), `{"count": 100}` sampling, an `agent`
   tag (`{"name": "agent", "value": "<AGENT_NAME>"}`) on every monitor, and
-  `includeToolCalls: true` on every conversation-grain transform (see the `backend_class`
+  `include_tool_calls: true` on every conversation-grain transform (see the `backend_class`
   capabilities in Step 1).
 - **Analytics pack — only when `backend_class` is `platform_agent` (Snowflake Cortex) or
   `databricks_genie`:** the `answer_attempt_score` and `user_correction` templates — the
@@ -435,7 +435,7 @@ behaviors a span pattern can't see — e.g. "did the agent claim it ran a query 
 never executed?", "did the agent re-ask for information the user already gave?".
 One boolean `custom_prompt` per behavior, alerting on `TRUE_RATE` / `FALSE_RATE`,
 at conversation grain where the backend supports it (see `backend_class` in
-Step 1 and `agent-evaluation-monitor.md`) — keep `includeToolCalls: true` on
+Step 1 and `agent-evaluation-monitor.md`) — keep `include_tool_calls: true` on
 these so the judge can see the tool calls it is judging.
 
 ---

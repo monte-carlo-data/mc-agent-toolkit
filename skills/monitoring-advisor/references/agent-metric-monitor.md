@@ -75,8 +75,8 @@ Each condition has:
 | `metric` | Yes | The metric to compute (see Metrics below). |
 | `operator` | Yes | See Operators below. |
 | `fields` | Depends | PARSED_SPANS field name(s). Required for every manual operator and range. Omit for `ROW_COUNT_CHANGE`. |
-| `thresholdValue` | Depends | Required for single-value operators (`GT`/`GTE`/`LT`/`LTE`/`EQ`/`NEQ`). camelCase — NOT `threshold_value`. |
-| `lowerThreshold` / `upperThreshold` | Depends | Both required for `INSIDE_RANGE` / `OUTSIDE_RANGE`; `lowerThreshold` ≤ `upperThreshold`. |
+| `threshold_value` | Depends | Required for single-value operators (`GT`/`GTE`/`LT`/`LTE`/`EQ`/`NEQ`). |
+| `lower_threshold` / `upper_threshold` | Depends | Both required for `INSIDE_RANGE` / `OUTSIDE_RANGE`; `lower_threshold` ≤ `upper_threshold`. |
 | `type` | No | `threshold` (default) or `noop` (collect without alerting; pair with `operator: "NOOP"`). |
 
 ### Operators
@@ -84,9 +84,9 @@ Each condition has:
 - **Anomaly detection:** `AUTO`, `AUTO_HIGH`, `AUTO_LOW` — learn thresholds
   automatically. Do NOT pass any threshold.
 - **Single threshold:** `GT`, `GTE`, `LT`, `LTE`, `EQ`, `NEQ` — require
-  `thresholdValue` **and** `fields`. (The not-equal operator is `NEQ`, not `NE`.)
-- **Range:** `INSIDE_RANGE`, `OUTSIDE_RANGE` — require both `lowerThreshold` and
-  `upperThreshold` (and `fields`).
+  `threshold_value` **and** `fields`. (The not-equal operator is `NEQ`, not `NE`.)
+- **Range:** `INSIDE_RANGE`, `OUTSIDE_RANGE` — require both `lower_threshold` and
+  `upper_threshold` (and `fields`).
 - **Collect-only:** `NOOP` — record the metric without alerting; pair with
   `type: "noop"`.
 
@@ -169,7 +169,7 @@ The set:
 | 2 | Token anomaly | `NUMERIC_MEDIAN` + `PERCENTILE_95` on `total_tokens`, both `AUTO` | Per-interaction cost drift; same one-monitor-two-conditions shape. |
 | 3 | Daily token spend | `SUM` on `total_tokens`, `AUTO`, with `aggregate_by="day"` | Aggregate cost creep. `aggregate_by` buckets the datapoints; `interval_minutes` only sets the run cadence — set both. |
 | 4 | Error-level anomaly | `NUMERIC_MEAN` on `status_code`, `AUTO_HIGH` | Error-rate proxy — see rationale below. |
-| 5 | Latency SLO | `PERCENTILE_95` on `duration_sec`, `GT`, `thresholdValue` = measured p95 × 1.2 | Separate monitor, measure-then-propose — see below. |
+| 5 | Latency SLO | `PERCENTILE_95` on `duration_sec`, `GT`, `threshold_value` = measured p95 × 1.2 | Separate monitor, measure-then-propose — see below. |
 
 **Why monitor 4 is `NUMERIC_MEAN` on `status_code`:** `status_code` is the one error
 signal available on every backend (OTel semantics: 0 = unset, 1 = ok, 2 = error).
@@ -186,7 +186,7 @@ first, and if one exists present it as the error coverage instead of duplicating
 1. Sample recent traces: `get_agent_traces` for the agent (default 14-day lookback),
    `first=50`, paging with `after`/`end_cursor` up to ~3 pages (≤150 traces).
 2. Compute the 95th percentile of the sampled `duration_seconds`.
-3. Propose `thresholdValue` = p95 × 1.2 (20% headroom), rounded to a clean number.
+3. Propose `threshold_value` = p95 × 1.2 (20% headroom), rounded to a clean number.
 4. Show the evidence: measured p95, sample size and window, and the proposed
    threshold — stating explicitly that the headroom and threshold are the user's to
    adjust.
@@ -254,7 +254,7 @@ create_or_update_agent_metric_monitor(
     warehouse="Prod Warehouse",
     alert_conditions=[
         {"metric": "NUMERIC_MEAN", "operator": "GT", "fields": ["total_tokens"],
-         "thresholdValue": 5000}
+         "threshold_value": 5000}
     ],
     dry_run=True
 )
@@ -284,7 +284,7 @@ create_or_update_agent_metric_monitor(
     warehouse="Prod Warehouse",
     alert_conditions=[
         {"metric": "TRUE_RATE", "operator": "LT", "fields": ["is_tool_call"],
-         "thresholdValue": 0.1}
+         "threshold_value": 0.1}
     ],
     dry_run=True
 )
@@ -299,7 +299,7 @@ create_or_update_agent_metric_monitor(
     warehouse="Prod Warehouse",
     alert_conditions=[
         {"metric": "PERCENTILE_95", "operator": "GT", "fields": ["duration_sec"],
-         "thresholdValue": 42}
+         "threshold_value": 42}
     ],
     is_agent_trace_aggregation=True,
     interval_minutes=1440,

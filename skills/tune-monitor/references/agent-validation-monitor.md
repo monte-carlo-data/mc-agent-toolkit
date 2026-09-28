@@ -98,7 +98,7 @@ Validation edits never reset anything — there is no learned baseline — but e
   full-replacement edit drops the window.
 - Pass `warehouse` (the report's `Warehouse:` UUID) on every edit.
 - When the report shows `Trace aggregation: enabled`, pass `is_agent_trace_aggregation=True` and
-  no workflow / task / spanName span filters — the platform rejects span-level filters in that
+  no workflow / task / span_name span filters — the platform rejects span-level filters in that
   mode.
 - **PUT semantics** — re-pass `is_draft` (omitting it un-drafts AND un-pauses) and `tags`
   (omitting them drops the platform's agent tags).

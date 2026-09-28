@@ -28,8 +28,8 @@ trend a numeric metric (mean latency, token counts) — that's
 
 > **CRITICAL:** Trajectory `agent_span_filters` allow only the `agent` field — at
 > most one filter, e.g. `agent_span_filters=[{"agent": {"value": "My Agent"}}]`.
-> Setting `workflow`, `task`, or `spanName` there causes a validation error — those go
-> in the condition's `spanField` instead. For OpenTelemetry agents the filter's
+> Setting `workflow`, `task`, or `span_name` there causes a validation error — those go
+> in the condition's `span_field` instead. For OpenTelemetry agents the filter's
 > `agent` value must equal the top-level `agent` reference.
 
 > **CRITICAL:** A span that never appears produces no rows to count, so "occurs 0
@@ -37,7 +37,7 @@ trend a numeric metric (mean latency, token counts) — that's
 > `LESS_THAN 1` are rejected. Use a SPAN_RELATION with a negated predicate to check a
 > span is absent relative to another span (see the missing-step example).
 
-> **IMPORTANT:** `time_filter` is REQUIRED; `timeField` is always
+> **IMPORTANT:** `time_filter` is REQUIRED; `time_field` is always
 > `{"field": "ingest_ts"}`.
 
 > **IMPORTANT:** `schedule_type` is `fixed` (default) or `manual` — never dynamic.
@@ -51,7 +51,7 @@ trend a numeric metric (mean latency, token counts) — that's
 
 - Uses `agent_span_alert_condition` (not `alert_conditions`) — `{"operator": "OR", "conditions": [...]}`
 - Two condition types: `SPAN_OCCURRENCE` (count) and `SPAN_RELATION` (relate two spans)
-- Requires `time_filter` with `timeField` (object `{"field": "ingest_ts"}`) and `lookbackInHrs`
+- Requires `time_filter` with `time_field` (object `{"field": "ingest_ts"}`) and `lookback_in_hrs`
 
 ## Parameters
 
@@ -60,10 +60,10 @@ trend a numeric metric (mean latency, token counts) — that's
 | `description` | string | Yes | Human-readable monitor description (shown as display name) |
 | `agent` | string | Yes | Agent reference — `agentReference` from `get_agent_metadata` (`{db}:{schema}.{name}` or OTel `service_name`) |
 | `agent_span_alert_condition` | object | Yes | The span pattern that flags a trace (see below) |
-| `time_filter` | object | Yes | `{"timeField": {"field": "ingest_ts"}, "lookbackInHrs": 24}` |
+| `time_filter` | object | Yes | `{"time_field": {"field": "ingest_ts"}, "lookback_in_hrs": 24}` |
 | `warehouse` | string | No | Warehouse name or UUID; defaults to the account default |
 | `trace_table` | string | No | Explicit trace table — only for non-ClickHouse OTel agents |
-| `agent_span_filters` | array | No | Optional — **only the `agent` field allowed** (no `workflow`/`task`/`spanName`); at most one |
+| `agent_span_filters` | array | No | Optional — **only the `agent` field allowed** (no `workflow`/`task`/`span_name`); at most one |
 | `schedule_type` | string | No | `fixed` (default) or `manual` |
 | `interval_minutes` | int | No | Default `60`; at least 5 |
 | `monitor_uuid` | string | No | UUID of an existing monitor to update in place (PUT semantics) |
@@ -90,14 +90,14 @@ of two types. To OR several patterns together, list them as multiple entries in
 {
   "type": "SPAN_OCCURRENCE",
   "predicate": {"name": "occurs"},
-  "spanField": {
-    "spanName": {"literal": "ChatBedrockConverse.chat"},
+  "span_field": {
+    "span_name": {"literal": "ChatBedrockConverse.chat"},
     "task": {"literal": "call_model"},
     "workflow": {"literal": "Chat Agent"},
     "type": "SPAN_FIELD"
   },
   "count": 5,
-  "comparisonOperator": "MORE_THAN"
+  "comparison_operator": "MORE_THAN"
 }
 ```
 
@@ -105,13 +105,13 @@ of two types. To OR several patterns together, list them as multiple entries in
 |-------|----------|-------------|
 | `type` | Yes | `"SPAN_OCCURRENCE"`. |
 | `predicate` | Yes | Always `{"name": "occurs"}`. `occurs` **cannot** be negated. |
-| `spanField` | Yes | The span to count (see spanField below). |
-| `comparisonOperator` | Yes | `"MORE_THAN"`, `"LESS_THAN"`, or `"EXACTLY"`. |
+| `span_field` | Yes | The span to count (see span_field below). |
+| `comparison_operator` | Yes | `"MORE_THAN"`, `"LESS_THAN"`, or `"EXACTLY"`. |
 | `count` | Yes | Occurrences to compare against. `EXACTLY` requires count ≥ 1; `LESS_THAN` requires count ≥ 2; `MORE_THAN` requires count ≥ 0. |
 
 Use `LESS_THAN 2` for "occurred exactly once when it should occur more". Occurrences
 are counted per `(trace, parent span, span name)` group — pin the `task`/`workflow`
-in `spanField` to the step you mean.
+in `span_field` to the step you mean.
 
 ### SPAN_RELATION — relate two spans in a trace
 
@@ -119,15 +119,15 @@ in `spanField` to the step you mean.
 {
   "type": "SPAN_RELATION",
   "predicate": {"name": "occurs_before"},
-  "spanField": {
-    "spanName": {"literal": "generate"},
+  "span_field": {
+    "span_name": {"literal": "generate"},
     "task": {"literal": "generate_answer"},
     "workflow": {"literal": "RAG Agent"},
     "type": "SPAN_FIELD"
   },
-  "relatedSpanFields": [
+  "related_span_fields": [
     {
-      "spanName": {"literal": "retrieve"},
+      "span_name": {"literal": "retrieve"},
       "task": {"literal": "generate_answer"},
       "workflow": {"literal": "RAG Agent"},
       "type": "SPAN_FIELD"
@@ -140,10 +140,10 @@ in `spanField` to the step you mean.
 |-------|----------|-------------|
 | `type` | Yes | `"SPAN_RELATION"`. |
 | `predicate` | Yes | `{"name": "occurs_with" \| "occurs_before" \| "occurs_after"}`. Add `"negated": true` for the inverse (e.g. `occurs_with` + negated = "occurs without"). |
-| `spanField` | Yes | The primary span (see spanField below). |
-| `relatedSpanFields` | Yes | One or more related spans. Each must share the same coarser `workflow` / `task` as `spanField` — a span-name comparison needs matching `task` and `workflow`; a task-level comparison needs matching `workflow`. |
+| `span_field` | Yes | The primary span (see span_field below). |
+| `related_span_fields` | Yes | One or more related spans. Each must share the same coarser `workflow` / `task` as `span_field` — a span-name comparison needs matching `task` and `workflow`; a task-level comparison needs matching `workflow`. |
 
-### spanField structure
+### span_field structure
 
 Identifies a span by workflow / task / span name. Fill in from coarse to fine.
 
@@ -151,10 +151,10 @@ Identifies a span by workflow / task / span name. Fill in from coarse to fine.
 |-------|----------|--------|
 | `type` | No (defaults `"SPAN_FIELD"`) | `"SPAN_FIELD"` |
 | `workflow` | **Yes — always** | `{"literal": "workflow name"}` |
-| `task` | Yes when `spanName` is set | `{"literal": "task name"}` — requires `workflow` |
-| `spanName` | No | `{"literal": "span operation name"}` — requires `task` AND `workflow` |
+| `task` | Yes when `span_name` is set | `{"literal": "task name"}` — requires `workflow` |
+| `span_name` | No | `{"literal": "span operation name"}` — requires `task` AND `workflow` |
 
-**`workflow` is the minimum.** If you set `spanName`, you MUST also set `task` and
+**`workflow` is the minimum.** If you set `span_name`, you MUST also set `task` and
 `workflow`. If you set `task`, you MUST also set `workflow`. All values use the
 `{"literal": "..."}` format. Discover the real names with `get_agent_segments` and
 `get_agent_trace`.
@@ -185,7 +185,7 @@ healthy run ever needed. Derive the threshold; never hardcode one:
    If it reports breaching traces, your sample missed the heavy tail (long agentic
    sessions, multi-turn conversations accumulating in one trace) — re-derive from a
    wider window. Preview probes at increasing counts (e.g. more than 20/30/40 on a
-   7-day `lookbackInHrs`) find the true historical max cheaply without pulling
+   7-day `lookback_in_hrs`) find the true historical max cheaply without pulling
    traces.
 
 A well-derived runaway-loop monitor matches **zero historical traces** — that is
@@ -197,7 +197,7 @@ every error-based monitor.
 
 Create it live (`dry_run=False` after user confirmation), tagged
 `{"name": "agent", "value": "<AGENT_NAME>"}`, on a daily schedule
-(`interval_minutes=1440`, `lookbackInHrs: 24`).
+(`interval_minutes=1440`, `lookback_in_hrs: 24`).
 
 ### Ungrounded-in-data — create as a DRAFT with an evidence preview
 
@@ -241,18 +241,18 @@ create_or_update_agent_trajectory_monitor(
             {
                 "type": "SPAN_OCCURRENCE",
                 "predicate": {"name": "occurs"},
-                "spanField": {
-                    "spanName": {"literal": "ChatBedrockConverse.chat"},
+                "span_field": {
+                    "span_name": {"literal": "ChatBedrockConverse.chat"},
                     "task": {"literal": "call_model"},
                     "workflow": {"literal": "Chat Agent"},
                     "type": "SPAN_FIELD"
                 },
                 "count": 5,
-                "comparisonOperator": "MORE_THAN"
+                "comparison_operator": "MORE_THAN"
             }
         ]
     },
-    time_filter={"timeField": {"field": "ingest_ts"}, "lookbackInHrs": 24},
+    time_filter={"time_field": {"field": "ingest_ts"}, "lookback_in_hrs": 24},
     dry_run=True
 )
 ```
@@ -273,15 +273,15 @@ create_or_update_agent_trajectory_monitor(
             {
                 "type": "SPAN_RELATION",
                 "predicate": {"name": "occurs_with", "negated": true},
-                "spanField": {
-                    "spanName": {"literal": "generate"},
+                "span_field": {
+                    "span_name": {"literal": "generate"},
                     "task": {"literal": "generate_answer"},
                     "workflow": {"literal": "Chat Agent"},
                     "type": "SPAN_FIELD"
                 },
-                "relatedSpanFields": [
+                "related_span_fields": [
                     {
-                        "spanName": {"literal": "validate_output"},
+                        "span_name": {"literal": "validate_output"},
                         "task": {"literal": "generate_answer"},
                         "workflow": {"literal": "Chat Agent"},
                         "type": "SPAN_FIELD"
@@ -290,7 +290,7 @@ create_or_update_agent_trajectory_monitor(
             }
         ]
     },
-    time_filter={"timeField": {"field": "ingest_ts"}, "lookbackInHrs": 24},
+    time_filter={"time_field": {"field": "ingest_ts"}, "lookback_in_hrs": 24},
     dry_run=True
 )
 ```
@@ -307,18 +307,18 @@ create_or_update_agent_trajectory_monitor(
             {
                 "type": "SPAN_OCCURRENCE",
                 "predicate": {"name": "occurs"},
-                "spanField": {
-                    "spanName": {"literal": "safety_check"},
+                "span_field": {
+                    "span_name": {"literal": "safety_check"},
                     "task": {"literal": "validate_output"},
                     "workflow": {"literal": "Chat Agent"},
                     "type": "SPAN_FIELD"
                 },
                 "count": 2,
-                "comparisonOperator": "LESS_THAN"
+                "comparison_operator": "LESS_THAN"
             }
         ]
     },
-    time_filter={"timeField": {"field": "ingest_ts"}, "lookbackInHrs": 24},
+    time_filter={"time_field": {"field": "ingest_ts"}, "lookback_in_hrs": 24},
     dry_run=True
 )
 ```
@@ -328,7 +328,7 @@ create_or_update_agent_trajectory_monitor(
 | Error message | Cause | Fix |
 |--------------|-------|-----|
 | invalid / unresolvable `agent` reference | The `agent` value wasn't taken from `get_agent_metadata` | Use the exact `agentReference` value — do not construct it by hand, and never pass an MCON |
-| "workflow should not be set" in agentSpanFilters | Trajectory monitors only allow the `agent` field in `agent_span_filters` | Remove `workflow`/`task`/`spanName`; put them in the condition's `spanField` |
+| "workflow should not be set" in agentSpanFilters | Trajectory monitors only allow the `agent` field in `agent_span_filters` | Remove `workflow`/`task`/`span_name`; put them in the condition's `span_field` |
 | `AND` operator rejected | `agent_span_alert_condition.operator` set to `"AND"` | Use `"OR"` (or omit it); split an all-must-hold rule into separate monitors |
 | `EXACTLY 0` / `LESS_THAN 1` rejected | Tried to express "occurs 0 times" | Use a negated SPAN_RELATION for a missing span, or `LESS_THAN 2` for "occurred only once" |
-| spanField rejected | Set `spanName` without `task`+`workflow`, or `task` without `workflow` | Fill coarse-to-fine: `workflow` always; `task` needs `workflow`; `spanName` needs `task`+`workflow` |
+| span_field rejected | Set `span_name` without `task`+`workflow`, or `task` without `workflow` | Fill coarse-to-fine: `workflow` always; `task` needs `workflow`; `span_name` needs `task`+`workflow` |

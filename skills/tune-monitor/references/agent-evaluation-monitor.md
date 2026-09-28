@@ -101,10 +101,9 @@ preview-then-confirm rules apply (always pass `monitor_uuid=<uuid>`, always dry-
 - **CRITICAL: the `agent` parameter takes the Agent reference, verbatim** (e.g.
   `analytics:prod_agents.rothbot`) — never the bare agent name or the trace-table MCON.
 - **Transforms MUST be re-passed on every call** — the full-replacement edit deletes any
-  transform you omit. The report renders them as MaC YAML with snake_case keys; the tool's
-  `transforms` entries take camelCase (`output_type` → `outputType`, `sql_expression` →
-  `sqlExpression`, `model_name` → `modelName`, `include_tool_calls` → `includeToolCalls`). Map
-  the keys; carry every value verbatim.
+  transform you omit. The report renders them as MaC YAML with snake_case keys, and the tool
+  takes the same snake_case keys (`output_type`, `sql_expression`, `model_name`,
+  `include_tool_calls`) — carry every value verbatim, no key mapping needed.
 - **Sampling MUST be re-passed on every call**: `up to N rows` → `sampling_config={"count": N}`,
   `P% of eligible rows` → `{"percentage": P}` — unless a recommendation changes it.
 - When the report shows `Conversation aggregation: enabled`, pass

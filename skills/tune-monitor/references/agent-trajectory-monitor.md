@@ -84,12 +84,11 @@ Trajectory edits never reset anything — there is no learned baseline — but e
   `analytics:prod_agents.rothbot`) — never the bare agent name or the trace-table MCON.
 - **The span alert condition MUST be re-passed in full** as `agent_span_alert_condition` — the
   edit deletes anything you omit; re-pass every condition verbatim except the one deliberately
-  tuned. The report's YAML is snake_case with NO `type` discriminators; the tool takes camelCase
-  (`span_field` → `spanField`, `related_span_fields` → `relatedSpanFields`, `span_name` →
-  `spanName`, `comparison_operator` → `comparisonOperator`) and REQUIRES `type` on every
-  condition: `"SPAN_RELATION"` for occurs_with/occurs_before/occurs_after, `"SPAN_OCCURRENCE"`
-  for occurs. Copy every span-selector level verbatim, including empty literals
-  (e.g. `task: {"literal": ""}`).
+  tuned. The report's YAML is snake_case with NO `type` discriminators; the tool takes the same
+  snake_case field names (`span_field`, `related_span_fields`, `span_name`,
+  `comparison_operator`) and REQUIRES `type` on every condition: `"SPAN_RELATION"` for
+  occurs_with/occurs_before/occurs_after, `"SPAN_OCCURRENCE"` for occurs. Copy every
+  span-selector level verbatim, including empty literals (e.g. `task: {"literal": ""}`).
 - **The time filter MUST be re-passed on every call** — copy the report's
   `Time filter (REQUIRED ...)` JSON verbatim as `time_filter`; omitting it on the
   full-replacement edit drops the window.

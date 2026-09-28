@@ -36,8 +36,8 @@ scopes the metric to just that slice — or excludes a noisy slice by monitoring
 
 - At most **one** span filter entry.
 - Each sub-field is a nested object: `{"workflow": {"value": "TTSA"}}` — never a bare string.
-- Field names are camelCase in the wire shape (`spanName`), snake_case in the tool parameter
-  (`agent_span_filters`).
+- Field names are snake_case throughout, including nested ones (`span_name`), and the tool
+  parameter itself (`agent_span_filters`).
 - **NEVER include an `agent` entry inside `agent_span_filters`.** The agent is identified by the
   top-level `agent` parameter, not a span filter. An `agent` sub-field is rejected.
 

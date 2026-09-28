@@ -4,7 +4,7 @@ Detailed reference for building `create_or_update_comparison_monitor` tool calls
 
 ## Critical Constraints
 
-- **NEVER guess column names.** Always get them from `get_table` for both the source and target tables. Verify that `sourceField` exists in the source table and `targetField` exists in the target table before building alert conditions.
+- **NEVER guess column names.** Always get them from `get_table` for both the source and target tables. Verify that `source_field` exists in the source table and `target_field` exists in the target table before building alert conditions.
 
 ---
 
@@ -25,7 +25,7 @@ Before constructing alert conditions, you MUST verify that both tables exist and
 
 1. **Resolve both MCONs.** Use `search` to find the source and target tables. If the user provided `database:schema.table` format, search for each to get the MCON.
 2. **Get full schemas.** Call `get_table` with `include_fields: true` on BOTH the source table and the target table. You need the column lists from both.
-3. **For field-level metrics, verify fields exist on both sides.** Confirm that `sourceField` exists in the source table's column list AND `targetField` exists in the target table's column list. Field names are case-sensitive on most warehouses.
+3. **For field-level metrics, verify fields exist on both sides.** Confirm that `source_field` exists in the source table's column list AND `target_field` exists in the target table's column list. Field names are case-sensitive on most warehouses.
 4. **Check field type compatibility.** The metric must be compatible with the column types on both sides. For example, `NUMERIC_MEAN` requires numeric columns in both the source and target tables. If the source column is numeric but the target is a string, the comparison will fail.
 5. If any field does not exist or types are incompatible, stop and ask the user to clarify. Do not guess.
 
@@ -83,11 +83,11 @@ Each condition compares a metric between the source and target tables.
 |-------|------|----------|-------------|
 | `metric` | string | Yes | The metric to compare (see Metrics Reference below). |
 | `type` | string | Yes (for non-AUTO thresholds) | Threshold type — one of `comparison_delta` (static threshold on source↔target diff) or `AUTO` (anomaly detection). Omitting `type` defaults to AUTO-style behavior. |
-| `sourceField` | string | For field-level metrics | Column in the source table. Required for ALL metrics except `ROW_COUNT`. |
-| `targetField` | string | For field-level metrics | Column in the target table. Required for ALL metrics except `ROW_COUNT`. |
-| `thresholdValue` | number | **Required for `comparison_delta`-type conditions**; optional for `AUTO`-type anomaly detection. | Threshold for acceptable difference between source and target. Omitting it on a delta-type condition is rejected with `threshold_value is required for comparison_delta type`. |
-| `isThresholdRelative` | boolean | No | `false` = absolute difference (default), `true` = percentage difference. |
-| `customMetric` | object | No | Custom SQL expressions for source and target (see Custom Metrics below). |
+| `source_field` | string | For field-level metrics | Column in the source table. Required for ALL metrics except `ROW_COUNT`. |
+| `target_field` | string | For field-level metrics | Column in the target table. Required for ALL metrics except `ROW_COUNT`. |
+| `threshold_value` | number | **Required for `comparison_delta`-type conditions**; optional for `AUTO`-type anomaly detection. | Threshold for acceptable difference between source and target. Omitting it on a delta-type condition is rejected with `threshold_value is required for comparison_delta type`. |
+| `is_threshold_relative` | boolean | No | `false` = absolute difference (default), `true` = percentage difference. |
+| `custom_metric` | object | No | Custom SQL expressions for source and target (see Custom Metrics below). |
 
 ### Threshold types
 
@@ -95,20 +95,20 @@ Two threshold types are supported on comparison alert conditions:
 
 | `type` | Behavior | Required fields |
 |---|---|---|
-| `AUTO` (default when `type` is omitted) | Monte Carlo learns normal variance and alerts on anomalies. | `metric`, `sourceField` / `targetField` (unless `ROW_COUNT`) |
-| `comparison_delta` | Static threshold on the source↔target difference. | `metric`, `sourceField` / `targetField` (unless `ROW_COUNT`), `thresholdValue` |
+| `AUTO` (default when `type` is omitted) | Monte Carlo learns normal variance and alerts on anomalies. | `metric`, `source_field` / `target_field` (unless `ROW_COUNT`) |
+| `comparison_delta` | Static threshold on the source↔target difference. | `metric`, `source_field` / `target_field` (unless `ROW_COUNT`), `threshold_value` |
 
-If the user wants a specific numeric tolerance (e.g. "alert if source and target row counts differ by more than 100"), use `comparison_delta` and set `thresholdValue`. If they want "alert when the difference looks unusual," use `AUTO` — no `thresholdValue` needed.
+If the user wants a specific numeric tolerance (e.g. "alert if source and target row counts differ by more than 100"), use `comparison_delta` and set `threshold_value`. If they want "alert when the difference looks unusual," use `AUTO` — no `threshold_value` needed.
 
 ---
 
 ## ROW_COUNT and Fields: A Critical Rule
 
-> **NEVER pass `sourceField` or `targetField` when using the `ROW_COUNT` metric.**
+> **NEVER pass `source_field` or `target_field` when using the `ROW_COUNT` metric.**
 
 `ROW_COUNT` is a table-level metric -- it counts all rows in the table, not values in a column. Passing field names with `ROW_COUNT` causes the API call to fail or produce unexpected behavior.
 
-This is the single most common mistake with comparison monitors. Before submitting any alert condition with `ROW_COUNT`, verify that `sourceField` and `targetField` are both absent from the condition object.
+This is the single most common mistake with comparison monitors. Before submitting any alert condition with `ROW_COUNT`, verify that `source_field` and `target_field` are both absent from the condition object.
 
 | Metric | Fields needed? | What happens if you pass fields? |
 |--------|---------------|----------------------------------|
@@ -125,7 +125,7 @@ This is the single most common mistake with comparison monitors. Before submitti
 |--------|-------------|
 | `ROW_COUNT` | Compare total row counts between source and target. |
 
-### Field-level metrics (require `sourceField` and `targetField`)
+### Field-level metrics (require `source_field` and `target_field`)
 
 #### Uniqueness and duplicates
 
@@ -218,7 +218,7 @@ This is the single most common mistake with comparison monitors. Before submitti
 | Sum, average, min, max | `SUM`, `NUMERIC_MEAN`, `NUMERIC_MIN`, `NUMERIC_MAX` | Yes |
 | Data completeness | `NON_NULL_COUNT` | Yes |
 | String format validation | `TEXT_NOT_EMAIL_ADDRESS_COUNT`, `TEXT_NOT_UUID_COUNT`, etc. | Yes |
-| Custom computed expressions | Use `customMetric` instead of `metric` | No (SQL handles it) |
+| Custom computed expressions | Use `custom_metric` instead of `metric` | No (SQL handles it) |
 
 ---
 
@@ -230,51 +230,51 @@ Use custom metrics when:
 - **You need a derived calculation** like `SUM(quantity * unit_price)` rather than a simple column metric.
 - **Standard metrics do not cover the comparison** (e.g., comparing a ratio, a conditional aggregate, or a windowed calculation).
 
-If the columns simply have different names but you want a standard metric (e.g., compare `SUM` of `revenue` in source vs `total_revenue` in target), you do NOT need a custom metric -- just use the standard metric with different `sourceField` and `targetField` values.
+If the columns simply have different names but you want a standard metric (e.g., compare `SUM` of `revenue` in source vs `total_revenue` in target), you do NOT need a custom metric -- just use the standard metric with different `source_field` and `target_field` values.
 
 Custom metric structure:
 
 ```json
 {
-  "customMetric": {
-    "displayName": "Revenue Sum",
-    "sourceSqlExpression": "SUM(revenue)",
-    "targetSqlExpression": "SUM(total_revenue)"
+  "custom_metric": {
+    "display_name": "Revenue Sum",
+    "source_sql_expression": "SUM(revenue)",
+    "target_sql_expression": "SUM(total_revenue)"
   }
 }
 ```
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `displayName` | string | Yes | Human-readable name for the metric in alerts and dashboards. |
-| `sourceSqlExpression` | string | Yes | SQL expression evaluated against the source table. |
-| `targetSqlExpression` | string | Yes | SQL expression evaluated against the target table. |
+| `display_name` | string | Yes | Human-readable name for the metric in alerts and dashboards. |
+| `source_sql_expression` | string | Yes | SQL expression evaluated against the source table. |
+| `target_sql_expression` | string | Yes | SQL expression evaluated against the target table. |
 
-When using `customMetric`, do NOT also pass `metric`, `sourceField`, or `targetField` in the same alert condition. The custom metric replaces all of those.
+When using `custom_metric`, do NOT also pass `metric`, `source_field`, or `target_field` in the same alert condition. The custom metric replaces all of those.
 
 ---
 
 ## Threshold Guidance
 
-### Absolute thresholds (`isThresholdRelative: false` or omitted)
+### Absolute thresholds (`is_threshold_relative: false` or omitted)
 
-The `thresholdValue` is the maximum acceptable absolute difference between the source and target metric values.
+The `threshold_value` is the maximum acceptable absolute difference between the source and target metric values.
 
-- `thresholdValue: 0` -- source and target must match exactly.
-- `thresholdValue: 100` -- up to 100 units of difference is acceptable.
+- `threshold_value: 0` -- source and target must match exactly.
+- `threshold_value: 100` -- up to 100 units of difference is acceptable.
 
-### Relative (percentage) thresholds (`isThresholdRelative: true`)
+### Relative (percentage) thresholds (`is_threshold_relative: true`)
 
-The `thresholdValue` is the maximum acceptable percentage difference.
+The `threshold_value` is the maximum acceptable percentage difference.
 
-- `thresholdValue: 5` -- up to 5% difference is acceptable.
-- `thresholdValue: 0.1` -- up to 0.1% difference is acceptable.
+- `threshold_value: 5` -- up to 5% difference is acceptable.
+- `threshold_value: 0.1` -- up to 0.1% difference is acceptable.
 
 ### When to use each
 
 | Scenario | Recommended threshold type |
 |----------|---------------------------|
-| Exact replication (row counts must match) | Absolute, `thresholdValue: 0` |
+| Exact replication (row counts must match) | Absolute, `threshold_value: 0` |
 | Near-real-time sync with small lag | Absolute, small value (e.g., 10-100) |
 | Tables at different scales | Relative, percentage-based |
 | Aggregated metrics (sums, means) | Relative, to handle floating-point differences |
@@ -296,14 +296,14 @@ Compare row counts between dev and prod, alerting if they differ by more than 10
   "alert_conditions": [
     {
       "metric": "ROW_COUNT",
-      "thresholdValue": 100,
-      "isThresholdRelative": false
+      "threshold_value": 100,
+      "is_threshold_relative": false
     }
   ]
 }
 ```
 
-Note: no `sourceField` or `targetField` -- `ROW_COUNT` is table-level.
+Note: no `source_field` or `target_field` -- `ROW_COUNT` is table-level.
 
 ### Row count parity with percentage threshold
 
@@ -318,8 +318,8 @@ Alert if row counts differ by more than 5%.
   "alert_conditions": [
     {
       "metric": "ROW_COUNT",
-      "thresholdValue": 5,
-      "isThresholdRelative": true
+      "threshold_value": 5,
+      "is_threshold_relative": true
     }
   ]
 }
@@ -338,10 +338,10 @@ Compare the sum of `revenue` in the source table against `total_revenue` in the 
   "alert_conditions": [
     {
       "metric": "SUM",
-      "sourceField": "revenue",
-      "targetField": "total_revenue",
-      "thresholdValue": 1,
-      "isThresholdRelative": true
+      "source_field": "revenue",
+      "target_field": "total_revenue",
+      "threshold_value": 1,
+      "is_threshold_relative": true
     }
   ]
 }
@@ -361,10 +361,10 @@ Compare null counts on `email` between source and target, segmented by `country`
   "alert_conditions": [
     {
       "metric": "NULL_COUNT",
-      "sourceField": "email",
-      "targetField": "email",
-      "thresholdValue": 0,
-      "isThresholdRelative": false
+      "source_field": "email",
+      "target_field": "email",
+      "threshold_value": 0,
+      "is_threshold_relative": false
     }
   ]
 }
@@ -385,8 +385,8 @@ When source and target are in different warehouses, both warehouse parameters mu
   "alert_conditions": [
     {
       "metric": "ROW_COUNT",
-      "thresholdValue": 0,
-      "isThresholdRelative": false
+      "threshold_value": 0,
+      "is_threshold_relative": false
     }
   ]
 }
@@ -404,13 +404,13 @@ Compare a computed revenue expression when the SQL differs between source and ta
   "target_table": "MCON++b2c3d4e5-f6a7-8901-bcde-f12345678901++1++1++warehouse:v2.orders",
   "alert_conditions": [
     {
-      "customMetric": {
-        "displayName": "Total Revenue",
-        "sourceSqlExpression": "SUM(quantity * unit_price)",
-        "targetSqlExpression": "SUM(total_amount)"
+      "custom_metric": {
+        "display_name": "Total Revenue",
+        "source_sql_expression": "SUM(quantity * unit_price)",
+        "target_sql_expression": "SUM(total_amount)"
       },
-      "thresholdValue": 0.01,
-      "isThresholdRelative": true
+      "threshold_value": 0.01,
+      "is_threshold_relative": true
     }
   ]
 }
@@ -430,25 +430,25 @@ Compare both row counts and field-level metrics in a single monitor.
   "alert_conditions": [
     {
       "metric": "ROW_COUNT",
-      "thresholdValue": 0,
-      "isThresholdRelative": false
+      "threshold_value": 0,
+      "is_threshold_relative": false
     },
     {
       "metric": "NULL_COUNT",
-      "sourceField": "customer_id",
-      "targetField": "customer_id",
-      "thresholdValue": 0,
-      "isThresholdRelative": false
+      "source_field": "customer_id",
+      "target_field": "customer_id",
+      "threshold_value": 0,
+      "is_threshold_relative": false
     },
     {
       "metric": "SUM",
-      "sourceField": "amount",
-      "targetField": "amount",
-      "thresholdValue": 0.1,
-      "isThresholdRelative": true
+      "source_field": "amount",
+      "target_field": "amount",
+      "threshold_value": 0.1,
+      "is_threshold_relative": true
     }
   ]
 }
 ```
 
-Note: the `ROW_COUNT` condition has no fields, while the field-level conditions each specify both `sourceField` and `targetField`.
+Note: the `ROW_COUNT` condition has no fields, while the field-level conditions each specify both `source_field` and `target_field`.

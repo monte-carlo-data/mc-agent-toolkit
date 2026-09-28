@@ -29,8 +29,8 @@ or to alert on span sequences / call counts (use
 > **IMPORTANT:** BINARY conditions use `left`/`right`; UNARY conditions use `value`
 > (NOT `left`). Getting this wrong is the most common failure.
 
-> **IMPORTANT:** `time_filter` is REQUIRED and `timeField` is always
-> `{"field": "ingest_ts"}`. `time_filter` is `{"timeField": {"field": "ingest_ts"}, "lookbackInHrs": <hours>}`.
+> **IMPORTANT:** `time_filter` is REQUIRED and `time_field` is always
+> `{"field": "ingest_ts"}`. `time_filter` is `{"time_field": {"field": "ingest_ts"}, "lookback_in_hrs": <hours>}`.
 
 > **IMPORTANT:** `schedule_type` is `fixed` (default) or `manual` — never dynamic.
 > `interval_minutes` defaults to `60` and must be at least 5 (sub-hourly is allowed;
@@ -50,7 +50,7 @@ or to alert on span sequences / call counts (use
 | `description` | string | Yes | Human-readable monitor description (shown as display name) |
 | `agent` | string | Yes | Agent reference — `agentReference` from `get_agent_metadata` (`{db}:{schema}.{name}` or OTel `service_name`) |
 | `alert_condition` | object | Yes | FilterGroup — the condition that marks INVALID rows (see below) |
-| `time_filter` | object | Yes | `{"timeField": {"field": "ingest_ts"}, "lookbackInHrs": 24}` |
+| `time_filter` | object | Yes | `{"time_field": {"field": "ingest_ts"}, "lookback_in_hrs": 24}` |
 | `warehouse` | string | Yes | Warehouse name or UUID where the agent's traces live |
 | `trace_table` | string | No | Explicit trace table — only for non-ClickHouse OTel agents |
 | `agent_span_filters` | array | No | Optional span-scope refinement; at most ONE filter object |
@@ -185,7 +185,7 @@ create_or_update_agent_validation_monitor(
             }
         ]
     },
-    time_filter={"timeField": {"field": "ingest_ts"}, "lookbackInHrs": 24},
+    time_filter={"time_field": {"field": "ingest_ts"}, "lookback_in_hrs": 24},
     dry_run=True
 )
 ```
@@ -211,7 +211,7 @@ create_or_update_agent_validation_monitor(
             }
         ]
     },
-    time_filter={"timeField": {"field": "ingest_ts"}, "lookbackInHrs": 24},
+    time_filter={"time_field": {"field": "ingest_ts"}, "lookback_in_hrs": 24},
     dry_run=True
 )
 ```
@@ -234,7 +234,7 @@ create_or_update_agent_validation_monitor(
             }
         ]
     },
-    time_filter={"timeField": {"field": "ingest_ts"}, "lookbackInHrs": 24},
+    time_filter={"time_field": {"field": "ingest_ts"}, "lookback_in_hrs": 24},
     agent_span_filters=[{"workflow": {"value": "Chat Agent"}}],
     dry_run=True
 )
@@ -258,7 +258,7 @@ create_or_update_agent_validation_monitor(
             }
         ]
     },
-    time_filter={"timeField": {"field": "ingest_ts"}, "lookbackInHrs": 24},
+    time_filter={"time_field": {"field": "ingest_ts"}, "lookback_in_hrs": 24},
     is_agent_trace_aggregation=True,
     dry_run=True
 )

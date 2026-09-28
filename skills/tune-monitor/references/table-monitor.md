@@ -112,13 +112,13 @@ paths**:
 
 - **AUTO sensitivity** (default lever):
   - `rule_type="last_updated_on"`: pass `threshold_sensitivity` (`low` / `medium` / `high`).
-  - `rule_type="total_row_count"` (volume): pass `alert_conditions=[{"type": "lookback", "operator": "AUTO", "thresholdSensitivity": "low"|"medium"|"high"}]`.
-  - `rule_type="total_row_count_last_changed_on"` (UCS): pass `alert_conditions=[{"type": "threshold", "operator": "AUTO", "thresholdSensitivity": "low"|"medium"|"high"}]`.
+  - `rule_type="total_row_count"` (volume): pass `alert_conditions=[{"type": "lookback", "operator": "AUTO", "threshold_sensitivity": "low"|"medium"|"high"}]`.
+  - `rule_type="total_row_count_last_changed_on"` (UCS): pass `alert_conditions=[{"type": "threshold", "operator": "AUTO", "threshold_sensitivity": "low"|"medium"|"high"}]`.
   - Omit `schedule_type` — the platform's existing schedule is preserved.
 - **Explicit threshold + fixed cadence**:
   - `rule_type="last_updated_on"`: pass `freshness_threshold_minutes=<int>` (single duration).
-  - `rule_type="total_row_count"`: pass `alert_conditions=[{"type": "lookback", "operator": "OUTSIDE_RANGE", "lowerThreshold": <pct>, "upperThreshold": <pct>, "thresholdLookbackMinutes": <minutes>}]` — thresholds are relative percentages (e.g. -50 / 50 = ±50 %).
-  - `rule_type="total_row_count_last_changed_on"`: pass `alert_conditions=[{"type": "threshold", "operator": "GT", "thresholdValue": <minutes>, "thresholdLookbackMinutes": <minutes>}]` — `thresholdValue` is duration in minutes.
+  - `rule_type="total_row_count"`: pass `alert_conditions=[{"type": "lookback", "operator": "OUTSIDE_RANGE", "lower_threshold": <pct>, "upper_threshold": <pct>, "threshold_lookback_minutes": <minutes>}]` — thresholds are relative percentages (e.g. -50 / 50 = ±50 %).
+  - `rule_type="total_row_count_last_changed_on"`: pass `alert_conditions=[{"type": "threshold", "operator": "GT", "threshold_value": <minutes>, "threshold_lookback_minutes": <minutes>}]` — `threshold_value` is duration in minutes.
   - **Must** also pass `schedule_type="fixed"` plus an `interval_minutes` (or `interval_crontab`) cadence — the threshold's meaning depends on how often the check runs.
 
 1. **Always preview first** — show the user the planned changes per `(table, rule_type)` pair
