@@ -59,10 +59,11 @@ The deployment comes first because it generates the external id the agent's role
 variable "aws_region" { type = string }
 # Account information → Collection → AWS account ID, not the customer's account ID.
 variable "monte_carlo_collection_account_id" { type = string }
+variable "deployment_name" { type = string } # from the customer
 provider "aws" { region = var.aws_region }
 
 resource "montecarlo_deployment" "agent" {
-  name             = "prod-vpc-agent"
+  name             = var.deployment_name
   type             = "COLLECTION_AGENT"
   runtime_platform = "AWS"
 }
@@ -116,11 +117,12 @@ configure both authentication methods.
 variable "aws_region" { type = string }
 variable "backend_service_url" { type = string }
 variable "agent_chart_version" { type = string }
+variable "deployment_name" { type = string } # from the customer
 
 provider "aws" { region = var.aws_region }
 
 resource "montecarlo_deployment" "agent" {
-  name             = "prod-k8s-agent"
+  name             = var.deployment_name
   type             = "COLLECTION_AGENT"
   runtime_platform = "GENERIC"
 }
@@ -187,11 +189,12 @@ is the Monte Carlo collection account shown under Account information → Collec
 
 ```hcl
 variable "aws_region" { type = string }
-variable "mcd_account_id" { type = string } # Collection AWS account ID
+variable "mcd_account_id" { type = string }  # Collection AWS account ID
+variable "deployment_name" { type = string } # from the customer
 provider "aws" { region = var.aws_region }
 
 resource "montecarlo_deployment" "store" {
-  name             = "prod-data-store"
+  name             = var.deployment_name
   type             = "COLLECTION_DATA_STORE"
   runtime_platform = "AWS"
 }
@@ -343,15 +346,18 @@ its ID and registration dependency with that selected route; do not leave refere
 agent resources. For a reused credential, set the local to its verified ID instead.
 
 ```hcl
+variable "warehouse_name" { type = string }  # from the customer, or an existing warehouse's
+variable "connection_name" { type = string } # from the customer
+
 resource "montecarlo_warehouse" "snowflake" {
-  name          = "Snowflake prod"
+  name          = var.warehouse_name
   type          = "snowflake" # or connection_type = "snowflake"; never both
   deployment_id = montecarlo_deployment.agent.id
   depends_on    = [montecarlo_aws_collection_agent.agent]
 }
 
 resource "montecarlo_connection" "snowflake" {
-  name           = "snowflake-prod"
+  name           = var.connection_name
   warehouse_id   = montecarlo_warehouse.snowflake.id
   credentials_id = local.snowflake_credentials_id
   # job_types omitted: the type's defaults
@@ -386,7 +392,7 @@ group and every operation a verb; `--output json` for machine-readable ids; a se
 ```bash
 montecarlo whoami
 montecarlo deployments list
-montecarlo deployments create --type COLLECTION_AGENT --runtime-platform AWS --name prod-vpc-agent --output json
+montecarlo deployments create --type COLLECTION_AGENT --runtime-platform AWS --name <deployment_name> --output json
 montecarlo deployments get <deployment_id> --output json          # aws_external_id
 
 # … deploy the agent with the module / CloudFormation, then:
@@ -417,10 +423,10 @@ montecarlo credentials create snowflake --account <snowflake_account> --user <sn
 
 montecarlo warehouses list --output json
 # Reuse the intended warehouse or create it if absent:
-montecarlo warehouses create --name "Snowflake prod" --type snowflake --deployment-id <deployment_id> --output json
+montecarlo warehouses create --name "<warehouse_name>" --type snowflake --deployment-id <deployment_id> --output json
 montecarlo connections list --warehouse-id <warehouse_id> --output json
 # Create only if the target connection is absent:
-montecarlo connections create --name snowflake-prod --warehouse-id <warehouse_id> --credentials-id <credentials_id> --output json
+montecarlo connections create --name <connection_name> --warehouse-id <warehouse_id> --credentials-id <credentials_id> --output json
 ```
 
 ## Python script (`montecarlo` SDK, mc-sdk-python)
