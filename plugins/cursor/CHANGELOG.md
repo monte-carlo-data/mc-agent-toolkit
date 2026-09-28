@@ -5,6 +5,12 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Cursor will be d
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.25.5] - 2026-09-28
+
+### Changed
+
+- onboarding: a new rule and `reference/connection-inputs.md` make every required input come from the customer or discovery before the first write, in every output mode. The reference lists the inputs per deployment, credential path and connection type, including inputs the API marks optional but the connection needs (the Snowflake warehouse) and the keys each connection type's self-hosted secret must carry, and says never to take example values as defaults. Terraform artifacts declare customer-specific inputs as variables without a `default`. The Snowflake key-pair examples in `output-modes.md` read the account, user, warehouse and key path from variables and placeholders instead of `MONTE_CARLO` / `MONTE_CARLO_WH` / `xy12345.us-east-1`, which were being copied into generated Terraform and failed validation (`JWT token is invalid`, "No active warehouse selected"). Step 1b warns that the Collection AWS account ID is never the account the agent runs in; Step 5 maps those validation errors back to the inputs. New live eval `terraform-missing-connection-inputs`.
+
 ## [1.25.4] - 2026-09-25
 
 ### Changed

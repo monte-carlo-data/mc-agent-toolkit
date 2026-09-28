@@ -88,6 +88,7 @@ connection for the intended account. The workflow requires no particular assista
 | `reference/api/<tag>.md` | One file per API tag with every tool's arguments, responses and failure modes. **Generated** by [api-codegen](https://github.com/monte-carlo-data/api-codegen) from the API spec; edit the spec, not these files. Until that generator mode ships they are stubs, with `deployments` and `warehouses` hand-filled from the live tools. |
 | `reference/deployment-guide.md` | Cloud-specific prerequisites, network paths and official setup guides |
 | `reference/output-modes.md` | Terraform, CLI and SDK snippets for each step |
+| `reference/connection-inputs.md` | The inputs each deployment, credential path and connection type requires (including the keys a self-hosted secret must carry), and the rule that each comes from the customer or discovery, never an example value |
 
 ## Not yet
 

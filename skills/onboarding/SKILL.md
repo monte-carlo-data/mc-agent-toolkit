@@ -26,6 +26,8 @@ Read the supporting references with the environment's available file or resource
 <!-- plugin-only:end -->
 - [Deployment guide](reference/deployment-guide.md): prerequisites, networking and handoffs.
 - [Output modes](reference/output-modes.md): Terraform, SDK and CLI examples.
+- [Connection inputs](reference/connection-inputs.md): the inputs each deployment, credential path
+  and connection type requires, and where each value must come from.
 
 If a referenced resource is unavailable, identify what is missing and consult the linked official
 documentation before proceeding. Do not guess a tool schema or provisioning parameter.
@@ -84,6 +86,12 @@ instrument-agent; for an already-connected warehouse's monitoring use monitoring
    hand them on write-only, for example to Secrets Manager with `secret_string_wo` as the
    output-modes reference shows, and never through an `output`, which state stores too. Either
    way, recommend a state backend that encrypts state and limits who can read it.
+8. **Every required input comes from the customer or discovery.** Before the first write, in any
+   output mode, build the inputs checklist for the chosen deployment, credential path and
+   connection type from the connection-inputs reference, show it in the plan with each value's
+   source, and ask for everything missing. Example values in these references are not defaults:
+   a guessed Snowflake user or warehouse still creates the connection, which then fails
+   validation. In Terraform, customer-specific inputs are variables without a `default`.
 
 ## Tools
 
@@ -201,8 +209,9 @@ or start a migration merely to make the new connection fit.
 3. **Hand over the deploy step.** The customer runs it where their cloud credentials are; keep secrets outside this
    session. Per platform, from the output-modes reference:
    - AWS: Terraform module `monte-carlo-data/mcd-agent/aws` with the account
-     information page's **Collection AWS account ID**, chosen region and generated `external_id`
-     (or the CloudFormation template from the docs). Outputs: Lambda function ARN, invoker role ARN.
+     information page's **Collection AWS account ID** (never the account the agent is deployed
+     into), chosen region and generated `external_id` (or the CloudFormation template from the
+     docs). Outputs: Lambda function ARN, invoker role ARN.
    - GCP: module `monte-carlo-data/mcd-agent/google`. Outputs: Cloud Run URL, invoker key.
    - Azure: module `monte-carlo-data/mcd-agent/azurerm`. Outputs: function app URL, auth details.
    - Generic: first a credential for the agent — `montecarlo collection-agents create generic-token
@@ -264,7 +273,11 @@ Otherwise the deployment from Step 1 decides what is possible:
   create an empty warehouse until its reuse in that UI flow is established.
 
 Use the credential policy already resolved in Step 1; ask only for the missing reference or
-authentication details. If it changes, revisit the deployment choice before writing:
+authentication details. Those details are the connection type's rows in the connection-inputs
+reference (rule 8): for a Snowflake key pair, the account, the user the key is set on, the
+warehouse and the key file's path; for a self-hosted reference, the store's fields plus the
+customer's confirmation that the secret carries the type's required keys. If the policy changes,
+revisit the deployment choice before writing:
 
 | Where | Tool | Notes |
 |---|---|---|
@@ -342,7 +355,10 @@ validation has `passed: true`; it does not when any has `passed: false`.
   Collection starts on its own, and the first metadata appears within about an hour.
 - **Any validation did not pass**: for each one, give its `name`, then its errors'
   `friendly_message` and `resolution` verbatim. A `skipped` validation waited on a prerequisite that
-  did not pass; fix that one first. The usual causes, in order: the agent cannot read the secret (IAM
+  did not pass; fix that one first. The usual causes, in order: a credential input is wrong (a
+  Snowflake `JWT token is invalid` means the user is not the one the key is set on; "No active
+  warehouse selected" means the warehouse is missing or not granted), so re-check the
+  connection-inputs checklist; the agent cannot read the secret (IAM
   grant, service-account role or Key Vault policy missing); the warehouse user lacks the grants in
   the connector's docs page; the network path is missing (Monte Carlo's IPs not allowlisted for the
   cloud node, or the agent's VPC has no route to the warehouse). After the fix, call

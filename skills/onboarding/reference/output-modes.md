@@ -294,16 +294,23 @@ Other stores: `montecarlo_self_hosted_gcp_credentials { connection_type, gcp_sec
 `montecarlo_self_hosted_env_var_credentials { connection_type, env_var_name }`,
 `montecarlo_self_hosted_file_credentials { connection_type, file_path }`.
 
-Monte Carlo managed Snowflake key pair (the key is read from a file kept out of version control):
+Monte Carlo managed Snowflake key pair (the key is read from a file kept out of version control).
+Every input comes from the customer, per the connection-inputs reference: the variables carry no
+`default`, so `terraform plan` asks for any value not set in an uncommitted `*.tfvars`.
 
 ```hcl
+variable "snowflake_account" { type = string }          # e.g. CURRENT_ACCOUNT() + region, from the customer
+variable "snowflake_user" { type = string }             # the user the public key is set on
+variable "snowflake_warehouse" { type = string }        # API-optional; queries fail without one
+variable "snowflake_private_key_path" { type = string } # absolute path; file() does not expand ~
+
 resource "montecarlo_snowflake_credentials" "snowflake" {
-  account   = "xy12345.us-east-1"
-  user      = "MONTE_CARLO"
-  warehouse = "MONTE_CARLO_WH"
+  account   = var.snowflake_account
+  user      = var.snowflake_user
+  warehouse = var.snowflake_warehouse
   # Write-only: never stored in state or a plan. Changing the key alone plans nothing; bump the
   # version with it. Bumping either version sends the key and the passphrase together.
-  private_key_wo         = file("${path.module}/snowflake_key.p8") # PEM text, BEGIN/END lines included
+  private_key_wo         = file(var.snowflake_private_key_path) # PEM text, BEGIN/END lines included
   private_key_wo_version = 1
   # Only for an encrypted key; omit both otherwise.
   # private_key_passphrase_wo         = var.snowflake_key_passphrase
@@ -402,10 +409,11 @@ montecarlo credentials validate-aws-secrets-manager-credentials --deployment-id 
 montecarlo credentials create aws-secrets-manager --connection-type snowflake --aws-secret <arn-or-name>
 # … or a key pair Monte Carlo stores (the key is read from a file, never typed into a chat);
 # validate it against the deployment first, then create:
+# (every <value> from the connection-inputs checklist; none has a default):
 montecarlo credentials validate-snowflake-credentials --deployment-id <deployment_id> \
-  --account xy12345.us-east-1 --user MONTE_CARLO --private-key @snowflake_key.p8
-montecarlo credentials create snowflake --account xy12345.us-east-1 --user MONTE_CARLO \
-  --warehouse MONTE_CARLO_WH --private-key @snowflake_key.p8
+  --account <snowflake_account> --user <snowflake_user> --private-key @<key_file.p8>
+montecarlo credentials create snowflake --account <snowflake_account> --user <snowflake_user> \
+  --warehouse <snowflake_warehouse> --private-key @<key_file.p8>
 
 montecarlo warehouses list --output json
 # Reuse the intended warehouse or create it if absent:
