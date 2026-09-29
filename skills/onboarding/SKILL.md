@@ -57,7 +57,14 @@ instrument-agent; for an already-connected warehouse's monitoring use monitoring
    the operations that do are CLI or Terraform steps. Tell the user this the first time the flow
    reaches a credential, so a local step reads as a safeguard rather than a gap. If the user
    pastes a secret into the chat, stop, tell them it is now in the transcript and should be
-   rotated, and continue with the reference or CLI path.
+   rotated, and continue with the reference or CLI path. A secret on disk is no different: when
+   the user gives the path of a key or credential file on their machine, the path only goes into
+   a command they run. Never open, list, read, copy or inspect that file with any tool, not even
+   its first line to check the format, because what a tool reads lands in the context just as a
+   paste does. Say so before anything else, add that Monte Carlo cannot read a file on their
+   machine either, and offer the routes the deployment allows: they put the secret into their
+   own secret store themselves and give you its reference (collection agent only), or they run
+   the mc-cli or Terraform step you write, which reads the file locally.
 3. **Never create a deployment with nothing behind it.** A deployment exists to host a collection
    agent or a data store. It is provisioned only when one of those will be registered on it, in
    the same run or in a follow-up the user commits to.
@@ -278,9 +285,10 @@ Otherwise the deployment from Step 1 decides what is possible:
 Use the credential policy already resolved in Step 1; ask only for the missing reference or
 authentication details. Those details are the connection type's rows in the connection-inputs
 reference (rule 8): for a Snowflake key pair, the account, the user the key is set on, the
-warehouse and the key file's path; for a self-hosted reference, the store's fields plus the
-customer's confirmation that the secret carries the type's required keys. If the policy changes,
-revisit the deployment choice before writing:
+warehouse and the key file's path (only for the customer's command; never open it, rule 2); for
+a self-hosted reference, the store's fields plus the customer's confirmation that the secret
+carries the type's required keys. If the policy changes, revisit the deployment choice before
+writing:
 
 | Where | Tool | Notes |
 |---|---|---|
@@ -288,7 +296,7 @@ revisit the deployment choice before writing:
 | GCP Secret Manager | `create_gcp_secret_manager_credentials(connection_type, gcp_secret)` | Same idea: the agent's service account must read it. |
 | Azure Key Vault | `create_azure_key_vault_credentials(connection_type, akv_secret, akv_vault_name and/or akv_vault_url)` | |
 | Environment variable on the agent | `create_env_var_credentials(connection_type, env_var_name (MCD_…), kms_key_id?)` | Only with a collection agent the customer runs; the cloud node has no customer-set variables. |
-| File on the agent | `create_file_credentials(connection_type, file_path)` | Generic Kubernetes/Docker: mount the JSON file into the agent; use its container path. |
+| File on the agent | `create_file_credentials(connection_type, file_path)` | Generic Kubernetes/Docker: mount the JSON file into the agent; use its container path. A path on the customer's machine (`~/Downloads/key.p8`) is not a file credential: it goes into the CLI or Terraform step. |
 | Monte Carlo stores it (Snowflake key pair) | **not a tool** | Emit `montecarlo credentials create snowflake --account … --user … --warehouse … --private-key @key.p8` or the `montecarlo_snowflake_credentials` resource with `file(...)`. The user runs it and gives back the `id`. |
 
 **Validate before creating.** Each self-hosted create has a matching validate that takes the same

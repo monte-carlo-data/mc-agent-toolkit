@@ -60,7 +60,7 @@ created, emitted or handed over.
 |---|---|---|
 | `account` | yes | The customer's Snowflake account identifier (`<locator>.<region>` or `<org>-<account>`). `SELECT CURRENT_ACCOUNT(), CURRENT_REGION();` confirms it. |
 | `user` | yes | The Snowflake user **the public key is set on**. Snowflake rejects any other user with `JWT token is invalid`. The customer can compare `DESC USER <user>` → `RSA_PUBLIC_KEY_FP` with the key file's fingerprint locally. |
-| Private key | yes | A file path on the customer's machine, PEM with BEGIN/END lines. Never its contents. |
+| Private key | yes | A file path on the customer's machine, PEM with BEGIN/END lines. Never its contents, and never open the file to check it: the customer's command reads it. |
 | `warehouse` | **in practice** | API-optional. Without it, queries fail with "No active warehouse selected" unless the user has a default warehouse. Ask for it. |
 | Passphrase | only for an encrypted key | Ask whether the key is encrypted; the passphrase itself stays with the customer (environment variable or prompt). |
 

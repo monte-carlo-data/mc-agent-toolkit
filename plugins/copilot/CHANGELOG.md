@@ -5,6 +5,12 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Copilot CLI will
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.25.7] - 2026-09-29
+
+### Changed
+
+- onboarding: rule 2 now covers a secret on disk as well as one pasted into the chat. When the user gives the path of a key or credential file on their machine, the agent never opens, lists, reads or inspects it with any tool (not even its first line to check the format), says so before anything else, and offers the routes the deployment allows: the customer stores the secret in their own secret store and gives its reference (collection agent only), or runs the mc-cli or Terraform step that reads the file locally. Step 2 and `reference/connection-inputs.md` say the key path is only for the customer's command, and that a path on the customer's machine is not a `create_file_credentials` path. New live eval `local-key-path-not-read`.
+
 ## [1.25.6] - 2026-09-29
 
 ### Changed
