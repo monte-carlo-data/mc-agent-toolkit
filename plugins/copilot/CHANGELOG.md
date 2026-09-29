@@ -5,6 +5,12 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Copilot CLI will
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.25.6] - 2026-09-29
+
+### Changed
+
+- onboarding: the skill's introduction and its Tools table no longer say "REST API v2": the intro names the tools by what they manage (deployments, credentials, warehouses and connections) and the table header is "Tools". Restores the wording the mc-onboarding MCP prompt was first copied with.
+
 ## [1.25.5] - 2026-09-28
 
 ### Changed
