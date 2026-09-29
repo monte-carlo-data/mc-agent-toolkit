@@ -89,9 +89,12 @@ instrument-agent; for an already-connected warehouse's monitoring use monitoring
 8. **Every required input comes from the customer or discovery.** Before the first write, in any
    output mode, build the inputs checklist for the chosen deployment, credential path and
    connection type from the connection-inputs reference, show it in the plan with each value's
-   source, and ask for everything missing. Example values in these references are not defaults:
-   a guessed Snowflake user or warehouse still creates the connection, which then fails
-   validation. In Terraform, customer-specific inputs are variables without a `default`.
+   source, and ask for everything missing. **Never give a credential field a default value**
+   (account, user, warehouse, host, key path, secret reference), in any output mode: no Terraform
+   `default`, no script fallback, no filled-in CLI placeholder. A missing value fails at once
+   and names the field; a defaulted one creates the credentials and connection, then fails
+   validation with an error that doesn't say which value was wrong (a wrong Snowflake user shows
+   as `JWT token is invalid`). Example values in these references are not defaults either.
 
 ## Tools
 

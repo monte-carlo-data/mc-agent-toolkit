@@ -23,11 +23,21 @@ created, emitted or handed over.
 - **IMPORTANT: ask for names and references, never secret values.** For a secret, the input is
   where it lives (file path, secret name/ARN, variable name) and, for self-hosted secrets, whether
   its contents carry every required key. The customer checks the keys; you never see the values.
-- **Terraform: customer-specific inputs are variables with no `default`.** An unset variable makes
-  `terraform plan` stop and ask, which is the check this reference exists for. Never ship example
-  values as defaults. Values discovery verified (a reused `deployment_id`) may be written literally.
-  The same applies to scripts (read from the environment, fail if unset) and CLI commands (fill
-  every `<placeholder>` from the checklist, or leave it visibly unfilled for the customer).
+- **CRITICAL: NEVER give a credential field a default value, in any output mode.** This covers the
+  account, user, warehouse, role, host, port, database, key file path and secret reference, and
+  every other field of a credential or its connection. A missing value fails at once with an error
+  that names the missing field, and the customer supplies it. A default value fails later, after the
+  credentials and connection exist, with an error that does not point at the field (a wrong
+  Snowflake user surfaces as `JWT token is invalid`), and someone has to work out which value was
+  wrong. So a value the customer has not given stays missing:
+  - Terraform: a `variable` with no `default`, so `terraform plan` stops and asks for it. No
+    example value in `default`, in a committed `*.tfvars`, or in a `locals` block.
+  - Script: `os.environ["NAME"]` (fails if unset), never `os.environ.get("NAME", "<value>")`.
+  - CLI: a visible `<placeholder>` left for the customer, never a filled-in guess.
+  - Tool call: no call until the customer gives the value.
+
+  Values discovery verified (a reused `deployment_id`, an existing warehouse's name) may be written
+  literally.
 
 ## Deployment inputs
 
