@@ -409,14 +409,14 @@ montecarlo collection-data-stores register aws --deployment-id <id> --bucket-nam
 # credentials: self-hosted reference …
 montecarlo credentials list --output json
 # Validate the reference against the deployment first (creates nothing; poll the returned run):
-montecarlo credentials validate-aws-secrets-manager-credentials --deployment-id <deployment_id> \
+montecarlo credentials validate aws-secrets-manager --deployment-id <deployment_id> \
   --connection-type snowflake --aws-secret <arn-or-name>
 # Create only if discovery found no matching reference:
 montecarlo credentials create aws-secrets-manager --connection-type snowflake --aws-secret <arn-or-name>
 # … or a key pair Monte Carlo stores (the key is read from a file, never typed into a chat);
 # validate it against the deployment first, then create:
 # (every <value> from the connection-inputs checklist; none has a default):
-montecarlo credentials validate-snowflake-credentials --deployment-id <deployment_id> \
+montecarlo credentials validate snowflake --deployment-id <deployment_id> \
   --account <snowflake_account> --user <snowflake_user> --private-key @<key_file.p8>
 montecarlo credentials create snowflake --account <snowflake_account> --user <snowflake_user> \
   --warehouse <snowflake_warehouse> --private-key @<key_file.p8>

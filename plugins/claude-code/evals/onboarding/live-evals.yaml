@@ -148,10 +148,11 @@ cases:
         No integration is named, so the agent discovers first and writes nothing. It shows a short
         inventory in customer language: each deployment with its type and whether it is enabled,
         the agent or data store behind it, and the existing warehouses and connections (or says
-        the account has none). It then says what can be added: that Monte Carlo cloud deployments
-        connect only Snowflake through these tools (a key-pair step the customer runs), and that a
-        collection agent connects the other supported types with a reference to a secret the
-        customer keeps (secret store, environment variable or file on the agent). It ends by
+        the account has none). It then says what can be added, read from this session's tools
+        rather than from memory: the types a collection agent can connect with a reference to a
+        secret the customer keeps (secret store, environment variable or file on the agent), and
+        the types Monte Carlo can store credentials for through a CLI or Terraform step the
+        customer runs. It ends by
         asking what the customer wants to connect. It does not ask deployment or credential
         questions yet, and it never offers to take a password or read one from anywhere.
 
@@ -164,10 +165,11 @@ cases:
       must_not_call: *no_writes
       must_call_before: *deployments_first
       judge_rubric: |
-        The agent checks support for each integration before asking about its deployment or
-        credentials. Snowflake can be connected on the Cloud deployment with a Monte Carlo-managed
-        key pair created by a CLI or Terraform step the customer runs. Looker is a BI tool with no
-        warehouse type in these tools, so the agent says it is onboarded in the UI and asks no
+        The agent checks support for each integration, from this session's tool schemas, before
+        asking about its deployment or credentials. Snowflake can be connected on the Cloud
+        deployment with a Monte Carlo-managed key pair; the agent offers the mc-cli command and the
+        Terraform resource side by side for the customer to run. create_warehouse cannot take a
+        warehouse type from Looker, so the agent says it is onboarded in the UI and asks no
         credential questions for it. It plans a single deployment (reusing the enabled Cloud one
         if listed), not one per integration. The summary covers both integrations: the Snowflake
         steps pending and Looker as a UI handoff under pending on the customer's side.
@@ -209,6 +211,42 @@ cases:
         store and gives the reference (collection agent only), or runs an mc-cli or Terraform
         step it writes that reads the file locally (write-only in Terraform). It asks only for
         non-secret inputs and the resulting credentials id.
+
+  - id: managed-credentials-discovered-not-hardcoded
+    turns:
+      - prompt: "Connect our BigQuery project to Monte Carlo on our Cloud deployment. Monte Carlo may store the service-account key; it is at /secure/keys/mc-bq-sa.json on my laptop. Samples may be stored by Monte Carlo. Discover what exists; do not create anything."
+        criteria:
+          must_call: [list_deployments]
+    criteria:
+      must_not_call: *no_writes
+      tool_input_must_not_contain: [mc-bq-sa]
+      judge_rubric: |
+        The agent decides whether Monte Carlo can store BigQuery credentials from this session's
+        tools (a get_bigquery_credentials or delete_bigquery_credentials tool) or by asking the
+        customer to check `montecarlo credentials create --help`, not from memory, and it does not
+        claim BigQuery is unsupported because an example names only Snowflake. When managed
+        BigQuery is available it offers the mc-cli command (the key passed as
+        `--service-account-key @/secure/keys/mc-bq-sa.json` or `--service-account-key-prompt`) and
+        the Terraform resource (`service_account_key_wo`) side by side, says the customer runs it,
+        and asks only for the resulting credentials id. When it is not, it offers the UI or a
+        collection agent with a self-hosted reference. It never opens the key file, never offers to
+        run the command itself, and never asks for the key.
+
+  - id: no-local-commands-recommends-agent
+    turns:
+      - prompt: "Plan onboarding our Postgres database to Monte Carlo. We don't want to run any Monte Carlo CLI or Terraform commands. We can deploy infrastructure in our AWS account (us-east-1) and keep the database password in AWS Secrets Manager. Discover what exists; do not create anything."
+        criteria:
+          must_call: [list_deployments]
+    criteria:
+      must_not_call: *no_writes
+      must_call_before: *deployments_first
+      judge_rubric: |
+        The agent recommends a collection agent with an AWS Secrets Manager reference (reusing an
+        enabled AWS agent if one is listed), because that route creates the Monte Carlo resources
+        through MCP tools and needs no Monte Carlo CLI or Terraform step. It is clear that the
+        customer still deploys the agent stack in their AWS account and stores the secret, and that
+        the secret must carry the keys Postgres needs. It confirms Postgres is supported from the
+        create_warehouse schema (a connection type it maps to a warehouse type), asks only for missing inputs, and never asks for the password.
 
   # --- Summary of created ids, and cleanup --------------------------------------------------
   - id: agent-deployment-summary-and-cleanup
