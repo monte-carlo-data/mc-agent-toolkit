@@ -11,19 +11,23 @@ the Monte Carlo MCP server.
 When you ask to connect Snowflake, BigQuery, Redshift, Databricks or any other supported platform,
 the skill:
 
-1. Discovers existing deployments and connections, identifies the target platform/cloud/region,
-   and asks only for missing requirements: connection origin, credential custody and sample storage.
-2. Reuses a suitable Cloud Deployment, Cloud with Customer-hosted Data Store Deployment, or
+1. Discovers existing deployments, agents, data stores, warehouses and connections, shows you
+   that inventory and what can be added (which integrations each kind of deployment supports and
+   with which credential options), then asks what you want to connect. One run can onboard
+   several integrations; each is checked for support before any other question about it.
+2. Identifies the target platform/cloud/region and asks only for missing requirements:
+   connection origin, credential custody and sample storage.
+3. Reuses a suitable Cloud Deployment, Cloud with Customer-hosted Data Store Deployment, or
    Customer-hosted Agent & Data Store Deployment. Where an agent is needed, distinguishes
    cloud-native inbound agents from the outbound Generic Agent (Docker/Kubernetes, preview).
    PrivateLink may support direct Cloud or an agent's connection to the integration; support
    depends on the integration, cloud and region, and the customer's origin policy still applies.
-3. References self-hosted credentials or hands over a local CLI/Terraform step for a managed
+4. References self-hosted credentials or hands over a local CLI/Terraform step for a managed
    Snowflake key pair. **No secret passes through chat.** See *How credentials are handled*.
-4. Reconciles the intended warehouse and connection before creating anything missing.
-5. Validates the connection over MCP and reports each check's result, falling back to the UI test
+5. Reconciles the intended warehouse and connection before creating anything missing.
+6. Validates the connection over MCP and reports each check's result, falling back to the UI test
    only when the session does not serve the validation tools.
-6. Ends with created/reused IDs, the validation result, a scoped cleanup order and the next
+7. Ends with created/reused IDs, the validation result, a scoped cleanup order and the next
    pending step. Creation alone is not a completed onboarding.
 
 The assistant guides the requested connection by default. Steps you run yourself use

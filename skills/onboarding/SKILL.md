@@ -1,17 +1,18 @@
 ---
 name: monte-carlo-onboarding
-description: Connect a warehouse to Monte Carlo using API v2 tools. Discover or provision deployments, reference credentials, reuse or create the connection, and validate it. Use when asked to connect a platform or onboard a warehouse, including generating the Terraform or a script for it.
+description: Connect warehouses to Monte Carlo with API v2 tools: show existing deployments and what can be added, reference credentials, create and validate connections. Use to connect or onboard platforms, or to generate the Terraform or a script for it.
 metadata:
   bucket: Setup
 ---
 
 # Monte Carlo Onboarding
 
-Walk a customer from "connect `<warehouse>` to Monte Carlo" to a working connection, using the
-Monte Carlo MCP tools for deployments, credentials, warehouses and connections. Discover what already exists, resolve only the missing
-customer decisions, and reuse or provision
-the deployment before creating a connection. A request to connect Snowflake does not imply that
-the customer knows which deployment or collection agent they need.
+Walk a customer from "connect `<warehouse>` to Monte Carlo" to working connections, one or
+several, using the Monte Carlo MCP tools for deployments, credentials, warehouses and
+connections. Start by showing what already exists and what can be added, then resolve only the
+missing customer decisions, and reuse or provision the deployment before creating a connection.
+A request to connect Snowflake does not imply that the customer knows which deployment or
+collection agent they need.
 
 ## Tools and supporting references
 
@@ -130,15 +131,45 @@ request only its non-secret result/IDs and reconcile them before continuing. If 
 local-client path is available, explain the pending step and who can complete it. A reference
 entry or an open implementation PR is not evidence that a tool is deployed in this session.
 
-## Step 0: Discover and frame the run
+## Step 0: Discover, show what exists, ask what to connect
 
-Start from the user's intent, such as "connect Snowflake". Use the request and available reads
-before asking questions:
+Invoking this workflow sets the scene for the rest of the conversation: discover the account,
+show the customer what they already have and what can be added, then let them lead. The rules
+above and the steps below keep applying to every later turn, however the customer phrases it.
+
+**0a. Discover.** Read before asking anything:
 
 - `get_current_user`: identify the account; stop if `account_frozen`. Confirm account ambiguity.
-- `list_deployments` before provisioning; also inspect `list_warehouses` and `list_connections`
-  for the target account/host and environment. Follow `next_cursor` while `has_more` on paginated
-  lists, including credentials. Read the relevant agent/store details when needed.
+- `list_deployments`, `list_collection_agents`, `list_collection_data_stores`, `list_warehouses`
+  and `list_connections`. Follow `next_cursor` while `has_more` on every paginated list,
+  including credentials later. Read agent/store details only when a choice depends on them.
+
+**0b. Show.** Present a short inventory in customer language: each deployment with its type,
+platform and `enabled`, the agent or data store behind it, and the existing warehouses with their
+connections. An empty account is an answer too; say so. Follow it with what can be added, from
+the support table in the connection-inputs reference: which integrations these tools can connect
+on each kind of deployment, and which credential options each allows. Keep both to a few lines;
+do not dump raw ids unless asked.
+
+**0c. Ask what to connect, then follow the customer.** If the request already names the
+integrations ("connect Snowflake and Postgres"), skip the question. Otherwise ask one open
+question, such as "What would you like to connect?", and stop. Do not open with deployment or
+credential questions; they come after the target is known.
+
+Several integrations can be onboarded in one run. For each one requested:
+
+- **Check support first**, with the support table and the tool schemas in this session, before
+  any other question about it. When the integration cannot be connected through these tools on
+  any deployment, or only through the UI on the one the customer wants, say so now and offer the
+  UI handoff or a route that is supported; do not provision anything for it.
+- **Resolve the route** (Step 1): reuse a compatible deployment from the inventory where one fits.
+  Integrations that fit the same deployment share it; do not create one per integration.
+- **Credentials, warehouse, connection, validation** (Steps 2 to 5) run per integration. The
+  inputs checklist (rule 8) covers every integration in the plan, and missing values for all of
+  them are asked in one message.
+
+Also in discovery:
+
 - Infer the integration's cloud and region from reliable existing information; otherwise ask
   only when needed to choose or configure the route. Do not infer an agent's cloud from the
   product name (Snowflake runs on multiple clouds), or assume its region from an example.
@@ -387,7 +418,10 @@ Do **not** substitute any other tool for validation. If the session does not ser
 
 ## Step 6: Summary (always)
 
-Finish every run, including an aborted one, with:
+Finish every run, including an aborted one, with the block below. With several integrations,
+repeat the credentials, warehouse, connection and validation lines under a heading per
+integration, and list any integration that was not supported, with its handoff, under *Pending
+on your side*.
 
 ```
 Account: <account_name> (<account_id>)

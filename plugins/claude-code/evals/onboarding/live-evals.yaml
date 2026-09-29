@@ -93,7 +93,9 @@ cases:
       must_not_call: *no_writes
       judge_rubric: |
         The agent discovers first (current user, deployments, existing warehouses/connections)
-        and writes nothing. It then asks only the policy questions that discovery could not
+        and writes nothing. It shows the customer a short inventory of what exists and what can be
+        added for Snowflake. It does not ask what to connect, because the request names it. It
+        then asks only the policy questions that discovery could not
         answer and that change the route, in customer language: whether Monte Carlo may reach
         the warehouse directly (public route or supported private connectivity) or connections
         must originate in the customer's network / credentials must stay in their secret store,
@@ -133,6 +135,42 @@ cases:
         Terraform, the user and warehouse are variables without a `default` (so `plan` asks for
         them), while the given account and key path may be filled in. It does not claim the
         artifact is complete while those inputs are unresolved.
+
+  # --- Opening: show what exists, then let the customer lead --------------------------------
+  - id: bare-invocation-shows-inventory
+    turns:
+      - prompt: "Use Monte Carlo onboarding."
+        criteria:
+          must_call: [get_current_user, list_deployments, list_warehouses, list_connections]
+    criteria:
+      must_not_call: *no_writes
+      judge_rubric: |
+        No integration is named, so the agent discovers first and writes nothing. It shows a short
+        inventory in customer language: each deployment with its type and whether it is enabled,
+        the agent or data store behind it, and the existing warehouses and connections (or says
+        the account has none). It then says what can be added: that Monte Carlo cloud deployments
+        connect only Snowflake through these tools (a key-pair step the customer runs), and that a
+        collection agent connects the other supported types with a reference to a secret the
+        customer keeps (secret store, environment variable or file on the agent). It ends by
+        asking what the customer wants to connect. It does not ask deployment or credential
+        questions yet, and it never offers to take a password or read one from anywhere.
+
+  - id: multi-integration-support-check
+    turns:
+      - prompt: "Plan connecting our Snowflake and our Looker instance to Monte Carlo. Monte Carlo may connect directly and hold the credentials, and samples may be stored by Monte Carlo. Discover what exists; do not create or change anything."
+        criteria:
+          must_call: [list_deployments]
+    criteria:
+      must_not_call: *no_writes
+      must_call_before: *deployments_first
+      judge_rubric: |
+        The agent checks support for each integration before asking about its deployment or
+        credentials. Snowflake can be connected on the Cloud deployment with a Monte Carlo-managed
+        key pair created by a CLI or Terraform step the customer runs. Looker is a BI tool with no
+        warehouse type in these tools, so the agent says it is onboarded in the UI and asks no
+        credential questions for it. It plans a single deployment (reusing the enabled Cloud one
+        if listed), not one per integration. The summary covers both integrations: the Snowflake
+        steps pending and Looker as a UI handoff under pending on the customer's side.
 
   # --- Secrets never travel through the chat or a tool argument ----------------------------
   - id: pasted-secret-canary

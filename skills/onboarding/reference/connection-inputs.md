@@ -39,6 +39,31 @@ created, emitted or handed over.
   Values discovery verified (a reused `deployment_id`, an existing warehouse's name) may be written
   literally.
 
+## Support: what these tools can connect, and how
+
+Check every requested integration against this table **before** asking about its deployment or
+credentials, and show the relevant rows when presenting what can be added.
+
+| Deployment | Credential options the customer can choose | Integrations these tools connect |
+|---|---|---|
+| Cloud Deployment, or Cloud with Customer-hosted Data Store | Monte Carlo-managed only. Through the v2 API that is the **Snowflake key pair**: a CLI or Terraform step that reads a key file on the customer's machine. | **Snowflake only.** Every other type on these deployments is onboarded in the UI (Settings → Integrations). |
+| Customer-hosted collection agent (AWS, GCP, Azure or Generic) | A reference to a secret the customer keeps: AWS Secrets Manager, GCP Secret Manager, Azure Key Vault, an environment variable on the agent, or a file on the agent. | Any connection type `create_warehouse` can take a warehouse type from, with the secret keys in *Required keys inside a self-hosted secret* below. |
+
+- **CRITICAL: the options above are the whole menu.** Offer them in customer language (for
+  example "a file on your machine that a command you run reads", "a secret in your AWS Secrets
+  Manager, by its name or ARN"). NEVER offer, accept or suggest typing a password, key or token
+  into the chat, and NEVER offer to read one from a file, a secret store or anywhere else.
+- **IMPORTANT: the credential choice can decide the deployment.** A self-hosted reference needs a
+  collection agent; a key file on the customer's machine means the Monte Carlo-managed Snowflake
+  key pair. Say which deployment an answer implies instead of asking the deployment question
+  separately, and ask it only when both fit.
+- **IMPORTANT: the `create_warehouse` type list in this session's tool schema is the authority on
+  types.** It has no BI type, so BI tools (Looker, Tableau, Power BI) are not connected through
+  these tools; hand them off to the UI. For a type whose mapping is unclear, say so and hand off;
+  NEVER create a warehouse or connection to find out.
+- NEVER provision a deployment or agent for an integration before it passes this check. An agent
+  built for an unsupported type is a deployment with nothing behind it (SKILL.md rule 3).
+
 ## Deployment inputs
 
 | Path | Required | Source and checks |
@@ -133,3 +158,6 @@ For a type not listed, read its section on that page and apply the same rule bef
 - Writing a Terraform variable with an example `default`, so `plan` never asks for the real value.
 - Discovering over one Monte Carlo account and generating an artifact whose profile reaches another.
 - Treating a secret reference as complete without confirming the secret carries the type's keys.
+- Asking about deployments or credentials before checking the integration is supported, then
+  discovering after an agent is provisioned that the type is UI-only on the chosen route.
+- Creating one deployment per integration when several fit the same one.

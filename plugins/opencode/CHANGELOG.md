@@ -5,6 +5,12 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for OpenCode will be
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.26.0] - 2026-09-29
+
+### Changed
+
+- onboarding: new opening. Step 0 now discovers the account's deployments, agents, data stores, warehouses and connections, shows the customer that inventory and what can be added, then asks what they want to connect (skipped when the request names it) and lets them lead; the rules and later steps keep applying to every turn. One run can onboard several integrations, sharing a compatible deployment, with a per-integration summary. Each integration is checked for support before any deployment or credential question. `reference/connection-inputs.md` gains a support table (Cloud deployments: Snowflake key pair only; collection agent: self-hosted references for the types `create_warehouse` accepts; BI tools hand off to the UI), states the credential options as the whole menu, and notes that the credential choice can decide the deployment. Skill description shortened to the 250-character limit. New live evals `bare-invocation-shows-inventory` and `multi-integration-support-check`; new trigger evals `should-15` and `should-16`.
+
 ## [1.25.7] - 2026-09-29
 
 ### Changed

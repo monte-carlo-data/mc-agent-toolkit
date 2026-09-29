@@ -16,6 +16,8 @@
     {"id": "should-12", "prompt": "Onboard BigQuery to Monte Carlo.", "expected": "trigger", "rationale": "Onboarding phrasing with a named platform"},
     {"id": "should-13", "prompt": "Set up an agent for Monte Carlo in our AWS account so it can reach our warehouse.", "expected": "trigger", "rationale": "Collection agent setup, phrased without the word 'collection'"},
     {"id": "should-14", "prompt": "We just signed up for Monte Carlo. How do we get our Databricks workspace connected?", "expected": "trigger", "rationale": "New account, first connection"},
+    {"id": "should-15", "prompt": "Connect Snowflake and Postgres to Monte Carlo.", "expected": "trigger", "rationale": "Several integrations in one onboarding run"},
+    {"id": "should-16", "prompt": "What can I connect to Monte Carlo from here?", "expected": "trigger", "rationale": "Open-ended onboarding: show inventory and what can be added"},
     {"id": "should-not-01", "prompt": "Push metadata and lineage from our homegrown catalog into Monte Carlo.", "expected": "no-trigger", "rationale": "Push ingestion, no connector: push-ingestion skill"},
     {"id": "should-not-02", "prompt": "Build the Connection Auth Rules JSON for our Postgres connector.", "expected": "no-trigger", "rationale": "connection-auth-rules skill"},
     {"id": "should-not-03", "prompt": "Instrument our LangChain agent for Monte Carlo Agent Observability.", "expected": "no-trigger", "rationale": "instrument-agent skill"},
