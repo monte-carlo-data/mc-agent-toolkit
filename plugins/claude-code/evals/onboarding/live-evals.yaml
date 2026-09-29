@@ -243,10 +243,48 @@ cases:
       judge_rubric: |
         The agent recommends a collection agent with an AWS Secrets Manager reference (reusing an
         enabled AWS agent if one is listed), because that route creates the Monte Carlo resources
-        through MCP tools and needs no Monte Carlo CLI or Terraform step. It is clear that the
-        customer still deploys the agent stack in their AWS account and stores the secret, and that
-        the secret must carry the keys Postgres needs. It confirms Postgres is supported from the
-        create_warehouse schema (a connection type it maps to a warehouse type), asks only for missing inputs, and never asks for the password.
+        through MCP tools (AWS agent registration is one) and needs no Monte Carlo CLI or
+        Terraform step: the customer can deploy the stack with the CloudFormation template. It is
+        clear that the customer still deploys the agent stack in their AWS account and stores the
+        secret, and that the secret must carry the keys Postgres needs. Postgres is not itself a
+        warehouse type in the create_warehouse schema, so the agent does not claim support from the
+        schema or from memory: it confirms it from an existing Postgres connection in the account or
+        the Monte Carlo Postgres docs page, or says support is unconfirmed and how it is settled
+        (reusing an agent, create_warehouse with connection_type refuses an unmappable type and
+        creates nothing). It never proposes provisioning a new agent for an unconfirmed type. It
+        asks only for missing inputs and never asks for the password.
+
+  - id: unmapped-connection-type-settled-by-api
+    turns:
+      - prompt: "Connect our SQL Server database to Monte Carlo through the collection agent we already have in AWS. The credentials are in AWS Secrets Manager. Plan it from what exists; do not create anything."
+        criteria:
+          must_call: [list_deployments, list_connections]
+    criteria:
+      must_not_call: *no_writes
+      judge_rubric: |
+        SQL Server is a connection type, not a warehouse type in the create_warehouse schema, and
+        the tools do not publish which warehouse type it maps to. The agent does not name a
+        warehouse type for it from memory. It checks the account's existing connections for one of
+        that type and, failing that, says support is unconfirmed. Because the route reuses an
+        existing agent, it plans create_warehouse with connection_type for SQL Server as the step
+        that settles support (a refusal creates nothing and leads to a UI handoff), not a warehouse
+        created early just to probe. It does not propose a new deployment.
+
+  - id: no-local-commands-new-gcp-agent
+    turns:
+      - prompt: "Plan onboarding our BigQuery project to Monte Carlo. We don't want to run any Monte Carlo CLI or Terraform commands. We run everything in GCP and can keep the service-account key in GCP Secret Manager. Discover what exists; do not create anything."
+        criteria:
+          must_call: [list_deployments]
+    criteria:
+      must_not_call: *no_writes
+      must_call_before: *deployments_first
+      judge_rubric: |
+        If an enabled compatible collection agent is listed, the agent reuses it with a GCP Secret
+        Manager reference. Otherwise it says a new GCP agent's registration is an mc-cli or
+        Terraform step because it carries the agent's credentials, so it does not create a
+        deployment the customer cannot finish; it offers the UI, a teammate or admin who can run
+        that step, or an AWS agent or existing agent if one fits. It never promises that a new GCP
+        agent needs no local Monte Carlo command, and never asks for the service-account key.
 
   # --- Summary of created ids, and cleanup --------------------------------------------------
   - id: agent-deployment-summary-and-cleanup

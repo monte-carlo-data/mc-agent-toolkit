@@ -39,7 +39,9 @@ you gave it the file's path. Ask for Terraform or an SDK script for the whole on
 if you prefer.
 
 Supported integrations are read from the tools in your session rather than listed in the skill:
-the `create_warehouse` schema for integrations connected through a collection agent, and the
+the `create_warehouse` schema (plus existing connections or the integration's docs page, for a
+connection type that is not itself a warehouse type) for integrations connected through a
+collection agent, and the
 Monte Carlo-managed credential tools (or `montecarlo credentials create --help`) for credentials
 Monte Carlo stores. A type in neither is handed off to the UI. Sample storage choices do not relocate metadata, metrics
 or query logs from Monte Carlo.

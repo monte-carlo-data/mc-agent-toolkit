@@ -86,8 +86,9 @@ instrument-agent; for an already-connected warehouse's monitoring use monitoring
    path: running it puts the file within reach of your tools, and an error can print the secret
    into the transcript (rule 2). Ask only for the non-secret result, such as the credentials id.
    If the customer cannot run mc-cli or Terraform, say the step is completed in the UI, or
-   recommend a collection agent with a self-hosted reference when it fits. Setup and commands
-   are in the output-modes reference. Two cautions to pass on: the legacy `montecarlodata`
+   recommend a collection agent with a self-hosted reference when its whole setup is served by
+   tools (connection-inputs reference, support section). Setup and commands are in the
+   output-modes reference. Two cautions to pass on: the legacy `montecarlodata`
    Python CLI installs a command with the same name, so have the customer confirm with
    `montecarlo deployments --help` that the REST API CLI is the one on their path; and the
    profile is set by the customer with `montecarlo profile set … --api-token-prompt`, never by
@@ -374,7 +375,9 @@ confirm any ambiguity. Do not take the first warehouse with a matching type.
 
 If none represents the target, `create_warehouse(name, deployment_id, type=<warehouse type>)` or
 `create_warehouse(name, deployment_id, connection_type=<connection type>)`. Send exactly one of
-`type` / `connection_type`; names are unique per type. Carry and record the `warehouse_id`.
+`type` / `connection_type`; names are unique per type. For a connection type that is not itself a
+warehouse type, send `connection_type`: a refusal means the API cannot map it, nothing was
+created, and the integration is handed off to the UI (connection-inputs support section). Carry and record the `warehouse_id`.
 
 ## Step 4: The connection
 

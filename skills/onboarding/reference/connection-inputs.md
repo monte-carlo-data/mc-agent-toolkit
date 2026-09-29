@@ -47,15 +47,26 @@ so this section says how to discover them; it does not list them.
 
 | Where the secret lives | How the credentials are created | Which types |
 |---|---|---|
-| The customer's own store, read by a collection agent | MCP tools: `create_aws_secrets_manager_credentials`, `create_gcp_secret_manager_credentials`, `create_azure_key_vault_credentials`, `create_env_var_credentials`, `create_file_credentials`. Only a reference is passed. | Every connection type `create_warehouse` can take a warehouse type from, per its schema in this session: a warehouse `type`, or a `connection_type` it maps to one (Postgres to `transactional-db`, for example). |
+| The customer's own store, read by a collection agent | MCP tools: `create_aws_secrets_manager_credentials`, `create_gcp_secret_manager_credentials`, `create_azure_key_vault_credentials`, `create_env_var_credentials`, `create_file_credentials`. Only a reference is passed. | A type that is itself a value of `create_warehouse`'s `type` list in this session. Any other connection type is settled as described below the table. |
 | Monte Carlo stores it (managed) | **Not an MCP tool**: the request carries the secret. A CLI or Terraform step the customer runs (rule 6). | A type with a `get_<type>_credentials` or `delete_<type>_credentials` tool in this session, or listed by `montecarlo credentials create --help` when the customer has mc-cli. |
 | Neither | — | Hand off to the UI (Settings → Integrations). |
 
 - **CRITICAL: discover types from this session, NEVER from memory or from examples in these
-  references.** A type `create_warehouse` cannot take a warehouse type from is not connected through
-  these tools; hand it off to the UI. For a type whose mapping is unclear, say so and hand off; NEVER
-  create a warehouse or connection to find out. The managed getter/delete tools can lag the API;
-  when they and the customer's `montecarlo credentials create --help` disagree, the CLI is newer.
+  references.** The managed getter/delete tools can lag the API; when they and the customer's
+  `montecarlo credentials create --help` disagree, the CLI is newer.
+- **CRITICAL: a connection type that is not itself a warehouse `type` is settled by the API, not
+  by you.** The tools do not publish which warehouse type a connection type maps to, and several
+  connection types share one. So such a type counts as supported only when one of these shows it:
+  - an existing connection of that type in this account (`list_connections` returns
+    `connection_type`), whose warehouse type is then known; or
+  - the Monte Carlo docs page for that integration, read in this session, saying it connects
+    through a collection agent with self-hosted credentials.
+
+  Otherwise tell the customer support is unconfirmed. When the route **reuses** an existing
+  deployment, it can proceed: `create_warehouse(connection_type=<type>)` refuses a type it cannot
+  map and creates nothing, so that call is the check; on a refusal, hand off to the UI. When the
+  route needs a **new** deployment or agent, NEVER provision it for an unconfirmed type; offer the
+  UI instead. NEVER create a warehouse or connection only to probe support.
 - **CRITICAL: the options above are the whole menu.** Offer them in customer language (for
   example "a file on your machine that a command you run reads", "a secret in your AWS Secrets
   Manager, by its name or ARN"). NEVER offer, accept or suggest typing a password, key or token
@@ -64,10 +75,17 @@ so this section says how to discover them; it does not list them.
   collection agent; a secret file on the customer's machine means Monte Carlo-managed credentials,
   which only managed types have. Say which deployment an answer implies instead of asking the
   deployment question separately, and ask it only when both fit.
-- **IMPORTANT: the agent route is the one that needs no local Monte Carlo command.** When the
-  customer wants to finish in the chat, or cannot run mc-cli or Terraform, recommend a collection
-  agent with a self-hosted reference. Their own infrastructure step (deploying the agent, storing
-  the secret) still runs on their side.
+- **IMPORTANT: only some agent routes need no local Monte Carlo command.** When the customer
+  wants to finish in the chat, or cannot run mc-cli or Terraform, recommend a collection agent
+  with a self-hosted reference only when every remaining setup operation of that route is an MCP
+  tool: reusing an enabled agent that fits, or a new AWS agent (registration is an MCP tool; the
+  customer can deploy the stack with the CloudFormation template instead of the Terraform
+  module). A new GCP or Azure agent (registration carries the agent's credentials) and a new
+  Generic agent (its token or OAuth client is minted by an mc-cli or Terraform step) still need
+  one. Check the whole route before recommending it. When none fits, hand the step off to the UI
+  or to a teammate or admin who can run mc-cli or Terraform; NEVER create a deployment the
+  customer cannot finish. Their own infrastructure step (deploying the agent, storing the secret)
+  still runs on their side.
 - NEVER provision a deployment or agent for an integration before it passes this check. An agent
   built for an unsupported type is a deployment with nothing behind it (SKILL.md rule 3).
 
