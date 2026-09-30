@@ -203,6 +203,8 @@ For a type not listed, read its section on that page and apply the same rule bef
   session's `create_warehouse` schema and managed credential tools.
 - Writing a managed secret as a literal CLI value instead of `@<path>` or `--<field>-prompt`.
 - Creating one deployment per integration when several fit the same one.
+- Creating a second connection to an account or host that is already connected, on any
+  deployment, without saying so: the same data is collected twice.
 - Validating a self-hosted reference before the agent's read grant on the secret is applied: it
   only fails, and looks like a bad secret.
 - Treating a failed **Tables** check on a database the customer just created as missing grants:

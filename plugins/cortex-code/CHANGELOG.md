@@ -5,6 +5,12 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Snowflake Cortex
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.26.3] - 2026-09-30
+
+### Changed
+
+- onboarding: fixes from scenarios S4 and S14. **Removing an AWS agent** (`reference/output-modes.md`): Monte Carlo cleanup order first, then empty the agent's versioned bucket of every object version and delete marker (a tested loop; `list-objects-v2` doesn't show them and `terraform destroy` / `delete-stack` fail with `BucketNotEmpty`), confirm the bucket and exact stack name, and expect 15–40 minutes for a VPC agent's stack delete; Step 6 points to it. **Brace rule** now covers brackets: zsh reads `$VAR[…]` as an array subscript. **Duplicate collection** (Step 3): warn before creating a second connection to an already-connected account, host, secret or managed identity, and offer reuse or name the old connection to remove. **Polling**: read `get_validation_run` again directly; at most a ~3 s pause, never longer or repeated `sleep`. New live evals `remove-agent-plan`, `duplicate-connection-warning`.
+
 ## [1.26.2] - 2026-09-30
 
 ### Changed

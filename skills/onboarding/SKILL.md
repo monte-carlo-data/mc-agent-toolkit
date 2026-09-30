@@ -383,6 +383,14 @@ well as type and deployment; different Snowflake accounts on one deployment are 
 one warehouse. Prefer a verified prior `warehouse_id`; otherwise inspect its connections and
 confirm any ambiguity. Do not take the first warehouse with a matching type.
 
+**Warn before duplicating collection.** Once the target account/host is known, check the
+discovered connections for the same one (the same Snowflake account, database host, project or
+workspace; the same self-hosted secret; or managed credentials with the same account and user),
+on any deployment. If one exists, say so before creating anything: a second connection collects
+the same metadata and query logs twice. Offer to reuse it, or, when the customer is moving the
+connection (to a new agent, to Terraform, to a data store), note that the old connection should be
+removed once the new one has collected, and name it.
+
 If none represents the target, `create_warehouse(name, deployment_id, type=<warehouse type>)` or
 `create_warehouse(name, deployment_id, connection_type=<connection type>)`. Send exactly one of
 `type` / `connection_type`; names are unique per type. For a connection type that is not itself a
@@ -407,8 +415,9 @@ Run this for every connection created or reused in this run:
 1. `validate_connection(connection_id)` starts a run and returns at once. Its response is the run
    itself, still in progress; keep its `id`.
 2. `get_validation_run(run_id=<id>)` reads the run. Read it again until its `status` is `completed`.
-   A run usually takes from a few seconds to a few minutes. If you can pause between calls, wait
-   about 3 seconds between reads; do not read it more often than that. If it is still running after
+   A run usually takes from a few seconds to a few minutes. Read it again directly; if the
+   environment needs a pause, keep it to about 3 seconds, never a longer or repeated shell
+   `sleep`. If it is still running after
    about 5 minutes, stop and report it as still running with its `id`, which can be read again until its
    `expires_at`.
 
@@ -478,6 +487,9 @@ On a handoff or failure, give the last completed stage, non-secret IDs and the e
 show validation only when a connection exists. Cleanup applies only to resources created by this
 run, after checking shared dependencies. Deregistration does not delete cloud infrastructure or
 storage contents; coordinate removal of deployments with jobs/history rather than forcing it.
+When the customer removes an agent's cloud side, hand over the output-modes steps for removing an
+agent: its versioned bucket must be emptied, including old versions, before `terraform destroy`
+or `delete-stack` can remove it.
 
 ## Error handling
 

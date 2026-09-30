@@ -339,6 +339,35 @@ cases:
         policy so existing grants are not replaced, and offers the IAM policy simulator (per
         secret) to check. It never suggests reading the secret's value.
 
+  - id: remove-agent-plan
+    turns:
+      - prompt: "Plan removing our AWS collection agent and everything on it, in Monte Carlo and in AWS (it was deployed with CloudFormation). Tell me the order and the commands; don't delete anything yet."
+    criteria:
+      must_not_call: *no_writes
+      # zsh reads $VAR[ as a subscript; the bucket loop must brace it (scenario S14).
+      output_must_not_contain: ["$kind[", "$Kind[", "get-secret-value"]
+      judge_rubric: |
+        The agent lists what is on the agent first and writes nothing. It gives the Monte Carlo
+        order (connections, warehouses, credentials, the agent, then the deployment) before the
+        AWS side, checks nothing else depends on the agent, and says the agent's versioned bucket
+        must be emptied of every object version and delete marker before delete-stack, with a
+        loop that repeats until it is empty and a check that the bucket name is this agent's. It
+        warns to use the exact stack name and that a VPC agent's stack can take many minutes to
+        delete. Commands are paste-safe with braced variables.
+
+  - id: duplicate-connection-warning
+    turns:
+      - prompt: "Connect our Snowflake to Monte Carlo on the Cloud deployment with a Monte Carlo-stored key pair. It's the same Snowflake account we already monitor; I just want a second connection for it. Plan it; don't create anything."
+    criteria:
+      must_not_call: *no_writes
+      judge_rubric: |
+        Before planning any creation, the agent checks the discovered connections for the same
+        Snowflake account (or says it can't match one without the account identifier and asks
+        for it) and warns that a second connection to an already-connected account collects the
+        same metadata and query logs twice. It offers to reuse the existing connection, or, if
+        the customer is moving it, says the old one should be removed once the new one has
+        collected. It does not silently plan a duplicate.
+
   # --- Summary of created ids, and cleanup --------------------------------------------------
   - id: agent-deployment-summary-and-cleanup
     turns:

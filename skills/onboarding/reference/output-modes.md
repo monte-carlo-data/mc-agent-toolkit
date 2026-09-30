@@ -29,9 +29,10 @@ Terraform commands. Customers paste them into bash or zsh, often on macOS.
   line, and pass multi-value parameters through a file (CloudFormation `--parameters
   file://params.json`, `--policy-document file://policy.json`) rather than inline JSON or escaped
   commas. Terminals wrap long lines when copying, which splits URLs and ids.
-- **IMPORTANT: brace every variable next to a colon or letter: `${VAR}:secret:…`, never
-  `$VAR:secret:…`.** zsh reads `$VAR:s…` as a substitution modifier and silently rewrites the
-  value (a garbled ARN, then `MalformedPolicyDocument`).
+- **IMPORTANT: brace every variable next to a colon, bracket, dot or letter: `${VAR}:secret:…`,
+  `${KIND}[]`, never `$VAR:secret:…` or `$KIND[]`.** zsh reads `$VAR:s…` as a substitution
+  modifier and `$VAR[…]` as an array subscript, and silently rewrites the value (a garbled ARN,
+  then `MalformedPolicyDocument`; an empty JMESPath query).
 - **IMPORTANT: portable only.** No GNU-only flags: `date -d` fails on macOS, so use fixed UTC
   timestamps (`2026-01-31T00:00:00Z`) or `--start-time` values the customer fills in; no
   `sed -i` without a suffix; no `source <(…)`.
@@ -493,6 +494,33 @@ aws iam simulate-principal-policy --policy-source-arn "$ROLE_ARN" \
 
 With several `--resource-arns`, per-secret decisions are in `ResourceSpecificResults`; the
 top-level `EvalResourceName` is a single grouped row with `${Region}` placeholders.
+
+### Remove an AWS agent
+
+Monte Carlo first, in the summary's cleanup order (connections → warehouses → credentials →
+agent → deployment), then the customer's side. The agent's storage bucket is versioned, and S3
+refuses to delete a bucket that still holds **old versions or delete markers**, which
+`list-objects-v2` doesn't show: both `terraform destroy` and `delete-stack` then fail (or stop)
+with `BucketNotEmpty`. Empty it first, after confirming the bucket name belongs to the agent being
+removed (CloudFormation: the `StorageArn` output; Terraform module:
+`terraform state show module.mcd_agent.aws_s3_bucket.mcd_agent_store`):
+
+```bash
+B=<agent-bucket-name>
+while :; do
+  aws s3api list-object-versions --bucket "${B}" --max-items 1000 \
+    --query '{Objects: [Versions, DeleteMarkers][][].{Key: Key, VersionId: VersionId}, Quiet: `true`}' \
+    --output json > empty-bucket.json
+  jq -e '.Objects | length > 0' empty-bucket.json > /dev/null || break
+  aws s3api delete-objects --bucket "${B}" --delete file://empty-bucket.json > /dev/null
+done
+```
+
+Then `terraform plan -destroy -out=destroy.tfplan` (review it lists only this agent's
+resources) and `terraform apply destroy.tfplan`, or `aws cloudformation delete-stack` and
+`wait stack-delete-complete` on the exact stack name (similarly named stacks are common). An agent
+running in a VPC takes 15–40 minutes to delete while AWS releases the Lambda's network
+interfaces; the wait isn't stuck.
 
 ## CLI (mc-cli, the `montecarlo` command for the REST API v2) — recommended for local steps
 
