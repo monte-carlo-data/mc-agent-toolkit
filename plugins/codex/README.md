@@ -40,6 +40,8 @@ The plugin uses two hooks to enforce the Monte Carlo Prevent workflow:
 
 **Note:** Codex currently only emits PreToolUse/PostToolUse for the Bash tool. Pre-edit and post-edit hooks (Edit|Write) are included in the plugin for forward compatibility but are not registered until Codex expands tool coverage.
 
+**Hook trust:** When Codex installs the plugin directly (for example from a plugin directory) rather than through `install.sh`, the hooks come from the plugin's `hooks/prevent/hooks.json`. Codex skips plugin-bundled hooks until you review and trust them. `install.sh` registers the hooks at the project level instead and removes the hook declaration from the plugin copy it installs, so each hook runs once.
+
 ## Skills
 
 All skills are registered in `.agents/skills/` during installation.
