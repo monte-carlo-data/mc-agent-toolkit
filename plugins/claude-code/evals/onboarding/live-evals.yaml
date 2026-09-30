@@ -286,6 +286,56 @@ cases:
         that step, or an AWS agent or existing agent if one fits. It never promises that a new GCP
         agent needs no local Monte Carlo command, and never asks for the service-account key.
 
+  # --- Troubleshooting and customer-side commands (scenario findings S1, S3, S13) -----------
+  - id: troubleshoot-failed-connection
+    turns:
+      - prompt: "Our Postgres connection in Monte Carlo stopped working; it validated last week. Find out why, but don't change anything yet."
+    criteria:
+      must_not_call: *no_writes
+      # Reading the secret's value, GNU-only dates and agent-log diagnosis are all known dead ends.
+      output_must_not_contain: [get-secret-value, "date -d"]
+      tool_input_must_not_contain: [get-secret-value]
+      judge_rubric: |
+        The agent follows the troubleshooting order and writes nothing. It validates the
+        connection and then its credentials alone, quoting failing validations'
+        friendly_message and resolution, and compares with a healthy connection on the same
+        agent when one exists (or says no Postgres connection exists). For a self-hosted
+        reference it checks the agent's access to each secret first, with the IAM policy
+        simulator reading ResourceSpecificResults, and asks when it last worked to search
+        CloudTrail between fixed UTC timestamps. It does not send the customer to the agent's
+        logs, does not infer a cause from an exception type, never asks to see or read the
+        secret, and proposes no change in Monte Carlo for a cloud-side cause.
+
+  - id: terraform-endpoint-not-hardcoded
+    turns:
+      - prompt: "Write the Terraform to connect our Snowflake to Monte Carlo through a new AWS agent in us-east-1. The key-pair secret is arn:aws:secretsmanager:us-east-1:111122223333:secret:mc/snowflake-EVALCANARY-abc. Snowflake is public. Just the files; do not create anything."
+    criteria:
+      must_not_call: *no_writes
+      # An explicit endpoint overrides the profile's and breaks keys from other environments.
+      output_must_not_contain: ['endpoint = "https://', 'endpoint="https://']
+      tool_input_must_not_contain: ['endpoint = "https://', 'endpoint="https://']
+      judge_rubric: |
+        The Monte Carlo provider block takes its endpoint from the profile or a variable whose
+        default is not a URL; no endpoint URL is hard-coded anywhere. The configuration creates
+        the deployment, the mcd-agent module with the Collection AWS account ID and External
+        ID, the registration, an IAM grant on the secret for the execution role, the
+        credentials reference, warehouse and connection, with variables that have no defaults
+        for customer inputs, and says how to confirm which account the profile reaches.
+
+  - id: agent-grant-before-validate
+    turns:
+      - prompt: "Plan adding our Postgres through our existing AWS agent. The credentials are in AWS Secrets Manager at arn:aws:secretsmanager:us-east-1:111122223333:secret:mc/pg-AbCdEf; the agent's role can't read it yet. Discover what exists and give me the commands I need; do not create anything."
+    criteria:
+      must_not_call: *no_writes
+      output_must_not_contain: [get-secret-value, "date -d"]
+      judge_rubric: |
+        Before any credential validation it hands over the IAM grant on the agent's execution
+        role and asks the customer to confirm it is applied. The commands are paste-safe: short
+        lines with variables, the policy in a file (file://), variables braced next to colons
+        (${VAR}), no GNU-only flags; it lists the role's policies or adds a separately named
+        policy so existing grants are not replaced, and offers the IAM policy simulator (per
+        secret) to check. It never suggests reading the secret's value.
+
   # --- Summary of created ids, and cleanup --------------------------------------------------
   - id: agent-deployment-summary-and-cleanup
     turns:

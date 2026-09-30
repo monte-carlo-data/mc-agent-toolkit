@@ -82,6 +82,7 @@ class ExampleTests(unittest.TestCase):
             "MCD_WAREHOUSE_NAME": "Snowflake production",
             "MCD_CONNECTION_NAME": "production",
             "SNOWFLAKE_SECRET_ARN": "arn:aws:secretsmanager:us-east-1:123456789012:secret:snowflake",
+            "MCD_API_ENDPOINT": "https://api.example.invalid",
         }
 
     def run_example(self):
@@ -197,3 +198,23 @@ class ExampleTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class NoHardcodedEndpointTests(unittest.TestCase):
+    """The endpoint decides which Monte Carlo environment is called, and an API key only works
+    in its own environment. A hard-coded prod URL sends a dev (or other instance's) key to the
+    wrong API, which refuses it (scenario S3). The examples must take it from the profile or a
+    required input instead."""
+
+    OUTPUT_MODES = (ROOT / "skills/onboarding/reference/output-modes.md").read_text()
+
+    def test_python_example_reads_endpoint_from_environment(self):
+        self.assertNotIn("api.getmontecarlo.com", EXAMPLE)
+        self.assertIn('os.environ["MCD_API_ENDPOINT"]', EXAMPLE)
+
+    def test_terraform_provider_blocks_do_not_hardcode_endpoint(self):
+        blocks = [b.split("```", 1)[0] for b in self.OUTPUT_MODES.split("```hcl\n")[1:]]
+        provider_blocks = [b for b in blocks if 'provider "montecarlo"' in b]
+        self.assertTrue(provider_blocks, "expected a montecarlo provider block")
+        for block in provider_blocks:
+            self.assertNotRegex(block, r'endpoint\s*=\s*"https?://')

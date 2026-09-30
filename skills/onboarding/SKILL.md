@@ -1,6 +1,6 @@
 ---
 name: monte-carlo-onboarding
-description: Connect warehouses to Monte Carlo with API v2 tools: show existing deployments and what can be added, reference credentials, create and validate connections. Use to connect or onboard platforms, or to generate the Terraform or a script for it.
+description: Connect warehouses to Monte Carlo with API v2 tools: show deployments and what can be added, reference credentials, create, validate and fix connections. Use to connect or onboard platforms, or to generate the Terraform or a script for it.
 metadata:
   bucket: Setup
 ---
@@ -29,12 +29,15 @@ Read the supporting references with the environment's available file or resource
 - [Output modes](reference/output-modes.md): Terraform, SDK and CLI examples.
 - [Connection inputs](reference/connection-inputs.md): the inputs each deployment, credential path
   and connection type requires, and where each value must come from.
+- [Troubleshooting](reference/troubleshooting.md): a connection that worked and now fails; the
+  order of checks and what each validation result means.
 
 If a referenced resource is unavailable, identify what is missing and consult the linked official
 documentation before proceeding. Do not guess a tool schema or provisioning parameter.
 
 This workflow covers connecting supported data platforms and selecting deployments, agents,
-data stores and credentials. For metadata or lineage without a connector use push-ingestion;
+data stores and credentials, and fixing a connection that stopped working (the troubleshooting
+reference; it skips the onboarding steps below). For metadata or lineage without a connector use push-ingestion;
 for Connection Auth Rules JSON use connection-auth-rules; for AI agent instrumentation use
 instrument-agent; for an already-connected warehouse's monitoring use monitoring-advisor.
 
@@ -88,7 +91,9 @@ instrument-agent; for an already-connected warehouse's monitoring use monitoring
    If the customer cannot run mc-cli or Terraform, say the step is completed in the UI, or
    recommend a collection agent with a self-hosted reference when its whole setup is served by
    tools (connection-inputs reference, support section). Setup and commands are in the
-   output-modes reference. Two cautions to pass on: the legacy `montecarlodata`
+   output-modes reference, and every command handed over follows its rules for commands the
+   customer runs: never one that reads a secret's value, short paste-safe lines, `${VAR}`
+   braces, portable to macOS. Two cautions to pass on: the legacy `montecarlodata`
    Python CLI installs a command with the same name, so have the customer confirm with
    `montecarlo deployments --help` that the REST API CLI is the one on their path; and the
    profile is set by the customer with `montecarlo profile set … --api-token-prompt`, never by
@@ -261,8 +266,9 @@ or start a migration merely to make the new connection fit.
    session. Per platform, from the output-modes reference:
    - AWS: Terraform module `monte-carlo-data/mcd-agent/aws` with the account
      information page's **Collection AWS account ID** (never the account the agent is deployed
-     into), chosen region and generated `external_id` (or the CloudFormation template from the
-     docs). Outputs: Lambda function ARN, invoker role ARN.
+     into), chosen region and generated `external_id`, or the CloudFormation template with a
+     parameters file (output-modes; parameter names from the template itself). Outputs: Lambda
+     function ARN, invoker role ARN.
    - GCP: module `monte-carlo-data/mcd-agent/google`. Outputs: Cloud Run URL, invoker key.
    - Azure: module `monte-carlo-data/mcd-agent/azurerm`. Outputs: function app URL, auth details.
    - Generic: first a credential for the agent — `montecarlo collection-agents create generic-token
@@ -340,6 +346,10 @@ writing:
 | Environment variable on the agent | `create_env_var_credentials(connection_type, env_var_name (MCD_…), kms_key_id?)` | Only with a collection agent the customer runs; the cloud node has no customer-set variables. |
 | File on the agent | `create_file_credentials(connection_type, file_path)` | Generic Kubernetes/Docker: mount the JSON file into the agent; use its container path. A path on the customer's machine (`~/Downloads/key.p8`) is not a file credential: it goes into the CLI or Terraform step. |
 | Monte Carlo stores it (a managed type) | **not a tool** | Offer both (rule 6): `montecarlo credentials create <type> …` with each secret field as `@<path>` or `--<field>-prompt`, never a literal; or the `montecarlo_<type>_credentials` resource with the secret in `<field>_wo` (rule 7). For a Snowflake key pair: `montecarlo credentials create snowflake --account … --user … --warehouse … --private-key @key.p8`. The user runs it and gives back the `id`. |
+
+**Grant, then validate, then create.** A self-hosted reference only validates once the agent
+can read the secret, so hand over that grant first (output-modes: grant the agent read access)
+and ask the customer to confirm it is applied; validating before the grant exists only fails.
 
 **Validate before creating.** Each self-hosted create has a matching validate that takes the same
 arguments plus `deployment_id`: `validate_aws_secrets_manager_credentials`, `validate_gcp_secret_manager_credentials`, `validate_azure_key_vault_credentials`, `validate_env_var_credentials`, `validate_file_credentials`. It creates nothing and

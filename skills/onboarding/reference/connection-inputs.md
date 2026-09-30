@@ -158,7 +158,7 @@ disagree, the page is right. Keys sit inside `connect_args` unless noted.
 | Databricks | the page marks no key required; ask which auth method the customer uses and confirm its keys: `databricks_workspace_url` with `databricks_token`, or with `databricks_client_id` + `databricks_client_secret` (plus `azure_tenant_id`, `azure_workspace_resource_id` on Azure) | the SQL warehouse id goes on the credential, not in the secret |
 | Redshift | `host`, `dbname`, `port`, `user`, `password` | `autocommit` |
 | Postgres | `dbname`, `user`, `password`, `host`, `port` | |
-| MySQL | `host`, `port`, `user`, `password` | |
+| MySQL | `host`, `port`, `user`, `password` | none: MySQL has no `database` key; schemas are discovered |
 | SQL Server, Azure SQL Database, Azure Dedicated SQL Pool | `connect_args` (a connection string) | `login_timeout`, `query_timeout` (`query_timeout_in_seconds` for SQL Server) |
 | Oracle | `dsn`, `user`, `password` | `ssl_options` |
 | DB2 | `hostname`, `port`, `database`, `uid`, `pwd` | `ssl_options.ca_data` |
@@ -203,3 +203,7 @@ For a type not listed, read its section on that page and apply the same rule bef
   session's `create_warehouse` schema and managed credential tools.
 - Writing a managed secret as a literal CLI value instead of `@<path>` or `--<field>-prompt`.
 - Creating one deployment per integration when several fit the same one.
+- Validating a self-hosted reference before the agent's read grant on the secret is applied: it
+  only fails, and looks like a bad secret.
+- Treating a failed **Tables** check on a database the customer just created as missing grants:
+  an empty database fails it too. Ask whether it has tables yet.

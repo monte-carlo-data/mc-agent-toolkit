@@ -30,6 +30,11 @@ the skill:
 7. Ends with created/reused IDs, the validation result, a scoped cleanup order and the next
    pending step. Creation alone is not a completed onboarding.
 
+It also fixes a connection that stopped working: it validates the connection and its
+credentials, compares with a healthy connection on the same agent, and gives you checks that
+confirm the cause (the agent's access to each secret, what changed since it last worked)
+without reading any secret.
+
 The assistant uses the MCP tools for every step they serve. A step moves to your machine only
 when it carries a secret, or its tool is not served: you get the
 [mc-cli](https://github.com/monte-carlo-data/mc-cli) command (`montecarlo`, the REST API v2 CLI)
@@ -103,6 +108,7 @@ connection for the intended account. The workflow requires no particular assista
 | `reference/deployment-guide.md` | Cloud-specific prerequisites, network paths and official setup guides |
 | `reference/output-modes.md` | Terraform, CLI and SDK snippets for each step |
 | `reference/connection-inputs.md` | The inputs each deployment, credential path and connection type requires (including the keys a self-hosted secret must carry), and the rule that each comes from the customer or discovery, never an example value |
+| `reference/troubleshooting.md` | A connection that worked and now fails: the order of checks (validation, a healthy connection on the same agent, the agent's access per secret, what changed in the audit log) and what each validation result means |
 
 ## Not yet
 

@@ -14,11 +14,43 @@ Names below are the API's: `type` is `COLLECTION_AGENT` or `COLLECTION_DATA_STOR
 `runtime_platform` is `AWS`, `GCP`, `AZURE` or `GENERIC`. Tool name = `operationId` = the
 Terraform resource verb's counterpart = the CLI command.
 
+## Rules for every command the customer runs
+
+These apply to every shell snippet handed over, in any mode: mc-cli, AWS CLI, gcloud, az,
+Terraform commands. Customers paste them into bash or zsh, often on macOS.
+
+- **CRITICAL: NEVER suggest a command that reads a secret's value**, not even piped into
+  `jq keys` or `wc`: `aws secretsmanager get-secret-value`, `gcloud secrets versions access`,
+  `az keyvault secret show`, `cat` of a key file. The value passes through the customer's shell
+  and one typo prints it. To check access, use the cloud's policy simulator or Monte Carlo's
+  credential validation; to check a secret exists or changed, use its metadata
+  (`describe-secret`, `list-secret-version-ids`).
+- **IMPORTANT: keep every line short and paste-safe.** Put long values in variables, one per
+  line, and pass multi-value parameters through a file (CloudFormation `--parameters
+  file://params.json`, `--policy-document file://policy.json`) rather than inline JSON or escaped
+  commas. Terminals wrap long lines when copying, which splits URLs and ids.
+- **IMPORTANT: brace every variable next to a colon or letter: `${VAR}:secret:…`, never
+  `$VAR:secret:…`.** zsh reads `$VAR:s…` as a substitution modifier and silently rewrites the
+  value (a garbled ARN, then `MalformedPolicyDocument`).
+- **IMPORTANT: portable only.** No GNU-only flags: `date -d` fails on macOS, so use fixed UTC
+  timestamps (`2026-01-31T00:00:00Z`) or `--start-time` values the customer fills in; no
+  `sed -i` without a suffix; no `source <(…)`.
+- Print only what the customer sends back: ARNs, ids, names, decisions (`allowed`), never a
+  credential. Say which outputs to send.
+
 ## Terraform
 
 Provider `monte-carlo-data/montecarlo` (generated from the same API). Credentials for the provider
 come from the environment (`MCD_DEFAULT_API_ID` / `MCD_DEFAULT_API_TOKEN`) or the CLI profile in
 `~/.mcd/profiles.ini`; never literals in a `.tf` file.
+
+**NEVER hard-code the provider's `endpoint`.** An API key works only in its own Monte Carlo
+environment, and an explicit `endpoint` overrides the profile's `mcd_api_endpoint`: a key sent to
+another environment's API is refused (`User is not authorized … explicit deny`, which the provider
+may surface as `no value given for required property type`). Use the variable below: left unset
+(`null`), the provider takes the profile's endpoint; when credentials come from
+`MCD_DEFAULT_API_*` alone, the customer sets it to their environment's API URL. Its default is
+never a URL. `montecarlo whoami` shows which account the profile reaches.
 
 **Secrets are write-only arguments.** Every secret a resource sends to Monte Carlo is
 `<name>_wo`, with a required `<name>_wo_version`. Terraform sends it on apply and never stores it
@@ -46,8 +78,14 @@ terraform {
   }
 }
 
+# Endpoint from the profile's mcd_api_endpoint when set; otherwise pass it in (no default).
+variable "montecarlo_endpoint" {
+  type    = string
+  default = null # null means "use the profile's endpoint"; never a URL here
+}
+
 provider "montecarlo" {
-  endpoint = "https://api.getmontecarlo.com"
+  endpoint = var.montecarlo_endpoint
 }
 ```
 
@@ -378,6 +416,84 @@ Reusing an existing deployment: omit creation/registration blocks and their `dep
 outputs; use the verified deployment ID. Likewise omit reused warehouse/credential resources
 and pass their IDs. Never destroy a shared reused resource as part of cleanup.
 
+## AWS CLI: customer-side AWS steps
+
+### Deploy the AWS agent with CloudFormation
+
+Parameter and output names come from the template itself
+(`https://mcd-public-resources.s3.amazonaws.com/cloudformation/aws_apollo_agent.yaml`); if a
+docs summary disagrees, the template is right, but don't tell the customer a docs page is wrong
+unless you read that page yourself.
+
+```bash
+REGION=<region>
+STACK=mcd-agent-<name>
+TPL=https://mcd-public-resources.s3.amazonaws.com
+TPL="${TPL}/cloudformation/aws_apollo_agent.yaml"
+aws sts get-caller-identity --query Account --output text   # the account the agent runs in
+
+cat > mcd-agent-params.json <<'EOF'
+[
+  {"ParameterKey": "ExternalId",        "ParameterValue": "<external-id>"},
+  {"ParameterKey": "CloudAccountId",    "ParameterValue": "<Collection AWS account ID>"},
+  {"ParameterKey": "ExistingVpcId",     "ParameterValue": "<vpc-id>"},
+  {"ParameterKey": "ExistingSubnetIds", "ParameterValue": "<subnet-a>,<subnet-b>"}
+]
+EOF
+aws cloudformation create-stack --region "$REGION" --stack-name "$STACK" \
+  --template-url "$TPL" --capabilities CAPABILITY_IAM \
+  --parameters file://mcd-agent-params.json
+aws cloudformation wait stack-create-complete --region "$REGION" --stack-name "$STACK"
+aws cloudformation describe-stacks --region "$REGION" --stack-name "$STACK" \
+  --query "Stacks[0].Outputs[].[OutputKey,OutputValue]" --output table
+```
+
+Drop the two `Existing*` parameters when the agent doesn't need a VPC. The customer sends back
+`FunctionArn` and `InvocationRoleArn` for `register_aws_collection_agent`, and checks that
+`InvocationRoleExternalId` matches. The agent's execution role is the stack resource
+`ExecutionRole`; its security group is the `SecurityGroupId` output.
+
+### Grant the agent read access to a secret
+
+Before validating a self-hosted reference (SKILL.md Step 2), the agent's execution role needs
+`secretsmanager:GetSecretValue` on the secret (plus `kms:Decrypt` for a customer-managed key). Add
+a **separate** inline policy per grant so existing grants are not rewritten, and list the role's
+policies first: `put-role-policy` replaces a policy of the same name.
+
+```bash
+ROLE=$(aws cloudformation describe-stack-resource \
+  --region "$REGION" --stack-name "$STACK" --logical-resource-id ExecutionRole \
+  --query StackResourceDetail.PhysicalResourceId --output text)
+SECRET_ARN=<secret-arn>
+aws iam list-role-policies --role-name "$ROLE"
+
+cat > secret-policy.json <<EOF
+{"Version": "2012-10-17", "Statement": [{"Effect": "Allow",
+  "Action": "secretsmanager:GetSecretValue", "Resource": "${SECRET_ARN}"}]}
+EOF
+aws iam put-role-policy --role-name "$ROLE" --policy-name <new-policy-name> \
+  --policy-document file://secret-policy.json
+```
+
+To change an existing policy instead, back it up, edit with `jq`, review a diff, then apply:
+`get-role-policy … --query PolicyDocument > backup.json` → `jq … > new.json` →
+`diff <(jq -S . backup.json) <(jq -S . new.json)` → `put-role-policy … file://new.json`.
+
+### Check the agent can read secrets
+
+```bash
+ROLE_ARN=$(aws iam get-role --role-name "$ROLE" --query Role.Arn --output text)
+Q='EvaluationResults[].ResourceSpecificResults[]'
+Q="${Q}.[EvalResourceName,EvalResourceDecision]"
+aws iam simulate-principal-policy --policy-source-arn "$ROLE_ARN" \
+  --action-names secretsmanager:GetSecretValue \
+  --resource-arns <secret-arn-1> <secret-arn-2> \
+  --query "$Q" --output text
+```
+
+With several `--resource-arns`, per-secret decisions are in `ResourceSpecificResults`; the
+top-level `EvalResourceName` is a single grouped row with `${Region}` placeholders.
+
 ## CLI (mc-cli, the `montecarlo` command for the REST API v2) — recommended for local steps
 
 Source: https://github.com/monte-carlo-data/mc-cli. Until its first release, build from source:
@@ -432,7 +548,8 @@ montecarlo connections create --name <connection_name> --warehouse-id <warehouse
 ## Python script (`montecarlo` SDK, mc-sdk-python)
 
 `pip install git+https://github.com/monte-carlo-data/mc-sdk-python.git`. The client reads
-`MCD_DEFAULT_API_ID` / `MCD_DEFAULT_API_TOKEN` or the CLI profile; only `endpoint` is required.
+`MCD_DEFAULT_API_ID` / `MCD_DEFAULT_API_TOKEN` or the CLI profile; only `endpoint` is required,
+and it comes from `MCD_API_ENDPOINT` (the customer's environment's API base URL), never a literal.
 Every operation is a method on its tag's `*Api` class with the same name as the tool; request
 models are `<Schema>In`. Operations the MCP server does not expose (the Snowflake key pair) are
 plain SDK calls here, with the secret read from a file the customer names.
@@ -461,7 +578,7 @@ from montecarlo.paging import paginate
 
 
 def main():
-    client = montecarlo.new_client(montecarlo.Options(endpoint="https://api.getmontecarlo.com"))
+    client = montecarlo.new_client(montecarlo.Options(endpoint=os.environ["MCD_API_ENDPOINT"]))
     deployments = montecarlo.DeploymentsApi(client)
     agents = montecarlo.CollectionAgentsApi(client)
     credentials = montecarlo.CredentialsApi(client)

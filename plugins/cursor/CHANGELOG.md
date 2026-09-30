@@ -5,6 +5,12 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Cursor will be d
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.26.1] - 2026-09-30
+
+### Changed
+
+- onboarding: fixes from end-to-end scenario runs (dev, headless, Opus 5.5). **Terraform/SDK endpoint**: the provider example no longer hard-codes `https://api.getmontecarlo.com` (it overrode the profile's `mcd_api_endpoint` and sent keys to the wrong environment, "explicit deny"); it takes `var.montecarlo_endpoint` (null → profile), and the SDK example reads `MCD_API_ENDPOINT`; new offline tests guard both. **Rules for every command the customer runs** (`reference/output-modes.md`): never a command that reads a secret's value (not even `get-secret-value | jq keys`), short paste-safe lines with variables and parameter/policy files, `${VAR}` braces (zsh `$VAR:s` modifier), macOS-portable (no `date -d`). **AWS CLI section**: CloudFormation with a parameters file and names from the template, a separately named inline grant on the `ExecutionRole`, backup/`jq`/diff edits, and the IAM simulator per secret (`ResourceSpecificResults`). **Grant, then validate, then create** for self-hosted references. New **`reference/troubleshooting.md`** for a connection that stopped working (validate → compare a healthy connection on the same agent → agent access per secret → audit log between fixed UTC times → reviewed fix → support ids; agent logs are redacted and exception types aren't diagnostic). MySQL secrets have no `database` key; an empty new database fails the Tables check. Description mentions fixing connections. New live evals `troubleshoot-failed-connection`, `terraform-endpoint-not-hardcoded`, `agent-grant-before-validate`; trigger eval `should-17`.
+
 ## [1.26.0] - 2026-09-29
 
 ### Changed
