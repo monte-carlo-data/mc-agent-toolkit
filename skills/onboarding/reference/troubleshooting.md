@@ -17,16 +17,46 @@ for every command).
    agent: its stack, VPC, NAT, or a recent upgrade.
 3. **For a self-hosted reference, check the agent's access to each secret first.** It is the
    most common cause after a change and the cheapest to confirm: the IAM policy simulator on the
-   agent's execution role, one decision per secret (`ResourceSpecificResults`, see output-modes).
-   `implicitDeny` on the failing secret and `allowed` on the working one confirms it.
+   agent's execution role, one decision per secret. Hand over exactly this query:
+
+   ```bash
+   Q='EvaluationResults[].ResourceSpecificResults[]'
+   Q="${Q}.[EvalResourceName,EvalResourceDecision]"
+   aws iam simulate-principal-policy --policy-source-arn "${ROLE_ARN}" \
+     --action-names secretsmanager:GetSecretValue \
+     --resource-arns "${FAILING_ARN}" "${WORKING_ARN}" \
+     --query "$Q" --output text
+   ```
+
+   **CRITICAL: NEVER query `EvaluationResults[].[EvalResourceName,EvalDecision]` with more than
+   one ARN.** That is one grouped row, `arn:aws:secretsmanager:${Region}:${Account}:secret:…`,
+   whose decision can't tell which secret is denied. `implicitDeny` on the failing secret and
+   `allowed` on the working one confirms the cause.
    GCP and Azure: the service account's IAM on the secret, the Key Vault access policy or RBAC.
 4. **Find what changed since it last worked.** CloudTrail (or the cloud's audit log) between
    the last good time and the first failure, as fixed UTC timestamps: `PutRolePolicy`,
    `DeleteRolePolicy`, `DetachRolePolicy`, security-group changes, `ModifyDBInstance`,
    `PutSecretValue` / `UpdateSecret` / `RotateSecret`, stack updates. Ask the customer when it
    last worked and when it first failed rather than guessing.
-5. **Fix on the side that changed**, with a reviewed edit: list the role's policies (grants are
-   often split across several), back up the policy, edit with `jq`, `diff`, then apply; or
+5. **Fix on the side that changed**, with a reviewed edit. For an IAM grant, first find which
+   inline policy should hold it: grants are often split one policy per secret, so NEVER assume
+   the failing secret's grant sits next to the working one's. Hand over this read-only check,
+   which prints each inline policy's secret ARNs (ARNs only, never values), and build the edit
+   from its output:
+
+   ```bash
+   for P in $(aws iam list-role-policies --role-name "${ROLE}" \
+       --query PolicyNames --output text); do
+     printf '%s\t' "${P}"
+     aws iam get-role-policy --role-name "${ROLE}" --policy-name "${P}" \
+       --query PolicyDocument --output json \
+       | jq -c '[.Statement[] | select((.Action|tostring)|test("GetSecretValue"))
+                | .Resource] | flatten'
+   done
+   ```
+
+   It only reads, so a `Throttling` error on a role with many policies is safe to re-run.
+   Then back up that policy, edit it with `jq`, `diff`, and apply; or
    restore the security-group rule; or point the credentials at a recreated secret's new ARN
    (`update_<store>_credentials`). Then re-run step 1. If the change came from Terraform or
    CloudFormation, fix it there, or the next apply reverts it.

@@ -5,6 +5,12 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Cursor will be d
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.26.2] - 2026-09-30
+
+### Changed
+
+- onboarding: troubleshooting follow-up from the post-merge S13 verification (7 → 5 turns). `reference/troubleshooting.md` step 3 now carries the exact per-secret IAM simulator query (`ResourceSpecificResults` / `EvalResourceDecision`) and forbids the grouped `EvaluationResults[].[EvalResourceName,EvalDecision]` form with several ARNs; step 5 hands over a read-only loop that shows which inline policy grants which secret before any edit, so a fix is no longer built on the assumption that the failing grant sits next to a working one. Both snippets run in bash and zsh against a real role. The `troubleshoot-failed-connection` live eval fails on the grouped query form.
+
 ## [1.26.1] - 2026-09-30
 
 ### Changed

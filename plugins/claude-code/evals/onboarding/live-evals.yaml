@@ -293,7 +293,8 @@ cases:
     criteria:
       must_not_call: *no_writes
       # Reading the secret's value, GNU-only dates and agent-log diagnosis are all known dead ends.
-      output_must_not_contain: [get-secret-value, "date -d"]
+      # The grouped simulator form can't say which secret is denied (S13 verification run).
+      output_must_not_contain: [get-secret-value, "date -d", "[EvalResourceName,EvalDecision]"]
       tool_input_must_not_contain: [get-secret-value]
       judge_rubric: |
         The agent follows the troubleshooting order and writes nothing. It validates the
@@ -304,7 +305,9 @@ cases:
         simulator reading ResourceSpecificResults, and asks when it last worked to search
         CloudTrail between fixed UTC timestamps. It does not send the customer to the agent's
         logs, does not infer a cause from an exception type, never asks to see or read the
-        secret, and proposes no change in Monte Carlo for a cloud-side cause.
+        secret, and proposes no change in Monte Carlo for a cloud-side cause. Before writing an
+        IAM edit it has the customer list which inline policy grants which secret, instead of
+        assuming the failing grant sits next to a working one.
 
   - id: terraform-endpoint-not-hardcoded
     turns:
