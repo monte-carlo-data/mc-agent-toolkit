@@ -254,7 +254,19 @@ class DeleteProvenanceTests(unittest.TestCase):
     def test_output_modes_has_terraform_removal_steps(self):
         self.assertIn("### Remove what Terraform manages", self.OUTPUT_MODES)
 
-    def test_state_check_prints_a_count_not_the_state(self):
-        section = self.OUTPUT_MODES.split("### Remove what Terraform manages", 1)[-1].split("\n## ", 1)[0]
-        self.assertIn('terraform state pull | grep -c "${ID}"', section)
+    def section(self):
+        return self.OUTPUT_MODES.split("### Remove what Terraform manages", 1)[-1].split("\n## ", 1)[0]
+
+    def test_state_check_matches_resource_ids_without_printing_state(self):
+        # A whole-state grep also matches reused resources whose ids appear as references on
+        # managed ones, and an empty -id lists every resource, so the check is guarded.
+        section = self.section()
+        self.assertIn('[ -n "${ID}" ] && terraform state list -id="${ID}"', section)
+        self.assertNotIn("state pull", section)
         self.assertNotIn("terraform show", section)
+
+    def test_terraform_addresses_are_quoted(self):
+        # Addresses can carry [0] or ["key"]; unquoted, zsh globs them before Terraform runs.
+        section = self.section()
+        self.assertIn("terraform destroy -target='<address>'", section)
+        self.assertIn("terraform state rm '<address>'", section)

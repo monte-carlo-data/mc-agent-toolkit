@@ -378,7 +378,7 @@ cases:
         The agent lists the connections and names the one it means. Before offering any delete
         tool, it asks how that connection and its warehouse were created (Terraform, the CLI, the
         UI or an earlier run), says Monte Carlo doesn't record this, and offers a check the
-        customer can run in their Terraform directories that prints a count or addresses, not
+        customer can run in their Terraform directories that prints only resource addresses, not
         the state. It says a Terraform-managed resource must be removed by Terraform (delete its
         block, plan, apply), because deleting it through Monte Carlo leaves the state behind and
         the next apply creates it again. It gives the Monte Carlo deletion order (connection,

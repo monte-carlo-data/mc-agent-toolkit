@@ -420,21 +420,26 @@ and pass their IDs. Never destroy a shared reused resource as part of cleanup.
 ### Remove what Terraform manages
 
 Monte Carlo doesn't record which tool created a resource. To find out whether Terraform manages
-one, the customer checks each Terraform directory that uses the provider for its id. The check
-prints a count, never the state, which can hold generated secrets:
+one, the customer runs this in each Terraform directory that uses the provider. It prints the
+address of the resource whose id this is, or nothing, and never the state, which can hold
+generated secrets:
 
 ```bash
 ID=<resource-id>
-terraform state pull | grep -c "${ID}"
-terraform state list | grep montecarlo_
+[ -n "${ID}" ] && terraform state list -id="${ID}"
 ```
 
-A count above 0 means that directory manages it; `state list` gives its address. Remove it the
-Terraform way: delete its block (and whatever references it) from the configuration, run
-`terraform plan` and check that it destroys only what is being removed, then `terraform apply`.
-`terraform destroy -target=<address>` also works, but the next apply creates it again while the
-block remains. To keep the resource in Monte Carlo and stop managing it with Terraform, delete the
-block and run `terraform state rm <address>`.
+Don't search the whole state for the id instead: a reused resource's id also appears as a
+reference on the managed resources that use it, so a search reports it as managed when it isn't.
+The guard matters because an empty `-id` lists every resource.
+
+An address in the output means that directory manages it. Remove it the Terraform way: delete its
+block (and whatever references it) from the configuration, run `terraform plan` and check that it
+destroys only what is being removed, then `terraform apply`. `terraform destroy -target='<address>'`
+also works, but the next apply creates it again while the block remains. To keep the resource in
+Monte Carlo and stop managing it with Terraform, delete the block and run
+`terraform state rm '<address>'`. Keep the address in single quotes: addresses such as
+`module.x.res["key"]` or `res[0]` otherwise break in the shell.
 
 ## AWS CLI: customer-side AWS steps
 
