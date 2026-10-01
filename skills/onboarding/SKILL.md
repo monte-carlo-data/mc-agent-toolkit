@@ -101,7 +101,9 @@ instrument-agent; for an already-connected warehouse's monitoring use monitoring
 7. **Terraform takes secrets write-only.** In a Terraform artifact, pass every secret as the
    resource's write-only argument, `<name>_wo` with `<name>_wo_version = 1` (for example
    `private_key_wo` on `montecarlo_snowflake_credentials`), read from a file or an uncommitted
-   variable, and set `required_version = ">= 1.11"`. Tell the customer that changing a secret
+   variable, and set `required_version = ">= 1.11"`. Every Terraform artifact starts from the
+   output-modes `terraform` block, including one with only AWS resources (a data store's bucket
+   and role), so the version floors are the same everywhere. Tell the customer that changing a secret
    alone plans nothing, so they bump its version with it. Secrets Monte Carlo generates (a generic
    agent's token or OAuth client secret) are returned once and stay in that resource's state:
    hand them on write-only, for example to Secrets Manager with `secret_string_wo` as the
@@ -389,7 +391,8 @@ workspace; the same self-hosted secret; or managed credentials with the same acc
 on any deployment. If one exists, say so before creating anything: a second connection collects
 the same metadata and query logs twice. Offer to reuse it, or, when the customer is moving the
 connection (to a new agent, to Terraform, to a data store), note that the old connection should be
-removed once the new one has collected, and name it.
+removed once the new one has collected, and name it. Removing it follows the rule below on how an
+existing resource was created.
 
 If none represents the target, `create_warehouse(name, deployment_id, type=<warehouse type>)` or
 `create_warehouse(name, deployment_id, connection_type=<connection type>)`. Send exactly one of
@@ -485,7 +488,15 @@ delete_generic_collection_agent_oauth_client).
 In artifact mode label resources as **planned**, not created. Record IDs only after execution.
 On a handoff or failure, give the last completed stage, non-secret IDs and the exact next step;
 show validation only when a connection exists. Cleanup applies only to resources created by this
-run, after checking shared dependencies. Deregistration does not delete cloud infrastructure or
+run, after checking shared dependencies.
+
+**Ask how an existing resource was created before deleting it.** Monte Carlo doesn't record whether
+Terraform, the CLI, the UI or an earlier run created a deployment, agent, credentials, warehouse
+or connection, so for anything this run didn't create, ask before offering a delete tool. If the
+customer isn't sure, hand over the output-modes check for each Terraform directory that uses the
+provider. A Terraform-managed resource is removed by Terraform (the output-modes steps for removing
+what Terraform manages): deleting it here leaves the state pointing at nothing, and the next apply
+creates it again. Offer the delete tools only for the rest, after confirmation. Deregistration does not delete cloud infrastructure or
 storage contents; coordinate removal of deployments with jobs/history rather than forcing it.
 When the customer removes an agent's cloud side, hand over the output-modes steps for removing an
 agent: its versioned bucket must be emptied, including old versions, before `terraform destroy`

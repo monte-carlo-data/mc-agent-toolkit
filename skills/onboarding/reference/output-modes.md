@@ -417,6 +417,25 @@ Reusing an existing deployment: omit creation/registration blocks and their `dep
 outputs; use the verified deployment ID. Likewise omit reused warehouse/credential resources
 and pass their IDs. Never destroy a shared reused resource as part of cleanup.
 
+### Remove what Terraform manages
+
+Monte Carlo doesn't record which tool created a resource. To find out whether Terraform manages
+one, the customer checks each Terraform directory that uses the provider for its id. The check
+prints a count, never the state, which can hold generated secrets:
+
+```bash
+ID=<resource-id>
+terraform state pull | grep -c "${ID}"
+terraform state list | grep montecarlo_
+```
+
+A count above 0 means that directory manages it; `state list` gives its address. Remove it the
+Terraform way: delete its block (and whatever references it) from the configuration, run
+`terraform plan` and check that it destroys only what is being removed, then `terraform apply`.
+`terraform destroy -target=<address>` also works, but the next apply creates it again while the
+block remains. To keep the resource in Monte Carlo and stop managing it with Terraform, delete the
+block and run `terraform state rm <address>`.
+
 ## AWS CLI: customer-side AWS steps
 
 ### Deploy the AWS agent with CloudFormation

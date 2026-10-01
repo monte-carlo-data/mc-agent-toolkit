@@ -5,6 +5,12 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Cursor will be d
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.26.4] - 2026-10-01
+
+### Changed
+
+- onboarding: fixes from scenario S6. **Ask how an existing resource was created before deleting it** (`SKILL.md` Step 6): Monte Carlo does not record whether Terraform, the CLI, the UI or an earlier run created a resource, so for anything the run did not create, ask before offering a delete tool; a Terraform-managed resource is removed by Terraform, since deleting it through Monte Carlo leaves the state behind and the next apply creates it again. New **Remove what Terraform manages** (`reference/output-modes.md`): a state check that prints a count, never the state, and the remove-block → plan → apply steps (or `state rm` to stop managing it). **One Terraform version floor**: every Terraform artifact, including one with only AWS resources, starts from the shared `terraform` block (`>= 1.11`). New live eval `delete-existing-asks-provenance`; static tests for both rules.
+
 ## [1.26.3] - 2026-09-30
 
 ### Changed
