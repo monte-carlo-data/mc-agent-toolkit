@@ -517,7 +517,27 @@ aws iam simulate-principal-policy --policy-source-arn "$ROLE_ARN" \
 ```
 
 With several `--resource-arns`, per-secret decisions are in `ResourceSpecificResults`; the
-top-level `EvalResourceName` is a single grouped row with `${Region}` placeholders.
+top-level `EvalResourceName` is a single grouped row with `${Region}` placeholders. Use the same
+query for a single ARN: `EvalResourceDecision` exists only per resource, so
+`EvaluationResults[].EvalResourceDecision` prints an empty line.
+
+### Revoke the agent's access to one secret
+
+When an integration is removed, take away the agent's read access to its secret, and only that.
+Read the policy first: delete it only if it grants nothing but this secret; otherwise edit the
+ARN out (back up, `jq`, the normalised diff above, `put-role-policy`).
+
+```bash
+SECRET_ARN=<secret-arn>
+POLICY=<policy-name>
+aws iam get-role-policy --role-name "$ROLE" --policy-name "$POLICY" \
+  --query PolicyDocument --output json > "${POLICY}.backup.json"
+jq -c '[.Statement[].Resource] | flatten' "${POLICY}.backup.json"
+aws iam delete-role-policy --role-name "$ROLE" --policy-name "$POLICY"
+```
+
+Then run the check above with this secret and the agent's other secrets: this one should show
+`implicitDeny`, every other `allowed`. To undo, `put-role-policy` with the backup.
 
 ### Remove an AWS agent
 

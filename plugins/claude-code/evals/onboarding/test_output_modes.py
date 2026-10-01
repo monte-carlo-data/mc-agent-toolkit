@@ -270,3 +270,48 @@ class DeleteProvenanceTests(unittest.TestCase):
         section = self.section()
         self.assertIn("terraform destroy -target='<address>'", section)
         self.assertIn("terraform state rm '<address>'", section)
+
+
+class ModelComparisonFindingsTests(unittest.TestCase):
+    """Findings from running the onboarding scenarios across models (2026-10-01): each rule
+    below closed a gap one of the models fell into."""
+
+    # Whitespace collapsed, so rewrapping the prose doesn't break the checks.
+    SKILL = " ".join((ROOT / "skills/onboarding/SKILL.md").read_text().split())
+    OUTPUT_MODES = " ".join((ROOT / "skills/onboarding/reference/output-modes.md").read_text().split())
+    TROUBLESHOOTING = " ".join((ROOT / "skills/onboarding/reference/troubleshooting.md").read_text().split())
+    CONNECTION_INPUTS = " ".join((ROOT / "skills/onboarding/reference/connection-inputs.md").read_text().split())
+
+    def test_credentials_pass_does_not_rule_out_iam(self):
+        # Right after a successful read the agent keeps the secret, so a fresh IAM break shows
+        # "credentials passed" with no warning; one model took that as a network problem.
+        self.assertIn("A credentials pass doesn't prove the agent can read the secret now", self.TROUBLESHOOTING)
+        self.assertIn("credentials valid with no warning, after a recent", self.TROUBLESHOOTING)
+
+    def test_policy_edits_use_the_normalised_diff(self):
+        # AWS CLI JSON (4 spaces) vs jq (2 spaces) makes a raw diff mark every line.
+        self.assertIn("diff <(jq -S . backup.json) <(jq -S . new.json)", self.TROUBLESHOOTING)
+
+    def test_single_arn_simulator_uses_the_same_query(self):
+        self.assertIn("Use the same query for a single ARN", self.OUTPUT_MODES)
+        self.assertIn("EvalResourceDecision` exists only per resource", self.OUTPUT_MODES)
+
+    def test_grant_handover_uses_the_reference_commands(self):
+        # A model that never opened output-modes improvised the grant without its guards.
+        self.assertIn("read that section and hand over its commands", self.SKILL)
+
+    def test_bi_tools_are_not_created_by_these_tools(self):
+        self.assertIn("BI tools in this table", self.CONNECTION_INPUTS)
+        self.assertIn("connected in the UI", self.CONNECTION_INPUTS)
+
+    def test_pasted_secret_is_never_repeated(self):
+        # One model echoed the pasted password while asking the user to rotate it.
+        self.assertIn("never repeat or quote it, not even to ask for rotation", self.SKILL)
+
+    def test_revoking_one_secret_checks_scope_first(self):
+        section = self.OUTPUT_MODES.split("### Revoke the agent's access to one secret", 1)
+        self.assertEqual(len(section), 2, "expected a revoke section")
+        body = section[1].split(" ### ", 1)[0]
+        self.assertIn("get-role-policy", body)
+        self.assertIn("delete-role-policy", body)
+        self.assertIn("implicitDeny", body)

@@ -56,7 +56,9 @@ for every command).
    ```
 
    It only reads, so a `Throttling` error on a role with many policies is safe to re-run.
-   Then back up that policy, edit it with `jq`, `diff`, and apply; or
+   Then back up that policy, edit it with `jq`, compare with
+   `diff <(jq -S . backup.json) <(jq -S . new.json)` (a plain `diff` of the AWS CLI's JSON and
+   `jq`'s output marks every line, because they indent differently), and apply; or
    restore the security-group rule; or point the credentials at a recreated secret's new ARN
    (`update_<store>_credentials`). Then re-run step 1. If the change came from Terraform or
    CloudFormation, fix it there, or the next apply reverts it.
@@ -69,10 +71,16 @@ for every command).
 |---|---|---|
 | Credentials warning "invalid or unreachable" + "Could not connect", a healthy connection on the same agent | The agent can't read this secret: IAM grant removed, customer-managed KMS key, secret resource policy | Simulator per secret; `describe-secret` (`KmsKeyId`); `get-resource-policy`; CloudTrail |
 | Same, and the secret's ARN suffix changed | The secret was deleted and recreated | `describe-secret`; update the credentials to the new ARN |
-| "Could not connect", credentials valid, slow failure | Network path: security group, route, NAT, database moved or stopped | The database's inbound rules for the agent's security group; its status and endpoint |
+| "Could not connect", credentials valid, slow failure, and the simulator shows `allowed` for this secret | Network path: security group, route, NAT, database moved or stopped | The database's inbound rules for the agent's security group; its status and endpoint |
 | Connects but fails **Tables** | Grants revoked, schemas moved, or the database has no tables | The user's grants per the connector's docs page |
 | Every connection on the agent fails | The agent itself | Stack events, the agent's subnets and NAT, `get_deployment` |
 
+- **IMPORTANT: A credentials pass doesn't prove the agent can read the secret now.** After a
+  recent successful read, the agent keeps the secret for a few minutes, so access removed in that
+  window shows as credentials valid with no warning, after a recent success, plus "Could not
+  connect". For a self-hosted reference, run the per-secret simulator before any network check,
+  whatever the credentials result. After an IAM change, validate again a few minutes later before
+  trusting a pass.
 - **IMPORTANT: the agent's own logs are not a diagnostic source.** It redacts error messages
   (`__redacted__`); only an exception type such as `ValueError` is visible, and the same type is
   raised for unreadable secrets, parse errors and connection failures. Don't send the customer

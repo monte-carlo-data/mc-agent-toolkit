@@ -5,6 +5,12 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Claude Code will
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.26.5] - 2026-10-01
+
+### Changed
+
+- onboarding: fixes from running the onboarding scenarios across models. **A credentials pass does not rule out IAM** (`reference/troubleshooting.md`): the agent keeps a recently read secret for a few minutes, so removed access can show as "credentials valid, no warning" plus "Could not connect"; run the per-secret simulator before network checks, and re-validate a few minutes after an IAM change. **Policy edits compare normalised JSON** (`diff <(jq -S . …) <(jq -S . …)`). **Single-ARN simulator** uses the same query (`EvalResourceDecision` exists only per resource). New **Revoke the agent's access to one secret** (`reference/output-modes.md`): read the policy, delete only a policy that grants just that secret, check the result. **Grant handover** (SKILL.md) uses the output-modes commands as written. **Never repeat a pasted secret**, not even to ask for rotation. **BI tools** (`reference/connection-inputs.md`): not created by these tools; connected in the UI. New live eval `bi-integration-not-served`; static tests for each rule.
+
 ## [1.26.4] - 2026-10-01
 
 ### Changed

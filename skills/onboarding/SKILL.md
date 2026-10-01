@@ -61,7 +61,8 @@ instrument-agent; for an already-connected warehouse's monitoring use monitoring
    the operations that do are CLI or Terraform steps. Tell the user this the first time the flow
    reaches a credential, so a local step reads as a safeguard rather than a gap. If the user
    pastes a secret into the chat, stop, tell them it is now in the transcript and should be
-   rotated, and continue with the reference or CLI path. A secret on disk is no different: when
+   rotated (call it the password or key they pasted: never repeat or quote it, not even to ask
+   for rotation), and continue with the reference or CLI path. A secret on disk is no different: when
    the user gives the path of a key or credential file on their machine, the path only goes into
    a command they run. Never open, list, read, copy or inspect that file with any tool, not even
    its first line to check the format, because what a tool reads lands in the context just as a
@@ -350,8 +351,9 @@ writing:
 | Monte Carlo stores it (a managed type) | **not a tool** | Offer both (rule 6): `montecarlo credentials create <type> …` with each secret field as `@<path>` or `--<field>-prompt`, never a literal; or the `montecarlo_<type>_credentials` resource with the secret in `<field>_wo` (rule 7). For a Snowflake key pair: `montecarlo credentials create snowflake --account … --user … --warehouse … --private-key @key.p8`. The user runs it and gives back the `id`. |
 
 **Grant, then validate, then create.** A self-hosted reference only validates once the agent
-can read the secret, so hand over that grant first (output-modes: grant the agent read access)
-and ask the customer to confirm it is applied; validating before the grant exists only fails.
+can read the secret, so hand over that grant first: read that section and hand over its commands
+(output-modes: grant the agent read access), with its policy-list check and a simulator check, and
+ask the customer to confirm it is applied; validating before the grant exists only fails.
 
 **Validate before creating.** Each self-hosted create has a matching validate that takes the same
 arguments plus `deployment_id`: `validate_aws_secrets_manager_credentials`, `validate_gcp_secret_manager_credentials`, `validate_azure_key_vault_credentials`, `validate_env_var_credentials`, `validate_file_credentials`. It creates nothing and
