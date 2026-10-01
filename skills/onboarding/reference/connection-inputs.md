@@ -179,6 +179,10 @@ disagree, the page is right. Keys sit inside `connect_args` unless noted.
 | Power BI | `client_id`, `client_secret`, `tenant_id` (top level) | |
 | Tableau | `username`, `client_id`, `secret_id`, `secret_value`, `server_name` (top level) | `site_name`, `verify_ssl`, `token_expiration_seconds` |
 
+BI tools in this table (Looker, Looker Git, Power BI, Tableau) are not created by the onboarding
+tools: `create_warehouse` has no BI type, and `list_connections` doesn't show BI connections. They
+are connected in the UI; their rows list what a self-hosted secret for them holds.
+
 For a type not listed, read its section on that page and apply the same rule before continuing.
 
 ## Warehouse and connection inputs
