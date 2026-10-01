@@ -218,3 +218,55 @@ class NoHardcodedEndpointTests(unittest.TestCase):
         self.assertTrue(provider_blocks, "expected a montecarlo provider block")
         for block in provider_blocks:
             self.assertNotRegex(block, r'endpoint\s*=\s*"https?://')
+
+
+class TerraformVersionFloorTests(unittest.TestCase):
+    """Every Terraform artifact uses one version floor, so a customer never gets a block that
+    can't take the write-only secrets another step needs (scenario S6 wrote `>= 1.5` for the
+    data store's AWS-only Terraform). The rule must reach AWS-only artifacts too."""
+
+    SKILL = (ROOT / "skills/onboarding/SKILL.md").read_text()
+    OUTPUT_MODES = (ROOT / "skills/onboarding/reference/output-modes.md").read_text()
+
+    def test_every_terraform_settings_block_requires_1_11(self):
+        blocks = [b.split("```", 1)[0] for b in self.OUTPUT_MODES.split("```hcl\n")[1:]]
+        settings = [b for b in blocks if "terraform {" in b]
+        self.assertTrue(settings, "expected a terraform settings block")
+        for block in settings:
+            self.assertIn('required_version = ">= 1.11"', block)
+
+    def test_floor_applies_to_aws_only_artifacts(self):
+        self.assertIn("including one with only AWS resources", self.SKILL)
+
+
+class DeleteProvenanceTests(unittest.TestCase):
+    """Monte Carlo doesn't record which tool created a resource. Deleting a Terraform-managed one
+    through MCP leaves the state pointing at nothing, and the next apply recreates it (scenario
+    S6 offered MCP deletes for a connection Terraform created in S4). The skill must ask first and
+    hand Terraform-managed resources back to Terraform, with a check that prints no state."""
+
+    SKILL = (ROOT / "skills/onboarding/SKILL.md").read_text()
+    OUTPUT_MODES = (ROOT / "skills/onboarding/reference/output-modes.md").read_text()
+
+    def test_skill_asks_how_an_existing_resource_was_created(self):
+        self.assertIn("Ask how an existing resource was created before deleting it", self.SKILL)
+
+    def test_output_modes_has_terraform_removal_steps(self):
+        self.assertIn("### Remove what Terraform manages", self.OUTPUT_MODES)
+
+    def section(self):
+        return self.OUTPUT_MODES.split("### Remove what Terraform manages", 1)[-1].split("\n## ", 1)[0]
+
+    def test_state_check_matches_resource_ids_without_printing_state(self):
+        # A whole-state grep also matches reused resources whose ids appear as references on
+        # managed ones, and an empty -id lists every resource, so the check is guarded.
+        section = self.section()
+        self.assertIn('[ -n "${ID}" ] && terraform state list -id="${ID}"', section)
+        self.assertNotIn("state pull", section)
+        self.assertNotIn("terraform show", section)
+
+    def test_terraform_addresses_are_quoted(self):
+        # Addresses can carry [0] or ["key"]; unquoted, zsh globs them before Terraform runs.
+        section = self.section()
+        self.assertIn("terraform destroy -target='<address>'", section)
+        self.assertIn("terraform state rm '<address>'", section)
