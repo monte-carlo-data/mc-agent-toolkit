@@ -1,8 +1,6 @@
 # `warehouses` tools
 
-<!-- GENERATED STUB: api-codegen's `-mcp-reference` mode will replace this file whole from the
-     REST API v2 OpenAPI document; do not hand-edit once that lands. Until then this copy is hand-filled
-     from the live v2 tools the Monte Carlo MCP server already serves, so the onboarding skill can run. -->
+<!-- Rendered from the REST API v2 OpenAPI document by api-codegen; do not edit. -->
 
 Monte Carlo REST API v2 tools of the `warehouses` tag, as the Monte Carlo MCP server exposes
 them. Each section is one tool; its name is the tool to call.
@@ -47,7 +45,7 @@ Returns `items` (response fields per item: id, name, type, deployment_id, create
 
 ## `create_warehouse`: Create a warehouse
 
-Create an empty warehouse on a deployment, to add connections to. Call list_deployments first and pick the deployment its connections will run through: the cloud deployment Monte Carlo hosts for the account, when the list shows one, or one with a collection agent or data store already registered. Create a new deployment with create_deployment only when the warehouse needs a collection agent inside your network or a data store on your side, never one with nothing behind it. Takes the name, the deployment id, and either the warehouse type or a connection type to derive it from.
+Create an empty warehouse on a deployment, to add connections to. Call list_deployments first and pick the deployment its connections will run through: the cloud deployment Monte Carlo hosts for the account, when the list shows one, or one with a collection agent or data store already registered. Create a new deployment with create_deployment only when the warehouse needs a collection agent inside your network or a data store on your side, never one with nothing behind it. Takes the name, the deployment id, and either the warehouse type or a connection type to derive it from. Databricks connections go on a data-lake warehouse. Send connection_type databricks-metastore-sql-warehouse, the connection to add first.
 
 - **Effect:** creates; repeating it creates again.
 - **Pairs with:** `list_warehouses`, `get_warehouse`, `update_warehouse`, `delete_warehouse`, `list_deployments`.
@@ -97,7 +95,7 @@ restrictions hide from you returns 404.
 
 | Argument | Type | Required | Description |
 |---|---|---|---|
-| `warehouse_id` | `str` | yes | Id of the warehouse, as returned by list_warehouses. |
+| `warehouse_id` | `str` | yes | Id of the warehouse, as returned when it is created or listed. |
 
 ### Response
 
@@ -129,7 +127,7 @@ Rename a warehouse. The name is the only field this takes; the type and the depl
 
 | Argument | Type | Required | Description |
 |---|---|---|---|
-| `warehouse_id` | `str` | yes | Id of the warehouse, as returned by list_warehouses. |
+| `warehouse_id` | `str` | yes | Id of the warehouse, as returned when it is created or listed. |
 | `name` | `str` | no | New display name for the warehouse. Omit it to leave the name unchanged. An explicit null is ignored, the same as omitting the field. Between 1 and 200 characters. |
 
 ### Response
@@ -165,7 +163,7 @@ Delete an empty warehouse. Refused while it still has connections, or while othe
 
 | Argument | Type | Required | Description |
 |---|---|---|---|
-| `warehouse_id` | `str` | yes | Id of the warehouse, as returned by list_warehouses. |
+| `warehouse_id` | `str` | yes | Id of the warehouse, as returned when it is created or listed. |
 
 ### Response
 

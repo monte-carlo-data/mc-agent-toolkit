@@ -1,8 +1,6 @@
 # `deployments` tools
 
-<!-- GENERATED STUB: api-codegen's `-mcp-reference` mode will replace this file whole from the
-     REST API v2 OpenAPI document; do not hand-edit once that lands. Until then this copy is hand-filled
-     from the live v2 tools the Monte Carlo MCP server already serves, so the onboarding skill can run. -->
+<!-- Rendered from the REST API v2 OpenAPI document by api-codegen; do not edit. -->
 
 Monte Carlo REST API v2 tools of the `deployments` tag, as the Monte Carlo MCP server exposes
 them. Each section is one tool; its name is the tool to call.
@@ -101,7 +99,7 @@ Carlo's older collection platform all return 404.
 
 | Argument | Type | Required | Description |
 |---|---|---|---|
-| `deployment_id` | `str` | yes | Id of the deployment, as returned by list_deployments. |
+| `deployment_id` | `str` | yes | Id of the deployment, as returned when it is created or listed. |
 
 ### Response
 
@@ -136,7 +134,7 @@ Rename a deployment. The name is the only field this takes. Nothing about the in
 
 | Argument | Type | Required | Description |
 |---|---|---|---|
-| `deployment_id` | `str` | yes | Id of the deployment, as returned by list_deployments. |
+| `deployment_id` | `str` | yes | Id of the deployment, as returned when it is created or listed. |
 | `name` | `str` | no | New display name for the deployment. Left out, the name is unchanged. Between 1 and 200 characters. |
 
 ### Response
@@ -174,7 +172,7 @@ Delete a deployment and release the infrastructure Monte Carlo runs for it. Refu
 
 | Argument | Type | Required | Description |
 |---|---|---|---|
-| `deployment_id` | `str` | yes | Id of the deployment, as returned by list_deployments. |
+| `deployment_id` | `str` | yes | Id of the deployment, as returned when it is created or listed. |
 
 ### Response
 
