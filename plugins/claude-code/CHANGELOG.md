@@ -5,6 +5,12 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Claude Code will
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.27.0] - 2026-10-06
+
+### Added
+
+- onboarding: **BI tools** (Tableau, Looker, Looker git clone, Power BI). Their connections go on a **BI container** (`create_bi_container`, Step 3b), never a warehouse; one `looker` container holds both the Looker API and the LookML repository connection. Discovery and the inventory include BI containers. BI credentials are managed types created by a CLI or Terraform step (`montecarlo credentials create tableau|looker|looker-git-clone|power-bi`, `montecarlo_<type>_credentials` with `<field>_wo`), or a self-hosted reference read by a collection agent. `reference/connection-inputs.md` lists each type's inputs, including Tableau's three exclusive sign-in methods and Power BI's `auth_mode`; `reference/output-modes.md` has the Terraform and CLI steps. Replaces the 1.26.5 note that BI tools are connected in the UI. Live eval `bi-integration-not-served` becomes `bi-tableau-on-a-bi-container`; new static tests and trigger cases.
+
 ## [1.26.5] - 2026-10-01
 
 ### Changed

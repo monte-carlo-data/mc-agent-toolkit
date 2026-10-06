@@ -300,10 +300,6 @@ class ModelComparisonFindingsTests(unittest.TestCase):
         # A model that never opened output-modes improvised the grant without its guards.
         self.assertIn("read that section and hand over its commands", self.SKILL)
 
-    def test_bi_tools_are_not_created_by_these_tools(self):
-        self.assertIn("BI tools in this table", self.CONNECTION_INPUTS)
-        self.assertIn("connected in the UI", self.CONNECTION_INPUTS)
-
     def test_pasted_secret_is_never_repeated(self):
         # One model echoed the pasted password while asking the user to rotate it.
         self.assertIn("never repeat or quote it, not even to ask for rotation", self.SKILL)
@@ -315,3 +311,34 @@ class ModelComparisonFindingsTests(unittest.TestCase):
         self.assertIn("get-role-policy", body)
         self.assertIn("delete-role-policy", body)
         self.assertIn("implicitDeny", body)
+
+
+class BiConnectionTests(unittest.TestCase):
+    """Tableau, Looker and Power BI connect through a BI container, not a warehouse."""
+
+    SKILL = ModelComparisonFindingsTests.SKILL
+    OUTPUT_MODES = ModelComparisonFindingsTests.OUTPUT_MODES
+    CONNECTION_INPUTS = ModelComparisonFindingsTests.CONNECTION_INPUTS
+
+    def test_bi_connections_go_on_a_bi_container(self):
+        self.assertIn("`list_bi_containers`", self.SKILL)
+        self.assertIn("`create_bi_container`", self.SKILL)
+        self.assertIn("create_connection(name, bi_container_id, credentials_id)", self.SKILL)
+        self.assertIn("NEVER create a warehouse for a BI tool", self.CONNECTION_INPUTS)
+        self.assertNotIn("connected in the UI", self.CONNECTION_INPUTS)
+
+    def test_one_looker_container_holds_both_looker_connections(self):
+        self.assertIn("one `looker` container holds both", self.SKILL)
+
+    def test_bi_credential_inputs_are_listed_per_type(self):
+        for heading in ("#### Tableau", "#### Looker API", "#### Looker git clone", "#### Power BI"):
+            self.assertIn(heading, self.CONNECTION_INPUTS)
+        # Tableau's three sign-in methods are exclusive; sending two is refused.
+        self.assertIn("exactly one sign-in method", self.CONNECTION_INPUTS)
+
+    def test_bi_secrets_are_write_only_in_terraform_and_never_literal_in_the_cli(self):
+        self.assertIn('resource "montecarlo_bi_container"', self.OUTPUT_MODES)
+        self.assertIn("password_wo", self.OUTPUT_MODES)
+        self.assertIn("bi_container_id = montecarlo_bi_container.", self.OUTPUT_MODES)
+        self.assertIn("montecarlo credentials create tableau", self.OUTPUT_MODES)
+        self.assertIn("--password-prompt", self.OUTPUT_MODES)
