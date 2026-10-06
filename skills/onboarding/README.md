@@ -1,17 +1,18 @@
 # Onboarding Skill
 
 Connect a data platform to Monte Carlo from your editor: choose or provision the **deployment** the
-connection runs through (the Monte Carlo hosted cloud node, a collection agent in your network, or
-a customer-owned data store), reference the **credentials**, create the **warehouse** and the
-**connection**, then validate the connection. Built on the Monte Carlo REST API v2 tools served by
-the Monte Carlo MCP server.
+connection runs through (the Monte Carlo hosted cloud node, a collection agent in your network, or a
+customer-owned data store), reference the **credentials**, create the **warehouse** (or, for a BI
+tool, the **BI container**) and the **connection**, then validate the connection. Built on the Monte
+Carlo REST API v2 tools served by the Monte Carlo MCP server.
 
 ## What it does
 
-When you ask to connect Snowflake, BigQuery, Redshift, Databricks or any other supported platform,
-the skill:
+When you ask to connect Snowflake, BigQuery, Redshift, Databricks, Tableau, Looker, Power BI or any
+other supported platform, the skill:
 
-1. Discovers existing deployments, agents, data stores, warehouses and connections, shows you
+1. Discovers existing deployments, agents, data stores, warehouses, BI containers and
+   connections, shows you
    that inventory and what can be added (which integrations each kind of deployment supports and
    with which credential options), then asks what you want to connect. One run can onboard
    several integrations; each is checked for support before any other question about it.
@@ -24,7 +25,8 @@ the skill:
    depends on the integration, cloud and region, and the customer's origin policy still applies.
 4. References self-hosted credentials or hands over a local CLI/Terraform step for Monte
    Carlo-managed credentials (a Snowflake key pair, for example). **No secret passes through chat.** See *How credentials are handled*.
-5. Reconciles the intended warehouse and connection before creating anything missing.
+5. Reconciles the intended warehouse or BI container and the connection before creating
+   anything missing. A Looker API and a LookML repository connection share one Looker container.
 6. Validates the connection over MCP and reports each check's result, falling back to the UI test
    only when the session does not serve the validation tools.
 7. Ends with created/reused IDs, the validation result, a scoped cleanup order and the next
@@ -46,7 +48,7 @@ if you prefer.
 Supported integrations are read from the tools in your session rather than listed in the skill:
 the `create_warehouse` schema (plus existing connections or the integration's docs page, for a
 connection type that is not itself a warehouse type) for integrations connected through a
-collection agent, and the
+collection agent, `create_bi_container`'s type list for BI tools, and the
 Monte Carlo-managed credential tools (or `montecarlo credentials create --help`) for credentials
 Monte Carlo stores. A type in neither is handed off to the UI. Sample storage choices do not relocate metadata, metrics
 or query logs from Monte Carlo.
@@ -104,7 +106,7 @@ connection for the intended account. The workflow requires no particular assista
 | Path | Role |
 |---|---|
 | `SKILL.md` | The workflow (hand-written) |
-| `reference/api/<tag>.md` | One file per API tag with every tool's arguments, responses and failure modes. **Generated** by [api-codegen](https://github.com/monte-carlo-data/api-codegen) from the API spec; edit the spec, not these files. Until that generator mode ships they are stubs, with `deployments` and `warehouses` hand-filled from the live tools. |
+| `reference/api/<tag>.md` | One file per API tag with every tool's arguments, responses and failure modes. **Generated** by [api-codegen](https://github.com/monte-carlo-data/api-codegen) from the API spec; edit the spec, not these files. |
 | `reference/deployment-guide.md` | Cloud-specific prerequisites, network paths and official setup guides |
 | `reference/output-modes.md` | Terraform, CLI and SDK snippets for each step |
 | `reference/connection-inputs.md` | The inputs each deployment, credential path and connection type requires (including the keys a self-hosted secret must carry), and the rule that each comes from the customer or discovery, never an example value |
@@ -113,7 +115,7 @@ connection for the intended account. The workflow requires no particular assista
 ## Not yet
 
 - **Azure and GCP agent/data-store registration, generic agent credentials, Monte Carlo-managed
-  warehouse credentials (such as the Snowflake key pair).**
+  credentials (such as the Snowflake key pair, or Tableau, Looker and Power BI credentials).**
   Their requests or responses carry a secret, so they are CLI/Terraform steps rather than MCP
   tools, by design (see *How credentials are handled*).
 

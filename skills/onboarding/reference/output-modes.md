@@ -417,6 +417,56 @@ Reusing an existing deployment: omit creation/registration blocks and their `dep
 outputs; use the verified deployment ID. Likewise omit reused warehouse/credential resources
 and pass their IDs. Never destroy a shared reused resource as part of cleanup.
 
+### BI container, credentials and connection
+
+A Tableau, Looker or Power BI connection goes on a `montecarlo_bi_container`, not a warehouse.
+This example is Tableau with a personal access token on a verified deployment; every input comes
+from the connection-inputs checklist and no variable has a `default`. For a password or a
+connected app, set that method's arguments instead (`username` with `password_wo`, or `username`
+with the `connected_app_*` arguments and `connected_app_secret_value_wo`); never two methods.
+
+```hcl
+variable "deployment_id" { type = string }       # verified in discovery
+variable "bi_container_name" { type = string }   # from the customer
+variable "connection_name" { type = string }     # from the customer
+variable "tableau_server_name" { type = string } # https://…
+variable "tableau_site_name" { type = string }   # omit the argument only for the default site
+variable "tableau_token_name" { type = string }
+variable "tableau_token_value_path" { type = string } # absolute path to a file holding the token
+
+resource "montecarlo_bi_container" "tableau" {
+  type          = "tableau" # looker | tableau | power-bi; one looker container for both Looker connections
+  name          = var.bi_container_name
+  deployment_id = var.deployment_id
+}
+
+resource "montecarlo_tableau_credentials" "tableau" {
+  server_name = var.tableau_server_name
+  site_name   = var.tableau_site_name
+  token_name  = var.tableau_token_name
+  # Write-only: never stored in state or a plan. Bump the version with a new token.
+  token_value_wo         = trimspace(file(var.tableau_token_value_path))
+  token_value_wo_version = 1
+}
+
+resource "montecarlo_connection" "tableau" {
+  name            = var.connection_name
+  bi_container_id = montecarlo_bi_container.tableau.id
+  credentials_id  = montecarlo_tableau_credentials.tableau.id
+}
+```
+
+The other BI credentials follow the same shape:
+
+- `montecarlo_looker_credentials { base_url, api_client_id, api_client_secret_wo }`.
+- `montecarlo_looker_git_clone_credentials { repo_url, ssh_key_wo }` for SSH (`file()` of the
+  key, BEGIN/END lines included), or `{ repo_url, username, token_wo }` for HTTPS. Its connection
+  takes the same `looker` container's id as the Looker API connection.
+- `montecarlo_power_bi_credentials { tenant_id, app_client_id, auth_mode = "service_principal",
+  app_client_secret_wo }`, or `auth_mode = "primary_user"` with `username` and `password_wo`.
+
+Every `<field>_wo` has its `<field>_wo_version` (SKILL.md rule 7).
+
 ### Remove what Terraform manages
 
 Monte Carlo doesn't record which tool created a resource. To find out whether Terraform manages
@@ -615,6 +665,19 @@ montecarlo warehouses create --name "<warehouse_name>" --type snowflake --deploy
 montecarlo connections list --warehouse-id <warehouse_id> --output json
 # Create only if the target connection is absent:
 montecarlo connections create --name <connection_name> --warehouse-id <warehouse_id> --credentials-id <credentials_id> --output json
+
+# BI tool (Tableau here): a BI container instead of a warehouse. Reuse one for the same instance:
+montecarlo bi-containers list --output json
+montecarlo bi-containers create --type tableau --name "<bi_container_name>" --deployment-id <deployment_id> --output json
+# Exactly one sign-in method; the secret from a hidden prompt or a file, never a literal:
+montecarlo credentials validate tableau --deployment-id <deployment_id> \
+  --server-name <https://server> --site-name <site> --username <tableau_user> --password-prompt
+montecarlo credentials create tableau --server-name <https://server> --site-name <site> \
+  --username <tableau_user> --password-prompt --output json
+# Other types: looker (--base-url --api-client-id --api-client-secret-prompt),
+# looker-git-clone (--repo-url with --ssh-key @<key_file> or --username --token-prompt),
+# power-bi (--tenant-id --app-client-id --auth-mode service_principal --app-client-secret-prompt).
+montecarlo connections create --name <connection_name> --bi-container-id <bi_container_id> --credentials-id <credentials_id> --output json
 ```
 
 ## Python script (`montecarlo` SDK, mc-sdk-python)

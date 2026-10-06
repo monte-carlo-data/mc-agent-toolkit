@@ -1,18 +1,22 @@
 ---
 name: monte-carlo-onboarding
-description: Connect warehouses to Monte Carlo with API v2 tools: show deployments and what can be added, reference credentials, create, validate and fix connections. Use to connect or onboard platforms, or to generate the Terraform or a script for it.
+description: Connect warehouses and BI tools (Tableau, Looker, Power BI) to Monte Carlo with API v2 tools: show what exists, reference credentials, create, validate and fix connections. Use to connect or onboard platforms, or to generate Terraform or a script.
 metadata:
   bucket: Setup
 ---
 
 # Monte Carlo Onboarding
 
-Walk a customer from "connect `<warehouse>` to Monte Carlo" to working connections, one or
-several, using the Monte Carlo MCP tools for deployments, credentials, warehouses and
-connections. Start by showing what already exists and what can be added, then resolve only the
-missing customer decisions, and reuse or provision the deployment before creating a connection.
-A request to connect Snowflake does not imply that the customer knows which deployment or
-collection agent they need.
+Walk a customer from "connect `<warehouse or BI tool>` to Monte Carlo" to working connections,
+one or several, using the Monte Carlo MCP tools for deployments, credentials, warehouses, BI
+containers and connections. Start by showing what already exists and what can be added, then
+resolve only the missing customer decisions, and reuse or provision the deployment before
+creating a connection. A request to connect Snowflake does not imply that the customer knows
+which deployment or collection agent they need.
+
+A warehouse connection goes on a **warehouse**. A Tableau, Looker or Power BI connection goes on a
+**BI container** instead: the BI tool's counterpart of a warehouse, with a type (`tableau`,
+`looker` or `power-bi`) and a deployment. The steps are the same; Step 3 picks the parent.
 
 ## Tools and supporting references
 
@@ -46,7 +50,7 @@ instrument-agent; for an already-connected warehouse's monitoring use monitoring
 
 1. **v2 tools only.** Use the tools listed under *Tools* below, and the tool schema or the per-tag
    API reference for any other v2 operation, and nothing else for reads or writes about deployments, agents, data
-   stores, credentials, warehouses and connections. Other
+   stores, credentials, warehouses, BI containers and connections. Other
    Monte Carlo tools that list warehouses, integrations or platform services, or that test an
    integration, are a different API with different ids and fields. Never mix them into this flow,
    even to "double-check".
@@ -129,6 +133,7 @@ instrument-agent; for an already-connected warehouse's monitoring use monitoring
 | Data store | `list_collection_data_stores`, `register_aws_collection_data_store`, `get_aws_collection_data_store`, `get_gcp_collection_data_store`, `get_azure_collection_data_store`, `update_aws_collection_data_store`, `delete_aws_collection_data_store`, `delete_gcp_collection_data_store`, `delete_azure_collection_data_store` |
 | Credentials | `list_credentials`, `create_aws_secrets_manager_credentials`, `create_gcp_secret_manager_credentials`, `create_azure_key_vault_credentials`, `create_env_var_credentials`, `create_file_credentials`, `get_<type>_credentials` for each managed type served (for example `get_snowflake_credentials`), `update_aws_secrets_manager_credentials`, `update_gcp_secret_manager_credentials`, `update_azure_key_vault_credentials`, `update_env_var_credentials`, `update_file_credentials`, `delete_<type>_credentials` for each managed type served (for example `delete_snowflake_credentials`), `delete_aws_secrets_manager_credentials`, `delete_gcp_secret_manager_credentials`, `delete_azure_key_vault_credentials`, `delete_env_var_credentials`, `delete_file_credentials`, `validate_aws_secrets_manager_credentials`, `validate_gcp_secret_manager_credentials`, `validate_azure_key_vault_credentials`, `validate_env_var_credentials`, `validate_file_credentials` |
 | Warehouse | `list_warehouses`, `get_warehouse`, `create_warehouse`, `update_warehouse`, `delete_warehouse` |
+| BI container | `list_bi_containers`, `get_bi_container`, `create_bi_container`, `update_bi_container`, `delete_bi_container` |
 | Connection | `list_connections`, `get_connection`, `create_connection`, `update_connection`, `delete_connection` |
 | Identity | `get_current_user` (which account you are in, and whether it is paused) |
 | Validation | `validate_connection`, `get_validation_run` (Steps 2 and 5) |
@@ -137,7 +142,8 @@ By design, no MCP tool accepts or returns a secret (rule 2). Operations whose re
 carries one are **not MCP tools** and are handed to the customer as a CLI or Terraform step, which
 reads the secret from a file on their machine and sends it to Monte Carlo directly:
 `create_<type>_credentials`, `update_<type>_credentials` and `validate_<type>_credentials` for
-every Monte Carlo-managed type (the Snowflake key pair among them), the Azure and GCP agent and
+every Monte Carlo-managed type (the Snowflake key pair, and the Tableau, Looker, Looker git clone
+and Power BI credentials, among them), the Azure and GCP agent and
 data-store registrations, `create_generic_collection_agent_token` and
 `create_generic_collection_agent_oauth_client`. The reference files mark them.
 
@@ -157,16 +163,17 @@ above and the steps below keep applying to every later turn, however the custome
 **0a. Discover.** Read before asking anything:
 
 - `get_current_user`: identify the account; stop if `account_frozen`. Confirm account ambiguity.
-- `list_deployments`, `list_collection_agents`, `list_collection_data_stores`, `list_warehouses`
-  and `list_connections`. Follow `next_cursor` while `has_more` on every paginated list,
-  including credentials later. Read agent/store details only when a choice depends on them.
+- `list_deployments`, `list_collection_agents`, `list_collection_data_stores`, `list_warehouses`,
+  `list_bi_containers` (when served) and `list_connections`. Follow `next_cursor` while
+  `has_more` on every paginated list, including credentials later. Read agent/store details only
+  when a choice depends on them.
 
 **0b. Show.** Present a short inventory in customer language: each deployment with its type,
-platform and `enabled`, the agent or data store behind it, and the existing warehouses with their
-connections. An empty account is an answer too; say so. Follow it with what can be added, from
-this session's tools, as the support section of the connection-inputs reference describes:
-which integrations can be connected, and with which credential options. Keep both to a few lines;
-do not dump raw ids unless asked.
+platform and `enabled`, the agent or data store behind it, and the existing warehouses and BI
+containers with their connections. An empty account is an answer too; say so. Follow it with what
+can be added, from this session's tools, as the support section of the connection-inputs reference
+describes: which integrations can be connected, and with which credential options. Keep both to a
+few lines; do not dump raw ids unless asked.
 
 **0c. Ask what to connect, then follow the customer.** If the request already names the
 integrations ("connect Snowflake and Postgres"), skip the question. Otherwise ask one open
@@ -182,7 +189,8 @@ Several integrations can be onboarded in one run. For each one requested:
   UI handoff or a route that is supported; do not provision anything for it.
 - **Resolve the route** (Step 1): reuse a compatible deployment from the inventory where one fits.
   Integrations that fit the same deployment share it; do not create one per integration.
-- **Credentials, warehouse, connection, validation** (Steps 2 to 5) run per integration. The
+- **Credentials, warehouse or BI container, connection, validation** (Steps 2 to 5) run per
+  integration. The
   inputs checklist (rule 8) covers every integration in the plan, and missing values for all of
   them are asked in one message.
 
@@ -203,7 +211,10 @@ requirement cannot be read, ask only for that missing fact or hand off to the ac
 
 The customer runs the connector's service-user/grants setup (for example,
 https://docs.getmontecarlo.com/docs/snowflake). Identify the intended account and databases;
-reuse existing setup where appropriate. Guide the required steps without requesting secrets.
+reuse existing setup where appropriate. Guide the required steps without requesting secrets. For
+a BI tool, that setup is the user, token, API client or app registration Monte Carlo signs in
+with, from the tool's page in the Monte Carlo docs (for example
+https://docs.getmontecarlo.com/docs/tableau or https://docs.getmontecarlo.com/docs/looker).
 
 ## Step 1: Resolve the deployment
 
@@ -380,7 +391,22 @@ Describe schemas without asking for values. For other types follow their self-ho
 add `bq_project_id` / `databricks_warehouse_id` where the v2 credential operation requires them.
 Password or external OAuth Snowflake setup is a UI handoff. Carry the `credentials_id` forward.
 
-## Step 3: The warehouse
+**BI tools.** Tableau, Looker, Looker git clone and Power BI credentials are managed types
+(`tableau`, `looker`, `looker-git-clone`, `power-bi`), created and validated by the customer's
+CLI or Terraform step like the Snowflake key pair: `montecarlo credentials validate <type>
+--deployment-id …`, then `montecarlo credentials create <type> …`. Each type has its own inputs
+and sign-in methods; take them from the connection-inputs BI section. A collection agent can also
+read a self-hosted reference with `connection_type` set to one of these types, holding the keys
+that section's self-hosted table lists. A Looker instance takes the API client (`looker`) and,
+when the customer wants it, the LookML repository (`looker-git-clone`): two credentials, two
+connections, one container.
+
+## Step 3: The warehouse, or the BI container
+
+For a Tableau, Looker or Power BI connection, skip to *3b*. Every other connection goes on a
+warehouse.
+
+### 3a. The warehouse
 
 Use the warehouses discovered in Step 0. Match the intended account/host and environment as
 well as type and deployment; different Snowflake accounts on one deployment are not automatically
@@ -402,16 +428,35 @@ If none represents the target, `create_warehouse(name, deployment_id, type=<ware
 warehouse type, send `connection_type`: a refusal means the API cannot map it, nothing was
 created, and the integration is handed off to the UI (connection-inputs support section). Carry and record the `warehouse_id`.
 
+### 3b. The BI container
+
+Use the BI containers discovered in Step 0. Match the tool and the instance (the same Tableau
+server and site, Looker instance or Power BI tenant), as well as the deployment; inspect a
+container's connections and their credentials' non-secret fields when its name alone does not say.
+The duplicate warning above applies here too: a second container for an instance already
+connected collects its reports twice.
+
+If none represents the target, `create_bi_container(type, name, deployment_id)` with `type`
+`tableau`, `looker` or `power-bi`. Create one per instance: one `looker` container holds both the
+Looker API and the LookML repository connection, so never create a second one for the repository.
+NEVER create a warehouse for a BI tool: `create_warehouse` has no BI type, and a warehouse refuses
+BI credentials. Carry and record the `bi_container_id`.
+
 ## Step 4: The connection
 
-`list_connections(warehouse_id)` first (paginate). Reuse a connection for the same target and
-credential identity; inspect the existing non-secret credential details if the IDs differ.
-A matching name alone is not proof. A name collision with a different target needs resolution,
-not another blind create. Preserve existing jobs and record its ID when reusing.
+`list_connections(warehouse_id)` or `list_connections(bi_container_id)` first (paginate). Reuse a
+connection for the same target and credential identity; inspect the existing non-secret
+credential details if the IDs differ. A matching name alone is not proof. A name collision with a
+different target needs resolution, not another blind create. Preserve existing jobs and record its
+ID when reusing.
 
-Otherwise `create_connection(name, warehouse_id, credentials_id)`. The type comes from the
-credentials and must fit the warehouse type; omit `job_types` for defaults. Verify the returned
-warehouse/deployment association and record `id`, `connection_type`, `deployment_id`, `job_types`.
+Otherwise `create_connection(name, warehouse_id, credentials_id)`, or for a BI tool
+`create_connection(name, bi_container_id, credentials_id)`. Send exactly one of `warehouse_id` and
+`bi_container_id`. The type comes from the credentials and must fit the parent: the warehouse
+type, or the container type (`looker` and `looker-git-clone` credentials both fit a `looker`
+container). Omit `job_types` for defaults; Power BI dataflows are not added through this API.
+Verify the returned parent/deployment association and record `id`, `connection_type`,
+`deployment_id`, `job_types`.
 
 ## Step 5: Validate
 
@@ -468,12 +513,12 @@ Created in this run
   deployment    <id>  <name>  <type>/<runtime_platform>  enabled=<bool>
   agent|store   <id>  (or: registration step handed over, pending)
   credentials   <id>  <connection_type>  <storage_type>  (or: CLI/Terraform step handed over)
-  warehouse     <id>  <name>  <type>
+  warehouse     <id>  <name>  <type>  (or: bi container  <id>  <name>  <type>)
   connection    <id>  <name>  <connection_type>  job_types=<…>
   validation    <run id>  passed | failed | running  <validations_passed>/<validations_total> passed  (or: not available in this session)
 
 Reused (excluded from cleanup)
-  deployment / agent|store / credentials / warehouse / connection  <ids and names>
+  deployment / agent|store / credentials / warehouse|bi container / connection  <ids and names>
 
 Pending on your side
   - <deploy/register/credential step still to run, with the exact command or file>
@@ -481,7 +526,7 @@ Pending on your side
   - Validation failed: fix what it reported, then re-run Step 5 (a new validate_connection)
   - Validation tools not available in this session: test in the UI under Settings → Integrations → <integration> → <connection name> → Test
 
-Cleanup if you abandon this: delete_connection → delete_warehouse → delete_<kind>_credentials →
+Cleanup if you abandon this: delete_connection → delete_warehouse|delete_bi_container → delete_<kind>_credentials →
 delete_<platform>_collection_agent|data_store → delete_deployment, in that order. On the generic
 agent path, also delete the token or OAuth client this run minted (delete_generic_collection_agent_token /
 delete_generic_collection_agent_oauth_client).
@@ -513,7 +558,8 @@ or `delete-stack` can remove it.
 - `create_deployment` refused with an account limit reached: the per-account deployment cap is
   raised by Monte Carlo support; do not delete a working deployment to make room.
 - A conflict on `create_*` usually means the name exists (warehouse names are unique per type,
-  connection names per warehouse) or the deployment cannot take that resource. `list_*` and reuse.
+  connection names per warehouse or BI container) or the deployment cannot take that resource.
+  `list_*` and reuse. `delete_bi_container` is refused while connections remain on it.
 - `register_*` that fails its check registers nothing; the same call can be repeated after the fix.
 - `delete_deployment` is refused while anything is registered or connected through it: the
   cleanup order in the summary is the order that works.
@@ -532,3 +578,18 @@ or `delete-stack` can remove it.
    its outbound architecture/runtime fits the requirements; follow its separate guide.
 4. Reuse or create the correct Snowflake credential reference, warehouse and connection; verify
    their association. Hand off the UI test and report created/reused IDs and remaining work.
+
+## Worked example: "Connect our Tableau Server"
+
+1. Discover, including `list_bi_containers`. Reuse a container already connected to the same
+   server and site; say so instead of creating a second one.
+2. Resolve the deployment as in Step 1. The Cloud Deployment reaches Tableau Cloud and a public
+   Tableau Server; a server reachable only inside the customer's network takes one of the
+   private routes Step 1 describes.
+3. Build the Tableau checklist (connection-inputs): the server URL, the site, and exactly one
+   sign-in method. Approve the plan.
+4. `create_bi_container(type="tableau", name, deployment_id)`. Hand over the credentials step:
+   `montecarlo credentials validate tableau --deployment-id …`, then `montecarlo credentials
+   create tableau …` with the secret as `--password-prompt` or `@<path>`, or the
+   `montecarlo_tableau_credentials` resource with `password_wo`. Ask only for the returned `id`.
+5. `create_connection(name, bi_container_id, credentials_id)`, then validate (Step 5).
