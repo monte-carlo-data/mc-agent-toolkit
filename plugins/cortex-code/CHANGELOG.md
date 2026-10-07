@@ -5,6 +5,12 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Snowflake Cortex
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.27.1] - 2026-10-07
+
+### Changed
+
+- onboarding: the Python script output mode imports the REST API v2 SDK as `pycarlo2`, its settled name for both the PyPI distribution and the import (was the provisional `montecarlo`). The `montecarlo` CLI commands are unchanged. Static test stubs follow.
+
 ## [1.27.0] - 2026-10-06
 
 ### Added

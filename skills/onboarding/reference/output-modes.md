@@ -680,7 +680,7 @@ montecarlo credentials create tableau --server-name <https://server> --site-name
 montecarlo connections create --name <connection_name> --bi-container-id <bi_container_id> --credentials-id <credentials_id> --output json
 ```
 
-## Python script (`montecarlo` SDK, mc-sdk-python)
+## Python script (`pycarlo2` SDK, mc-sdk-python)
 
 `pip install git+https://github.com/monte-carlo-data/mc-sdk-python.git`. The client reads
 `MCD_DEFAULT_API_ID` / `MCD_DEFAULT_API_TOKEN` or the CLI profile; only `endpoint` is required,
@@ -708,18 +708,18 @@ It does not read secret contents; MCP-managed key pairs use the separate local C
 import os
 import sys
 import time
-import montecarlo
-from montecarlo.paging import paginate
+import pycarlo2
+from pycarlo2.paging import paginate
 
 
 def main():
-    client = montecarlo.new_client(montecarlo.Options(endpoint=os.environ["MCD_API_ENDPOINT"]))
-    deployments = montecarlo.DeploymentsApi(client)
-    agents = montecarlo.CollectionAgentsApi(client)
-    credentials = montecarlo.CredentialsApi(client)
-    warehouses = montecarlo.WarehousesApi(client)
-    connections = montecarlo.ConnectionsApi(client)
-    validations = montecarlo.ValidationsApi(client)
+    client = pycarlo2.new_client(pycarlo2.Options(endpoint=os.environ["MCD_API_ENDPOINT"]))
+    deployments = pycarlo2.DeploymentsApi(client)
+    agents = pycarlo2.CollectionAgentsApi(client)
+    credentials = pycarlo2.CredentialsApi(client)
+    warehouses = pycarlo2.WarehousesApi(client)
+    connections = pycarlo2.ConnectionsApi(client)
+    validations = pycarlo2.ValidationsApi(client)
     created, reused = {}, {}
     pending = "Resolve inputs; no connection has been verified."
 
@@ -749,7 +749,7 @@ def main():
             raise ValueError(f"{label} validation {run.id} failed: {problems}")
 
     try:
-        identity = montecarlo.UsersApi(client).get_current_user()
+        identity = pycarlo2.UsersApi(client).get_current_user()
         print(f"Account: {identity.account_name} ({identity.account_id})")
         if identity.account_frozen:
             raise ValueError("Account is paused")
@@ -767,7 +767,7 @@ def main():
         if dep is None:
             if os.environ.get("MCD_CREATE_DEPLOYMENT") != "1":
                 raise ValueError("Select an existing deployment or approve a new one before setting MCD_CREATE_DEPLOYMENT=1")
-            dep = deployments.create_deployment(montecarlo.DeploymentIn(
+            dep = deployments.create_deployment(pycarlo2.DeploymentIn(
                 type="COLLECTION_AGENT", runtime_platform="AWS", name=dep_name))
             created["deployment"] = dep.id
         else:
@@ -787,7 +787,7 @@ def main():
             if not os.environ.get("LAMBDA_ARN") or not os.environ.get("ROLE_ARN"):
                 print("Set LAMBDA_ARN and ROLE_ARN after deploying the agent.")
                 return 1
-            agent = agents.register_aws_collection_agent(montecarlo.AwsCollectionAgentIn(
+            agent = agents.register_aws_collection_agent(pycarlo2.AwsCollectionAgentIn(
                 deployment_id=dep.id, lambda_function_arn=os.environ["LAMBDA_ARN"],
                 role_arn=os.environ["ROLE_ARN"]))
             created["agent"] = agent.id
@@ -806,11 +806,11 @@ def main():
         if creds is None:
             # Check the reference from this deployment before storing it; the check creates nothing.
             check(credentials.validate_aws_secrets_manager_credentials(
-                montecarlo.AwsSecretsManagerCredentialsValidateIn(
+                pycarlo2.AwsSecretsManagerCredentialsValidateIn(
                     deployment_id=dep.id, connection_type="snowflake", aws_secret=secret_arn)),
                 "Credentials")
             creds = credentials.create_aws_secrets_manager_credentials(
-                montecarlo.AwsSecretsManagerCredentialsIn(connection_type="snowflake", aws_secret=secret_arn))
+                pycarlo2.AwsSecretsManagerCredentialsIn(connection_type="snowflake", aws_secret=secret_arn))
             created["credentials"] = creds.id
         else:
             reused["credentials"] = creds.id
@@ -826,7 +826,7 @@ def main():
                 raise ValueError("Selected warehouse belongs to a different type/deployment")
             reused["warehouse"] = wh.id
         else:
-            wh = warehouses.create_warehouse(montecarlo.WarehouseIn(
+            wh = warehouses.create_warehouse(pycarlo2.WarehouseIn(
                 name=warehouse_name, deployment_id=dep.id, type="snowflake"))
             created["warehouse"] = wh.id
 
@@ -840,7 +840,7 @@ def main():
         else:
             if any(c.name == connection_name for c in existing):
                 raise ValueError("Connection name exists with another credential; verify identity before proceeding")
-            conn = connections.create_connection(montecarlo.ConnectionIn(
+            conn = connections.create_connection(pycarlo2.ConnectionIn(
                 name=connection_name, warehouse_id=wh.id, credentials_id=creds.id))
             created["connection"] = conn.id
         pending = f"Validate connection {conn.id} in the UI and confirm initial collection."
@@ -848,7 +848,7 @@ def main():
     except (ValueError, KeyError) as error:
         print(f"Stopped: {error}", file=sys.stderr)
         return 1
-    except montecarlo.ApiException as error:
+    except pycarlo2.ApiException as error:
         print(f"API call failed (HTTP {error.status}); reconcile state before retrying.", file=sys.stderr)
         return 1
     finally:
