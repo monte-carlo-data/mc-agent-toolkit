@@ -86,7 +86,7 @@ class ExampleTests(unittest.TestCase):
         }
 
     def run_example(self):
-        sdk = ModuleType("montecarlo")
+        sdk = ModuleType("pycarlo2")
         sdk.Options = Row
         sdk.new_client = lambda options: None
         sdk.ApiException = ApiError
@@ -94,10 +94,10 @@ class ExampleTests(unittest.TestCase):
             setattr(sdk, name, lambda client: self.backend)
         for name in ["DeploymentIn", "AwsCollectionAgentIn", "AwsSecretsManagerCredentialsIn", "AwsSecretsManagerCredentialsValidateIn", "WarehouseIn", "ConnectionIn"]:
             setattr(sdk, name, Row)
-        paging = ModuleType("montecarlo.paging")
+        paging = ModuleType("pycarlo2.paging")
         paging.paginate = lambda method, **kwargs: iter(method(**kwargs))
         out = io.StringIO()
-        with patch.dict(sys.modules, {"montecarlo": sdk, "montecarlo.paging": paging}), patch.dict(os.environ, self.env, clear=True), contextlib.redirect_stdout(out), contextlib.redirect_stderr(out), patch("time.sleep"):
+        with patch.dict(sys.modules, {"pycarlo2": sdk, "pycarlo2.paging": paging}), patch.dict(os.environ, self.env, clear=True), contextlib.redirect_stdout(out), contextlib.redirect_stderr(out), patch("time.sleep"):
             namespace = {"__name__": "onboarding_example"}
             exec(compile(EXAMPLE, "output-modes.md", "exec"), namespace)
             status = namespace["main"]()
