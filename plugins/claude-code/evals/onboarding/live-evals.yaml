@@ -419,6 +419,38 @@ cases:
         credentials, warehouse, connection and validation under pending.
         Turn 2: it deletes only the deployment it created, nothing it reused, and confirms.
 
+  # --- Custom connectors -------------------------------------------------------------------
+  - id: custom-etl-connector-on-its-agents-deployment
+    turns:
+      - prompt: "Our collection agent registered a custom ETL connector. Plan connecting it to Monte Carlo; the credentials will be in an environment variable on that agent. Discover what exists; do not create or change anything."
+        criteria:
+          must_call: [list_custom_connector_types]
+    criteria:
+      must_not_call: *no_writes
+      judge_rubric: |
+        The agent finds the connector with list_custom_connector_types (asset class etl) and
+        takes its deployment from the type's deployment_id; it does not ask which deployment to
+        use and never plans a new deployment or agent. If no ETL type is listed, it says so and
+        asks whether an agent runs the connector or the customer pushes its data, without
+        planning anything else. Otherwise the plan is a custom-etl-connector ETL container on that
+        deployment (or an existing empty one there), self-hosted environment-variable credentials
+        with connection_type set to the type's id and a variable name starting with MCD_ that the
+        customer supplies, validated on that same deployment before they are created, then the
+        connection on the ETL container and its validation. It asks for no secret value and
+        confirms the plan before any write.
+
+  - id: custom-bi-connector-push-only
+    turns:
+      - prompt: "We push our BI assets to Monte Carlo ourselves with a script; no agent is involved. Plan the custom BI connector for them. Discover what exists; do not create or change anything."
+    criteria:
+      must_not_call: *no_writes
+      judge_rubric: |
+        The agent plans a push-only custom BI connector: a custom-bi-connector BI container with
+        no deployment, and a connection on it with no credentials. It plans no deployment, agent
+        or credentials, and no validation, because nothing for Monte Carlo to reach exists. It
+        says the key to push with is not created by these tools yet and lists it, with the push
+        itself, as pending on the customer's side. It never plans a warehouse for it.
+
   # --- Connector surface: no skill content, the MCP server alone must carry the flow --------
   - id: connector-vague-connect
     surface: connector

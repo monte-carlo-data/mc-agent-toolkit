@@ -3,7 +3,8 @@
 Connect a data platform to Monte Carlo from your editor: choose or provision the **deployment** the
 connection runs through (the Monte Carlo hosted cloud node, a collection agent in your network, or a
 customer-owned data store), reference the **credentials**, create the **warehouse** (or, for a BI
-tool, the **BI container**) and the **connection**, then validate the connection. Built on the Monte
+tool, the **BI container**; for a custom ETL or BI connector, its **ETL or BI container**) and the
+**connection**, then validate the connection. Built on the Monte
 Carlo REST API v2 tools served by the Monte Carlo MCP server.
 
 ## What it does
@@ -27,6 +28,9 @@ other supported platform, the skill:
    Carlo-managed credentials (a Snowflake key pair, for example). **No secret passes through chat.** See *How credentials are handled*.
 5. Reconciles the intended warehouse or BI container and the connection before creating
    anything missing. A Looker API and a LookML repository connection share one Looker container.
+   A custom ETL or BI connector goes on a container on the deployment of the agent that
+   registered it, or on one with no deployment and no credentials when the customer pushes its
+   data.
 6. Validates the connection over MCP and reports each check's result, falling back to the UI test
    only when the session does not serve the validation tools.
 7. Ends with created/reused IDs, the validation result, a scoped cleanup order and the next
@@ -114,6 +118,8 @@ connection for the intended account. The workflow requires no particular assista
 
 ## Not yet
 
+- **Custom warehouse connectors, and the key a push-only custom connector pushes with.** Not
+  served by the v2 tools yet; the skill hands them off.
 - **Azure and GCP agent/data-store registration, generic agent credentials, Monte Carlo-managed
   credentials (such as the Snowflake key pair, or Tableau, Looker and Power BI credentials).**
   Their requests or responses carry a secret, so they are CLI/Terraform steps rather than MCP
