@@ -9,15 +9,17 @@ them. Each section is one tool; its name is the tool to call.
 
 List the connections in your account, a page at a time.
 
-Connections are returned oldest first. Pass `warehouse_id` or `bi_container_id` to list
-one warehouse's or one BI container's connections; an id you cannot see returns an empty
-page. A caller whose asset access is restricted to certain domains sees only the
-connections of warehouses holding assets in those domains, and every BI connection.
+Connections are returned oldest first. Pass `warehouse_id`, `bi_container_id` or
+`etl_container_id` to list one parent's connections; an id you cannot see returns an
+empty page. A caller whose asset access is restricted to certain domains sees only the
+connections of warehouses holding assets in those domains, and every BI and ETL
+connection.
 
-Connections that belong to an ETL integration are not listed here.
+Filtering by an ETL container also returns a warehouse or BI connection that collects ETL
+jobs through it, such as a Snowflake Tasks or Power BI dataflows connection.
 
 - **Effect:** read-only.
-- **Pairs with:** `create_connection`, `get_connection`, `validate_connection`, `list_warehouses`, `list_bi_containers`.
+- **Pairs with:** `create_connection`, `get_connection`, `validate_connection`, `list_warehouses`, `list_bi_containers`, `list_etl_containers`.
 - **Paging:** one page per call; pass `next_cursor` back as `cursor` for the next page.
 
 ### Arguments
@@ -26,24 +28,27 @@ Connections that belong to an ETL integration are not listed here.
 |---|---|---|---|
 | `warehouse_id` | `str` | no | Only list connections on this warehouse. Omit it to list every connection in your account. |
 | `bi_container_id` | `str` | no | Only list connections on this BI container. Omit it to list every connection in your account. |
+| `etl_container_id` | `str` | no | Only list connections on this ETL container. Omit it to list every connection in your account. |
 | `cursor` | `str` | no | Position to continue from, as returned in `next_cursor` by the previous page. Omit it to start from the first page. The value is opaque; do not build or modify one. |
 | `limit` | `int` | no | Maximum number of items to return, between 1 and 100. |
 | `with_count` | `bool` | no | Whether to also return the total number of items across every page, in `count`. Off by default: counting costs an extra query. |
 
 ### Response
 
-Returns `items` (response fields per item: id, connection_type, name, warehouse_id, warehouse_name, bi_container_id, bi_container_name, deployment_id, deployment_name, credentials_id, credentials_storage_type, job_types, created_time), `next_cursor` (pass it as `cursor` for the next page; null on the last page), `has_more`, and `count` (the total across pages, only when `with_count` is true).
+Returns `items` (response fields per item: id, connection_type, name, warehouse_id, warehouse_name, bi_container_id, bi_container_name, etl_container_id, etl_container_name, deployment_id, deployment_name, credentials_id, credentials_storage_type, job_types, created_time), `next_cursor` (pass it as `cursor` for the next page; null on the last page), `has_more`, and `count` (the total across pages, only when `with_count` is true).
 
 | Field | Description |
 |---|---|
 | `id` | Unique identifier of the connection. |
 | `connection_type` | What the connection reaches, such as `snowflake`. Taken from the credentials the connection was created with, and fixed once created. |
 | `name` | Display name of the connection. Null for a connection that was never named. |
-| `warehouse_id` | The warehouse the connection belongs to. Null for a connection on a BI container. Fixed once created. |
-| `warehouse_name` | Display name of that warehouse. Null for a warehouse that was never named, and for a connection on a BI container. |
-| `bi_container_id` | The BI container the connection belongs to. Null for a connection on a warehouse. Fixed once created. |
-| `bi_container_name` | Display name of that BI container. Null for a container that was never named, and for a connection on a warehouse. |
-| `deployment_id` | The deployment the connection runs through, taken from its warehouse or BI container. Null when that has no deployment. The id may name a deployment on Monte Carlo's older collection platform, which the deployments endpoints do not list. |
+| `warehouse_id` | The warehouse the connection belongs to. Null for a connection on a BI or ETL container. Fixed once created. |
+| `warehouse_name` | Display name of that warehouse. Null for a warehouse that was never named, and for a connection on a BI or ETL container. |
+| `bi_container_id` | The BI container the connection belongs to. Null for a connection on a warehouse or an ETL container. Fixed once created. |
+| `bi_container_name` | Display name of that BI container. Null for a container that was never named, and for a connection on a warehouse or an ETL container. |
+| `etl_container_id` | The ETL container the connection belongs to. Fixed once created for a connection on an ETL container. A warehouse or BI connection has one while it collects ETL jobs through a container of its own, such as Snowflake Tasks, a Databricks metastore or Power BI dataflows, and it changes when that is turned on or off. Null otherwise. |
+| `etl_container_name` | Display name of that ETL container. Null when there is no ETL container. |
+| `deployment_id` | The deployment the connection runs through, taken from its warehouse, BI container or ETL container. Null when that has no deployment, as an Airflow ETL container has none. The id may name a deployment on Monte Carlo's older collection platform, which the deployments endpoints do not list. |
 | `deployment_name` | Display name of that deployment. Null when there is no deployment to name. |
 | `credentials_id` | The credentials the connection reads with. Null for a connection created before credentials became their own resource, and for one created outside this API. |
 | `credentials_storage_type` | Where that secret lives. Null when there are no credentials to describe. |
@@ -59,35 +64,38 @@ Returns `items` (response fields per item: id, connection_type, name, warehouse_
 
 ## `create_connection`: Create a connection
 
-Add a connection to a warehouse or a BI container from credentials that already exist. Takes the name, the credentials id, and either the warehouse id or, for Tableau, Looker or Power BI credentials, the BI container id from create_bi_container. The connection type comes from the credentials. The connection runs through its parent's deployment, so call list_deployments and list_warehouses or list_bi_containers first and reuse a parent on the right deployment: the cloud deployment hosted by Monte Carlo, or one with a collection agent or data store registered. Create a deployment only for an agent or a data store, never one with nothing behind it. Some types need another connection on the warehouse first. A databricks-sql-warehouse connection goes on a data-lake warehouse that already has a databricks-metastore-sql-warehouse connection, so add the metastore first. Credentials that reference a store you run are created from here with create_aws_secrets_manager_credentials, create_gcp_secret_manager_credentials, create_azure_key_vault_credentials, create_env_var_credentials or create_file_credentials. Credentials whose secret has to be sent in the request, such as a Snowflake key pair, a BigQuery service account key, a database password, a Databricks token or a BI tool's password or client secret, are created with the CLI or Terraform, not from here.
+Add a connection to a warehouse, a BI container or an ETL container from credentials that already exist. Takes the name, the credentials id, and exactly one parent: the warehouse id, the BI container id from create_bi_container for Tableau, Looker or Power BI credentials, or the ETL container id from create_etl_container for ETL tool credentials such as Fivetran or Airflow. An ETL container takes one connection, of its own type. A custom ETL or BI connector's credentials, of type custom-etl-connector-<id> or custom-bi-connector-<id>, go on a custom-etl-connector or custom-bi-connector container on the deployment of the agent that registered the connector. Such a container with no deployment is push-only: send no credentials id, and the connection takes the container's type. Every other parent needs the credentials id. The connection type comes from the credentials. The connection runs through its parent's deployment, so call list_deployments and list_warehouses, list_bi_containers or list_etl_containers first and reuse a parent on the right deployment: the cloud deployment hosted by Monte Carlo, or one with a collection agent or data store registered. Create a deployment only for an agent or a data store, never one with nothing behind it. Some types need another connection on the warehouse first. A databricks-sql-warehouse connection goes on a data-lake warehouse that already has a databricks-metastore-sql-warehouse connection, so add the metastore first. Credentials that reference a store you run are created from here with create_aws_secrets_manager_credentials, create_gcp_secret_manager_credentials, create_azure_key_vault_credentials, create_env_var_credentials or create_file_credentials. Credentials whose secret has to be sent in the request, such as a Snowflake key pair, a BigQuery service account key, a database password, a Databricks token or a BI tool's password or client secret, are created with the CLI or Terraform, not from here.
 
 - **Effect:** creates; repeating it creates again.
-- **Pairs with:** `list_connections`, `get_connection`, `update_connection`, `delete_connection`, `list_credentials`, `list_warehouses`, `list_bi_containers`.
+- **Pairs with:** `list_connections`, `get_connection`, `update_connection`, `delete_connection`, `list_warehouses`, `list_bi_containers`, `list_etl_containers`, `list_credentials`.
 
 ### Arguments
 
 | Argument | Type | Required | Description |
 |---|---|---|---|
-| `name` | `str` | yes | Display name for the connection. Unique among the connections of its warehouse or BI container. Between 1 and 200 characters. |
-| `credentials_id` | `str` | yes | The credentials the connection reads with. They also decide the connection's type. Create them first, through one of the credentials endpoints. |
-| `warehouse_id` | `str` | no | The warehouse to add the connection to. Its type has to match what the credentials are for. Send this or `bi_container_id`, not both. |
-| `bi_container_id` | `str` | no | The BI container to add the connection to, for Tableau, Looker or Power BI credentials. Its type has to match what the credentials are for: a `looker` container takes both `looker` and `looker-git-clone` credentials. Send this or `warehouse_id`, not both. |
-| `job_types` | `list[str]` | no | The jobs to run on this connection. Omit it to run what the connection type runs by default, which is what the app does. Which values are accepted depends on the connection type. An empty list is not accepted; omit the field to take the defaults. At least 1 items. |
+| `name` | `str` | yes | Display name for the connection. Unique among the connections of its warehouse or BI container. An ETL container holds one connection. Between 1 and 200 characters. |
+| `warehouse_id` | `str` | no | The warehouse to add the connection to. Its type has to match what the credentials are for. Send exactly one of this, `bi_container_id` and `etl_container_id`. |
+| `bi_container_id` | `str` | no | The BI container to add the connection to, for Tableau, Looker or Power BI credentials. Its type has to match what the credentials are for: a `looker` container takes both `looker` and `looker-git-clone` credentials. A `custom-bi-connector` container takes a custom BI connector's credentials, or none when it has no deployment. Send exactly one of this, `warehouse_id` and `etl_container_id`. |
+| `etl_container_id` | `str` | no | The ETL container to add the connection to, for ETL tool credentials such as Fivetran or Airflow. The container's type has to equal the credentials' type, and the container must not have a connection yet. A `custom-etl-connector` container takes a custom ETL connector's credentials, or none when it has no deployment. Send exactly one of this, `warehouse_id` and `bi_container_id`. |
+| `credentials_id` | `str` | no | The credentials the connection reads with. They also decide the connection's type. Create them first, through one of the credentials endpoints. Required, except on a push-only container: a `custom-etl-connector` or `custom-bi-connector` container with no deployment. Its connection takes no credentials, and has the container's type. |
+| `job_types` | `list[str]` | no | The jobs to run on this connection. Omit it to run what the connection type runs by default, which is what the app does. Which values are accepted depends on the connection type. `etl` on a Snowflake, Power BI or Salesforce Data Cloud connection also creates its ETL container. An empty list is not accepted; omit the field to take the defaults. At least 1 items. |
 
 ### Response
 
-Returns the new connection. Response fields: id, connection_type, name, warehouse_id, warehouse_name, bi_container_id, bi_container_name, deployment_id, deployment_name, credentials_id, credentials_storage_type, job_types, created_time.
+Returns the new connection. Response fields: id, connection_type, name, warehouse_id, warehouse_name, bi_container_id, bi_container_name, etl_container_id, etl_container_name, deployment_id, deployment_name, credentials_id, credentials_storage_type, job_types, created_time.
 
 | Field | Description |
 |---|---|
 | `id` | Unique identifier of the connection. |
 | `connection_type` | What the connection reaches, such as `snowflake`. Taken from the credentials the connection was created with, and fixed once created. |
 | `name` | Display name of the connection. Null for a connection that was never named. |
-| `warehouse_id` | The warehouse the connection belongs to. Null for a connection on a BI container. Fixed once created. |
-| `warehouse_name` | Display name of that warehouse. Null for a warehouse that was never named, and for a connection on a BI container. |
-| `bi_container_id` | The BI container the connection belongs to. Null for a connection on a warehouse. Fixed once created. |
-| `bi_container_name` | Display name of that BI container. Null for a container that was never named, and for a connection on a warehouse. |
-| `deployment_id` | The deployment the connection runs through, taken from its warehouse or BI container. Null when that has no deployment. The id may name a deployment on Monte Carlo's older collection platform, which the deployments endpoints do not list. |
+| `warehouse_id` | The warehouse the connection belongs to. Null for a connection on a BI or ETL container. Fixed once created. |
+| `warehouse_name` | Display name of that warehouse. Null for a warehouse that was never named, and for a connection on a BI or ETL container. |
+| `bi_container_id` | The BI container the connection belongs to. Null for a connection on a warehouse or an ETL container. Fixed once created. |
+| `bi_container_name` | Display name of that BI container. Null for a container that was never named, and for a connection on a warehouse or an ETL container. |
+| `etl_container_id` | The ETL container the connection belongs to. Fixed once created for a connection on an ETL container. A warehouse or BI connection has one while it collects ETL jobs through a container of its own, such as Snowflake Tasks, a Databricks metastore or Power BI dataflows, and it changes when that is turned on or off. Null otherwise. |
+| `etl_container_name` | Display name of that ETL container. Null when there is no ETL container. |
+| `deployment_id` | The deployment the connection runs through, taken from its warehouse, BI container or ETL container. Null when that has no deployment, as an Airflow ETL container has none. The id may name a deployment on Monte Carlo's older collection platform, which the deployments endpoints do not list. |
 | `deployment_name` | Display name of that deployment. Null when there is no deployment to name. |
 | `credentials_id` | The credentials the connection reads with. Null for a connection created before credentials became their own resource, and for one created outside this API. |
 | `credentials_storage_type` | Where that secret lives. Null when there are no credentials to describe. |
@@ -122,18 +130,20 @@ restrictions hide from you returns 404.
 
 ### Response
 
-Response fields: id, connection_type, name, warehouse_id, warehouse_name, bi_container_id, bi_container_name, deployment_id, deployment_name, credentials_id, credentials_storage_type, job_types, created_time.
+Response fields: id, connection_type, name, warehouse_id, warehouse_name, bi_container_id, bi_container_name, etl_container_id, etl_container_name, deployment_id, deployment_name, credentials_id, credentials_storage_type, job_types, created_time.
 
 | Field | Description |
 |---|---|
 | `id` | Unique identifier of the connection. |
 | `connection_type` | What the connection reaches, such as `snowflake`. Taken from the credentials the connection was created with, and fixed once created. |
 | `name` | Display name of the connection. Null for a connection that was never named. |
-| `warehouse_id` | The warehouse the connection belongs to. Null for a connection on a BI container. Fixed once created. |
-| `warehouse_name` | Display name of that warehouse. Null for a warehouse that was never named, and for a connection on a BI container. |
-| `bi_container_id` | The BI container the connection belongs to. Null for a connection on a warehouse. Fixed once created. |
-| `bi_container_name` | Display name of that BI container. Null for a container that was never named, and for a connection on a warehouse. |
-| `deployment_id` | The deployment the connection runs through, taken from its warehouse or BI container. Null when that has no deployment. The id may name a deployment on Monte Carlo's older collection platform, which the deployments endpoints do not list. |
+| `warehouse_id` | The warehouse the connection belongs to. Null for a connection on a BI or ETL container. Fixed once created. |
+| `warehouse_name` | Display name of that warehouse. Null for a warehouse that was never named, and for a connection on a BI or ETL container. |
+| `bi_container_id` | The BI container the connection belongs to. Null for a connection on a warehouse or an ETL container. Fixed once created. |
+| `bi_container_name` | Display name of that BI container. Null for a container that was never named, and for a connection on a warehouse or an ETL container. |
+| `etl_container_id` | The ETL container the connection belongs to. Fixed once created for a connection on an ETL container. A warehouse or BI connection has one while it collects ETL jobs through a container of its own, such as Snowflake Tasks, a Databricks metastore or Power BI dataflows, and it changes when that is turned on or off. Null otherwise. |
+| `etl_container_name` | Display name of that ETL container. Null when there is no ETL container. |
+| `deployment_id` | The deployment the connection runs through, taken from its warehouse, BI container or ETL container. Null when that has no deployment, as an Airflow ETL container has none. The id may name a deployment on Monte Carlo's older collection platform, which the deployments endpoints do not list. |
 | `deployment_name` | Display name of that deployment. Null when there is no deployment to name. |
 | `credentials_id` | The credentials the connection reads with. Null for a connection created before credentials became their own resource, and for one created outside this API. |
 | `credentials_storage_type` | Where that secret lives. Null when there are no credentials to describe. |
@@ -149,7 +159,7 @@ Response fields: id, connection_type, name, warehouse_id, warehouse_name, bi_con
 
 ## `update_connection`: Update a connection
 
-Rename a connection. The name is the only field this takes; the type, the warehouse or BI container and the credentials are fixed once the connection exists.
+Rename a connection, or turn ETL on or off for a Snowflake, Power BI or Salesforce Data Cloud connection by sending its job_types with 'etl' added or removed. The type, the parent and the credentials are fixed once the connection exists.
 
 - **Effect:** updates in place; idempotent.
 - **Pairs with:** `list_connections`, `create_connection`, `get_connection`, `delete_connection`.
@@ -160,21 +170,24 @@ Rename a connection. The name is the only field this takes; the type, the wareho
 |---|---|---|---|
 | `connection_id` | `str` | yes | Id of the connection, as returned when it is created or listed. |
 | `name` | `str` | no | New display name for the connection. Omit it to leave the name unchanged. An explicit null is ignored, the same as omitting the field. Between 1 and 200 characters. |
+| `job_types` | `list[str]` | no | The connection's job types with `etl` added or removed. Adding `etl` turns on ETL collection for a Snowflake (Snowflake Tasks), Power BI (dataflows) or Salesforce Data Cloud connection, and creates the ETL container that `etl_container_id` then names. Removing it deletes that container. No other job can be added or removed. Omit it to leave the job types unchanged. At least 1 items. |
 
 ### Response
 
-Returns the connection after the change. Response fields: id, connection_type, name, warehouse_id, warehouse_name, bi_container_id, bi_container_name, deployment_id, deployment_name, credentials_id, credentials_storage_type, job_types, created_time.
+Returns the connection after the change. Response fields: id, connection_type, name, warehouse_id, warehouse_name, bi_container_id, bi_container_name, etl_container_id, etl_container_name, deployment_id, deployment_name, credentials_id, credentials_storage_type, job_types, created_time.
 
 | Field | Description |
 |---|---|
 | `id` | Unique identifier of the connection. |
 | `connection_type` | What the connection reaches, such as `snowflake`. Taken from the credentials the connection was created with, and fixed once created. |
 | `name` | Display name of the connection. Null for a connection that was never named. |
-| `warehouse_id` | The warehouse the connection belongs to. Null for a connection on a BI container. Fixed once created. |
-| `warehouse_name` | Display name of that warehouse. Null for a warehouse that was never named, and for a connection on a BI container. |
-| `bi_container_id` | The BI container the connection belongs to. Null for a connection on a warehouse. Fixed once created. |
-| `bi_container_name` | Display name of that BI container. Null for a container that was never named, and for a connection on a warehouse. |
-| `deployment_id` | The deployment the connection runs through, taken from its warehouse or BI container. Null when that has no deployment. The id may name a deployment on Monte Carlo's older collection platform, which the deployments endpoints do not list. |
+| `warehouse_id` | The warehouse the connection belongs to. Null for a connection on a BI or ETL container. Fixed once created. |
+| `warehouse_name` | Display name of that warehouse. Null for a warehouse that was never named, and for a connection on a BI or ETL container. |
+| `bi_container_id` | The BI container the connection belongs to. Null for a connection on a warehouse or an ETL container. Fixed once created. |
+| `bi_container_name` | Display name of that BI container. Null for a container that was never named, and for a connection on a warehouse or an ETL container. |
+| `etl_container_id` | The ETL container the connection belongs to. Fixed once created for a connection on an ETL container. A warehouse or BI connection has one while it collects ETL jobs through a container of its own, such as Snowflake Tasks, a Databricks metastore or Power BI dataflows, and it changes when that is turned on or off. Null otherwise. |
+| `etl_container_name` | Display name of that ETL container. Null when there is no ETL container. |
+| `deployment_id` | The deployment the connection runs through, taken from its warehouse, BI container or ETL container. Null when that has no deployment, as an Airflow ETL container has none. The id may name a deployment on Monte Carlo's older collection platform, which the deployments endpoints do not list. |
 | `deployment_name` | Display name of that deployment. Null when there is no deployment to name. |
 | `credentials_id` | The credentials the connection reads with. Null for a connection created before credentials became their own resource, and for one created outside this API. |
 | `credentials_storage_type` | Where that secret lives. Null when there are no credentials to describe. |
@@ -193,7 +206,7 @@ Returns the connection after the change. Response fields: id, connection_type, n
 
 ## `delete_connection`: Delete a connection
 
-Delete a connection. Its warehouse or BI container and its credentials are left in place, but its own schedules, monitors and rules are deleted with it. Refused when it is the warehouse's last connection and deleting it would also take monitors, rules or use cases that belong to the warehouse as a whole, and for a custom BI connector, whose container would go with it.
+Delete a connection. Its warehouse, BI container or ETL container and its credentials are left in place, but its own schedules, monitors and rules are deleted with it. Refused when it is the warehouse's last connection and deleting it would also take monitors, rules or use cases that belong to the warehouse as a whole, and for a Power BI connection with ETL on. Remove 'etl' from that one's job_types first.
 
 - **Effect:** deletes; destructive and idempotent.
 - **Pairs with:** `list_connections`, `create_connection`, `get_connection`, `update_connection`.
