@@ -22,6 +22,8 @@
     {"id": "should-18", "prompt": "Connect our Tableau Server to Monte Carlo so we get report lineage.", "expected": "trigger", "rationale": "Connect a BI tool: a connection on a BI container"},
     {"id": "should-19", "prompt": "Add our Looker instance and its LookML repo to Monte Carlo.", "expected": "trigger", "rationale": "Looker API and LookML repository connections share one Looker container"},
     {"id": "should-20", "prompt": "Set up the Power BI integration in Monte Carlo with a service principal, via Terraform.", "expected": "trigger", "rationale": "BI onboarding in Terraform output mode"},
+    {"id": "should-21", "prompt": "Our collection agent registered a custom ETL connector. Connect it to Monte Carlo.", "expected": "trigger", "rationale": "Custom connector onboarding"},
+    {"id": "should-22", "prompt": "We push our BI assets to Monte Carlo ourselves. Set up a custom BI connector for them.", "expected": "trigger", "rationale": "Push-only custom BI connector: container and connection"},
     {"id": "should-not-01", "prompt": "Push metadata and lineage from our homegrown catalog into Monte Carlo.", "expected": "no-trigger", "rationale": "Push ingestion, no connector: push-ingestion skill"},
     {"id": "should-not-02", "prompt": "Build the Connection Auth Rules JSON for our Postgres connector.", "expected": "no-trigger", "rationale": "connection-auth-rules skill"},
     {"id": "should-not-03", "prompt": "Instrument our LangChain agent for Monte Carlo Agent Observability.", "expected": "no-trigger", "rationale": "instrument-agent skill"},
