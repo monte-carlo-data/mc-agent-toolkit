@@ -90,6 +90,14 @@ so this section says how to discover them; it does not list them.
   or to a teammate or admin who can run mc-cli or Terraform; NEVER create a deployment the
   customer cannot finish. Their own infrastructure step (deploying the agent, storing the secret)
   still runs on their side.
+- **CRITICAL: a custom connector is supported through its own type, not a warehouse `type`.**
+  `list_connection_types` marks one with `is_custom`, and `list_custom_connector_types` lists
+  the ones the account's agents registered, with each one's `asset_class` and deployment. An
+  `etl` or `bi` type is supported when `create_etl_container` or `create_bi_container` names
+  `custom-etl-connector` or `custom-bi-connector` in its `type` list; a push-only connector is
+  supported on the same condition. A `warehouse` type is handed off to the UI for now (SKILL.md
+  *Custom connectors*). NEVER provision a deployment or agent for a custom connector: the type
+  already runs on its agent's deployment.
 - NEVER provision a deployment or agent for an integration before it passes this check. An agent
   built for an unsupported type is a deployment with nothing behind it (SKILL.md rule 3).
 
@@ -239,13 +247,20 @@ warehouse for a BI tool: `create_warehouse` has no BI type.
 
 For a type not listed, read its section on that page and apply the same rule before continuing.
 
+A **custom connector** type is not on that page: the keys are whatever the customer's connector
+reads. Ask the customer to confirm the secret carries them; do not guess them from a similar
+built-in type.
+
 ## Warehouse and connection inputs
 
 | Resource | Required | Source |
 |---|---|---|
 | Warehouse | `name`, `deployment_id`, and exactly one of `type` / `connection_type` | Name from the customer or an existing warehouse; never reuse a different target's warehouse because the type matches. |
 | BI container | `type` (`tableau`, `looker` or `power-bi`), `name`, `deployment_id` | Name from the customer or an existing container; one container per BI instance, and one `looker` container for both Looker connections. |
-| Connection | `name`, `credentials_id`, and exactly one of `warehouse_id` / `bi_container_id` | Name from the customer; ids from the earlier steps. A BI connection takes `bi_container_id`. |
+| ETL container (custom ETL connector) | `type` `custom-etl-connector`, `name`; `deployment_id` for an agent-registered connector, none for a push-only one | Name from the customer or an existing empty container; the deployment from the type in `list_custom_connector_types`, never chosen or provisioned. One connection per container. |
+| BI container (custom BI connector) | `type` `custom-bi-connector`, `name`; `deployment_id` as for ETL | As for ETL. |
+| Connection | `name`, `credentials_id`, and exactly one of `warehouse_id` / `bi_container_id` / `etl_container_id` | Name from the customer; ids from the earlier steps. A BI connection takes `bi_container_id`, a custom ETL one `etl_container_id`. A push-only custom connector's connection takes no `credentials_id`. |
+| Custom connector credentials | a self-hosted reference with `connection_type` set to the type's `id`; an environment variable name starting with `MCD_` | The customer, for the store and the reference; the type's `id` from discovery. None for push-only. |
 
 ## Common mistakes
 
@@ -270,5 +285,10 @@ For a type not listed, read its section on that page and apply the same rule bef
   deployment, without saying so: the same data is collected twice.
 - Validating a self-hosted reference before the agent's read grant on the secret is applied: it
   only fails, and looks like a bad secret.
+- Creating or choosing a deployment for a custom connector, or validating its credentials on a
+  deployment other than the type's: it is refused as `custom_connector_deployment_mismatch`.
+- Sending credentials for a push-only custom connector, or calling `validate_connection` on its
+  connection: it has no deployment and nothing to validate.
+- Naming an environment variable for custom connector credentials without the `MCD_` prefix.
 - Treating a failed **Tables** check on a database the customer just created as missing grants:
   an empty database fails it too. Ask whether it has tables yet.
