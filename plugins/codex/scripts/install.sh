@@ -112,6 +112,21 @@ find "$TARGET" -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
 find "$TARGET" -name "*.pyc" -delete 2>/dev/null || true
 rm -rf "$TARGET/hooks/prevent/lib/tests" "$TARGET/hooks/telemetry/tests"
 
+# --- Drop the plugin-bundled hook declaration ---
+# STEP 3 registers these hooks at the project level with absolute paths. Codex
+# also loads hooks declared by an enabled plugin, so keeping the declaration in
+# this installed copy would run every hook twice once the user trusts it.
+python3 - "$TARGET/.codex-plugin/plugin.json" << 'PYEOF'
+import json, sys
+path = sys.argv[1]
+with open(path) as f:
+    manifest = json.load(f)
+manifest.pop("hooks", None)
+with open(path, "w") as f:
+    json.dump(manifest, f, indent=2, ensure_ascii=False)
+    f.write("\n")
+PYEOF
+
 echo "  Plugin files installed."
 
 # ============================================================

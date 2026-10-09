@@ -6,7 +6,7 @@
                 "hooks": [
                     {
                         "type": "command",
-                        "command": "python3 ${CODEX_PLUGIN_ROOT}/hooks/prevent/bash_hook.py"
+                        "command": "python3 \"${PLUGIN_ROOT}/hooks/prevent/bash_hook.py\""
                     }
                 ]
             }
@@ -16,7 +16,7 @@
                 "hooks": [
                     {
                         "type": "command",
-                        "command": "python3 ${CODEX_PLUGIN_ROOT}/hooks/prevent/turn_end_hook.py"
+                        "command": "python3 \"${PLUGIN_ROOT}/hooks/prevent/turn_end_hook.py\""
                     }
                 ]
             }

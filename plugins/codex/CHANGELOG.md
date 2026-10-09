@@ -5,6 +5,12 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Codex will be do
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.27.2] - 2026-10-09
+
+### Fixed
+
+- Codex: plugin-bundled hooks now use `${PLUGIN_ROOT}`, the variable Codex sets for plugin hook commands. `${CODEX_PLUGIN_ROOT}` was never set, so the bash and turn-end hooks failed when Codex loaded them from the plugin. `install.sh` now removes the hook declaration from the plugin copy it installs, since it already registers the same hooks at the project level; this keeps each hook from running twice once the plugin's hooks are trusted.
+
 ## [1.27.1] - 2026-10-07
 
 ### Changed
