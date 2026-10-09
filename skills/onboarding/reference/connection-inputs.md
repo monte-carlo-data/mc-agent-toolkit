@@ -54,6 +54,10 @@ so this section says how to discover them; it does not list them.
 - **CRITICAL: discover types from this session, NEVER from memory or from examples in these
   references.** The managed getter/delete tools can lag the API; when they and the customer's
   `montecarlo credentials create --help` disagree, the CLI is newer.
+- **CRITICAL: a BI tool is supported when this session serves `create_bi_container` and its
+  `type` list names the tool** (`tableau`, `looker` — also for `looker-git-clone` — or `power-bi`).
+  Its connections go on a BI container, never a warehouse; the rule below does not apply to them.
+  Without `create_bi_container`, hand the BI tool off to the UI.
 - **CRITICAL: a connection type that is not itself a warehouse `type` is settled by the API, not
   by you.** The tools do not publish which warehouse type a connection type maps to, and several
   connection types share one. So such a type counts as supported only when one of these shows it:
@@ -132,6 +136,55 @@ The user also needs the grants from https://docs.getmontecarlo.com/docs/snowflak
 `IMPORTED PRIVILEGES` on the `SNOWFLAKE` database for query logs. Confirm the grants script ran for
 this user and warehouse.
 
+#### BI tools
+
+The four BI types are managed. Each table lists the create operation's inputs; secret inputs are a
+file path or a prompt, never a value. CLI flags are the field names with dashes (`server_name` →
+`--server-name`); Terraform secrets are `<field>_wo` with `<field>_wo_version`.
+
+#### Tableau
+
+| Input | Required | Notes |
+|---|---|---|
+| `server_name` | yes | The server URL, starting with `https://` or `http://`. |
+| `site_name` | **in practice** | The site to connect to. Leave it out only for the server's default site; ask which. |
+| Sign-in method | yes | **exactly one sign-in method**, below. Sending inputs of two methods is refused. |
+| `verify_ssl` | no | Verified when left out. Set `false` only when the customer asks, for a self-signed certificate. |
+
+| Sign-in method | Inputs |
+|---|---|
+| Personal access token | `token_name`, and the token's secret as `token_value` (secret). No `username`. |
+| Username and password | `username`, `password` (secret). |
+| Connected app | `username`, `connected_app_client_id`, `connected_app_secret_id` (an identifier, not the secret), `connected_app_secret_value` (secret). A deployment on an older collector version refuses it with an upgrade-required error. |
+
+#### Looker API
+
+| Input | Required | Notes |
+|---|---|---|
+| `base_url` | yes | The instance's API URL. |
+| `api_client_id` | yes | Client ID of the Looker API key Monte Carlo signs in with. |
+| `api_client_secret` | yes, secret | |
+| `verify_ssl` | no | Verified when left out. |
+
+#### Looker git clone
+
+The LookML repository, on the same `looker` container as the Looker API connection.
+
+| Input | Required | Notes |
+|---|---|---|
+| `repo_url` | yes | Clone URL, HTTPS or SSH. |
+| Clone method | yes | HTTPS: `username` and `token` (secret). SSH: `ssh_key` (secret), the private key file with its BEGIN/END lines; the customer's command reads the file. |
+| `ssl_ca_data` | no | PEM of the CA that signed the git server's certificate, for a private CA. |
+| `ssl_skip_cert_verification` | no | Only when the customer asks. |
+
+#### Power BI
+
+| Input | Required | Notes |
+|---|---|---|
+| `tenant_id` | yes | The Microsoft Entra ID tenant. |
+| `app_client_id` | yes | The app registration Monte Carlo signs in with. |
+| `auth_mode` | yes | `service_principal` with `app_client_secret` (secret), or `primary_user` with `username` and `password` (secret). Ask which; there is no default. |
+
 ### Self-hosted reference (the customer keeps the secret)
 
 | Store | Required | Optional |
@@ -179,6 +232,11 @@ disagree, the page is right. Keys sit inside `connect_args` unless noted.
 | Power BI | `client_id`, `client_secret`, `tenant_id` (top level) | |
 | Tableau | `username`, `client_id`, `secret_id`, `secret_value`, `server_name` (top level) | `site_name`, `verify_ssl`, `token_expiration_seconds` |
 
+The BI rows (Looker, Looker Git, Power BI, Tableau) are what a self-hosted secret holds when a
+collection agent reads it; the credential's `connection_type` is `looker`, `looker-git-clone`,
+`power-bi` or `tableau`. Their connections go on a BI container (SKILL.md Step 3b). NEVER create a
+warehouse for a BI tool: `create_warehouse` has no BI type.
+
 For a type not listed, read its section on that page and apply the same rule before continuing.
 
 ## Warehouse and connection inputs
@@ -186,7 +244,8 @@ For a type not listed, read its section on that page and apply the same rule bef
 | Resource | Required | Source |
 |---|---|---|
 | Warehouse | `name`, `deployment_id`, and exactly one of `type` / `connection_type` | Name from the customer or an existing warehouse; never reuse a different target's warehouse because the type matches. |
-| Connection | `name`, `warehouse_id`, `credentials_id` | Name from the customer; ids from the earlier steps. |
+| BI container | `type` (`tableau`, `looker` or `power-bi`), `name`, `deployment_id` | Name from the customer or an existing container; one container per BI instance, and one `looker` container for both Looker connections. |
+| Connection | `name`, `credentials_id`, and exactly one of `warehouse_id` / `bi_container_id` | Name from the customer; ids from the earlier steps. A BI connection takes `bi_container_id`. |
 
 ## Common mistakes
 
@@ -203,6 +262,10 @@ For a type not listed, read its section on that page and apply the same rule bef
   session's `create_warehouse` schema and managed credential tools.
 - Writing a managed secret as a literal CLI value instead of `@<path>` or `--<field>-prompt`.
 - Creating one deployment per integration when several fit the same one.
+- Planning a warehouse for Tableau, Looker or Power BI. They go on a BI container.
+- Creating a second `looker` container for the LookML repository instead of adding the
+  `looker-git-clone` connection to the existing one.
+- Sending a Tableau `username` with a personal access token, or the inputs of two sign-in methods.
 - Creating a second connection to an account or host that is already connected, on any
   deployment, without saying so: the same data is collected twice.
 - Validating a self-hosted reference before the agent's read grant on the secret is applied: it

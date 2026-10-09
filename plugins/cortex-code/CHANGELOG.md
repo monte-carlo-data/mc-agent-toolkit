@@ -5,11 +5,35 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Snowflake Cortex
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.26.4] - 2026-09-30
+## [1.27.2] - 2026-10-09
 
 ### Fixed
 
 - Codex: plugin-bundled hooks now use `${PLUGIN_ROOT}`, the variable Codex sets for plugin hook commands. `${CODEX_PLUGIN_ROOT}` was never set, so the bash and turn-end hooks failed when Codex loaded them from the plugin. `install.sh` now removes the hook declaration from the plugin copy it installs, since it already registers the same hooks at the project level; this keeps each hook from running twice once the plugin's hooks are trusted.
+
+## [1.27.1] - 2026-10-07
+
+### Changed
+
+- onboarding: the Python script output mode imports the REST API v2 SDK as `pycarlo2`, its settled name for both the PyPI distribution and the import (was the provisional `montecarlo`). The `montecarlo` CLI commands are unchanged. Static test stubs follow.
+
+## [1.27.0] - 2026-10-06
+
+### Added
+
+- onboarding: **BI tools** (Tableau, Looker, Looker git clone, Power BI). Their connections go on a **BI container** (`create_bi_container`, Step 3b), never a warehouse; one `looker` container holds both the Looker API and the LookML repository connection. Discovery and the inventory include BI containers. BI credentials are managed types created by a CLI or Terraform step (`montecarlo credentials create tableau|looker|looker-git-clone|power-bi`, `montecarlo_<type>_credentials` with `<field>_wo`), or a self-hosted reference read by a collection agent. `reference/connection-inputs.md` lists each type's inputs, including Tableau's three exclusive sign-in methods and Power BI's `auth_mode`; `reference/output-modes.md` has the Terraform and CLI steps. Replaces the 1.26.5 note that BI tools are connected in the UI. Live eval `bi-integration-not-served` becomes `bi-tableau-on-a-bi-container`; new static tests and trigger cases.
+
+## [1.26.5] - 2026-10-01
+
+### Changed
+
+- onboarding: fixes from running the onboarding scenarios across models. **A credentials pass does not rule out IAM** (`reference/troubleshooting.md`): the agent keeps a recently read secret for a few minutes, so removed access can show as "credentials valid, no warning" plus "Could not connect"; run the per-secret simulator before network checks, and re-validate a few minutes after an IAM change. **Policy edits compare normalised JSON** (`diff <(jq -S . …) <(jq -S . …)`). **Single-ARN simulator** uses the same query (`EvalResourceDecision` exists only per resource). New **Revoke the agent's access to one secret** (`reference/output-modes.md`): read the policy, delete only a policy that grants just that secret, check the result. **Grant handover** (SKILL.md) uses the output-modes commands as written. **Never repeat a pasted secret**, not even to ask for rotation. **BI tools** (`reference/connection-inputs.md`): not created by these tools; connected in the UI. New live eval `bi-integration-not-served`; static tests for each rule.
+
+## [1.26.4] - 2026-10-01
+
+### Changed
+
+- onboarding: fixes from scenario S6. **Ask how an existing resource was created before deleting it** (`SKILL.md` Step 6): Monte Carlo does not record whether Terraform, the CLI, the UI or an earlier run created a resource, so for anything the run did not create, ask before offering a delete tool; a Terraform-managed resource is removed by Terraform, since deleting it through Monte Carlo leaves the state behind and the next apply creates it again. New **Remove what Terraform manages** (`reference/output-modes.md`): a state check (`terraform state list -id`) that prints the managing address, never the state, and the remove-block → plan → apply steps (or `state rm` to stop managing it). **One Terraform version floor**: every Terraform artifact, including one with only AWS resources, starts from the shared `terraform` block (`>= 1.11`). New live eval `delete-existing-asks-provenance`; static tests for both rules.
 
 ## [1.26.3] - 2026-09-30
 

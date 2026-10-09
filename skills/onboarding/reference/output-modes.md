@@ -417,6 +417,80 @@ Reusing an existing deployment: omit creation/registration blocks and their `dep
 outputs; use the verified deployment ID. Likewise omit reused warehouse/credential resources
 and pass their IDs. Never destroy a shared reused resource as part of cleanup.
 
+### BI container, credentials and connection
+
+A Tableau, Looker or Power BI connection goes on a `montecarlo_bi_container`, not a warehouse.
+This example is Tableau with a personal access token on a verified deployment; every input comes
+from the connection-inputs checklist and no variable has a `default`. For a password or a
+connected app, set that method's arguments instead (`username` with `password_wo`, or `username`
+with the `connected_app_*` arguments and `connected_app_secret_value_wo`); never two methods.
+
+```hcl
+variable "deployment_id" { type = string }       # verified in discovery
+variable "bi_container_name" { type = string }   # from the customer
+variable "connection_name" { type = string }     # from the customer
+variable "tableau_server_name" { type = string } # https://…
+variable "tableau_site_name" { type = string }   # omit the argument only for the default site
+variable "tableau_token_name" { type = string }
+variable "tableau_token_value_path" { type = string } # absolute path to a file holding the token
+
+resource "montecarlo_bi_container" "tableau" {
+  type          = "tableau" # looker | tableau | power-bi; one looker container for both Looker connections
+  name          = var.bi_container_name
+  deployment_id = var.deployment_id
+}
+
+resource "montecarlo_tableau_credentials" "tableau" {
+  server_name = var.tableau_server_name
+  site_name   = var.tableau_site_name
+  token_name  = var.tableau_token_name
+  # Write-only: never stored in state or a plan. Bump the version with a new token.
+  token_value_wo         = trimspace(file(var.tableau_token_value_path))
+  token_value_wo_version = 1
+}
+
+resource "montecarlo_connection" "tableau" {
+  name            = var.connection_name
+  bi_container_id = montecarlo_bi_container.tableau.id
+  credentials_id  = montecarlo_tableau_credentials.tableau.id
+}
+```
+
+The other BI credentials follow the same shape:
+
+- `montecarlo_looker_credentials { base_url, api_client_id, api_client_secret_wo }`.
+- `montecarlo_looker_git_clone_credentials { repo_url, ssh_key_wo }` for SSH (`file()` of the
+  key, BEGIN/END lines included), or `{ repo_url, username, token_wo }` for HTTPS. Its connection
+  takes the same `looker` container's id as the Looker API connection.
+- `montecarlo_power_bi_credentials { tenant_id, app_client_id, auth_mode = "service_principal",
+  app_client_secret_wo }`, or `auth_mode = "primary_user"` with `username` and `password_wo`.
+
+Every `<field>_wo` has its `<field>_wo_version` (SKILL.md rule 7).
+
+### Remove what Terraform manages
+
+Monte Carlo doesn't record which tool created a resource. To find out whether Terraform manages
+one, the customer runs this in each Terraform directory that uses the provider. It prints the
+address of the resource whose id this is, or nothing, and never the state, which can hold
+generated secrets:
+
+```bash
+ID=<resource-id>
+[ -n "${ID}" ] && terraform state list -id="${ID}"
+```
+
+Don't search the whole state for the id instead: a reused resource's id also appears as a
+reference on the managed resources that use it, so a search reports it as managed when it isn't.
+The guard matters because an empty `-id` lists every resource.
+
+An address in the output means that directory manages it. Remove it the Terraform way: delete its
+block (and whatever references it) from the configuration, run `terraform plan` and check that it
+destroys only what is being removed, then `terraform apply`. `terraform destroy -target='<address>'`
+also works, but the next apply creates it again while the block remains. To keep the resource in
+Monte Carlo and stop managing it with Terraform, delete the block and run
+`terraform state rm '<address>'`. Keep the address in single quotes: addresses such as
+`module.x.res["key"]` or `res[0]` otherwise break in the shell.
+
 ## AWS CLI: customer-side AWS steps
 
 ### Deploy the AWS agent with CloudFormation
@@ -493,7 +567,27 @@ aws iam simulate-principal-policy --policy-source-arn "$ROLE_ARN" \
 ```
 
 With several `--resource-arns`, per-secret decisions are in `ResourceSpecificResults`; the
-top-level `EvalResourceName` is a single grouped row with `${Region}` placeholders.
+top-level `EvalResourceName` is a single grouped row with `${Region}` placeholders. Use the same
+query for a single ARN: `EvalResourceDecision` exists only per resource, so
+`EvaluationResults[].EvalResourceDecision` prints an empty line.
+
+### Revoke the agent's access to one secret
+
+When an integration is removed, take away the agent's read access to its secret, and only that.
+Read the policy first: delete it only if it grants nothing but this secret; otherwise edit the
+ARN out (back up, `jq`, the normalised diff above, `put-role-policy`).
+
+```bash
+SECRET_ARN=<secret-arn>
+POLICY=<policy-name>
+aws iam get-role-policy --role-name "$ROLE" --policy-name "$POLICY" \
+  --query PolicyDocument --output json > "${POLICY}.backup.json"
+jq -c '[.Statement[].Resource] | flatten' "${POLICY}.backup.json"
+aws iam delete-role-policy --role-name "$ROLE" --policy-name "$POLICY"
+```
+
+Then run the check above with this secret and the agent's other secrets: this one should show
+`implicitDeny`, every other `allowed`. To undo, `put-role-policy` with the backup.
 
 ### Remove an AWS agent
 
@@ -571,9 +665,22 @@ montecarlo warehouses create --name "<warehouse_name>" --type snowflake --deploy
 montecarlo connections list --warehouse-id <warehouse_id> --output json
 # Create only if the target connection is absent:
 montecarlo connections create --name <connection_name> --warehouse-id <warehouse_id> --credentials-id <credentials_id> --output json
+
+# BI tool (Tableau here): a BI container instead of a warehouse. Reuse one for the same instance:
+montecarlo bi-containers list --output json
+montecarlo bi-containers create --type tableau --name "<bi_container_name>" --deployment-id <deployment_id> --output json
+# Exactly one sign-in method; the secret from a hidden prompt or a file, never a literal:
+montecarlo credentials validate tableau --deployment-id <deployment_id> \
+  --server-name <https://server> --site-name <site> --username <tableau_user> --password-prompt
+montecarlo credentials create tableau --server-name <https://server> --site-name <site> \
+  --username <tableau_user> --password-prompt --output json
+# Other types: looker (--base-url --api-client-id --api-client-secret-prompt),
+# looker-git-clone (--repo-url with --ssh-key @<key_file> or --username --token-prompt),
+# power-bi (--tenant-id --app-client-id --auth-mode service_principal --app-client-secret-prompt).
+montecarlo connections create --name <connection_name> --bi-container-id <bi_container_id> --credentials-id <credentials_id> --output json
 ```
 
-## Python script (`montecarlo` SDK, mc-sdk-python)
+## Python script (`pycarlo2` SDK, mc-sdk-python)
 
 `pip install git+https://github.com/monte-carlo-data/mc-sdk-python.git`. The client reads
 `MCD_DEFAULT_API_ID` / `MCD_DEFAULT_API_TOKEN` or the CLI profile; only `endpoint` is required,
@@ -601,18 +708,18 @@ It does not read secret contents; MCP-managed key pairs use the separate local C
 import os
 import sys
 import time
-import montecarlo
-from montecarlo.paging import paginate
+import pycarlo2
+from pycarlo2.paging import paginate
 
 
 def main():
-    client = montecarlo.new_client(montecarlo.Options(endpoint=os.environ["MCD_API_ENDPOINT"]))
-    deployments = montecarlo.DeploymentsApi(client)
-    agents = montecarlo.CollectionAgentsApi(client)
-    credentials = montecarlo.CredentialsApi(client)
-    warehouses = montecarlo.WarehousesApi(client)
-    connections = montecarlo.ConnectionsApi(client)
-    validations = montecarlo.ValidationsApi(client)
+    client = pycarlo2.new_client(pycarlo2.Options(endpoint=os.environ["MCD_API_ENDPOINT"]))
+    deployments = pycarlo2.DeploymentsApi(client)
+    agents = pycarlo2.CollectionAgentsApi(client)
+    credentials = pycarlo2.CredentialsApi(client)
+    warehouses = pycarlo2.WarehousesApi(client)
+    connections = pycarlo2.ConnectionsApi(client)
+    validations = pycarlo2.ValidationsApi(client)
     created, reused = {}, {}
     pending = "Resolve inputs; no connection has been verified."
 
@@ -642,7 +749,7 @@ def main():
             raise ValueError(f"{label} validation {run.id} failed: {problems}")
 
     try:
-        identity = montecarlo.UsersApi(client).get_current_user()
+        identity = pycarlo2.UsersApi(client).get_current_user()
         print(f"Account: {identity.account_name} ({identity.account_id})")
         if identity.account_frozen:
             raise ValueError("Account is paused")
@@ -660,7 +767,7 @@ def main():
         if dep is None:
             if os.environ.get("MCD_CREATE_DEPLOYMENT") != "1":
                 raise ValueError("Select an existing deployment or approve a new one before setting MCD_CREATE_DEPLOYMENT=1")
-            dep = deployments.create_deployment(montecarlo.DeploymentIn(
+            dep = deployments.create_deployment(pycarlo2.DeploymentIn(
                 type="COLLECTION_AGENT", runtime_platform="AWS", name=dep_name))
             created["deployment"] = dep.id
         else:
@@ -680,7 +787,7 @@ def main():
             if not os.environ.get("LAMBDA_ARN") or not os.environ.get("ROLE_ARN"):
                 print("Set LAMBDA_ARN and ROLE_ARN after deploying the agent.")
                 return 1
-            agent = agents.register_aws_collection_agent(montecarlo.AwsCollectionAgentIn(
+            agent = agents.register_aws_collection_agent(pycarlo2.AwsCollectionAgentIn(
                 deployment_id=dep.id, lambda_function_arn=os.environ["LAMBDA_ARN"],
                 role_arn=os.environ["ROLE_ARN"]))
             created["agent"] = agent.id
@@ -699,11 +806,11 @@ def main():
         if creds is None:
             # Check the reference from this deployment before storing it; the check creates nothing.
             check(credentials.validate_aws_secrets_manager_credentials(
-                montecarlo.AwsSecretsManagerCredentialsValidateIn(
+                pycarlo2.AwsSecretsManagerCredentialsValidateIn(
                     deployment_id=dep.id, connection_type="snowflake", aws_secret=secret_arn)),
                 "Credentials")
             creds = credentials.create_aws_secrets_manager_credentials(
-                montecarlo.AwsSecretsManagerCredentialsIn(connection_type="snowflake", aws_secret=secret_arn))
+                pycarlo2.AwsSecretsManagerCredentialsIn(connection_type="snowflake", aws_secret=secret_arn))
             created["credentials"] = creds.id
         else:
             reused["credentials"] = creds.id
@@ -719,7 +826,7 @@ def main():
                 raise ValueError("Selected warehouse belongs to a different type/deployment")
             reused["warehouse"] = wh.id
         else:
-            wh = warehouses.create_warehouse(montecarlo.WarehouseIn(
+            wh = warehouses.create_warehouse(pycarlo2.WarehouseIn(
                 name=warehouse_name, deployment_id=dep.id, type="snowflake"))
             created["warehouse"] = wh.id
 
@@ -733,7 +840,7 @@ def main():
         else:
             if any(c.name == connection_name for c in existing):
                 raise ValueError("Connection name exists with another credential; verify identity before proceeding")
-            conn = connections.create_connection(montecarlo.ConnectionIn(
+            conn = connections.create_connection(pycarlo2.ConnectionIn(
                 name=connection_name, warehouse_id=wh.id, credentials_id=creds.id))
             created["connection"] = conn.id
         pending = f"Validate connection {conn.id} in the UI and confirm initial collection."
@@ -741,7 +848,7 @@ def main():
     except (ValueError, KeyError) as error:
         print(f"Stopped: {error}", file=sys.stderr)
         return 1
-    except montecarlo.ApiException as error:
+    except pycarlo2.ApiException as error:
         print(f"API call failed (HTTP {error.status}); reconcile state before retrying.", file=sys.stderr)
         return 1
     finally:

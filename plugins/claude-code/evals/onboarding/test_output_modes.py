@@ -86,7 +86,7 @@ class ExampleTests(unittest.TestCase):
         }
 
     def run_example(self):
-        sdk = ModuleType("montecarlo")
+        sdk = ModuleType("pycarlo2")
         sdk.Options = Row
         sdk.new_client = lambda options: None
         sdk.ApiException = ApiError
@@ -94,10 +94,10 @@ class ExampleTests(unittest.TestCase):
             setattr(sdk, name, lambda client: self.backend)
         for name in ["DeploymentIn", "AwsCollectionAgentIn", "AwsSecretsManagerCredentialsIn", "AwsSecretsManagerCredentialsValidateIn", "WarehouseIn", "ConnectionIn"]:
             setattr(sdk, name, Row)
-        paging = ModuleType("montecarlo.paging")
+        paging = ModuleType("pycarlo2.paging")
         paging.paginate = lambda method, **kwargs: iter(method(**kwargs))
         out = io.StringIO()
-        with patch.dict(sys.modules, {"montecarlo": sdk, "montecarlo.paging": paging}), patch.dict(os.environ, self.env, clear=True), contextlib.redirect_stdout(out), contextlib.redirect_stderr(out), patch("time.sleep"):
+        with patch.dict(sys.modules, {"pycarlo2": sdk, "pycarlo2.paging": paging}), patch.dict(os.environ, self.env, clear=True), contextlib.redirect_stdout(out), contextlib.redirect_stderr(out), patch("time.sleep"):
             namespace = {"__name__": "onboarding_example"}
             exec(compile(EXAMPLE, "output-modes.md", "exec"), namespace)
             status = namespace["main"]()
@@ -218,3 +218,127 @@ class NoHardcodedEndpointTests(unittest.TestCase):
         self.assertTrue(provider_blocks, "expected a montecarlo provider block")
         for block in provider_blocks:
             self.assertNotRegex(block, r'endpoint\s*=\s*"https?://')
+
+
+class TerraformVersionFloorTests(unittest.TestCase):
+    """Every Terraform artifact uses one version floor, so a customer never gets a block that
+    can't take the write-only secrets another step needs (scenario S6 wrote `>= 1.5` for the
+    data store's AWS-only Terraform). The rule must reach AWS-only artifacts too."""
+
+    SKILL = (ROOT / "skills/onboarding/SKILL.md").read_text()
+    OUTPUT_MODES = (ROOT / "skills/onboarding/reference/output-modes.md").read_text()
+
+    def test_every_terraform_settings_block_requires_1_11(self):
+        blocks = [b.split("```", 1)[0] for b in self.OUTPUT_MODES.split("```hcl\n")[1:]]
+        settings = [b for b in blocks if "terraform {" in b]
+        self.assertTrue(settings, "expected a terraform settings block")
+        for block in settings:
+            self.assertIn('required_version = ">= 1.11"', block)
+
+    def test_floor_applies_to_aws_only_artifacts(self):
+        self.assertIn("including one with only AWS resources", self.SKILL)
+
+
+class DeleteProvenanceTests(unittest.TestCase):
+    """Monte Carlo doesn't record which tool created a resource. Deleting a Terraform-managed one
+    through MCP leaves the state pointing at nothing, and the next apply recreates it (scenario
+    S6 offered MCP deletes for a connection Terraform created in S4). The skill must ask first and
+    hand Terraform-managed resources back to Terraform, with a check that prints no state."""
+
+    SKILL = (ROOT / "skills/onboarding/SKILL.md").read_text()
+    OUTPUT_MODES = (ROOT / "skills/onboarding/reference/output-modes.md").read_text()
+
+    def test_skill_asks_how_an_existing_resource_was_created(self):
+        self.assertIn("Ask how an existing resource was created before deleting it", self.SKILL)
+
+    def test_output_modes_has_terraform_removal_steps(self):
+        self.assertIn("### Remove what Terraform manages", self.OUTPUT_MODES)
+
+    def section(self):
+        return self.OUTPUT_MODES.split("### Remove what Terraform manages", 1)[-1].split("\n## ", 1)[0]
+
+    def test_state_check_matches_resource_ids_without_printing_state(self):
+        # A whole-state grep also matches reused resources whose ids appear as references on
+        # managed ones, and an empty -id lists every resource, so the check is guarded.
+        section = self.section()
+        self.assertIn('[ -n "${ID}" ] && terraform state list -id="${ID}"', section)
+        self.assertNotIn("state pull", section)
+        self.assertNotIn("terraform show", section)
+
+    def test_terraform_addresses_are_quoted(self):
+        # Addresses can carry [0] or ["key"]; unquoted, zsh globs them before Terraform runs.
+        section = self.section()
+        self.assertIn("terraform destroy -target='<address>'", section)
+        self.assertIn("terraform state rm '<address>'", section)
+
+
+class ModelComparisonFindingsTests(unittest.TestCase):
+    """Findings from running the onboarding scenarios across models (2026-10-01): each rule
+    below closed a gap one of the models fell into."""
+
+    # Whitespace collapsed, so rewrapping the prose doesn't break the checks.
+    SKILL = " ".join((ROOT / "skills/onboarding/SKILL.md").read_text().split())
+    OUTPUT_MODES = " ".join((ROOT / "skills/onboarding/reference/output-modes.md").read_text().split())
+    TROUBLESHOOTING = " ".join((ROOT / "skills/onboarding/reference/troubleshooting.md").read_text().split())
+    CONNECTION_INPUTS = " ".join((ROOT / "skills/onboarding/reference/connection-inputs.md").read_text().split())
+
+    def test_credentials_pass_does_not_rule_out_iam(self):
+        # Right after a successful read the agent keeps the secret, so a fresh IAM break shows
+        # "credentials passed" with no warning; one model took that as a network problem.
+        self.assertIn("A credentials pass doesn't prove the agent can read the secret now", self.TROUBLESHOOTING)
+        self.assertIn("credentials valid with no warning, after a recent", self.TROUBLESHOOTING)
+
+    def test_policy_edits_use_the_normalised_diff(self):
+        # AWS CLI JSON (4 spaces) vs jq (2 spaces) makes a raw diff mark every line.
+        self.assertIn("diff <(jq -S . backup.json) <(jq -S . new.json)", self.TROUBLESHOOTING)
+
+    def test_single_arn_simulator_uses_the_same_query(self):
+        self.assertIn("Use the same query for a single ARN", self.OUTPUT_MODES)
+        self.assertIn("EvalResourceDecision` exists only per resource", self.OUTPUT_MODES)
+
+    def test_grant_handover_uses_the_reference_commands(self):
+        # A model that never opened output-modes improvised the grant without its guards.
+        self.assertIn("read that section and hand over its commands", self.SKILL)
+
+    def test_pasted_secret_is_never_repeated(self):
+        # One model echoed the pasted password while asking the user to rotate it.
+        self.assertIn("never repeat or quote it, not even to ask for rotation", self.SKILL)
+
+    def test_revoking_one_secret_checks_scope_first(self):
+        section = self.OUTPUT_MODES.split("### Revoke the agent's access to one secret", 1)
+        self.assertEqual(len(section), 2, "expected a revoke section")
+        body = section[1].split(" ### ", 1)[0]
+        self.assertIn("get-role-policy", body)
+        self.assertIn("delete-role-policy", body)
+        self.assertIn("implicitDeny", body)
+
+
+class BiConnectionTests(unittest.TestCase):
+    """Tableau, Looker and Power BI connect through a BI container, not a warehouse."""
+
+    SKILL = ModelComparisonFindingsTests.SKILL
+    OUTPUT_MODES = ModelComparisonFindingsTests.OUTPUT_MODES
+    CONNECTION_INPUTS = ModelComparisonFindingsTests.CONNECTION_INPUTS
+
+    def test_bi_connections_go_on_a_bi_container(self):
+        self.assertIn("`list_bi_containers`", self.SKILL)
+        self.assertIn("`create_bi_container`", self.SKILL)
+        self.assertIn("create_connection(name, bi_container_id, credentials_id)", self.SKILL)
+        self.assertIn("NEVER create a warehouse for a BI tool", self.CONNECTION_INPUTS)
+        self.assertNotIn("connected in the UI", self.CONNECTION_INPUTS)
+
+    def test_one_looker_container_holds_both_looker_connections(self):
+        self.assertIn("one `looker` container holds both", self.SKILL)
+
+    def test_bi_credential_inputs_are_listed_per_type(self):
+        for heading in ("#### Tableau", "#### Looker API", "#### Looker git clone", "#### Power BI"):
+            self.assertIn(heading, self.CONNECTION_INPUTS)
+        # Tableau's three sign-in methods are exclusive; sending two is refused.
+        self.assertIn("exactly one sign-in method", self.CONNECTION_INPUTS)
+
+    def test_bi_secrets_are_write_only_in_terraform_and_never_literal_in_the_cli(self):
+        self.assertIn('resource "montecarlo_bi_container"', self.OUTPUT_MODES)
+        self.assertIn("password_wo", self.OUTPUT_MODES)
+        self.assertIn("bi_container_id = montecarlo_bi_container.", self.OUTPUT_MODES)
+        self.assertIn("montecarlo credentials create tableau", self.OUTPUT_MODES)
+        self.assertIn("--password-prompt", self.OUTPUT_MODES)
