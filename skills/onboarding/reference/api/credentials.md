@@ -13,7 +13,7 @@ Credentials are returned oldest first. Each entry says what connection type it i
 where its secret lives; read the typed endpoint for that kind to see its other fields.
 
 - **Effect:** read-only.
-- **Pairs with:** `get_azure_dedicated_sql_pool_credentials`, `get_azure_sql_database_credentials`, `get_bigquery_credentials`, `get_clickhouse_credentials`, `get_databricks_metastore_sql_warehouse_credentials`, `get_databricks_sql_warehouse_credentials`, `get_db2_credentials`, `get_looker_git_clone_credentials`, `get_looker_credentials`, `get_mariadb_credentials`, `get_mysql_credentials`, `get_oracle_credentials`, `get_postgres_credentials`, `get_power_bi_credentials`, `get_redshift_credentials`, `get_sap_hana_credentials`, `create_aws_secrets_manager_credentials`, `validate_aws_secrets_manager_credentials`, `get_aws_secrets_manager_credentials`, `create_azure_key_vault_credentials`, `validate_azure_key_vault_credentials`, `get_azure_key_vault_credentials`, `create_env_var_credentials`, `validate_env_var_credentials`, `get_env_var_credentials`, `create_file_credentials`, `validate_file_credentials`, `get_file_credentials`, `create_gcp_secret_manager_credentials`, `validate_gcp_secret_manager_credentials`, `get_gcp_secret_manager_credentials`, `get_snowflake_credentials`, `get_starburst_enterprise_credentials`, `get_starburst_galaxy_credentials`, `get_tableau_credentials`, `get_teradata_credentials`.
+- **Pairs with:** `create_airflow_credentials`, `get_airflow_credentials`, `get_azure_data_factory_credentials`, `get_azure_dedicated_sql_pool_credentials`, `get_azure_sql_database_credentials`, `get_bigquery_credentials`, `get_clickhouse_credentials`, `get_databricks_metastore_sql_warehouse_credentials`, `get_databricks_sql_warehouse_credentials`, `get_db2_credentials`, `get_fivetran_credentials`, `get_gcp_dataform_credentials`, `get_informatica_v2_credentials`, `get_looker_git_clone_credentials`, `get_looker_credentials`, `get_mariadb_credentials`, `get_mulesoft_credentials`, `get_mysql_credentials`, `get_oracle_credentials`, `get_postgres_credentials`, `get_power_bi_credentials`, `get_redshift_credentials`, `get_sap_hana_credentials`, `create_aws_secrets_manager_credentials`, `validate_aws_secrets_manager_credentials`, `get_aws_secrets_manager_credentials`, `create_azure_key_vault_credentials`, `validate_azure_key_vault_credentials`, `get_azure_key_vault_credentials`, `create_env_var_credentials`, `validate_env_var_credentials`, `get_env_var_credentials`, `create_file_credentials`, `validate_file_credentials`, `get_file_credentials`, `create_gcp_secret_manager_credentials`, `validate_gcp_secret_manager_credentials`, `get_gcp_secret_manager_credentials`, `get_snowflake_credentials`, `get_sql_server_credentials`, `get_starburst_enterprise_credentials`, `get_starburst_galaxy_credentials`, `get_tableau_credentials`, `get_teradata_credentials`.
 - **Paging:** one page per call; pass `next_cursor` back as `cursor` for the next page.
 
 ### Arguments
@@ -40,6 +40,203 @@ Returns `items` (response fields per item: id, connection_type, storage_type, cr
 - Authentication credentials are missing or invalid.
 - The request was authenticated, but the caller is not allowed to perform this operation. Read `code` to tell the reasons apart: `account_frozen` means the account is paused, rather than that the caller lacks permission.
 - An argument is invalid; the error names the field.
+- An unexpected error prevented the request from being processed.
+
+## `create_airflow_credentials`: Create Airflow credentials
+
+Store the host name of an Airflow environment as credentials. Takes `host_name` only: Airflow needs no secret. Refused once the account holds its limit of credentials.
+
+- **Effect:** creates; repeating it creates again.
+- **Pairs with:** `get_airflow_credentials`, `update_airflow_credentials`, `delete_airflow_credentials`, `list_credentials`.
+
+### Arguments
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `host_name` | `str` | yes | Host name of the Airflow web server, as Airflow reports it to Monte Carlo. Between 1 and 2048 characters. |
+
+### Response
+
+Returns the new credentials. Response fields: id, connection_type, storage_type, created_time, host_name.
+
+| Field | Description |
+|---|---|
+| `id` | Unique identifier of the credentials. |
+| `connection_type` | The connection type the credentials are for, such as `snowflake`. Fixed once created. |
+| `storage_type` | Where the secret lives. Fixed once created. |
+| `created_time` | When the credentials were created. |
+| `host_name` | Host name of the Airflow web server, as Airflow reports it to Monte Carlo. |
+
+### What can fail
+
+- Authentication credentials are missing or invalid.
+- The request was authenticated, but the caller is not allowed to perform this operation. Read `code` to tell the reasons apart: `account_frozen` means the account is paused, rather than that the caller lacks permission.
+- The change conflicts with the current state of the credentials.
+- An argument is invalid; the error names the field.
+- Monte Carlo is busy or temporarily unavailable; the tool retries once after the wait Monte Carlo asks for.
+- An unexpected error prevented the request from being processed.
+
+## `get_airflow_credentials`: Get Airflow credentials
+
+Get one set of Airflow connection details.
+
+An id that does not exist, belongs to another account, or names credentials of another kind
+returns 404.
+
+- **Effect:** read-only.
+- **Pairs with:** `create_airflow_credentials`, `update_airflow_credentials`, `delete_airflow_credentials`, `list_credentials`.
+
+### Arguments
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `credentials_id` | `str` | yes | Id of the credentials, as returned by list_credentials. |
+
+### Response
+
+Response fields: id, connection_type, storage_type, created_time, host_name.
+
+| Field | Description |
+|---|---|
+| `id` | Unique identifier of the credentials. |
+| `connection_type` | The connection type the credentials are for, such as `snowflake`. Fixed once created. |
+| `storage_type` | Where the secret lives. Fixed once created. |
+| `created_time` | When the credentials were created. |
+| `host_name` | Host name of the Airflow web server, as Airflow reports it to Monte Carlo. |
+
+### What can fail
+
+- Authentication credentials are missing or invalid.
+- The request was authenticated, but the caller is not allowed to perform this operation. Read `code` to tell the reasons apart: `account_frozen` means the account is paused, rather than that the caller lacks permission.
+- The credentials does not exist, or is not visible to the caller.
+- An unexpected error prevented the request from being processed.
+- Monte Carlo is busy or temporarily unavailable; try again after a moment.
+
+## `update_airflow_credentials`: Update Airflow credentials
+
+Change the `host_name` of Airflow credentials. Every connection using them picks up the change. An empty body returns them unchanged.
+
+- **Effect:** updates in place; idempotent.
+- **Pairs with:** `create_airflow_credentials`, `get_airflow_credentials`, `delete_airflow_credentials`, `list_credentials`.
+
+### Arguments
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `credentials_id` | `str` | yes | Id of the credentials, as returned by list_credentials. |
+| `host_name` | `str` | no | Host name of the Airflow web server, as Airflow reports it to Monte Carlo. Between 1 and 2048 characters. |
+
+### Response
+
+Returns the credentials after the change. Response fields: id, connection_type, storage_type, created_time, host_name.
+
+| Field | Description |
+|---|---|
+| `id` | Unique identifier of the credentials. |
+| `connection_type` | The connection type the credentials are for, such as `snowflake`. Fixed once created. |
+| `storage_type` | Where the secret lives. Fixed once created. |
+| `created_time` | When the credentials were created. |
+| `host_name` | Host name of the Airflow web server, as Airflow reports it to Monte Carlo. |
+
+### What can fail
+
+- Authentication credentials are missing or invalid.
+- The request was authenticated, but the caller is not allowed to perform this operation. Read `code` to tell the reasons apart: `account_frozen` means the account is paused, rather than that the caller lacks permission.
+- The credentials does not exist, or is not visible to the caller.
+- An argument is invalid; the error names the field.
+- Monte Carlo is busy or temporarily unavailable; the tool retries once after the wait Monte Carlo asks for.
+- An unexpected error prevented the request from being processed.
+
+## `delete_airflow_credentials`: Delete Airflow credentials
+
+Delete Airflow credentials no connection uses.
+
+- **Effect:** deletes; destructive and idempotent.
+- **Pairs with:** `create_airflow_credentials`, `get_airflow_credentials`, `update_airflow_credentials`, `list_credentials`.
+
+### Arguments
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `credentials_id` | `str` | yes | Id of the credentials, as returned by list_credentials. |
+
+### Response
+
+Returns `credentials_id` and `deleted: true` once the credentials is gone.
+
+### What can fail
+
+- Authentication credentials are missing or invalid.
+- The request was authenticated, but the caller is not allowed to perform this operation. Read `code` to tell the reasons apart: `account_frozen` means the account is paused, rather than that the caller lacks permission.
+- The credentials does not exist, or is not visible to the caller.
+- The change conflicts with the current state of the credentials.
+- Monte Carlo is busy or temporarily unavailable; try again after a moment.
+- An unexpected error prevented the request from being processed.
+
+## `get_azure_data_factory_credentials`: Get Azure Data Factory credentials
+
+Get one set of Azure Data Factory credentials, without the client secret.
+
+An id that does not exist, belongs to another account, or names credentials of another kind
+returns 404.
+
+- **Effect:** read-only.
+- **Pairs with:** `delete_azure_data_factory_credentials`, `list_credentials`.
+
+### Arguments
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `credentials_id` | `str` | yes | Id of the credentials, as returned by list_credentials. |
+
+### Response
+
+Response fields: id, connection_type, storage_type, created_time, tenant_id, app_client_id, subscription_id, resource_group_name, factory_name.
+
+| Field | Description |
+|---|---|
+| `id` | Unique identifier of the credentials. |
+| `connection_type` | The connection type the credentials are for, such as `snowflake`. Fixed once created. |
+| `storage_type` | Where the secret lives. Fixed once created. |
+| `created_time` | When the credentials were created. |
+| `tenant_id` | Microsoft Entra ID tenant the data factory belongs to. |
+| `app_client_id` | Client ID of the Entra ID app registration Monte Carlo signs in with. |
+| `subscription_id` | Azure subscription that holds the data factory. |
+| `resource_group_name` | Resource group that holds the data factory. |
+| `factory_name` | Name of the data factory. |
+
+### What can fail
+
+- Authentication credentials are missing or invalid.
+- The request was authenticated, but the caller is not allowed to perform this operation. Read `code` to tell the reasons apart: `account_frozen` means the account is paused, rather than that the caller lacks permission.
+- The credentials does not exist, or is not visible to the caller.
+- An unexpected error prevented the request from being processed.
+- Monte Carlo is busy or temporarily unavailable; try again after a moment.
+
+## `delete_azure_data_factory_credentials`: Delete Azure Data Factory credentials
+
+Delete Azure Data Factory credentials no connection uses. Monte Carlo stops using the stored client secret. Rotate it in Microsoft Entra ID if it must be retired.
+
+- **Effect:** deletes; destructive and idempotent.
+- **Pairs with:** `get_azure_data_factory_credentials`, `list_credentials`.
+
+### Arguments
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `credentials_id` | `str` | yes | Id of the credentials, as returned by list_credentials. |
+
+### Response
+
+Returns `credentials_id` and `deleted: true` once the credentials is gone.
+
+### What can fail
+
+- Authentication credentials are missing or invalid.
+- The request was authenticated, but the caller is not allowed to perform this operation. Read `code` to tell the reasons apart: `account_frozen` means the account is paused, rather than that the caller lacks permission.
+- The credentials does not exist, or is not visible to the caller.
+- The change conflicts with the current state of the credentials.
+- Monte Carlo is busy or temporarily unavailable; try again after a moment.
 - An unexpected error prevented the request from being processed.
 
 ## `get_azure_dedicated_sql_pool_credentials`: Get Azure Dedicated SQL Pool credentials
@@ -501,6 +698,202 @@ Returns `credentials_id` and `deleted: true` once the credentials is gone.
 - Monte Carlo is busy or temporarily unavailable; try again after a moment.
 - An unexpected error prevented the request from being processed.
 
+## `get_fivetran_credentials`: Get Fivetran credentials
+
+Get one set of Fivetran credentials, without the API key and its secret.
+
+An id that does not exist, belongs to another account, or names credentials of another kind
+returns 404.
+
+- **Effect:** read-only.
+- **Pairs with:** `delete_fivetran_credentials`, `list_credentials`.
+
+### Arguments
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `credentials_id` | `str` | yes | Id of the credentials, as returned by list_credentials. |
+
+### Response
+
+Response fields: id, connection_type, storage_type, created_time, base_url.
+
+| Field | Description |
+|---|---|
+| `id` | Unique identifier of the credentials. |
+| `connection_type` | The connection type the credentials are for, such as `snowflake`. Fixed once created. |
+| `storage_type` | Where the secret lives. Fixed once created. |
+| `created_time` | When the credentials were created. |
+| `base_url` | URL of the Fivetran REST API. Leave it out for https://api.fivetran.com/v1/. Null unless set. |
+
+### What can fail
+
+- Authentication credentials are missing or invalid.
+- The request was authenticated, but the caller is not allowed to perform this operation. Read `code` to tell the reasons apart: `account_frozen` means the account is paused, rather than that the caller lacks permission.
+- The credentials does not exist, or is not visible to the caller.
+- An unexpected error prevented the request from being processed.
+- Monte Carlo is busy or temporarily unavailable; try again after a moment.
+
+## `delete_fivetran_credentials`: Delete Fivetran credentials
+
+Delete Fivetran credentials no connection uses. Monte Carlo stops using the stored API key and secret. Delete the API key in Fivetran if it must be retired.
+
+- **Effect:** deletes; destructive and idempotent.
+- **Pairs with:** `get_fivetran_credentials`, `list_credentials`.
+
+### Arguments
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `credentials_id` | `str` | yes | Id of the credentials, as returned by list_credentials. |
+
+### Response
+
+Returns `credentials_id` and `deleted: true` once the credentials is gone.
+
+### What can fail
+
+- Authentication credentials are missing or invalid.
+- The request was authenticated, but the caller is not allowed to perform this operation. Read `code` to tell the reasons apart: `account_frozen` means the account is paused, rather than that the caller lacks permission.
+- The credentials does not exist, or is not visible to the caller.
+- The change conflicts with the current state of the credentials.
+- Monte Carlo is busy or temporarily unavailable; try again after a moment.
+- An unexpected error prevented the request from being processed.
+
+## `get_gcp_dataform_credentials`: Get GCP Dataform credentials
+
+Get one set of GCP Dataform credentials, without the key.
+
+An id that does not exist, belongs to another account, or names credentials of another kind
+returns 404.
+
+- **Effect:** read-only.
+- **Pairs with:** `delete_gcp_dataform_credentials`, `list_credentials`.
+
+### Arguments
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `credentials_id` | `str` | yes | Id of the credentials, as returned by list_credentials. |
+
+### Response
+
+Response fields: id, connection_type, storage_type, created_time, project_id, locations, client_email.
+
+| Field | Description |
+|---|---|
+| `id` | Unique identifier of the credentials. |
+| `connection_type` | The connection type the credentials are for, such as `snowflake`. Fixed once created. |
+| `storage_type` | Where the secret lives. Fixed once created. |
+| `created_time` | When the credentials were created. |
+| `project_id` | Google Cloud project that holds the Dataform repositories. |
+| `locations` | Google Cloud regions to read Dataform repositories in, such as us-central1. |
+| `client_email` | Email address of the service account. |
+
+### What can fail
+
+- Authentication credentials are missing or invalid.
+- The request was authenticated, but the caller is not allowed to perform this operation. Read `code` to tell the reasons apart: `account_frozen` means the account is paused, rather than that the caller lacks permission.
+- The credentials does not exist, or is not visible to the caller.
+- An unexpected error prevented the request from being processed.
+- Monte Carlo is busy or temporarily unavailable; try again after a moment.
+
+## `delete_gcp_dataform_credentials`: Delete GCP Dataform credentials
+
+Delete GCP Dataform credentials no connection uses. Monte Carlo stops using the stored service account key. Delete the key in Google Cloud if it must be retired.
+
+- **Effect:** deletes; destructive and idempotent.
+- **Pairs with:** `get_gcp_dataform_credentials`, `list_credentials`.
+
+### Arguments
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `credentials_id` | `str` | yes | Id of the credentials, as returned by list_credentials. |
+
+### Response
+
+Returns `credentials_id` and `deleted: true` once the credentials is gone.
+
+### What can fail
+
+- Authentication credentials are missing or invalid.
+- The request was authenticated, but the caller is not allowed to perform this operation. Read `code` to tell the reasons apart: `account_frozen` means the account is paused, rather than that the caller lacks permission.
+- The credentials does not exist, or is not visible to the caller.
+- The change conflicts with the current state of the credentials.
+- Monte Carlo is busy or temporarily unavailable; try again after a moment.
+- An unexpected error prevented the request from being processed.
+
+## `get_informatica_v2_credentials`: Get Informatica credentials
+
+Get one set of Informatica credentials, without the passwords and the client secret.
+
+An id that does not exist, belongs to another account, or names credentials of another kind
+returns 404.
+
+- **Effect:** read-only.
+- **Pairs with:** `delete_informatica_v2_credentials`, `list_credentials`.
+
+### Arguments
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `credentials_id` | `str` | yes | Id of the credentials, as returned by list_credentials. |
+
+### Response
+
+Response fields: id, connection_type, storage_type, created_time, auth_mode, base_url, username, org_id, oauth_client_id, oauth_grant_type, oauth_access_token_endpoint, oauth_scope, oauth_username.
+
+| Field | Description |
+|---|---|
+| `id` | Unique identifier of the credentials. |
+| `connection_type` | The connection type the credentials are for, such as `snowflake`. Fixed once created. |
+| `storage_type` | Where the secret lives. Fixed once created. |
+| `created_time` | When the credentials were created. |
+| `auth_mode` | How Monte Carlo signs in. `password` takes `username` and `password`. `oauth` takes `org_id` and the `oauth_*` fields. |
+| `base_url` | Informatica login URL for your POD. Leave it out for https://dm-us.informaticacloud.com. Null unless set. |
+| `username` | Informatica user. Null unless `auth_mode` is password. |
+| `org_id` | Informatica organization ID. Null unless `auth_mode` is oauth. |
+| `oauth_client_id` | Client ID of the identity provider app. Null unless `auth_mode` is oauth. |
+| `oauth_grant_type` | Grant Monte Carlo requests the token with. Null unless `auth_mode` is oauth. |
+| `oauth_access_token_endpoint` | Identity provider URL Monte Carlo requests tokens from. Null unless `auth_mode` is oauth. |
+| `oauth_scope` | Scope the token is requested with. Null unless set. |
+| `oauth_username` | Identity provider user. Null unless the grant is password. |
+
+### What can fail
+
+- Authentication credentials are missing or invalid.
+- The request was authenticated, but the caller is not allowed to perform this operation. Read `code` to tell the reasons apart: `account_frozen` means the account is paused, rather than that the caller lacks permission.
+- The credentials does not exist, or is not visible to the caller.
+- An unexpected error prevented the request from being processed.
+- Monte Carlo is busy or temporarily unavailable; try again after a moment.
+
+## `delete_informatica_v2_credentials`: Delete Informatica credentials
+
+Delete Informatica credentials no connection uses. Monte Carlo stops using the stored password or client secret. Rotate it in Informatica or your identity provider if it must be retired.
+
+- **Effect:** deletes; destructive and idempotent.
+- **Pairs with:** `get_informatica_v2_credentials`, `list_credentials`.
+
+### Arguments
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `credentials_id` | `str` | yes | Id of the credentials, as returned by list_credentials. |
+
+### Response
+
+Returns `credentials_id` and `deleted: true` once the credentials is gone.
+
+### What can fail
+
+- Authentication credentials are missing or invalid.
+- The request was authenticated, but the caller is not allowed to perform this operation. Read `code` to tell the reasons apart: `account_frozen` means the account is paused, rather than that the caller lacks permission.
+- The credentials does not exist, or is not visible to the caller.
+- The change conflicts with the current state of the credentials.
+- Monte Carlo is busy or temporarily unavailable; try again after a moment.
+- An unexpected error prevented the request from being processed.
+
 ## `get_looker_git_clone_credentials`: Get LookML repository credentials
 
 Get one set of LookML repository credentials, without the token or the SSH key.
@@ -681,6 +1074,70 @@ Delete MariaDB credentials no connection uses. Monte Carlo stops using the store
 | Argument | Type | Required | Description |
 |---|---|---|---|
 | `credentials_id` | `str` | yes | Id of the credentials, as returned when they are created or listed. |
+
+### Response
+
+Returns `credentials_id` and `deleted: true` once the credentials is gone.
+
+### What can fail
+
+- Authentication credentials are missing or invalid.
+- The request was authenticated, but the caller is not allowed to perform this operation. Read `code` to tell the reasons apart: `account_frozen` means the account is paused, rather than that the caller lacks permission.
+- The credentials does not exist, or is not visible to the caller.
+- The change conflicts with the current state of the credentials.
+- Monte Carlo is busy or temporarily unavailable; try again after a moment.
+- An unexpected error prevented the request from being processed.
+
+## `get_mulesoft_credentials`: Get MuleSoft credentials
+
+Get one set of MuleSoft credentials, without the client secret.
+
+An id that does not exist, belongs to another account, or names credentials of another kind
+returns 404.
+
+- **Effect:** read-only.
+- **Pairs with:** `delete_mulesoft_credentials`, `list_credentials`.
+
+### Arguments
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `credentials_id` | `str` | yes | Id of the credentials, as returned by list_credentials. |
+
+### Response
+
+Response fields: id, connection_type, storage_type, created_time, app_client_id, region, org_id.
+
+| Field | Description |
+|---|---|
+| `id` | Unique identifier of the credentials. |
+| `connection_type` | The connection type the credentials are for, such as `snowflake`. Fixed once created. |
+| `storage_type` | Where the secret lives. Fixed once created. |
+| `created_time` | When the credentials were created. |
+| `app_client_id` | Client ID of the Anypoint connected app. The app needs the View Environment, Read Deployments and Exchange Viewer scopes. |
+| `region` | Anypoint Platform instance the organization lives on. |
+| `org_id` | Anypoint organization or business group to collect from. Set it when your Mule applications are deployed in a business group. Leave it out to collect the organization that owns the connected app. Null unless set. |
+
+### What can fail
+
+- Authentication credentials are missing or invalid.
+- The request was authenticated, but the caller is not allowed to perform this operation. Read `code` to tell the reasons apart: `account_frozen` means the account is paused, rather than that the caller lacks permission.
+- The credentials does not exist, or is not visible to the caller.
+- An unexpected error prevented the request from being processed.
+- Monte Carlo is busy or temporarily unavailable; try again after a moment.
+
+## `delete_mulesoft_credentials`: Delete MuleSoft credentials
+
+Delete MuleSoft credentials no connection uses. Monte Carlo stops using the stored client secret. Rotate it in Anypoint if it must be retired.
+
+- **Effect:** deletes; destructive and idempotent.
+- **Pairs with:** `get_mulesoft_credentials`, `list_credentials`.
+
+### Arguments
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `credentials_id` | `str` | yes | Id of the credentials, as returned by list_credentials. |
 
 ### Response
 
@@ -2126,6 +2583,75 @@ Delete Snowflake credentials no connection uses. Monte Carlo stops using the sto
 
 - **Effect:** deletes; destructive and idempotent.
 - **Pairs with:** `get_snowflake_credentials`, `list_credentials`.
+
+### Arguments
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `credentials_id` | `str` | yes | Id of the credentials, as returned when they are created or listed. |
+
+### Response
+
+Returns `credentials_id` and `deleted: true` once the credentials is gone.
+
+### What can fail
+
+- Authentication credentials are missing or invalid.
+- The request was authenticated, but the caller is not allowed to perform this operation. Read `code` to tell the reasons apart: `account_frozen` means the account is paused, rather than that the caller lacks permission.
+- The credentials does not exist, or is not visible to the caller.
+- The change conflicts with the current state of the credentials.
+- Monte Carlo is busy or temporarily unavailable; try again after a moment.
+- An unexpected error prevented the request from being processed.
+
+## `get_sql_server_credentials`: Get SQL Server credentials
+
+Get one set of SQL Server credentials, without the password or the keytab.
+
+An id that does not exist, belongs to another account, or names credentials of another
+kind returns 404.
+
+- **Effect:** read-only.
+- **Pairs with:** `delete_sql_server_credentials`, `list_credentials`.
+
+### Arguments
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `credentials_id` | `str` | yes | Id of the credentials, as returned when they are created or listed. |
+
+### Response
+
+Response fields: id, connection_type, storage_type, created_time, host, port, db_name, auth_mode, user, realm, kdc, principal.
+
+| Field | Description |
+|---|---|
+| `id` | Unique identifier of the credentials. |
+| `connection_type` | The connection type the credentials are for, such as `snowflake`. Fixed once created. |
+| `storage_type` | Where the secret lives. Fixed once created. |
+| `created_time` | When the credentials were created. |
+| `host` | Hostname of the database endpoint. For `kerberos`, the fully qualified name the server's service principal is registered under. |
+| `port` | Port the database listens on. |
+| `db_name` | Database to connect to. Null when none is set. |
+| `auth_mode` | How Monte Carlo signs in. `sql` takes `user` and `password`. `kerberos` takes `realm`, `kdc`, `principal`, and one of `keytab_base64` or `password`. |
+| `user` | SQL login Monte Carlo signs in as, for `sql`. Null for `kerberos`. |
+| `realm` | Kerberos realm, normally the Active Directory domain in capitals, for `kerberos`. Null for `sql`. |
+| `kdc` | Hostname of the key distribution center, optionally with `:port`, for `kerberos`. Null for `sql`. |
+| `principal` | Active Directory principal Monte Carlo signs in as, for `kerberos`. Null for `sql`. |
+
+### What can fail
+
+- Authentication credentials are missing or invalid.
+- The request was authenticated, but the caller is not allowed to perform this operation. Read `code` to tell the reasons apart: `account_frozen` means the account is paused, rather than that the caller lacks permission.
+- The credentials does not exist, or is not visible to the caller.
+- An unexpected error prevented the request from being processed.
+- Monte Carlo is busy or temporarily unavailable; try again after a moment.
+
+## `delete_sql_server_credentials`: Delete SQL Server credentials
+
+Delete SQL Server credentials no connection uses. Monte Carlo stops using the stored password or keytab. Change the password in SQL Server or Active Directory if it must be retired.
+
+- **Effect:** deletes; destructive and idempotent.
+- **Pairs with:** `get_sql_server_credentials`, `list_credentials`.
 
 ### Arguments
 
