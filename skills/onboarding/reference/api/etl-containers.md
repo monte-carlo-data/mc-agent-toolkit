@@ -27,7 +27,7 @@ Returns `items`. Response fields per item: id, type, name, is_synthetic, deploym
 | `id` | Unique identifier of the ETL container. |
 | `type` | The ETL tool the container represents. Fixed once created. |
 | `name` | Display name of the ETL container. |
-| `is_synthetic` | True for a container this API does not create or delete. Most belong to another connection, such as a warehouse or BI connection, and go away with it. |
+| `is_synthetic` | True for a container that belongs to a warehouse or BI connection and goes away with it. This API does not create or delete one. Fixed by the type. |
 | `deployment_id` | The deployment the container's connection runs through. Null for a type that runs on none, such as `airflow`. The id may name a deployment on Monte Carlo's older collection platform. The deployments endpoints do not list those. |
 | `deployment_name` | Display name of the deployment. Null exactly when `deployment_id` is. |
 | `created_time` | When the ETL container was created. |
@@ -40,7 +40,7 @@ Returns `items`. Response fields per item: id, type, name, is_synthetic, deploym
 
 ## `create_etl_container`: Create an ETL container
 
-Create an empty ETL container for Airflow, Azure Data Factory, Fivetran, GCP Dataform, Informatica or MuleSoft, to add that tool's connection to. Takes the ETL tool as type, a name, and a deployment id. Every type except airflow needs the deployment id: call list_deployments first and pick the deployment the connection will run through, the cloud deployment Monte Carlo hosts for the account when the list shows one, or one with a collection agent already registered. Send no deployment id for airflow. Refused when a container of the same type already has the name, and for a second fivetran container on one deployment.
+Create an empty ETL container for Airflow, Azure Data Factory, Fivetran, GCP Dataform, Informatica, MuleSoft or a custom ETL connector, to add that tool's connection to. Takes the ETL tool as type, a name, and a deployment id. Every type except airflow needs the deployment id: call list_deployments first and pick the deployment the connection will run through, the cloud deployment Monte Carlo hosts for the account when the list shows one, or one with a collection agent already registered. A custom-etl-connector container goes on the deployment of the agent that registered the connector, or on none for a push-only connector, whose jobs and runs the customer pushes. Send no deployment id for airflow. Refused when a container of the same type already has the name, and for a second fivetran container on one deployment.
 
 - **Effect:** creates; repeating it creates again.
 - **Pairs with:** `list_etl_containers`, `get_etl_container`, `update_etl_container`, `delete_etl_container`, `list_deployments`.
@@ -49,9 +49,9 @@ Create an empty ETL container for Airflow, Azure Data Factory, Fivetran, GCP Dat
 
 | Argument | Type | Required | Description |
 |---|---|---|---|
-| `type` | one of `airflow`, `azure-data-factory`, `fivetran`, `gcp-dataform`, `informatica-v2`, `mulesoft` | yes | The ETL tool the container represents. Its connection has to be for this tool. Cannot be changed after the container is created. |
+| `type` | one of `airflow`, `azure-data-factory`, `custom-etl-connector`, `fivetran`, `gcp-dataform`, `informatica-v2`, `mulesoft` | yes | The ETL tool the container represents. Its connection has to be for this tool. Cannot be changed after the container is created. |
 | `name` | `str` | yes | Display name for the ETL container. No two containers of the same type can share a name. Between 1 and 200 characters. |
-| `deployment_id` | `str` | no | The deployment the container's connection will run through. Pick one from the deployments list. Only a deployment on Monte Carlo's current collection platform is accepted. Required for every type except `airflow`, which takes none. |
+| `deployment_id` | `str` | no | The deployment the container's connection will run through. Pick one from the deployments list. Only a deployment on Monte Carlo's current collection platform is accepted. `airflow` takes none. `custom-etl-connector` takes the deployment of the agent that registered the connector, or none for a push-only connector. Every other type requires one. |
 
 ### Response
 
@@ -62,7 +62,7 @@ Returns the new etl container. Response fields: id, type, name, is_synthetic, de
 | `id` | Unique identifier of the ETL container. |
 | `type` | The ETL tool the container represents. Fixed once created. |
 | `name` | Display name of the ETL container. |
-| `is_synthetic` | True for a container this API does not create or delete. Most belong to another connection, such as a warehouse or BI connection, and go away with it. |
+| `is_synthetic` | True for a container that belongs to a warehouse or BI connection and goes away with it. This API does not create or delete one. Fixed by the type. |
 | `deployment_id` | The deployment the container's connection runs through. Null for a type that runs on none, such as `airflow`. The id may name a deployment on Monte Carlo's older collection platform. The deployments endpoints do not list those. |
 | `deployment_name` | Display name of the deployment. Null exactly when `deployment_id` is. |
 | `created_time` | When the ETL container was created. |
@@ -101,7 +101,7 @@ Response fields: id, type, name, is_synthetic, deployment_id, deployment_name, c
 | `id` | Unique identifier of the ETL container. |
 | `type` | The ETL tool the container represents. Fixed once created. |
 | `name` | Display name of the ETL container. |
-| `is_synthetic` | True for a container this API does not create or delete. Most belong to another connection, such as a warehouse or BI connection, and go away with it. |
+| `is_synthetic` | True for a container that belongs to a warehouse or BI connection and goes away with it. This API does not create or delete one. Fixed by the type. |
 | `deployment_id` | The deployment the container's connection runs through. Null for a type that runs on none, such as `airflow`. The id may name a deployment on Monte Carlo's older collection platform. The deployments endpoints do not list those. |
 | `deployment_name` | Display name of the deployment. Null exactly when `deployment_id` is. |
 | `created_time` | When the ETL container was created. |
@@ -136,7 +136,7 @@ Returns the etl container after the change. Response fields: id, type, name, is_
 | `id` | Unique identifier of the ETL container. |
 | `type` | The ETL tool the container represents. Fixed once created. |
 | `name` | Display name of the ETL container. |
-| `is_synthetic` | True for a container this API does not create or delete. Most belong to another connection, such as a warehouse or BI connection, and go away with it. |
+| `is_synthetic` | True for a container that belongs to a warehouse or BI connection and goes away with it. This API does not create or delete one. Fixed by the type. |
 | `deployment_id` | The deployment the container's connection runs through. Null for a type that runs on none, such as `airflow`. The id may name a deployment on Monte Carlo's older collection platform. The deployments endpoints do not list those. |
 | `deployment_name` | Display name of the deployment. Null exactly when `deployment_id` is. |
 | `created_time` | When the ETL container was created. |
