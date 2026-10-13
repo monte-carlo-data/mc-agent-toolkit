@@ -95,8 +95,8 @@ so this section says how to discover them; it does not list them.
   the ones the account's agents registered, with each one's `asset_class` and deployment. An
   `etl` or `bi` type is supported when `create_etl_container` or `create_bi_container` names
   `custom-etl-connector` or `custom-bi-connector` in its `type` list; a push-only connector is
-  supported on the same condition. A `warehouse` type is handed off to the UI for now (SKILL.md
-  *Custom connectors*). NEVER provision a deployment or agent for a custom connector: the type
+  supported on the same condition. A `warehouse` type goes on a warehouse on its agent's
+  deployment, usually `custom-integration` (SKILL.md *Custom connectors*). NEVER provision a deployment or agent for a custom connector: the type
   already runs on its agent's deployment.
 - NEVER provision a deployment or agent for an integration before it passes this check. An agent
   built for an unsupported type is a deployment with nothing behind it (SKILL.md rule 3).
@@ -260,7 +260,9 @@ built-in type.
 | ETL container (custom ETL connector) | `type` `custom-etl-connector`, `name`; `deployment_id` for an agent-registered connector, none for a push-only one | Name from the customer or an existing empty container; the deployment from the type in `list_custom_connector_types`, never chosen or provisioned. One connection per container. |
 | BI container (custom BI connector) | `type` `custom-bi-connector`, `name`; `deployment_id` as for ETL | As for ETL. |
 | Connection | `name`, `credentials_id`, and exactly one of `warehouse_id` / `bi_container_id` / `etl_container_id` | Name from the customer; ids from the earlier steps. A BI connection takes `bi_container_id`, a custom ETL one `etl_container_id`. A push-only custom connector's connection takes no `credentials_id`. |
+| Warehouse (custom warehouse connector) | `name`, `deployment_id`, `type` `custom-integration` | Reuse a warehouse on the type's deployment when one fits; the deployment from the type. |
 | Custom connector credentials | a self-hosted reference with `connection_type` set to the type's `id`; an environment variable name starting with `MCD_` | The customer, for the store and the reference; the type's `id` from discovery. None for push-only. |
+| Ingestion key (push-only) | exactly one of `etl_container_id` / `bi_container_id` | The push-only container this run created or reused. Created by the customer's CLI or Terraform step; only the key's id comes back. |
 
 ## Common mistakes
 
@@ -289,6 +291,10 @@ built-in type.
   deployment other than the type's: it is refused as `custom_connector_deployment_mismatch`.
 - Sending credentials for a push-only custom connector, or calling `validate_connection` on its
   connection: it has no deployment and nothing to validate.
+- Minting a push-only connector's ingestion key for a different container, or unscoped: a push
+  with it is refused for that container.
+- Planning `create_warehouse(connection_type=…)` for a custom warehouse type: it is refused. Send
+  `type="custom-integration"` instead.
 - Naming an environment variable for custom connector credentials without the `MCD_` prefix.
 - Treating a failed **Tables** check on a database the customer just created as missing grants:
   an empty database fails it too. Ask whether it has tables yet.

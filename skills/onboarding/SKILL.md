@@ -140,6 +140,7 @@ instrument-agent; for an already-connected warehouse's monitoring use monitoring
 | BI container | `list_bi_containers`, `get_bi_container`, `create_bi_container`, `update_bi_container`, `delete_bi_container` |
 | ETL container (custom ETL connectors) | `list_etl_containers`, `get_etl_container`, `create_etl_container`, `delete_etl_container` |
 | Connection types | `list_connection_types`, `list_custom_connector_types`, `get_custom_connector_type` |
+| Integration keys (push-only custom connectors) | `list_integration_keys`, `get_ingestion_key`, `delete_ingestion_key` |
 | Connection | `list_connections`, `get_connection`, `create_connection`, `update_connection`, `delete_connection` |
 | Identity | `get_current_user` (which account you are in, and whether it is paused) |
 | Validation | `validate_connection`, `get_validation_run` (Steps 2 and 5) |
@@ -150,8 +151,8 @@ reads the secret from a file on their machine and sends it to Monte Carlo direct
 `create_<type>_credentials`, `update_<type>_credentials` and `validate_<type>_credentials` for
 every Monte Carlo-managed type (the Snowflake key pair, and the Tableau, Looker, Looker git clone
 and Power BI credentials, among them), the Azure and GCP agent and
-data-store registrations, `create_generic_collection_agent_token` and
-`create_generic_collection_agent_oauth_client`. The reference files mark them.
+data-store registrations, `create_generic_collection_agent_token`,
+`create_generic_collection_agent_oauth_client` and `create_ingestion_key`. The reference files mark them.
 
 Check which v2 tools are actually available before promising an automated run. Missing tools,
 read-only mode and a missing `mcp/edit` scope are different conditions. Use the equivalent mc-cli
@@ -519,7 +520,7 @@ parent and the deployment**, so there is no deployment to choose.
 
 `list_custom_connector_types` lists the types the account's agents registered; pass `asset_class`
 (`etl`, `bi` or `warehouse`) to narrow it. Each item gives the `id` (the connection type, for
-example `custom-etl-connector-<id>`), the agent-supplied `name`, the `asset_class`, the
+example `custom-etl-connector-<id>`, `custom-bi-connector-<id>` or `custom-connector-<id>`), the agent-supplied `name`, the `asset_class`, the
 `collection_agent_id` that registered it and that agent's `deployment_id`. Match what the customer
 names against `name`; it is not validated, so confirm when two types could fit. Read one type with
 `get_custom_connector_type`.
@@ -528,9 +529,10 @@ There are two kinds, and they take different steps:
 
 - **Agent-registered**: the type is listed. Its connection runs through the registering agent's
   deployment, with self-hosted credentials that agent reads.
-- **Push-only**: the customer sends the data to Monte Carlo themselves (ETL jobs and runs, or BI
-  assets), and no agent reaches anything. Nothing is listed for it. Its container is created with
-  no deployment, and its connection takes no credentials.
+- **Push-only** (ETL and BI only): the customer sends the data to Monte Carlo themselves (ETL
+  jobs and runs, or BI assets), and no agent reaches anything. Nothing is listed for it. Its
+  container is created with no deployment, its connection takes no credentials, and the customer
+  pushes with an ingestion key scoped to that container.
 
 When the customer's words leave the kind open, ask one question, such as "Does a Monte Carlo agent
 run this connector, or will you push its data to Monte Carlo yourselves?" A type whose agent was
@@ -543,18 +545,17 @@ removed is not listed; when the customer expects one that is missing, check
 |---|---|---|
 | `etl` | `create_etl_container(type="custom-etl-connector", name, deployment_id)` | Agent-registered: the type's `deployment_id`. Push-only: none. |
 | `bi` | `create_bi_container(type="custom-bi-connector", name, deployment_id)` | Agent-registered: the type's `deployment_id`. Push-only: none. |
-| `warehouse` | Not served yet (below). | |
+| `warehouse` | A warehouse on the type's deployment: reuse one there, usually a `custom-integration` one, or `create_warehouse(name, deployment_id, type="custom-integration")` | The type's `deployment_id`. Always agent-registered. |
 
-<!-- placeholder(YET-3103): custom warehouse connectors. Replace this paragraph with the
-create_warehouse step for a custom-connector-<id> type once YET-3103 phase 2 ships it. -->
-A custom **warehouse** connector cannot be connected through these tools yet. Say so, create
-nothing for it, and hand it off to the Monte Carlo app (Settings → Integrations).
+NEVER put a custom ETL or BI type on a warehouse, or a custom warehouse type on a container: each
+is refused, and the message names the parent the type belongs on.
 
 Step 1 does not apply: never create or provision a deployment for a custom connector. Check that
 the type's `deployment_id` is in `list_deployments` and `enabled`; if it is missing or disabled,
 the agent behind it is the problem, so stop and resolve it with the customer (Step 1a). Reuse a
 container of the same type on that deployment, or with no deployment for push-only, that has no
-connection yet; an ETL container holds one connection. Otherwise create one and record its id.
+connection yet; an ETL container holds one connection. A warehouse on that deployment can hold
+several connections. Otherwise create the parent and record its id.
 
 ### Credentials (agent-registered only)
 
@@ -570,18 +571,34 @@ A push-only connector takes no credentials. Do not create any for it.
 
 ### Connection and validation
 
-- **Agent-registered**: `create_connection(name, etl_container_id|bi_container_id,
-  credentials_id)`, then Step 5.
+- **Agent-registered**: `create_connection(name, etl_container_id|bi_container_id|warehouse_id,
+  credentials_id)`, then Step 5. For a warehouse type, the type's `capabilities` decide the job
+  types: omit `job_types` for all of them, or send a subset the customer asks for. Validation
+  skips the checks those capabilities rule out (no query-log check for a connector without query
+  logs), so a skipped check there is not a failure.
 - **Push-only**: `create_connection(name, etl_container_id|bi_container_id)` with no
   `credentials_id`; the connection takes the container's type. There is nothing for Monte Carlo to
   validate, because no agent reaches anything: skip Step 5 and do not call `validate_connection`.
   The connection is ready to receive what the customer pushes.
 
-<!-- placeholder(YET-3141): push-only ingestion key. Replace this paragraph with the step that
-mints the key for the push-only container once YET-3141 ships it. -->
-The key the customer pushes with is not created by these tools yet. Say so, list it under
-*Pending on your side* in the summary, and point the customer to the push-ingestion workflow for
-the key and the push itself.
+### The ingestion key (push-only)
+
+<!-- The integration-keys tools ship with monolith-django#16205 (YET-3141); the generated
+reference/api/integration-keys.md arrives with the api-codegen regen that follows it. -->
+A push-only connector receives data through an **ingestion key** scoped to its container. The key's
+secret is returned once, when it is created, so creating it is **not an MCP tool** (rule 2): hand
+over both forms (rule 6), with the container's id.
+
+- mc-cli: `montecarlo integration-keys create ingestion --etl-container-id <id> --output json`
+  (or `--bi-container-id <id>`). It prints `mcd_id` and `mcd_token` once, to the customer.
+- Terraform: the `montecarlo_ingestion_key` resource with `etl_container_id` or
+  `bi_container_id`. The token stays in its state, so hand it on write-only to the customer's
+  secret store (rule 7), never through an `output`.
+
+The customer stores the id and token where their push job reads them, and gives back only the
+key's id. Then `list_integration_keys(parent_id=<container id>)` or `get_ingestion_key` confirms
+the key exists and is scoped to the container; neither returns the token. A key scoped to another
+container is refused when pushing. For the push itself, hand over to the push-ingestion workflow.
 
 ### Refusals, in the customer's words
 
@@ -590,11 +607,15 @@ A refusal creates nothing. Relay the meaning, then the fix:
 - **`custom_connector_has_no_agent`**: the agent that registered this connector is no longer
   registered with Monte Carlo, so nothing could run it. Check `list_collection_agents` with the
   customer; the connector can be connected once its agent is running and registered again.
-- **`custom_connector_deployment_mismatch`**: the container, or the deployment given to a
-  credentials validation, is not the one the connector's agent runs on. The message names the
-  right deployment. Use a container on that deployment; never move the agent to fit. An empty
-  container this run created on the wrong deployment is removed with `delete_etl_container` or
-  `delete_bi_container`.
+- **`custom_connector_deployment_mismatch`**: the warehouse or container, or the deployment
+  given to a credentials validation, is not the one the connector's agent runs on. The message
+  names the right deployment. Use a parent on that deployment; never move the agent to fit. An
+  empty parent this run created on the wrong deployment is removed with `delete_warehouse`,
+  `delete_etl_container` or `delete_bi_container`.
+- **`connection_type_unsupported`** on a warehouse: the credentials are for a custom ETL or BI
+  type. The message names the container it belongs on; use that instead.
+- **`unknown_connection_type`**: the type is no longer the account's. List the types again and
+  start from a current one.
 - **An argument error on `credentials_id`**: credentials were sent to a push-only container, or
   left out on an agent's container, or their type does not fit the container. Recheck the kind
   (agent-registered or push-only) and the type's `asset_class` against the container.
@@ -618,6 +639,7 @@ Created in this run
   credentials   <id>  <connection_type>  <storage_type>  (or: CLI/Terraform step handed over)
   warehouse     <id>  <name>  <type>  (or: bi container | etl container  <id>  <name>  <type>  deployment=<id or none>)
   connection    <id>  <name>  <connection_type>  job_types=<…>
+  ingestion key <id>  scoped to <container id>  (push-only; or: CLI/Terraform step handed over)
   validation    <run id>  passed | failed | running  <validations_passed>/<validations_total> passed  (or: not available in this session; or: none, push-only)
 
 Reused (excluded from cleanup)
@@ -628,9 +650,9 @@ Pending on your side
   - Validation still running: read it again with get_validation_run(run_id=<run id>) before its expires_at; do not start a new one
   - Validation failed: fix what it reported, then re-run Step 5 (a new validate_connection)
   - Validation tools not available in this session: test in the UI under Settings → Integrations → <integration> → <connection name> → Test
-  - Push-only custom connector: the key to push with, then the push itself (push-ingestion)
+  - Push-only custom connector: the ingestion key step (CLI or Terraform), then the push itself (push-ingestion)
 
-Cleanup if you abandon this: delete_connection → delete_warehouse|delete_bi_container|delete_etl_container → delete_<kind>_credentials →
+Cleanup if you abandon this: delete_ingestion_key → delete_connection → delete_warehouse|delete_bi_container|delete_etl_container → delete_<kind>_credentials →
 delete_<platform>_collection_agent|data_store → delete_deployment, in that order. On the generic
 agent path, also delete the token or OAuth client this run minted (delete_generic_collection_agent_token /
 delete_generic_collection_agent_oauth_client).
@@ -712,5 +734,6 @@ or `delete-stack` can remove it.
 4. `create_etl_container(type="custom-etl-connector", name, deployment_id)`, then
    `create_connection(name, etl_container_id, credentials_id)`, then validate (Step 5).
 5. Had the customer said they push the jobs and runs themselves, the container would take no
-   deployment, the connection no credentials, and there would be no validation; the push key
-   stays pending on their side.
+   deployment, the connection no credentials, and there would be no validation. Instead, they
+   run the ingestion key step with the container's id and give back the key's id, which
+   `list_integration_keys(parent_id=…)` confirms.

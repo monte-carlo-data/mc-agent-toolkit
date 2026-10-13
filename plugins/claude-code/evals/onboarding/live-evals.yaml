@@ -447,9 +447,28 @@ cases:
       judge_rubric: |
         The agent plans a push-only custom BI connector: a custom-bi-connector BI container with
         no deployment, and a connection on it with no credentials. It plans no deployment, agent
-        or credentials, and no validation, because nothing for Monte Carlo to reach exists. It
-        says the key to push with is not created by these tools yet and lists it, with the push
-        itself, as pending on the customer's side. It never plans a warehouse for it.
+        or credentials, and no validation, because nothing for Monte Carlo to reach exists. For
+        the key the customer pushes with, it hands over an ingestion key step scoped to that
+        container (montecarlo integration-keys create ingestion, or the montecarlo_ingestion_key
+        resource), because the key's secret is returned once and is never an MCP tool, and asks
+        back only for the key's id. It never plans a warehouse for it.
+
+  - id: custom-warehouse-connector-on-a-warehouse
+    turns:
+      - prompt: "Our collection agent registered a custom warehouse connector. Plan connecting it to Monte Carlo; its credentials are in AWS Secrets Manager. Discover what exists; do not create or change anything."
+        criteria:
+          must_call: [list_custom_connector_types]
+    criteria:
+      must_not_call: *no_writes
+      judge_rubric: |
+        The agent finds the connector with list_custom_connector_types (asset class warehouse)
+        and takes its deployment from the type's deployment_id; it never plans a new deployment
+        or agent. It plans a warehouse on that deployment, reusing one there or creating a
+        custom-integration warehouse (type, not connection_type), never an ETL or BI container.
+        The credentials are an AWS Secrets Manager reference with connection_type set to the
+        type's id, validated on that deployment before they are created; then the connection on
+        the warehouse and its validation. It asks for no secret value. If no warehouse type is
+        listed, it says so instead of planning.
 
   # --- Connector surface: no skill content, the MCP server alone must carry the flow --------
   - id: connector-vague-connect

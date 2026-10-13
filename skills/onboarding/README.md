@@ -28,9 +28,10 @@ other supported platform, the skill:
    Carlo-managed credentials (a Snowflake key pair, for example). **No secret passes through chat.** See *How credentials are handled*.
 5. Reconciles the intended warehouse or BI container and the connection before creating
    anything missing. A Looker API and a LookML repository connection share one Looker container.
-   A custom ETL or BI connector goes on a container on the deployment of the agent that
-   registered it, or on one with no deployment and no credentials when the customer pushes its
-   data.
+   A custom connector goes on its agent's deployment: a custom ETL or BI container, or a
+   `custom-integration` warehouse. A push-only ETL or BI connector gets a container with no
+   deployment and no credentials, and the customer mints its ingestion key with a CLI or
+   Terraform step.
 6. Validates the connection over MCP and reports each check's result, falling back to the UI test
    only when the session does not serve the validation tools.
 7. Ends with created/reused IDs, the validation result, a scoped cleanup order and the next
@@ -118,10 +119,9 @@ connection for the intended account. The workflow requires no particular assista
 
 ## Not yet
 
-- **Custom warehouse connectors, and the key a push-only custom connector pushes with.** Not
-  served by the v2 tools yet; the skill hands them off.
 - **Azure and GCP agent/data-store registration, generic agent credentials, Monte Carlo-managed
-  credentials (such as the Snowflake key pair, or Tableau, Looker and Power BI credentials).**
+  credentials (such as the Snowflake key pair, or Tableau, Looker and Power BI credentials), and
+  ingestion keys.**
   Their requests or responses carry a secret, so they are CLI/Terraform steps rather than MCP
   tools, by design (see *How credentials are handled*).
 
