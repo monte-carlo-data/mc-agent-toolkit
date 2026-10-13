@@ -580,16 +580,18 @@ A push-only connector takes no credentials. Do not create any for it.
   credentials_id)`, then Step 5. For a warehouse type, the type's `capabilities` decide the job
   types: omit `job_types` for all of them, or send a subset the customer asks for. Validation
   skips the checks those capabilities rule out (no query-log check for a connector without query
-  logs), so a skipped check there is not a failure.
+  logs), so a skipped check there is not a failure. "Could not connect to the custom … connector"
+  (or "to the database", for a warehouse type) on the first check means the agent could not run
+  the connector with that secret: the variable or secret is missing on the agent, lacks the keys
+  the connector reads, or the connector itself fails. The customer checks it on their side.
 - **Push-only**: `create_connection(name, etl_container_id|bi_container_id)` with no
   `credentials_id`; the connection takes the container's type. There is nothing for Monte Carlo to
-  validate, because no agent reaches anything: skip Step 5 and do not call `validate_connection`.
+  validate, because no agent reaches anything: skip Step 5 and do not call `validate_connection`,
+  which answers `connection_has_no_deployment`.
   The connection is ready to receive what the customer pushes.
 
 ### The ingestion key (push-only)
 
-<!-- The integration-keys tools ship with monolith-django#16205 (YET-3141); the generated
-reference/api/integration-keys.md arrives with the api-codegen regen that follows it. -->
 A push-only connector receives data through an **ingestion key** scoped to its container. The key's
 secret is returned once, when it is created, so creating it is **not an MCP tool** (rule 2): hand
 over both forms (rule 6), with the container's id.
