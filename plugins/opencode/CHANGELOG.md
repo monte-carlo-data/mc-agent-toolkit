@@ -5,6 +5,10 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for OpenCode will be
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+### Added
+
+- onboarding: custom connectors over the REST API v2 tools. The skill finds the type with `list_custom_connector_types` and puts it on its agent's deployment: a `custom-etl-connector` ETL container, a `custom-bi-connector` BI container, or a `custom-integration` warehouse. It references self-hosted credentials with the custom type as `connection_type`, then creates and validates the connection. A push-only ETL or BI connector gets a container with no deployment and a connection with no credentials, and its ingestion key is a CLI or Terraform step (`montecarlo integration-keys create ingestion`, `montecarlo_ingestion_key`). Refusals such as `custom_connector_has_no_agent` and `custom_connector_deployment_mismatch` are explained in plain language. New live and trigger evals.
+
 ## [1.27.1] - 2026-10-07
 
 ### Changed
