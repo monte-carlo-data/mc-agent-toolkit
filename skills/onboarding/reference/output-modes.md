@@ -467,6 +467,53 @@ The other BI credentials follow the same shape:
 
 Every `<field>_wo` has its `<field>_wo_version` (SKILL.md rule 7).
 
+### Custom connector: container, credentials, connection, ingestion key
+
+A custom ETL or BI connector goes on a `montecarlo_etl_container` (`custom-etl-connector`) or a
+`montecarlo_bi_container` (`custom-bi-connector`); a custom warehouse connector on a
+`montecarlo_warehouse` of type `custom-integration`. An agent-registered connector takes the
+type's `deployment_id` from `list_custom_connector_types` and a self-hosted credential whose
+`connection_type` is the type's id (the credentials resources above). A push-only one takes
+neither, plus the ingestion key below. This example is push-only ETL.
+
+```hcl
+variable "etl_container_name" { type = string } # from the customer
+variable "connection_name" { type = string }    # from the customer
+variable "push_key_secret_name" { type = string } # where the customer's push job reads the key
+
+resource "montecarlo_etl_container" "push" {
+  type = "custom-etl-connector" # no deployment_id: push-only
+  name = var.etl_container_name
+}
+
+resource "montecarlo_connection" "push" {
+  name             = var.connection_name
+  etl_container_id = montecarlo_etl_container.push.id # no credentials_id: push-only
+}
+
+# Returned once and held in this resource's state; never copied into chat or an output.
+resource "montecarlo_ingestion_key" "push" {
+  etl_container_id = montecarlo_etl_container.push.id
+}
+
+resource "aws_secretsmanager_secret" "push_key" {
+  name = var.push_key_secret_name
+}
+
+resource "aws_secretsmanager_secret_version" "push_key" {
+  secret_id = aws_secretsmanager_secret.push_key.id
+  secret_string_wo = jsonencode({
+    mcd_id    = montecarlo_ingestion_key.push.mcd_id
+    mcd_token = montecarlo_ingestion_key.push.mcd_token
+  })
+  # Bump when the key is replaced, so the new token is written.
+  secret_string_wo_version = 1
+}
+```
+
+Use the customer's own secret store in place of Secrets Manager when they have another; the rule
+is the same (SKILL.md rule 7).
+
 ### Remove what Terraform manages
 
 Monte Carlo doesn't record which tool created a resource. To find out whether Terraform manages
@@ -678,6 +725,14 @@ montecarlo credentials create tableau --server-name <https://server> --site-name
 # looker-git-clone (--repo-url with --ssh-key @<key_file> or --username --token-prompt),
 # power-bi (--tenant-id --app-client-id --auth-mode service_principal --app-client-secret-prompt).
 montecarlo connections create --name <connection_name> --bi-container-id <bi_container_id> --credentials-id <credentials_id> --output json
+
+# Custom connector: the type's id and deployment come from discovery, never chosen here.
+montecarlo etl-containers create --type custom-etl-connector --name "<etl_container_name>" --deployment-id <type_deployment_id> --output json
+# … then a self-hosted credential with --connection-type <type_id>, and
+montecarlo connections create --name <connection_name> --etl-container-id <etl_container_id> --credentials-id <credentials_id> --output json
+# Push-only: no --deployment-id on the container, no --credentials-id on the connection, then the
+# ingestion key for that container (printed once, to the customer; store it where the push job reads it):
+montecarlo integration-keys create ingestion --etl-container-id <etl_container_id> --output json
 ```
 
 ## Python script (`pycarlo2` SDK, mc-sdk-python)

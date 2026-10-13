@@ -3,7 +3,9 @@
 Connect a data platform to Monte Carlo from your editor: choose or provision the **deployment** the
 connection runs through (the Monte Carlo hosted cloud node, a collection agent in your network, or a
 customer-owned data store), reference the **credentials**, create the **warehouse** (or, for a BI
-tool, the **BI container**) and the **connection**, then validate the connection. Built on the Monte
+tool, the **BI container**; for a custom ETL or BI connector, its **ETL or BI container**) and the
+**connection**, then validate the connection — unless it is a push-only connector, which no agent
+reaches and so has nothing to validate. Built on the Monte
 Carlo REST API v2 tools served by the Monte Carlo MCP server.
 
 ## What it does
@@ -27,8 +29,13 @@ other supported platform, the skill:
    Carlo-managed credentials (a Snowflake key pair, for example). **No secret passes through chat.** See *How credentials are handled*.
 5. Reconciles the intended warehouse or BI container and the connection before creating
    anything missing. A Looker API and a LookML repository connection share one Looker container.
+   A custom connector goes on its agent's deployment: a custom ETL or BI container, or a
+   `custom-integration` warehouse. A push-only ETL or BI connector gets a container with no
+   deployment and no credentials, and the customer mints its ingestion key with a CLI or
+   Terraform step.
 6. Validates the connection over MCP and reports each check's result, falling back to the UI test
-   only when the session does not serve the validation tools.
+   only when the session does not serve the validation tools. A push-only connector has nothing for
+   Monte Carlo to reach, so it has no validation step.
 7. Ends with created/reused IDs, the validation result, a scoped cleanup order and the next
    pending step. Creation alone is not a completed onboarding.
 
@@ -115,7 +122,8 @@ connection for the intended account. The workflow requires no particular assista
 ## Not yet
 
 - **Azure and GCP agent/data-store registration, generic agent credentials, Monte Carlo-managed
-  credentials (such as the Snowflake key pair, or Tableau, Looker and Power BI credentials).**
+  credentials (such as the Snowflake key pair, or Tableau, Looker and Power BI credentials), and
+  ingestion keys.**
   Their requests or responses carry a secret, so they are CLI/Terraform steps rather than MCP
   tools, by design (see *How credentials are handled*).
 
