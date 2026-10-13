@@ -9,7 +9,7 @@ them. Each section is one tool; its name is the tool to call.
 
 List the custom connector types your collection agents registered, oldest first.
 
-A type whose collection agent was removed outright is not listed.
+A type whose collection agent was removed is not listed.
 
 - **Effect:** read-only.
 - **Pairs with:** `get_custom_connector_type`, `list_collection_agents`.
@@ -50,7 +50,8 @@ Returns `items`. Response fields per item: id, name, asset_class, collection_age
 
 Get one custom connector type.
 
-An id that does not exist or belongs to another account returns 404.
+An id that does not exist, belongs to another account, or whose collection agent was
+removed returns 404.
 
 - **Effect:** read-only.
 - **Pairs with:** `list_custom_connector_types`.
