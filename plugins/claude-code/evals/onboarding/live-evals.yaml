@@ -430,9 +430,10 @@ cases:
       judge_rubric: |
         The agent finds the connector with list_custom_connector_types (asset class etl) and
         takes its deployment from the type's deployment_id; it does not ask which deployment to
-        use and never plans a new deployment or agent. If no ETL type is listed, it says so and
-        asks whether an agent runs the connector or the customer pushes its data, without
-        planning anything else. Otherwise the plan is a custom-etl-connector ETL container on that
+        use and never plans a new deployment or agent. If no ETL type is listed, it says so and,
+        because the prompt says an agent registered the connector, checks list_collection_agents
+        with the customer rather than asking whether they push the data, planning nothing else.
+        Otherwise the plan is a custom-etl-connector ETL container on that
         deployment (or an existing empty one there), self-hosted environment-variable credentials
         with connection_type set to the type's id and a variable name starting with MCD_ that the
         customer supplies, validated on that same deployment before they are created, then the

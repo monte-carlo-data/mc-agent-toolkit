@@ -171,9 +171,10 @@ above and the steps below keep applying to every later turn, however the custome
 
 - `get_current_user`: identify the account; stop if `account_frozen`. Confirm account ambiguity.
 - `list_deployments`, `list_collection_agents`, `list_collection_data_stores`, `list_warehouses`,
-  `list_bi_containers` (when served) and `list_connections`. When the account has custom
-  connectors or the customer names one, also `list_custom_connector_types` and
-  `list_etl_containers`. Follow `next_cursor` while
+  `list_bi_containers` (when served) and `list_connections`. Also `list_connection_types`, which
+  takes no arguments and reports what the account can connect and whether any type is `is_custom`;
+  when it marks one `is_custom` or the customer names their own connector, also
+  `list_custom_connector_types` and `list_etl_containers`. Follow `next_cursor` while
   `has_more` on every paginated list, including credentials later. Read agent/store details only
   when a choice depends on them.
 
@@ -550,9 +551,13 @@ removed is not listed; when the customer expects one that is missing, check
 NEVER put a custom ETL or BI type on a warehouse, or a custom warehouse type on a container: each
 is refused, and the message names the parent the type belongs on.
 
-Step 1 does not apply: never create or provision a deployment for a custom connector. Check that
-the type's `deployment_id` is in `list_deployments` and `enabled`; if it is missing or disabled,
-the agent behind it is the problem, so stop and resolve it with the customer (Step 1a). Reuse a
+Step 1 does not apply: never create or provision a deployment for a custom connector. Check the
+type's `deployment_id` against `list_deployments`. If it is listed but not `enabled`, the agent
+behind it is the problem, so stop and resolve it with the customer (Step 1a). If it is not listed
+at all, it may be an older-platform deployment the endpoint omits (custom-connector-types
+reference); the container-create APIs take only current-platform deployments, so this route cannot
+be onboarded with these tools — say so and hand off to the Monte Carlo app, rather than sending the
+customer to troubleshoot a healthy agent. Reuse a
 container of the same type on that deployment, or with no deployment for push-only, that has no
 connection yet; an ETL container holds one connection. A warehouse on that deployment can hold
 several connections. Otherwise create the parent and record its id.

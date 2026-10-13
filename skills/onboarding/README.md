@@ -4,7 +4,8 @@ Connect a data platform to Monte Carlo from your editor: choose or provision the
 connection runs through (the Monte Carlo hosted cloud node, a collection agent in your network, or a
 customer-owned data store), reference the **credentials**, create the **warehouse** (or, for a BI
 tool, the **BI container**; for a custom ETL or BI connector, its **ETL or BI container**) and the
-**connection**, then validate the connection. Built on the Monte
+**connection**, then validate the connection — unless it is a push-only connector, which no agent
+reaches and so has nothing to validate. Built on the Monte
 Carlo REST API v2 tools served by the Monte Carlo MCP server.
 
 ## What it does
@@ -33,7 +34,8 @@ other supported platform, the skill:
    deployment and no credentials, and the customer mints its ingestion key with a CLI or
    Terraform step.
 6. Validates the connection over MCP and reports each check's result, falling back to the UI test
-   only when the session does not serve the validation tools.
+   only when the session does not serve the validation tools. A push-only connector has nothing for
+   Monte Carlo to reach, so it has no validation step.
 7. Ends with created/reused IDs, the validation result, a scoped cleanup order and the next
    pending step. Creation alone is not a completed onboarding.
 
