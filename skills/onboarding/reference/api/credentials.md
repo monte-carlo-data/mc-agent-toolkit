@@ -13,7 +13,7 @@ Credentials are returned oldest first. Each entry says what connection type it i
 where its secret lives; read the typed endpoint for that kind to see its other fields.
 
 - **Effect:** read-only.
-- **Pairs with:** `create_airflow_credentials`, `get_airflow_credentials`, `get_azure_data_factory_credentials`, `get_azure_dedicated_sql_pool_credentials`, `get_azure_sql_database_credentials`, `get_bigquery_credentials`, `get_clickhouse_credentials`, `get_databricks_metastore_sql_warehouse_credentials`, `get_databricks_sql_warehouse_credentials`, `get_db2_credentials`, `get_fivetran_credentials`, `get_gcp_dataform_credentials`, `get_informatica_v2_credentials`, `get_looker_git_clone_credentials`, `get_looker_credentials`, `get_mariadb_credentials`, `get_mulesoft_credentials`, `get_mysql_credentials`, `get_oracle_credentials`, `get_postgres_credentials`, `get_power_bi_credentials`, `get_redshift_credentials`, `get_sap_hana_credentials`, `create_aws_secrets_manager_credentials`, `validate_aws_secrets_manager_credentials`, `get_aws_secrets_manager_credentials`, `create_azure_key_vault_credentials`, `validate_azure_key_vault_credentials`, `get_azure_key_vault_credentials`, `create_env_var_credentials`, `validate_env_var_credentials`, `get_env_var_credentials`, `create_file_credentials`, `validate_file_credentials`, `get_file_credentials`, `create_gcp_secret_manager_credentials`, `validate_gcp_secret_manager_credentials`, `get_gcp_secret_manager_credentials`, `get_snowflake_credentials`, `get_sql_server_credentials`, `get_starburst_enterprise_credentials`, `get_starburst_galaxy_credentials`, `get_tableau_credentials`, `get_teradata_credentials`.
+- **Pairs with:** `create_airflow_credentials`, `get_airflow_credentials`, `get_azure_data_factory_credentials`, `get_azure_dedicated_sql_pool_credentials`, `get_azure_sql_database_credentials`, `get_bigquery_credentials`, `get_clickhouse_credentials`, `get_databricks_metastore_sql_warehouse_credentials`, `get_databricks_sql_warehouse_credentials`, `get_db2_credentials`, `get_fivetran_credentials`, `get_gcp_dataform_credentials`, `get_informatica_v2_credentials`, `get_looker_git_clone_credentials`, `get_looker_credentials`, `get_mariadb_credentials`, `get_mulesoft_credentials`, `get_mysql_credentials`, `get_oracle_credentials`, `get_postgres_credentials`, `get_power_bi_credentials`, `get_redshift_credentials`, `get_sap_hana_credentials`, `create_aws_secrets_manager_credentials`, `validate_aws_secrets_manager_credentials`, `get_aws_secrets_manager_credentials`, `validate_aws_secrets_manager_credentials_change`, `create_azure_key_vault_credentials`, `validate_azure_key_vault_credentials`, `get_azure_key_vault_credentials`, `validate_azure_key_vault_credentials_change`, `create_env_var_credentials`, `validate_env_var_credentials`, `get_env_var_credentials`, `validate_env_var_credentials_change`, `create_file_credentials`, `validate_file_credentials`, `get_file_credentials`, `validate_file_credentials_change`, `create_gcp_secret_manager_credentials`, `validate_gcp_secret_manager_credentials`, `get_gcp_secret_manager_credentials`, `validate_gcp_secret_manager_credentials_change`, `get_snowflake_credentials`, `get_sql_server_credentials`, `get_starburst_enterprise_credentials`, `get_starburst_galaxy_credentials`, `get_tableau_credentials`, `get_teradata_credentials`.
 - **Paging:** one page per call; pass `next_cursor` back as `cursor` for the next page.
 
 ### Arguments
@@ -1639,7 +1639,7 @@ Returns the accepted request as-is. Response fields: id, status, revision, targe
 | `status` | Whether the run is still going. Every validation is final once it is not. |
 | `revision` | Moves forward every time a validation changes. Pass it as `since` on the next poll to get only the validations that changed after this response. |
 | `target_type` | What the run validates. |
-| `target_id` | Identifier of what is being validated. Null for candidate values, which are not stored anywhere. |
+| `target_id` | Identifier of what is being validated: the connection, or the credentials a change applies to. Null for candidate values, which are not stored anywhere. |
 | `validations_passed` | How many validations reached a passing verdict. One that was skipped or never reached a verdict is not counted here, but is still in `validations_total`. |
 | `validations_total` | How many validations the run covers. |
 | `started_at` | When the run started. |
@@ -1769,6 +1769,55 @@ Returns `credentials_id` and `deleted: true` once the credentials is gone.
 - Monte Carlo is busy or temporarily unavailable; try again after a moment.
 - An unexpected error prevented the request from being processed.
 
+## `validate_aws_secrets_manager_credentials_change`: Validate a change to AWS Secrets Manager credentials
+
+Check whether a change to existing AWS Secrets Manager credentials works before making it. Takes only the fields to change, as the update does, and a deployment to run from. The stored credentials are not changed. Returns a run that is still going: poll `get_validation_run` with its id until the status is `completed`, then read each validation's own verdict.
+
+- **Effect:** creates; repeating it creates again.
+- **Pairs with:** `list_credentials`, `list_deployments`.
+- **Runs in the background:** the response is the accepted request; poll it to completion.
+
+### Arguments
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `credentials_id` | `str` | yes | Id of the credentials, as returned when they are created or listed. |
+| `deployment_id` | `str` | yes | Deployment that runs the validations. It has to be one `GET /deployments` lists, and it has to be able to reach the system the credentials are for. |
+| `bq_project_id` | `str` | no | BigQuery project the connection reads from. Only for a BigQuery connection. Between 1 and 200 characters. |
+| `sql_warehouse_id` | `str` | no | Databricks SQL warehouse the connection runs queries on. Required for a `databricks-sql-warehouse` or `databricks-metastore-sql-warehouse` connection. Between 1 and 200 characters. |
+| `aws_secret` | `str` | no | Name or ARN of the AWS Secrets Manager secret holding the connection's credentials. Between 1 and 2048 characters. |
+| `aws_region` | `str` | no | AWS region of the secret. Omit it to use the deployment's own region. Between 1 and 200 characters. |
+| `assumable_role` | `str` | no | ARN of a role the deployment assumes to read the secret. Omit it to read as itself. Between 1 and 2048 characters. |
+| `external_id` | `str` | no | External id the assumed role's trust policy requires, if it requires one. Between 1 and 1224 characters. |
+
+### Response
+
+Returns the accepted request as-is. Response fields: id, status, revision, target_type, target_id, validations_passed, validations_total, started_at, finished_at, expires_at, validations.
+
+| Field | Description |
+|---|---|
+| `id` | Identifier of the run. Poll `GET /validations/{run_id}` with it. |
+| `status` | Whether the run is still going. Every validation is final once it is not. |
+| `revision` | Moves forward every time a validation changes. Pass it as `since` on the next poll to get only the validations that changed after this response. |
+| `target_type` | What the run validates. |
+| `target_id` | Identifier of what is being validated: the connection, or the credentials a change applies to. Null for candidate values, which are not stored anywhere. |
+| `validations_passed` | How many validations reached a passing verdict. One that was skipped or never reached a verdict is not counted here, but is still in `validations_total`. |
+| `validations_total` | How many validations the run covers. |
+| `started_at` | When the run started. |
+| `finished_at` | When the run finished. Null while it is still going. |
+| `expires_at` | When the run stops being readable. Measured from the start, not the finish, and never extended, so a slow run is readable for less time after it ends. |
+| `validations` | The run's validations, in the order they are declared. A validation stays `pending` until it starts. It can wait on a prerequisite, or for earlier validations to finish. A read with `since` lists only the validations that changed after that revision, and may list none. |
+
+### What can fail
+
+- Authentication credentials are missing or invalid.
+- The request was authenticated, but the caller is not allowed to perform this operation. Read `code` to tell the reasons apart: `account_frozen` means the account is paused, rather than that the caller lacks permission.
+- The credentials does not exist, or is not visible to the caller.
+- The change conflicts with the current state of the credentials.
+- An argument is invalid; the error names the field.
+- Monte Carlo is busy or temporarily unavailable; the tool retries once after the wait Monte Carlo asks for.
+- An unexpected error prevented the request from being processed.
+
 ## `create_azure_key_vault_credentials`: Create Azure Key Vault credentials
 
 Store where a connection's credentials live in Azure Key Vault: the vault and the secret's name, never the secret itself.
@@ -1842,7 +1891,7 @@ Returns the accepted request as-is. Response fields: id, status, revision, targe
 | `status` | Whether the run is still going. Every validation is final once it is not. |
 | `revision` | Moves forward every time a validation changes. Pass it as `since` on the next poll to get only the validations that changed after this response. |
 | `target_type` | What the run validates. |
-| `target_id` | Identifier of what is being validated. Null for candidate values, which are not stored anywhere. |
+| `target_id` | Identifier of what is being validated: the connection, or the credentials a change applies to. Null for candidate values, which are not stored anywhere. |
 | `validations_passed` | How many validations reached a passing verdict. One that was skipped or never reached a verdict is not counted here, but is still in `validations_total`. |
 | `validations_total` | How many validations the run covers. |
 | `started_at` | When the run started. |
@@ -1969,6 +2018,54 @@ Returns `credentials_id` and `deleted: true` once the credentials is gone.
 - Monte Carlo is busy or temporarily unavailable; try again after a moment.
 - An unexpected error prevented the request from being processed.
 
+## `validate_azure_key_vault_credentials_change`: Validate a change to Azure Key Vault credentials
+
+Check whether a change to existing Azure Key Vault credentials works before making it. Takes only the fields to change, as the update does, and a deployment to run from. The stored credentials are not changed. Returns a run that is still going: poll `get_validation_run` with its id until the status is `completed`, then read each validation's own verdict.
+
+- **Effect:** creates; repeating it creates again.
+- **Pairs with:** `list_credentials`, `list_deployments`.
+- **Runs in the background:** the response is the accepted request; poll it to completion.
+
+### Arguments
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `credentials_id` | `str` | yes | Id of the credentials, as returned when they are created or listed. |
+| `deployment_id` | `str` | yes | Deployment that runs the validations. It has to be one `GET /deployments` lists, and it has to be able to reach the system the credentials are for. |
+| `bq_project_id` | `str` | no | BigQuery project the connection reads from. Only for a BigQuery connection. Between 1 and 200 characters. |
+| `sql_warehouse_id` | `str` | no | Databricks SQL warehouse the connection runs queries on. Required for a `databricks-sql-warehouse` or `databricks-metastore-sql-warehouse` connection. Between 1 and 200 characters. |
+| `akv_secret` | `str` | no | Name of the Azure Key Vault secret holding the connection's credentials. Between 1 and 200 characters. |
+| `akv_vault_name` | `str` | no | Name of the key vault. Send this, `akv_vault_url`, or both. Between 1 and 200 characters. |
+| `akv_vault_url` | `str` | no | URL of the key vault. Send this, `akv_vault_name`, or both. Between 1 and 2048 characters. |
+
+### Response
+
+Returns the accepted request as-is. Response fields: id, status, revision, target_type, target_id, validations_passed, validations_total, started_at, finished_at, expires_at, validations.
+
+| Field | Description |
+|---|---|
+| `id` | Identifier of the run. Poll `GET /validations/{run_id}` with it. |
+| `status` | Whether the run is still going. Every validation is final once it is not. |
+| `revision` | Moves forward every time a validation changes. Pass it as `since` on the next poll to get only the validations that changed after this response. |
+| `target_type` | What the run validates. |
+| `target_id` | Identifier of what is being validated: the connection, or the credentials a change applies to. Null for candidate values, which are not stored anywhere. |
+| `validations_passed` | How many validations reached a passing verdict. One that was skipped or never reached a verdict is not counted here, but is still in `validations_total`. |
+| `validations_total` | How many validations the run covers. |
+| `started_at` | When the run started. |
+| `finished_at` | When the run finished. Null while it is still going. |
+| `expires_at` | When the run stops being readable. Measured from the start, not the finish, and never extended, so a slow run is readable for less time after it ends. |
+| `validations` | The run's validations, in the order they are declared. A validation stays `pending` until it starts. It can wait on a prerequisite, or for earlier validations to finish. A read with `since` lists only the validations that changed after that revision, and may list none. |
+
+### What can fail
+
+- Authentication credentials are missing or invalid.
+- The request was authenticated, but the caller is not allowed to perform this operation. Read `code` to tell the reasons apart: `account_frozen` means the account is paused, rather than that the caller lacks permission.
+- The credentials does not exist, or is not visible to the caller.
+- The change conflicts with the current state of the credentials.
+- An argument is invalid; the error names the field.
+- Monte Carlo is busy or temporarily unavailable; the tool retries once after the wait Monte Carlo asks for.
+- An unexpected error prevented the request from being processed.
+
 ## `create_env_var_credentials`: Create environment variable credentials
 
 Store which environment variable of the deployment holds a connection's credentials, and the KMS key that encrypts it, never the value itself.
@@ -2039,7 +2136,7 @@ Returns the accepted request as-is. Response fields: id, status, revision, targe
 | `status` | Whether the run is still going. Every validation is final once it is not. |
 | `revision` | Moves forward every time a validation changes. Pass it as `since` on the next poll to get only the validations that changed after this response. |
 | `target_type` | What the run validates. |
-| `target_id` | Identifier of what is being validated. Null for candidate values, which are not stored anywhere. |
+| `target_id` | Identifier of what is being validated: the connection, or the credentials a change applies to. Null for candidate values, which are not stored anywhere. |
 | `validations_passed` | How many validations reached a passing verdict. One that was skipped or never reached a verdict is not counted here, but is still in `validations_total`. |
 | `validations_total` | How many validations the run covers. |
 | `started_at` | When the run started. |
@@ -2163,6 +2260,53 @@ Returns `credentials_id` and `deleted: true` once the credentials is gone.
 - Monte Carlo is busy or temporarily unavailable; try again after a moment.
 - An unexpected error prevented the request from being processed.
 
+## `validate_env_var_credentials_change`: Validate a change to environment variable credentials
+
+Check whether a change to existing environment variable credentials works before making it. Takes only the fields to change, as the update does, and a deployment to run from. The stored credentials are not changed. Returns a run that is still going: poll `get_validation_run` with its id until the status is `completed`, then read each validation's own verdict.
+
+- **Effect:** creates; repeating it creates again.
+- **Pairs with:** `list_credentials`, `list_deployments`.
+- **Runs in the background:** the response is the accepted request; poll it to completion.
+
+### Arguments
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `credentials_id` | `str` | yes | Id of the credentials, as returned when they are created or listed. |
+| `deployment_id` | `str` | yes | Deployment that runs the validations. It has to be one `GET /deployments` lists, and it has to be able to reach the system the credentials are for. |
+| `bq_project_id` | `str` | no | BigQuery project the connection reads from. Only for a BigQuery connection. Between 1 and 200 characters. |
+| `sql_warehouse_id` | `str` | no | Databricks SQL warehouse the connection runs queries on. Required for a `databricks-sql-warehouse` or `databricks-metastore-sql-warehouse` connection. Between 1 and 200 characters. |
+| `env_var_name` | `str` | no | Name of the environment variable on the deployment that holds the connection's credentials. Must start with `MCD_`. Between 1 and 200 characters. |
+| `kms_key_id` | `str` | no | AWS KMS key the variable's value is encrypted with. Omit it for a value stored in the clear. Between 1 and 200 characters. |
+
+### Response
+
+Returns the accepted request as-is. Response fields: id, status, revision, target_type, target_id, validations_passed, validations_total, started_at, finished_at, expires_at, validations.
+
+| Field | Description |
+|---|---|
+| `id` | Identifier of the run. Poll `GET /validations/{run_id}` with it. |
+| `status` | Whether the run is still going. Every validation is final once it is not. |
+| `revision` | Moves forward every time a validation changes. Pass it as `since` on the next poll to get only the validations that changed after this response. |
+| `target_type` | What the run validates. |
+| `target_id` | Identifier of what is being validated: the connection, or the credentials a change applies to. Null for candidate values, which are not stored anywhere. |
+| `validations_passed` | How many validations reached a passing verdict. One that was skipped or never reached a verdict is not counted here, but is still in `validations_total`. |
+| `validations_total` | How many validations the run covers. |
+| `started_at` | When the run started. |
+| `finished_at` | When the run finished. Null while it is still going. |
+| `expires_at` | When the run stops being readable. Measured from the start, not the finish, and never extended, so a slow run is readable for less time after it ends. |
+| `validations` | The run's validations, in the order they are declared. A validation stays `pending` until it starts. It can wait on a prerequisite, or for earlier validations to finish. A read with `since` lists only the validations that changed after that revision, and may list none. |
+
+### What can fail
+
+- Authentication credentials are missing or invalid.
+- The request was authenticated, but the caller is not allowed to perform this operation. Read `code` to tell the reasons apart: `account_frozen` means the account is paused, rather than that the caller lacks permission.
+- The credentials does not exist, or is not visible to the caller.
+- The change conflicts with the current state of the credentials.
+- An argument is invalid; the error names the field.
+- Monte Carlo is busy or temporarily unavailable; the tool retries once after the wait Monte Carlo asks for.
+- An unexpected error prevented the request from being processed.
+
 ## `create_file_credentials`: Create file credentials
 
 Store which file on the deployment holds a connection's credentials, never the contents.
@@ -2230,7 +2374,7 @@ Returns the accepted request as-is. Response fields: id, status, revision, targe
 | `status` | Whether the run is still going. Every validation is final once it is not. |
 | `revision` | Moves forward every time a validation changes. Pass it as `since` on the next poll to get only the validations that changed after this response. |
 | `target_type` | What the run validates. |
-| `target_id` | Identifier of what is being validated. Null for candidate values, which are not stored anywhere. |
+| `target_id` | Identifier of what is being validated: the connection, or the credentials a change applies to. Null for candidate values, which are not stored anywhere. |
 | `validations_passed` | How many validations reached a passing verdict. One that was skipped or never reached a verdict is not counted here, but is still in `validations_total`. |
 | `validations_total` | How many validations the run covers. |
 | `started_at` | When the run started. |
@@ -2351,6 +2495,52 @@ Returns `credentials_id` and `deleted: true` once the credentials is gone.
 - Monte Carlo is busy or temporarily unavailable; try again after a moment.
 - An unexpected error prevented the request from being processed.
 
+## `validate_file_credentials_change`: Validate a change to file credentials
+
+Check whether a change to existing file credentials works before making it. Takes only the fields to change, as the update does, and a deployment to run from. The stored credentials are not changed. Returns a run that is still going: poll `get_validation_run` with its id until the status is `completed`, then read each validation's own verdict.
+
+- **Effect:** creates; repeating it creates again.
+- **Pairs with:** `list_credentials`, `list_deployments`.
+- **Runs in the background:** the response is the accepted request; poll it to completion.
+
+### Arguments
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `credentials_id` | `str` | yes | Id of the credentials, as returned when they are created or listed. |
+| `deployment_id` | `str` | yes | Deployment that runs the validations. It has to be one `GET /deployments` lists, and it has to be able to reach the system the credentials are for. |
+| `bq_project_id` | `str` | no | BigQuery project the connection reads from. Only for a BigQuery connection. Between 1 and 200 characters. |
+| `sql_warehouse_id` | `str` | no | Databricks SQL warehouse the connection runs queries on. Required for a `databricks-sql-warehouse` or `databricks-metastore-sql-warehouse` connection. Between 1 and 200 characters. |
+| `file_path` | `str` | no | Path of the file on the deployment that holds the connection's credentials. Between 1 and 1024 characters. |
+
+### Response
+
+Returns the accepted request as-is. Response fields: id, status, revision, target_type, target_id, validations_passed, validations_total, started_at, finished_at, expires_at, validations.
+
+| Field | Description |
+|---|---|
+| `id` | Identifier of the run. Poll `GET /validations/{run_id}` with it. |
+| `status` | Whether the run is still going. Every validation is final once it is not. |
+| `revision` | Moves forward every time a validation changes. Pass it as `since` on the next poll to get only the validations that changed after this response. |
+| `target_type` | What the run validates. |
+| `target_id` | Identifier of what is being validated: the connection, or the credentials a change applies to. Null for candidate values, which are not stored anywhere. |
+| `validations_passed` | How many validations reached a passing verdict. One that was skipped or never reached a verdict is not counted here, but is still in `validations_total`. |
+| `validations_total` | How many validations the run covers. |
+| `started_at` | When the run started. |
+| `finished_at` | When the run finished. Null while it is still going. |
+| `expires_at` | When the run stops being readable. Measured from the start, not the finish, and never extended, so a slow run is readable for less time after it ends. |
+| `validations` | The run's validations, in the order they are declared. A validation stays `pending` until it starts. It can wait on a prerequisite, or for earlier validations to finish. A read with `since` lists only the validations that changed after that revision, and may list none. |
+
+### What can fail
+
+- Authentication credentials are missing or invalid.
+- The request was authenticated, but the caller is not allowed to perform this operation. Read `code` to tell the reasons apart: `account_frozen` means the account is paused, rather than that the caller lacks permission.
+- The credentials does not exist, or is not visible to the caller.
+- The change conflicts with the current state of the credentials.
+- An argument is invalid; the error names the field.
+- Monte Carlo is busy or temporarily unavailable; the tool retries once after the wait Monte Carlo asks for.
+- An unexpected error prevented the request from being processed.
+
 ## `create_gcp_secret_manager_credentials`: Create GCP Secret Manager credentials
 
 Store where a connection's credentials live in GCP Secret Manager: the secret's name, never the secret itself.
@@ -2418,7 +2608,7 @@ Returns the accepted request as-is. Response fields: id, status, revision, targe
 | `status` | Whether the run is still going. Every validation is final once it is not. |
 | `revision` | Moves forward every time a validation changes. Pass it as `since` on the next poll to get only the validations that changed after this response. |
 | `target_type` | What the run validates. |
-| `target_id` | Identifier of what is being validated. Null for candidate values, which are not stored anywhere. |
+| `target_id` | Identifier of what is being validated: the connection, or the credentials a change applies to. Null for candidate values, which are not stored anywhere. |
 | `validations_passed` | How many validations reached a passing verdict. One that was skipped or never reached a verdict is not counted here, but is still in `validations_total`. |
 | `validations_total` | How many validations the run covers. |
 | `started_at` | When the run started. |
@@ -2537,6 +2727,52 @@ Returns `credentials_id` and `deleted: true` once the credentials is gone.
 - The credentials does not exist, or is not visible to the caller.
 - The change conflicts with the current state of the credentials.
 - Monte Carlo is busy or temporarily unavailable; try again after a moment.
+- An unexpected error prevented the request from being processed.
+
+## `validate_gcp_secret_manager_credentials_change`: Validate a change to GCP Secret Manager credentials
+
+Check whether a change to existing GCP Secret Manager credentials works before making it. Takes only the fields to change, as the update does, and a deployment to run from. The stored credentials are not changed. Returns a run that is still going: poll `get_validation_run` with its id until the status is `completed`, then read each validation's own verdict.
+
+- **Effect:** creates; repeating it creates again.
+- **Pairs with:** `list_credentials`, `list_deployments`.
+- **Runs in the background:** the response is the accepted request; poll it to completion.
+
+### Arguments
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `credentials_id` | `str` | yes | Id of the credentials, as returned when they are created or listed. |
+| `deployment_id` | `str` | yes | Deployment that runs the validations. It has to be one `GET /deployments` lists, and it has to be able to reach the system the credentials are for. |
+| `bq_project_id` | `str` | no | BigQuery project the connection reads from. Only for a BigQuery connection. Between 1 and 200 characters. |
+| `sql_warehouse_id` | `str` | no | Databricks SQL warehouse the connection runs queries on. Required for a `databricks-sql-warehouse` or `databricks-metastore-sql-warehouse` connection. Between 1 and 200 characters. |
+| `gcp_secret` | `str` | no | Name of the GCP Secret Manager secret holding the connection's credentials. Between 1 and 200 characters. |
+
+### Response
+
+Returns the accepted request as-is. Response fields: id, status, revision, target_type, target_id, validations_passed, validations_total, started_at, finished_at, expires_at, validations.
+
+| Field | Description |
+|---|---|
+| `id` | Identifier of the run. Poll `GET /validations/{run_id}` with it. |
+| `status` | Whether the run is still going. Every validation is final once it is not. |
+| `revision` | Moves forward every time a validation changes. Pass it as `since` on the next poll to get only the validations that changed after this response. |
+| `target_type` | What the run validates. |
+| `target_id` | Identifier of what is being validated: the connection, or the credentials a change applies to. Null for candidate values, which are not stored anywhere. |
+| `validations_passed` | How many validations reached a passing verdict. One that was skipped or never reached a verdict is not counted here, but is still in `validations_total`. |
+| `validations_total` | How many validations the run covers. |
+| `started_at` | When the run started. |
+| `finished_at` | When the run finished. Null while it is still going. |
+| `expires_at` | When the run stops being readable. Measured from the start, not the finish, and never extended, so a slow run is readable for less time after it ends. |
+| `validations` | The run's validations, in the order they are declared. A validation stays `pending` until it starts. It can wait on a prerequisite, or for earlier validations to finish. A read with `since` lists only the validations that changed after that revision, and may list none. |
+
+### What can fail
+
+- Authentication credentials are missing or invalid.
+- The request was authenticated, but the caller is not allowed to perform this operation. Read `code` to tell the reasons apart: `account_frozen` means the account is paused, rather than that the caller lacks permission.
+- The credentials does not exist, or is not visible to the caller.
+- The change conflicts with the current state of the credentials.
+- An argument is invalid; the error names the field.
+- Monte Carlo is busy or temporarily unavailable; the tool retries once after the wait Monte Carlo asks for.
 - An unexpected error prevented the request from being processed.
 
 ## `get_snowflake_credentials`: Get Snowflake credentials
