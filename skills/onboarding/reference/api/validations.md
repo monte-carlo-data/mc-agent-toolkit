@@ -39,7 +39,7 @@ Response fields: id, status, revision, target_type, target_id, validations_passe
 | `status` | Whether the run is still going. Every validation is final once it is not. |
 | `revision` | Moves forward every time a validation changes. Pass it as `since` on the next poll to get only the validations that changed after this response. |
 | `target_type` | What the run validates. |
-| `target_id` | Identifier of what is being validated. Null for candidate values, which are not stored anywhere. |
+| `target_id` | Identifier of what is being validated: the connection, or the credentials a change applies to. Null for candidate values, which are not stored anywhere. |
 | `validations_passed` | How many validations reached a passing verdict. One that was skipped or never reached a verdict is not counted here, but is still in `validations_total`. |
 | `validations_total` | How many validations the run covers. |
 | `started_at` | When the run started. |
