@@ -5,6 +5,12 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for OpenCode will be
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.28.1] - 2026-10-20
+
+### Changed
+
+- onboarding: Terraform for an AWS collection agent or AWS data store reads Monte Carlo's AWS account from the provider's `montecarlo_hosting_private_link` data source (provider 0.1.27 or later), so the skill no longer asks for the Collection AWS account ID on those paths. The agent passes `aws.account_id` to the `mcd-agent` module's `cloud_account_id`; the data store role trusts `arn:aws:iam::<account>:root` with it, and AWS-only data store Terraform keeps the `montecarlo` provider for this data source. The `monte_carlo_collection_account_id` and `mcd_account_id` variables are gone. CloudFormation and CLI steps still take the account from Account information.
+
 ## [1.28.0] - 2026-10-13
 
 ### Added

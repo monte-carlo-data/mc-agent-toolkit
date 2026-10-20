@@ -290,11 +290,12 @@ or start a migration merely to make the new connection fit.
    a moment right after creation; retry the read briefly, then check permission/status if still null).
 3. **Hand over the deploy step.** The customer runs it where their cloud credentials are; keep secrets outside this
    session. Per platform, from the output-modes reference:
-   - AWS: Terraform module `monte-carlo-data/mcd-agent/aws` with the account
+   - AWS: Terraform module `monte-carlo-data/mcd-agent/aws` with the chosen region, the generated
+     `external_id`, and `cloud_account_id` read from the `montecarlo_hosting_private_link` data
+     source, so don't ask for it. Or the CloudFormation template with a parameters file
+     (output-modes; parameter names from the template itself), which needs the account
      information page's **Collection AWS account ID** (never the account the agent is deployed
-     into), chosen region and generated `external_id`, or the CloudFormation template with a
-     parameters file (output-modes; parameter names from the template itself). Outputs: Lambda
-     function ARN, invoker role ARN.
+     into). Outputs: Lambda function ARN, invoker role ARN.
    - GCP: module `monte-carlo-data/mcd-agent/google`. Outputs: Cloud Run URL, invoker key.
    - Azure: module `monte-carlo-data/mcd-agent/azurerm`. Outputs: function app URL, auth details.
    - Generic: first a credential for the agent — `montecarlo collection-agents create generic-token
@@ -706,7 +707,8 @@ or `delete-stack` can remove it.
    must originate in the customer's VPC, recommend an agent. A public-internet restriction alone
    leaves Cloud + supported PrivateLink as an option; respect a preference for agent + PrivateLink.
 3. If an AWS native agent fits and none can be reused, approve the concrete plan, provision the
-   deployment, and hand over the module with the Collection AWS account ID and External ID.
+   deployment, and hand over the module with the External ID (it reads Monte Carlo's AWS
+   account from the provider; CloudFormation needs the Collection AWS account ID).
    Stop until infrastructure exists, then register and confirm enabled. Use Generic only when
    its outbound architecture/runtime fits the requirements; follow its separate guide.
 4. Reuse or create the correct Snowflake credential reference, warehouse and connection; verify

@@ -93,13 +93,17 @@ provider "montecarlo" {
 ### Deployment + AWS collection agent
 
 The deployment comes first because it generates the external id the agent's role must trust.
+Monte Carlo's AWS account, which assumes the invoker role, comes from the
+`montecarlo_hosting_private_link` data source (provider 0.1.27 or later): never ask the customer
+for it or make it a variable.
 
 ```hcl
 variable "aws_region" { type = string }
-# Account information → Collection → AWS account ID, not the customer's account ID.
-variable "monte_carlo_collection_account_id" { type = string }
 variable "deployment_name" { type = string } # from the customer
 provider "aws" { region = var.aws_region }
+
+# Monte Carlo's AWS account, which assumes the agent's invoker role.
+data "montecarlo_hosting_private_link" "this" {}
 
 resource "montecarlo_deployment" "agent" {
   name             = var.deployment_name
@@ -113,7 +117,7 @@ module "mcd_agent" {
   version = "1.0.7"
 
   region           = var.aws_region
-  cloud_account_id = var.monte_carlo_collection_account_id
+  cloud_account_id = data.montecarlo_hosting_private_link.this.aws.account_id
   external_id      = montecarlo_deployment.agent.aws_external_id
   # private_subnets = ["subnet-…", "subnet-…"]   # to reach a warehouse inside the VPC
 }
@@ -223,14 +227,18 @@ and the [Generic guide](https://docs.getmontecarlo.com/docs/generic-agent-platfo
 
 ### Deployment + AWS data store
 
-No published module. Bucket, role trusting the external id, and the registration. `mcd_account_id`
-is the Monte Carlo collection account shown under Account information → Collection.
+No published module. Bucket, role trusting the external id, and the registration. The role
+trusts Monte Carlo's AWS account from the `montecarlo_hosting_private_link` data source. When the
+deployment already exists and the artifact holds only the AWS resources, keep the `montecarlo`
+provider (credentials from the CLI profile) for this data source alone.
 
 ```hcl
 variable "aws_region" { type = string }
-variable "mcd_account_id" { type = string }  # Collection AWS account ID
 variable "deployment_name" { type = string } # from the customer
 provider "aws" { region = var.aws_region }
+
+# Monte Carlo's AWS account, which assumes the role.
+data "montecarlo_hosting_private_link" "this" {}
 
 resource "montecarlo_deployment" "store" {
   name             = var.deployment_name
@@ -272,7 +280,7 @@ resource "aws_iam_role" "store" {
     Statement = [{
       Effect    = "Allow"
       Action    = "sts:AssumeRole"
-      Principal = { AWS = "arn:aws:iam::${var.mcd_account_id}:root" }
+      Principal = { AWS = "arn:aws:iam::${data.montecarlo_hosting_private_link.this.aws.account_id}:root" }
       Condition = { StringEquals = { "sts:ExternalId" = montecarlo_deployment.store.aws_external_id } }
     }]
   })
