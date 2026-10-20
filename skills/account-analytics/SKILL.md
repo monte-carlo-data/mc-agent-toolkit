@@ -21,11 +21,29 @@ never fill a gap from memory.
 - **`query_metrics`**: one request: `metrics`, `group_by`, `filters` (`in`, `not_in`, `gte`, `lte`), `order_by`,
   `limit`. The answer has `columns`, `rows`, `data_as_of` and `truncated`.
 
+## From the catalog to a request
+
+Catalog pages describe each example query in words; build the `query_metrics` request from it:
+
+| Catalog says | Request |
+|---|---|
+| Metrics: `a`, `b` | `"metrics": ["a", "b"]` |
+| Grouped by: `x`, `y` | `"group_by": ["x", "y"]` |
+| Filter: `f` is `v`, or is one of `v`, `w` | `{"field": "f", "op": "in", "values": ["v", "w"]}` |
+| Filter: `f` is not `v`, or is none of `v`, `w` | `{"field": "f", "op": "not_in", "values": ["v", "w"]}` |
+| Filter: `f` on or after, or at least, `v` | `{"field": "f", "op": "gte", "values": ["v"]}` |
+| Filter: `f` on or before, or at most, `v` | `{"field": "f", "op": "lte", "values": ["v"]}` |
+| A date in words: "30 days ago", "the start of this quarter" | that date as `YYYY-MM-DD` |
+| Sorted by: `m`, highest first (lowest first) | `"order_by": [{"field": "m", "descending": true}]` (`false`) |
+| At most N rows | `"limit": N` |
+
+`true` and `false` are JSON booleans; other values are strings.
+
 ## Workflow
 
 1. **Find the topic.** Read the catalog index, pick the topic (data quality, coverage, monitor runs, consumption) and
-   read its page: rules, metrics, example requests. If the ask matches a dashboard example, read that page too: its
-   requests are tested.
+   read its page: rules, metrics, example questions. If the ask matches a dashboard example, read that page too: its
+   queries are tested.
 2. **Pick names from the catalog.** Use only metric and dimension names you read in the catalog or got from
    `get_metrics_catalog`. A metric marked as not served cannot be used: say so and offer what is served.
 3. **Resolve time.** Today is the date the user is in. "Last N days" is `metric_time__day` `gte` today minus N days
