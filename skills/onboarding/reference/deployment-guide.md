@@ -58,7 +58,7 @@ both paths; it is not a guarantee of no internet exposure on every cloud.
 
 | Platform | Deployment and registration handoff |
 |---|---|
-| [AWS](https://docs.getmontecarlo.com/docs/create-and-register-an-aws-agent) | Provision in Monte Carlo first. Read its generated External ID. Configure the module/template with that value, the **Collection AWS account ID** from Account information (not the customer's account ID), and the chosen region/network. Return Lambda and invoker-role ARNs, register, confirm enabled. V2 uses supported VPC endpoints for inbound invocation; separately configure the agent's route to the warehouse and required cloud services. |
+| [AWS](https://docs.getmontecarlo.com/docs/create-and-register-an-aws-agent) | Provision in Monte Carlo first. Read its generated External ID. Configure the module/template with that value, Monte Carlo's AWS account, and the chosen region/network. Terraform reads that account from the `montecarlo_hosting_private_link` data source; CloudFormation takes the **Collection AWS account ID** from Account information (not the customer's account ID). Return Lambda and invoker-role ARNs, register, confirm enabled. V2 uses supported VPC endpoints for inbound invocation; separately configure the agent's route to the warehouse and required cloud services. |
 | [Azure](https://docs.getmontecarlo.com/docs/create-and-register-an-azure-agent) | Provision, deploy Function and storage, choose Function App Key or supported service-principal/custom-header auth, then complete registration locally. Inbound HTTPS is public by default; private endpoints require the documented provision/request/approval sequence. Configure outbound VNet reachability separately. |
 | [GCP](https://docs.getmontecarlo.com/docs/create-and-register-a-gcp-agent) | Provision, choose project/region and deploy the Cloud Run agent/storage; establish invoker credentials and network access. Complete registration locally and confirm enabled. The general matrix lists no Private Link for GCP **classic ingress**; it does not describe Generic's outbound path. |
 
@@ -72,7 +72,8 @@ Use a dedicated private object store and the cloud's access identity. AWS Extern
 not the Azure/GCP authentication model. Complete the selected guide before registering:
 
 - [AWS S3](https://docs.getmontecarlo.com/docs/direct-connection-with-an-aws-data-store): provision
-  first; use generated External ID and Collection account in the assumable role; return bucket
+  first; use generated External ID and Monte Carlo's AWS account in the assumable role (Terraform
+  reads it from `montecarlo_hosting_private_link`, CLI steps from Account information); return bucket
   name and role ARN. The output-modes reference includes an S3 Terraform example.
 - [Azure Blob](https://docs.getmontecarlo.com/docs/create-and-register-an-azure-blob-data-store):
   storage account supporting block blobs, private container, and connection-string or OAuth

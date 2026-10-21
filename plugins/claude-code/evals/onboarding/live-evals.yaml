@@ -328,13 +328,14 @@ cases:
     criteria:
       must_not_call: *no_writes
       # An explicit endpoint overrides the profile's and breaks keys from other environments.
-      output_must_not_contain: ['endpoint = "https://', 'endpoint="https://']
+      output_must_not_contain: ['endpoint = "https://', 'endpoint="https://', 'cloud_account_id = var.']
       tool_input_must_not_contain: ['endpoint = "https://', 'endpoint="https://']
       judge_rubric: |
         The Monte Carlo provider block takes its endpoint from the profile or a variable whose
         default is not a URL; no endpoint URL is hard-coded anywhere. The configuration creates
-        the deployment, the mcd-agent module with the Collection AWS account ID and External
-        ID, the registration, an IAM grant on the secret for the execution role, the
+        the deployment, the mcd-agent module with the External ID and `cloud_account_id` read
+        from the `montecarlo_hosting_private_link` data source (not a variable or a question), the
+        registration, an IAM grant on the secret for the execution role, the
         credentials reference, warehouse and connection, with variables that have no defaults
         for customer inputs, and says how to confirm which account the profile reaches.
 
@@ -413,9 +414,10 @@ cases:
       judge_rubric: |
         Turn 1: the agent creates exactly one COLLECTION_AGENT deployment on AWS, reads its
         External ID, and hands over the agent deploy step (the mcd-agent AWS Terraform module or
-        CloudFormation, with the Collection AWS account ID and External ID) naming the outputs to
-        send back (Lambda ARN, invoker role ARN). It stops before registration and ends with the
-        summary: the created deployment id under "Created in this run" and the agent registration,
+        CloudFormation, with the External ID; Terraform reads Monte Carlo's AWS account from
+        `montecarlo_hosting_private_link`, CloudFormation takes the Collection AWS account ID)
+        naming the outputs to send back (Lambda ARN, invoker role ARN). It stops before
+        registration and ends with the summary: the created deployment id under "Created in this run" and the agent registration,
         credentials, warehouse, connection and validation under pending.
         Turn 2: it deletes only the deployment it created, nothing it reused, and confirms.
 

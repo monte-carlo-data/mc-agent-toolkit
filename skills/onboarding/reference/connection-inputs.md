@@ -108,7 +108,7 @@ so this section says how to discover them; it does not list them.
 | Any | Target Monte Carlo account and environment | `get_current_user`. The artifact's credentials (CLI profile, provider `profile`, SDK env) must reach this same account: compare the account the customer's profile resolves to before carrying discovered ids into an artifact. |
 | Reuse | `deployment_id` | Discovery (Step 1a). |
 | AWS agent | Region | Customer or existing infrastructure. |
-| AWS agent | Collection AWS account ID | Account information → Collection → AWS account ID, read by the customer. NEVER the AWS account the agent is deployed into. If both are equal, stop and re-check: registration then fails after several minutes with "Could not connect to Agent" because Monte Carlo is denied `sts:AssumeRole`. |
+| AWS agent, CloudFormation or CLI | Collection AWS account ID | Account information → Collection → AWS account ID, read by the customer. Terraform reads it from the `montecarlo_hosting_private_link` data source instead; don't ask for it there. NEVER the AWS account the agent is deployed into. If both are equal, stop and re-check: registration then fails after several minutes with "Could not connect to Agent" because Monte Carlo is denied `sts:AssumeRole`. |
 | AWS agent | External ID | `get_deployment` → `aws_external_id` (Step 1b). |
 | AWS agent, private warehouse | Subnets that route to the warehouse | Customer. |
 | GCP / Azure / Generic agent | The module or guide's required inputs | The linked module or official guide; ask for each one it marks required. |
