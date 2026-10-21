@@ -18,6 +18,26 @@ Extract these from the `get_monitors` config response for your Phase 2 analysis:
 
 ---
 
+## Daily cost exception: `total_cost`
+
+A `total_cost` monitor measures the whole agent's daily reported Snowflake credits,
+including model usage and warehouse queries. It is not a span-level field or a dollar
+amount. The following constraints override the general tuning guidance:
+
+- Keep exactly one condition: `SUM` on `total_cost`, operator `AUTO_HIGH`.
+- Keep daily buckets (`aggregate_by="day"`) and a fixed daily schedule
+  (`schedule_type="fixed"`, `interval_minutes=1440`).
+- **Do not change** the field, metric, direction, thresholds, bucket, or schedule.
+  Do not use NOOP, splits, span filters, trace/conversation aggregation, or cluster scope.
+- **Sensitivity is the only tuning setting.** If it is already LOW, or the evidence
+  does not justify a sensitivity change, return no recommendation. Do not replace the
+  cost monitor with a token monitor or propose an unsupported change as a workaround.
+
+The threshold, span-filter, and aggregation guidance below applies to other agent metric
+monitors. The applying-changes instructions apply to both cost and other metric monitors.
+
+---
+
 ## Threshold adjustment
 
 For explicit-threshold comparisons (`GT`, `LT`, etc.), follow the same rules as metric monitors:
