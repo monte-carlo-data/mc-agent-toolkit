@@ -73,7 +73,8 @@ terraform {
   required_version = ">= 1.11"
 
   required_providers {
-    montecarlo = { source = "monte-carlo-data/montecarlo" }
+    # 0.1.27 is the first with `montecarlo_hosting_private_link`.
+    montecarlo = { source = "monte-carlo-data/montecarlo", version = ">= 0.1.27" }
     # For the AWS examples; 6.50 is the first with `secret_string_wo`. Omit when no AWS resource is used.
     aws = { source = "hashicorp/aws", version = ">= 6.50" }
   }
@@ -94,7 +95,7 @@ provider "montecarlo" {
 
 The deployment comes first because it generates the external id the agent's role must trust.
 Monte Carlo's AWS account, which assumes the invoker role, comes from the
-`montecarlo_hosting_private_link` data source (provider 0.1.27 or later): never ask the customer
+`montecarlo_hosting_private_link` data source: never ask the customer
 for it or make it a variable.
 
 ```hcl
