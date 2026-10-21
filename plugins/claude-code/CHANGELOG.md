@@ -5,6 +5,12 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Claude Code will
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.28.2] - 2026-10-21
+
+### Changed
+
+- Daily agent cost monitor tuning now preserves SUM / AUTO_HIGH on total_cost and the fixed daily schedule. Sensitivity is the only supported adjustment; other agent metrics retain their existing tuning guidance.
+
 ## [1.28.1] - 2026-10-20
 
 ### Changed
