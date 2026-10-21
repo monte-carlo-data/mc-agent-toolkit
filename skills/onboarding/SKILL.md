@@ -223,7 +223,11 @@ requirement cannot be read, ask only for that missing fact or hand off to the ac
 
 The customer runs the connector's service-user/grants setup (for example,
 https://docs.getmontecarlo.com/docs/snowflake). Identify the intended account and databases;
-reuse existing setup where appropriate. Guide the required steps without requesting secrets. For
+reuse existing setup where appropriate. Guide the required steps without requesting secrets.
+When the customer wants Terraform to create the Snowflake service user too, put it in the same
+configuration as the deployment and connection, per the output-modes reference (*Snowflake
+service user, in the same configuration*): the customer generates the key pair, Terraform reads
+it by path, and the inputs checklist adds the admin login, role and databases. For
 a BI tool, that setup is the user, token, API client or app registration Monte Carlo signs in
 with, from the tool's page in the Monte Carlo docs (for example
 https://docs.getmontecarlo.com/docs/tableau or https://docs.getmontecarlo.com/docs/looker).
