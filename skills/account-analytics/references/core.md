@@ -146,10 +146,10 @@ One self-contained HTML file: inline CSS and SVG, no external scripts, fonts or 
 - **Only what was asked.** Put on it the answers the user asked for in the chat, or the example's blocks; nothing
   extra.
 - **One grouping per dashboard** (domains unless data products are asked for); never both side by side.
-- **Why a table fails.** Next to a failing table, list its failing data quality dimensions. When some of its alerts
-  come from monitors with no data quality dimension set, name their alert types instead of leaving it empty
-  ("accuracy; no dimension set: freshness, volume"): request the table's alert count grouped by
-  `incident__incident_type` over the same window.
+- **Why a table fails.** Next to a failing table, list its failing data quality dimensions. When some of its failing
+  monitors have no data quality dimension set, name their monitor types instead of leaving it empty ("accuracy,
+  timeliness; no dimension set: table, comparison monitor"): group the same monitor-by-table request by
+  `monitor__monitor_type` as well. Do not use the internal incident type for this.
 - **Every number** comes from a request listed under "How this was built"; a share of two returned numbers says so.
 - **A block the data cannot fill** stays, with one sentence on why.
 - **It is a snapshot:** say the numbers are as of the data refresh, and that running the request again refreshes them.
