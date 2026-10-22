@@ -77,6 +77,9 @@ If the question is vague ("how is our data quality?", "tell me about domain X", 
   fix): the purpose picks the reading.
 - Ask once, in one message. If the user says "just answer", answer only the recommended reading and state the
   choices; offer the others as follow-ups.
+- Ask only when the purpose is unclear or the readings would answer different questions. When the question names what
+  to count and only a detail is open (which window, which of two definitions, which of several close values), answer
+  the recommended reading, say so under "Choices I made", and offer the others as follow-ups.
 - Say early what the data cannot answer (history it does not keep, cost per table, predictions, other accounts) and
   offer the closest question it can. Lead with what it cannot answer; do not open with a substitute number nobody asked
   for.
@@ -110,7 +113,10 @@ If the question is vague ("how is our data quality?", "tell me about domain X", 
 - **Never add up rows.** A total, a headline number or an "all" row comes from its own request without the group by.
   Rows of domains, data products, tags, monitor domains and audiences overlap (a table can be in two domains, an alert
   can have two tags), and `limit` cuts rows, so their sum is not a count of anything. When you show members, say that
-  they overlap and give the total from its own request next to them.
+  they overlap and give the total from its own request next to them. This holds for the first sentence too: write a
+  number there only after a request returned it.
+- **Counts of things** (how many data products, domains, monitors, tables) come from a count metric such as
+  `data_product_count` or `monitor_count`, never from counting rows by hand.
 - **Small samples:** say how many rows a median, percentile or rate rests on ("p90 over 2 fixed alerts").
 - **Before you decline:** search the topic and dimension pages for the concept, and check the metric's allowed
   dimensions. One failed request or a missing name in your first guess is not proof the data lacks it.
