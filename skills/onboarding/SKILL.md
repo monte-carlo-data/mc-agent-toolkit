@@ -227,8 +227,9 @@ reuse existing setup where appropriate. Guide the required steps without request
 When the customer wants Terraform to create the Snowflake service user too, put it in the same
 configuration as the deployment and connection, per the output-modes reference (*Snowflake
 service user, in the same configuration*): the customer generates the key pair, Terraform reads
-it by path, and the inputs checklist adds the admin login, role and databases. Everything goes in
-one apply; the connection is validated right after it (Step 5). For
+it by path, and the inputs checklist takes the connection-inputs reference's inputs for that case
+(*When Terraform creates the service user*). Everything goes in one apply; the connection is
+validated right after it (Step 5). For
 a BI tool, that setup is the user, token, API client or app registration Monte Carlo signs in
 with, from the tool's page in the Monte Carlo docs (for example
 https://docs.getmontecarlo.com/docs/tableau or https://docs.getmontecarlo.com/docs/looker).
@@ -395,6 +396,10 @@ step beside the create step, with the same fields plus `--deployment-id`: for a 
 `montecarlo credentials validate snowflake --deployment-id … --account … --user … --private-key @key.p8`
 (not an MCP tool: the secret travels in the request). When the session does not serve these tools,
 skip this check; Step 5 still validates the connection.
+**Exception: Terraform that also creates the Snowflake service user** (output-modes, *Snowflake
+service user, in the same configuration*) creates the credential, warehouse and connection in the
+same apply and validates the connection right after it; it does not split into a validate-first
+apply.
 
 Two Snowflake key formats belong to different paths; do not interchange them:
 

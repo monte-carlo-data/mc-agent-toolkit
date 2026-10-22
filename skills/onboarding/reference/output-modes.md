@@ -401,7 +401,11 @@ use another name or to `terraform import` it; a plain apply fails with "already 
   or monitors fail.
 - **Key rotation:** the customer points both path variables at the new pair and applies. The
   secret's version is derived from the public key, so the new private key is sent in the same apply
-  that sets the new public key; never a hand-bumped version that can fall out of step.
+  that sets the new public key; never a hand-bumped version that can fall out of step. The switch is
+  not atomic: between the user update and the secret write the agent's logins fail, and a failed
+  apply leaves them mismatched until the next one. For no gap, first add `rsa_public_key_2` on the
+  user with the **old** public key's body while repointing the paths and apply (both keys accepted,
+  secret now new); after the connection validates, remove `rsa_public_key_2` and apply again.
 
 ```hcl
 # In required_providers: snowflake = { source = "snowflakedb/snowflake", version = ">= 2.22" }
@@ -432,13 +436,20 @@ provider "snowflake" {
 }
 
 locals {
+  # Each key file read once; the body extraction and the preconditions use this.
+  snowflake_key_pem = {
+    public  = file(var.snowflake_public_key_path)
+    private = file(var.snowflake_private_key_path)
+  }
   # PEM body without the BEGIN/END lines: what rsa_public_key and the secret's private_key take.
-  snowflake_key_body = { for k, path in {
-    public  = var.snowflake_public_key_path
-    private = var.snowflake_private_key_path
-    } : k => join("", [
-      for line in split("\n", file(path)) : trimspace(line) if !startswith(trimspace(line), "-----")
+  snowflake_key_body = { for k, pem in local.snowflake_key_pem : k => join("", [
+    for line in split("\n", pem) : trimspace(line) if !startswith(trimspace(line), "-----")
   ]) }
+  # Unencrypted PKCS#8, which the self-hosted secret and the managed credential both need.
+  snowflake_private_key_ok = (
+    strcontains(local.snowflake_key_pem.private, "-----BEGIN PRIVATE KEY-----") &&
+    !strcontains(local.snowflake_key_pem.private, "ENCRYPTED")
+  )
   # Changes whenever the key pair does, so a rotation always re-sends the private key.
   snowflake_key_version = parseint(substr(sha256(local.snowflake_key_body.public), 0, 12), 16)
 
@@ -477,7 +488,7 @@ resource "snowflake_service_user" "monte_carlo" {
 
   lifecycle {
     precondition {
-      condition     = strcontains(file(var.snowflake_public_key_path), "BEGIN PUBLIC KEY")
+      condition     = strcontains(local.snowflake_key_pem.public, "BEGIN PUBLIC KEY")
       error_message = "snowflake_public_key_path must be a PEM public key (openssl rsa -pubout)."
     }
   }
@@ -581,7 +592,8 @@ resource "aws_secretsmanager_secret_version" "snowflake" {
   # Write-only: the private key never reaches state or a plan.
   secret_string_wo = jsonencode({
     connect_args = {
-      account     = "${var.snowflake_organization_name}-${var.snowflake_account_name}"
+      # Account names may contain underscores; the connector's hostname form uses hyphens.
+      account     = "${var.snowflake_organization_name}-${replace(var.snowflake_account_name, "_", "-")}"
       user        = snowflake_service_user.monte_carlo.name
       warehouse   = snowflake_warehouse.monte_carlo.name
       private_key = local.snowflake_key_body.private
@@ -591,10 +603,7 @@ resource "aws_secretsmanager_secret_version" "snowflake" {
 
   lifecycle {
     precondition {
-      condition = (
-        strcontains(file(var.snowflake_private_key_path), "-----BEGIN PRIVATE KEY-----") &&
-        !strcontains(file(var.snowflake_private_key_path), "ENCRYPTED")
-      )
+      condition     = local.snowflake_private_key_ok
       error_message = "snowflake_private_key_path must be an unencrypted PKCS#8 key (openssl pkcs8 -topk8 -nocrypt)."
     }
   }
@@ -624,11 +633,18 @@ managed locals block of the *Warehouse and connection* section:
 
 ```hcl
 resource "montecarlo_snowflake_credentials" "snowflake" {
-  account                = "${var.snowflake_organization_name}-${var.snowflake_account_name}"
+  account                = "${var.snowflake_organization_name}-${replace(var.snowflake_account_name, "_", "-")}"
   user                   = snowflake_service_user.monte_carlo.name
   warehouse              = snowflake_warehouse.monte_carlo.name
-  private_key_wo         = file(var.snowflake_private_key_path) # PEM text, BEGIN/END lines included
+  private_key_wo         = local.snowflake_key_pem.private # PEM text, BEGIN/END lines included
   private_key_wo_version = local.snowflake_key_version
+
+  lifecycle {
+    precondition {
+      condition     = local.snowflake_private_key_ok
+      error_message = "snowflake_private_key_path must be an unencrypted PKCS#8 key (openssl pkcs8 -topk8 -nocrypt)."
+    }
+  }
 }
 ```
 
