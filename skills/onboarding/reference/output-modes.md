@@ -384,6 +384,8 @@ use another name or to `terraform import` it; a plain apply fails with "already 
   state. The private key reaches the self-hosted secret only through `secret_string_wo` (or the
   managed variant's `private_key_wo`). The self-hosted secret needs an **unencrypted PKCS#8** key
   (`openssl pkcs8 -topk8 -nocrypt`); the preconditions below stop an encrypted or PKCS#1 key at plan.
+  Hand over the key commands inside `( umask 077; … )`, so the files are never readable by others
+  and the customer's shell stays in its folder; not a `chmod` after the fact.
 - **The Snowflake provider signs in as the customer's admin**, by key pair from a file path: a role
   allowed to create users, roles and warehouses and to grant `IMPORTED PRIVILEGES` on `SNOWFLAKE`
   (`ACCOUNTADMIN`, or a custom role with `CREATE USER`, `CREATE ROLE`, `CREATE WAREHOUSE` and
