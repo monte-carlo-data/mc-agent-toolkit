@@ -1,0 +1,146 @@
+<!-- Shared core of two twin skills: account-analytics (mc-agent-toolkit, this file is the source) and
+customer-account-analytics (claude-skills, a checked copy). Edit only here, then run the sync script in
+claude-skills; its test fails when the copy differs. This file speaks of the docs and of requests only; each
+SKILL.md says where the docs are and how a request runs. -->
+
+# Account analytics: shared core
+
+## The docs
+
+The Composable dashboards docs hold every fact you use; this file holds only how to work. Read only the page you
+need:
+
+| Page | Read it for |
+|---|---|
+| How to query | the parts of a request, names, time, filters, access |
+| Data catalog → Metrics (one page per topic: data quality, coverage, consumption, monitor runs) | the metrics, their rules and example questions |
+| Data catalog → Dimensions, Glossary | what a dimension means; words with two meanings; periods and how far back a series goes |
+| Dashboard examples | tested dashboards, each with its blocks and one request per block |
+| Dashboard style | how any dashboard looks |
+
+Use only metric and dimension names you read in the docs or in the list of metrics the SKILL.md gives you. A metric
+marked as not served cannot be used: say so and offer what is served.
+
+## A request
+
+Every number comes from a request of this shape, whatever runs it:
+
+```json
+{"metrics": ["incident_count"], "group_by": ["metric_time__week"],
+ "filters": [{"field": "metric_time__day", "op": "gte", "values": ["2026-07-22"]}],
+ "order_by": [{"field": "incident_count", "descending": true}], "limit": 1000}
+```
+
+The answer has `columns` (group-by names, then metrics), `rows`, `data_as_of` and `truncated`. Read columns by name.
+The docs describe requests in words; translate them like this:
+
+| The docs say | Request |
+|---|---|
+| Metrics: `a`, `b` | `"metrics": ["a", "b"]` |
+| Grouped by: `x`, `y` | `"group_by": ["x", "y"]` |
+| Filter: `f` is `v`, or is one of `v`, `w` | `{"field": "f", "op": "in", "values": ["v", "w"]}` |
+| Filter: `f` is not `v`, or is none of `v`, `w` | `{"field": "f", "op": "not_in", "values": ["v", "w"]}` |
+| Filter: `f` on or after, or at least, `v` | `{"field": "f", "op": "gte", "values": ["v"]}` |
+| Filter: `f` on or before, or at most, `v` | `{"field": "f", "op": "lte", "values": ["v"]}` |
+| A date in words: "30 days ago", "the start of this quarter" | that date as `YYYY-MM-DD` |
+| Sorted by: `m`, highest first (lowest first) | `"order_by": [{"field": "m", "descending": true}]` (`false`) |
+| At most N rows | `"limit": N` (1,000 by default, at most 10,000) |
+
+`true` and `false` are JSON booleans; other values are strings. To list the values a dimension has (domain names,
+monitor types), request a count grouped by that dimension, for example `monitor_count` grouped by
+`monitor__monitor_type`.
+
+## 1. Find the business question
+
+A question is ready when it says four things. Fill each from the question, from the docs' defaults, or from the user:
+
+1. **What to count**: a metric the docs have. Map the user's words with the glossary and the metrics' synonyms
+   ("spend" is credits; "incident" is a declared incident; "health" is asset health, not the product's data quality
+   score).
+2. **Over what**: the whole account, or a grouping (domain, data product, asset tag, monitor tag, warehouse) and which
+   members.
+3. **When**: a window and a grain for series ("weekly, last 3 months"), or current state (coverage, monitor counts,
+   asset health take no dates).
+4. **The shape**: one number, a ranking, a trend, or a list of tables or monitors.
+
+If all four are clear, or the docs give a default for the missing one, go to step 2 and name the defaults under
+"Choices I made".
+
+If the question is vague ("how is our data quality?", "tell me about domain X", "is our monitoring good?"):
+
+- Offer two or three precise questions the data answers, each one line, with what it would show, and recommend one.
+  Take them from the topic's example questions when one fits. Example: "Asset health of your tables this week, per
+  data quality dimension (which kind of check fails most)" / "Tables failing this week, worst first (where to look)" /
+  "Weekly alerts over the last 3 months (is it getting better)".
+- When the purpose is unclear, ask what the answer is for (a weekly review, a report to leadership, finding what to
+  fix): the purpose picks the reading.
+- Ask once, in one message. If the user says "just answer", answer the recommended reading and state the choices.
+- Say early what the data cannot answer (history it does not keep, cost per table, predictions, other accounts) and
+  offer the closest question it can.
+
+Do not ask about what the docs settle (a default window, which meaning of a word is the default); answer it and
+state the choice.
+
+## 2. Build the request
+
+- **Topic rules first.** Read the topic's page and apply its rules as written: default filters (deleted monitors,
+  deleted data products), which meaning of "domain", credit pricing.
+- **Groupings.** To split a metric by domain, data product, asset tag, monitor domain, monitor tag or audience, use its
+  per-grouping metric (`domain_...`, `data_product_...`). Members overlap, so their rows do not add up to a total.
+- **Entity rows.** For one row per table or monitor, group by `asset` or `monitor` and put its name next to it; never
+  by the name alone (names repeat).
+- **Time.** Today is the date the user is in. "Last N days" is `metric_time__day` on or after today minus N days.
+  Group a series by `metric_time__day`, `__week` or `__month` within the limits in the glossary's Time section. Do not
+  group current-state metrics by time.
+- **Two groupings at once** that one metric does not allow: take two steps, as Dimensions → "Before you group or
+  filter" shows.
+- **A dashboard example matches the ask:** use its requests, adapting only the window and filters.
+
+## 3. Run and check
+
+- **Errors** list what works; fix the request and retry, at most three times per request.
+- **`truncated` is true:** narrow the request or raise `limit`.
+- **Empty answer:** check the filter values (list them as above). If the default window is empty, also give the most
+  recent value or a wider window. "Nothing matched" is an answer.
+- **Totals** come from their own request without the group by, never from adding rows: an alert can have two types, a
+  table can be in two domains, and `limit` cuts rows.
+- **Small samples:** say how many rows a median, percentile or rate rests on ("p90 over 2 fixed alerts").
+- **Before you decline:** search the topic and dimension pages for the concept, and check the metric's allowed
+  dimensions. One failed request or a missing name in your first guess is not proof the data lacks it.
+
+## 4. Answer in the chat
+
+Answer in the chat first; build a dashboard only when the user asks for one. In this order, never leaving out 3 and 4:
+
+```text
+<one to three sentences with the numbers>
+
+<a table when there are several rows; at most 25, say how many more>
+
+Data as of <data_as_of>; the data is not real time.
+
+Choices I made:
+- <window, and the default it came from>
+- <metric and its definition, when two could fit>
+- <filters the rules added; how ties were broken>
+```
+
+If a number is computed from returned rows (a share), say how under Choices. No labels the docs do not define
+("Good", "Fair") and no scores they do not define (weighted, composite, "overall"): show the metrics and let the user
+combine them. End with one or two follow-up questions the data can answer, worded so the user can send them as they
+are.
+
+## 5. Dashboards, when asked
+
+One self-contained HTML file: inline CSS and SVG, no external scripts, fonts or images.
+
+- **Start from the docs.** If a dashboard example matches, keep its blocks and requests. Lay out every dashboard as
+  Dashboard style says: header with the window in dates and "Data as of", filters, the answer, the breakdown, the
+  detail, and "How this was built" (every request and the choices) at the bottom; its colours, number formats and
+  status words.
+- **Only what was asked.** Put on it the answers the user asked for in the chat, or the example's blocks; nothing
+  extra.
+- **One grouping per dashboard** (domains unless data products are asked for); never both side by side.
+- **Every number** comes from a request listed under "How this was built"; a share of two returned numbers says so.
+- **A block the data cannot fill** stays, with one sentence on why.
+- **It is a snapshot:** say the numbers are as of the data refresh, and that running the request again refreshes them.
