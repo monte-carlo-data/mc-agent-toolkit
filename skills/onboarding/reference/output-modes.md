@@ -403,9 +403,10 @@ use another name or to `terraform import` it; a plain apply fails with "already 
   secret's version is derived from the public key, so the new private key is sent in the same apply
   that sets the new public key; never a hand-bumped version that can fall out of step. The switch is
   not atomic: between the user update and the secret write the agent's logins fail, and a failed
-  apply leaves them mismatched until the next one. For no gap, first add `rsa_public_key_2` on the
-  user with the **old** public key's body while repointing the paths and apply (both keys accepted,
-  secret now new); after the connection validates, remove `rsa_public_key_2` and apply again.
+  apply leaves them mismatched until the next one. For no gap, three applies (tested): (1) add
+  `rsa_public_key_2` with the **new** public key's body; (2) repoint the paths at the new pair and set
+  `rsa_public_key_2` to the **old** key's body, so the secret gets the new key while the old one still
+  works; (3) after the connection validates, remove `rsa_public_key_2`.
 
 ```hcl
 # In required_providers: snowflake = { source = "snowflakedb/snowflake", version = ">= 2.22" }
