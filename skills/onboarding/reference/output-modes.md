@@ -374,7 +374,8 @@ resource "montecarlo_snowflake_credentials" "snowflake" {
 Only when the customer asks Terraform to create the Snowflake side too (the service user does not
 exist yet). It replaces the docs' setup script (https://docs.getmontecarlo.com/docs/snowflake): user
 `MONTE_CARLO` (`TYPE=SERVICE`), role `MONTE_CARLO_ROLE`, warehouse `MONTE_CARLO_WH` and the grants
-below. Without that request, keep the hand-off: the customer runs the docs' script.
+below. Without that request, keep the hand-off: the customer runs the docs' script. Propose the
+docs' names shown below and let the customer confirm or change them; do not ask them to invent names.
 
 - **The customer generates the key pair** locally (`openssl`, per the docs' key-pair section) and
   Terraform reads both files by path. **NEVER use `tls_private_key`**: it keeps the private key in
@@ -556,14 +557,58 @@ resource "aws_secretsmanager_secret_version" "snowflake" {
 }
 ```
 
-Add `aws_secretsmanager_secret_version.snowflake` to the credential resource's `depends_on`. For the
-managed key-pair variant instead, set `account` to the same `<org>-<account>`, `user` and
+For the managed key-pair variant instead, set `account` to the same `<org>-<account>`, `user` and
 `warehouse` from these resources and `private_key_wo = file(var.snowflake_private_key_path)`.
 
-Order the connection after the grants, so collection never starts before them. Add to
-`montecarlo_connection.snowflake` below:
+**Test the credentials before creating the connection: two applies of the same configuration.**
+Terraform cannot run Monte Carlo's validation in the middle of an apply, and SKILL.md's
+*Validate before creating* still applies. So the Monte Carlo credential, warehouse and connection
+are switched on by `create_connection`, which the customer sets in their `*.tfvars`:
+
+1. Apply with `create_connection = false`: the Snowflake side, the deployment and agent, the
+   secret and the agent's read grant. The customer sends back `validation_inputs`.
+2. Run `validate_aws_secrets_manager_credentials(deployment_id, connection_type="snowflake",
+   aws_secret=<secret_arn>)` and read the run with `get_validation_run`. It proves the agent reads
+   the secret and signs in to Snowflake as the new user. Go on only when every validation passed;
+   otherwise relay `friendly_message` and `resolution` and fix before creating anything in Monte Carlo.
+3. The customer sets `create_connection = true` and applies again. Then validate the connection
+   (Step 5).
+
+**NEVER create the connection in the first apply**, and never set `create_connection = true` before
+the credential validation passed. Use these blocks in place of the credential resource above and
+the warehouse and connection resources below:
 
 ```hcl
+variable "create_connection" { type = bool } # false for apply 1; true after the credentials validate
+
+output "validation_inputs" { # ids and an ARN only, for the credential validation
+  value = {
+    deployment_id = montecarlo_deployment.agent.id
+    secret_arn    = aws_secretsmanager_secret.snowflake.arn
+  }
+}
+
+resource "montecarlo_self_hosted_aws_credentials" "snowflake" {
+  count           = var.create_connection ? 1 : 0
+  connection_type = "snowflake"
+  aws_secret      = aws_secretsmanager_secret.snowflake.arn
+  depends_on      = [aws_iam_role_policy.agent_read_secret, aws_secretsmanager_secret_version.snowflake]
+}
+
+resource "montecarlo_warehouse" "snowflake" {
+  count         = var.create_connection ? 1 : 0
+  name          = var.warehouse_name
+  type          = "snowflake"
+  deployment_id = montecarlo_deployment.agent.id
+  depends_on    = [montecarlo_aws_collection_agent.agent]
+}
+
+resource "montecarlo_connection" "snowflake" {
+  count          = var.create_connection ? 1 : 0
+  name           = var.connection_name
+  warehouse_id   = montecarlo_warehouse.snowflake[0].id
+  credentials_id = montecarlo_self_hosted_aws_credentials.snowflake[0].id
+  # Collection never starts before the grants exist.
   depends_on = [
     snowflake_grant_account_role.monte_carlo,
     snowflake_grant_privileges_to_account_role.warehouse,
@@ -573,7 +618,13 @@ Order the connection after the grants, so collection never starts before them. A
     snowflake_grant_privileges_to_account_role.future_schemas,
     snowflake_grant_privileges_to_account_role.objects,
   ]
+}
 ```
+
+In `created_ids` and anywhere else, refer to them as `one(montecarlo_connection.snowflake[*].id)`
+(and likewise for the credential and warehouse), which is `null` after apply 1. The managed
+key-pair variant follows the same two applies, with `montecarlo credentials validate snowflake`
+(see the CLI section) as the check between them.
 
 ### Warehouse and connection
 
