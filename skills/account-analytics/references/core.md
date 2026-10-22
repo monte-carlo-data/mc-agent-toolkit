@@ -78,14 +78,20 @@ If the question is vague ("how is our data quality?", "tell me about domain X", 
 - Ask once, in one message. If the user says "just answer", answer only the recommended reading and state the
   choices; offer the others as follow-ups.
 - Say early what the data cannot answer (history it does not keep, cost per table, predictions, other accounts) and
-  offer the closest question it can.
+  offer the closest question it can. Lead with what it cannot answer; do not open with a substitute number nobody asked
+  for.
+- **A named value that does not exist** (a tag, domain, warehouse or data product the account does not have) is not a
+  reason to stop. Check it by listing the values, say it does not exist, name the closest values the account has, and
+  answer the rest of the question with the nearest reading: without that filter, or with the grouping it stands for
+  (all monitor tags for "squad"). Ask only if no reading is close.
 
 ## 2. Build the request
 
 - **Topic rules first.** Read the topic's page and apply its rules as written: default filters (deleted monitors,
   deleted data products), which meaning of "domain", credit pricing.
 - **Groupings.** To split a metric by domain, data product, asset tag, monitor domain, monitor tag or audience, use its
-  per-grouping metric (`domain_...`, `data_product_...`). Members overlap, so their rows do not add up to a total.
+  per-grouping metric (`domain_...`, `data_product_...`). Tags are `name: value`: group by both unless the user names
+  the tag.
 - **Entity rows.** For one row per table or monitor, group by `asset` or `monitor` and put its name next to it; never
   by the name alone (names repeat).
 - **Time.** Today is the session's current date. "Last N days" is `metric_time__day` on or after today minus N days.
@@ -101,15 +107,18 @@ If the question is vague ("how is our data quality?", "tell me about domain X", 
 - **`truncated` is true:** narrow the request or raise `limit`.
 - **Empty answer:** check the filter values (list them as above). If the default window is empty, also give the most
   recent value or a wider window. "Nothing matched" is an answer.
-- **Totals** come from their own request without the group by, never from adding rows: an alert can have two types, a
-  table can be in two domains, and `limit` cuts rows.
+- **Never add up rows.** A total, a headline number or an "all" row comes from its own request without the group by.
+  Rows of domains, data products, tags, monitor domains and audiences overlap (a table can be in two domains, an alert
+  can have two tags), and `limit` cuts rows, so their sum is not a count of anything. When you show members, say that
+  they overlap and give the total from its own request next to them.
 - **Small samples:** say how many rows a median, percentile or rate rests on ("p90 over 2 fixed alerts").
 - **Before you decline:** search the topic and dimension pages for the concept, and check the metric's allowed
   dimensions. One failed request or a missing name in your first guess is not proof the data lacks it.
 
 ## 4. Answer in the chat
 
-Answer in the chat first; build a dashboard only when the user asks for one. In this order, never leaving out 3 and 4:
+Answer in the chat first; build a dashboard only when the user asks for one. In this order, in every turn that has
+numbers (follow-ups too), never leaving out 3 and 4:
 
 ```text
 <one to three sentences with the numbers>
