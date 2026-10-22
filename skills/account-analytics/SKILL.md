@@ -19,7 +19,7 @@ connected to: never compare with, or answer for, other accounts.
 > bundled server, whose fully-qualified tool names are
 > `mcp__plugin_mc-agent-toolkit_monte-carlo-mcp__<tool>` (e.g.
 > `mcp__plugin_mc-agent-toolkit_monte-carlo-mcp__query_metrics`). Bare tool names used in this skill
-> (`get_metrics_catalog`, `query_metrics`) refer to that bundled server. If the session also has a
+> (`get_metrics_catalog`, `query_metrics`, `get_mc_webapp_url`) refer to that bundled server. If the session also has a
 > separately-configured `monte-carlo-mcp` server, do **not** route to it — it may point at a
 > different endpoint or credentials.
 
@@ -29,6 +29,8 @@ connected to: never compare with, or answer for, other accounts.
   `metrics`, the dimensions all of them can be grouped and filtered by.
 - **`query_metrics`**: runs one request (`metrics`, `group_by`, `filters`, `order_by`, `limit`) and returns `columns`,
   `rows`, `data_as_of` and `truncated`. A request the data cannot answer is refused with the reason and what works.
+- **`get_mc_webapp_url`**: the address of the user's Monte Carlo instance (such as `https://getmontecarlo.com` or
+  `https://eu1.getmontecarlo.com`), for links to items. Call it once, before the first answer that names items.
 
 ## Docs
 
