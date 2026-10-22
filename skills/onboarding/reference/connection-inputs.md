@@ -144,6 +144,20 @@ The user also needs the grants from https://docs.getmontecarlo.com/docs/snowflak
 `IMPORTED PRIVILEGES` on the `SNOWFLAKE` database for query logs. Confirm the grants script ran for
 this user and warehouse.
 
+When Terraform creates the service user (output-modes reference, *Snowflake service user, in the
+same configuration*), the user, warehouse and key come from those resources, and the checklist
+asks instead for:
+
+| Input | Required | Notes |
+|---|---|---|
+| Organization and account name | yes | `SELECT CURRENT_ORGANIZATION_NAME(), CURRENT_ACCOUNT_NAME();`. The secret's `account` is `<org>-<account>`. |
+| Admin login and role | yes | The user the Snowflake provider signs in with, and a role that can create users, roles and warehouses and grant `IMPORTED PRIVILEGES` on `SNOWFLAKE` (for example `ACCOUNTADMIN`). |
+| Admin private key | yes | A file path, as above. Never its contents. Ask whether it is encrypted: the passphrase stays in the customer's `SNOWFLAKE_PRIVATE_KEY_PASSPHRASE` environment variable. |
+| User, role and warehouse names | yes | Propose the docs' `MONTE_CARLO`, `MONTE_CARLO_ROLE`, `MONTE_CARLO_WH` for the customer to confirm. If one already exists, another name or `terraform import`. |
+| Databases | yes | The databases Monte Carlo monitors. Never default to all of them. |
+| New key pair | yes | Two file paths: the public and the private key the customer generated for the service user. The private key is unencrypted PKCS#8 (`openssl pkcs8 -topk8 -nocrypt`). |
+| Schema-level future grants | yes | From the docs' check: the schemas and object types it lists, or "none". Never the grants' full output. |
+
 #### BI tools
 
 The four BI types are managed. Each table lists the create operation's inputs; secret inputs are a
