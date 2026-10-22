@@ -5,6 +5,14 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Claude Code will
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.29.0] - 2026-10-22
+
+### Added
+
+- onboarding: Terraform can create the Snowflake service user too. When the customer asks for it, the onboarding Terraform adds the `snowflakedb/snowflake` provider and creates user `MONTE_CARLO` (`TYPE=SERVICE`), role `MONTE_CARLO_ROLE`, warehouse `MONTE_CARLO_WH` and the grants from https://docs.getmontecarlo.com/docs/snowflake: `IMPORTED PRIVILEGES` on `SNOWFLAKE`, and grants on existing and future schemas and objects in each database the customer names. The skill proposes the docs' names. Terraform signs in to Snowflake as the customer's admin through a key file path. The customer generates the service user's key pair with `openssl`, and Terraform reads both files by path. The private key reaches the agent's Secrets Manager secret only through `secret_string_wo`, never state; `tls_private_key` is not used. The checklist asks for the future-grants check output (schemas and object types only) and flags row access policies.
+- onboarding: credentials are validated before the connection is created, in two applies of the same configuration. Apply 1 (`create_connection = false`) creates the Snowflake side, the agent and the secret. `validate_aws_secrets_manager_credentials` then runs from the agent. Apply 2 (`create_connection = true`) creates the credential, warehouse and connection.
+- evals: `terraform-snowflake-service-user-end-to-end` checks the plan, the key handling and the two applies.
+
 ## [1.28.1] - 2026-10-20
 
 ### Changed
