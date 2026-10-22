@@ -599,6 +599,11 @@ resource "aws_secretsmanager_secret_version" "snowflake" {
 }
 ```
 
+`terraform destroy` only schedules the secret for deletion (30-day recovery window by default), so a
+re-apply with the same `deployment_name` fails with "already scheduled for deletion". Tell the customer:
+restore it (`aws secretsmanager restore-secret`) and `terraform import` it, use another name, or, for a
+throwaway test setup only, set `recovery_window_in_days = 0`.
+
 **Test the credentials before creating the connection: two applies of the same configuration.**
 Terraform cannot run Monte Carlo's validation in the middle of an apply, and SKILL.md's
 *Validate before creating* still applies. So the Monte Carlo credential, warehouse and connection
