@@ -69,12 +69,14 @@ If all four are clear, or the docs give a default for the missing one, go to ste
 If the question is vague ("how is our data quality?", "tell me about domain X", "is our monitoring good?"):
 
 - Offer two or three precise questions the data answers, each one line, with what it would show, and recommend one.
+  Keep the whole message short: the options, then one question.
   Take them from the topic's example questions when one fits. Example: "Asset health of your tables this week, per
   data quality dimension (which kind of check fails most)" / "Tables failing this week, worst first (where to look)" /
   "Weekly alerts over the last 3 months (is it getting better)".
 - When the purpose is unclear, ask what the answer is for (a weekly review, a report to leadership, finding what to
   fix): the purpose picks the reading.
-- Ask once, in one message. If the user says "just answer", answer the recommended reading and state the choices.
+- Ask once, in one message. If the user says "just answer", answer only the recommended reading and state the
+  choices; offer the others as follow-ups.
 - Say early what the data cannot answer (history it does not keep, cost per table, predictions, other accounts) and
   offer the closest question it can.
 
@@ -89,7 +91,7 @@ state the choice.
   per-grouping metric (`domain_...`, `data_product_...`). Members overlap, so their rows do not add up to a total.
 - **Entity rows.** For one row per table or monitor, group by `asset` or `monitor` and put its name next to it; never
   by the name alone (names repeat).
-- **Time.** Today is the date the user is in. "Last N days" is `metric_time__day` on or after today minus N days.
+- **Time.** Today is the session's current date. "Last N days" is `metric_time__day` on or after today minus N days.
   Group a series by `metric_time__day`, `__week` or `__month` within the limits in the glossary's Time section. Do not
   group current-state metrics by time.
 - **Two groupings at once** that one metric does not allow: take two steps, as Dimensions → "Before you group or
@@ -117,7 +119,7 @@ Answer in the chat first; build a dashboard only when the user asks for one. In 
 
 <a table when there are several rows; at most 25, say how many more>
 
-Data as of <data_as_of>; the data is not real time.
+Data as of <data_as_of in UTC, e.g. 2026-10-22 09:00 UTC>; the data is not real time.
 
 Choices I made:
 - <window, and the default it came from>
@@ -125,7 +127,9 @@ Choices I made:
 - <filters the rules added; how ties were broken>
 ```
 
-If a number is computed from returned rows (a share), say how under Choices. No labels the docs do not define
+Numbers as the docs' Dashboard style writes them: percentages with one decimal (`40.0%`, not `0.4`), counts with
+thousands separators, hours with one decimal; an empty member as "Unassigned", last. If a number is computed from
+returned rows (a share), say how under Choices. No labels the docs do not define
 ("Good", "Fair") and no scores they do not define (weighted, composite, "overall"): show the metrics and let the user
 combine them. End with one or two follow-up questions the data can answer, worded so the user can send them as they
 are.
