@@ -13,7 +13,7 @@ Credentials are returned oldest first. Each entry says what connection type it i
 where its secret lives; read the typed endpoint for that kind to see its other fields.
 
 - **Effect:** read-only.
-- **Pairs with:** `create_airflow_credentials`, `get_airflow_credentials`, `create_athena_credentials`, `validate_athena_credentials`, `get_athena_credentials`, `validate_athena_credentials_change`, `get_azure_data_factory_credentials`, `get_azure_dedicated_sql_pool_credentials`, `get_azure_sql_database_credentials`, `get_bigquery_credentials`, `get_clickhouse_credentials`, `get_databricks_metastore_sql_warehouse_credentials`, `get_databricks_sql_warehouse_credentials`, `get_db2_credentials`, `get_dbt_cloud_webhook_credentials`, `get_fivetran_credentials`, `get_gcp_dataform_credentials`, `create_glue_credentials`, `validate_glue_credentials`, `get_glue_credentials`, `validate_glue_credentials_change`, `get_informatica_v2_credentials`, `get_looker_git_clone_credentials`, `get_looker_credentials`, `get_mariadb_credentials`, `get_mulesoft_credentials`, `get_mysql_credentials`, `get_oracle_credentials`, `get_postgres_credentials`, `get_power_bi_credentials`, `get_redshift_credentials`, `get_salesforce_crm_credentials`, `get_sap_hana_credentials`, `create_aws_secrets_manager_credentials`, `validate_aws_secrets_manager_credentials`, `get_aws_secrets_manager_credentials`, `validate_aws_secrets_manager_credentials_change`, `create_azure_key_vault_credentials`, `validate_azure_key_vault_credentials`, `get_azure_key_vault_credentials`, `validate_azure_key_vault_credentials_change`, `create_env_var_credentials`, `validate_env_var_credentials`, `get_env_var_credentials`, `validate_env_var_credentials_change`, `create_file_credentials`, `validate_file_credentials`, `get_file_credentials`, `validate_file_credentials_change`, `create_gcp_secret_manager_credentials`, `validate_gcp_secret_manager_credentials`, `get_gcp_secret_manager_credentials`, `validate_gcp_secret_manager_credentials_change`, `get_snowflake_credentials`, `get_sql_server_credentials`, `get_starburst_enterprise_credentials`, `get_starburst_galaxy_credentials`, `get_tableau_credentials`, `get_teradata_credentials`.
+- **Pairs with:** `create_airflow_credentials`, `get_airflow_credentials`, `create_athena_credentials`, `validate_athena_credentials`, `get_athena_credentials`, `validate_athena_credentials_change`, `get_azure_data_factory_credentials`, `get_azure_dedicated_sql_pool_credentials`, `get_azure_sql_database_credentials`, `get_bigquery_credentials`, `get_clickhouse_credentials`, `get_databricks_metastore_sql_warehouse_credentials`, `get_databricks_sql_warehouse_credentials`, `get_db2_credentials`, `get_dbt_cloud_webhook_credentials`, `get_fivetran_credentials`, `get_gcp_dataform_credentials`, `create_glue_credentials`, `validate_glue_credentials`, `get_glue_credentials`, `validate_glue_credentials_change`, `get_informatica_v2_credentials`, `get_looker_git_clone_credentials`, `get_looker_credentials`, `get_mariadb_credentials`, `get_mulesoft_credentials`, `get_mysql_credentials`, `get_oracle_credentials`, `get_postgres_credentials`, `get_power_bi_credentials`, `get_redshift_credentials`, `get_salesforce_crm_credentials`, `get_salesforce_data_cloud_credentials`, `get_sap_hana_credentials`, `create_aws_secrets_manager_credentials`, `validate_aws_secrets_manager_credentials`, `get_aws_secrets_manager_credentials`, `validate_aws_secrets_manager_credentials_change`, `create_azure_key_vault_credentials`, `validate_azure_key_vault_credentials`, `get_azure_key_vault_credentials`, `validate_azure_key_vault_credentials_change`, `create_env_var_credentials`, `validate_env_var_credentials`, `get_env_var_credentials`, `validate_env_var_credentials_change`, `create_file_credentials`, `validate_file_credentials`, `get_file_credentials`, `validate_file_credentials_change`, `create_gcp_secret_manager_credentials`, `validate_gcp_secret_manager_credentials`, `get_gcp_secret_manager_credentials`, `validate_gcp_secret_manager_credentials_change`, `get_snowflake_credentials`, `get_sql_server_credentials`, `get_starburst_enterprise_credentials`, `get_starburst_galaxy_credentials`, `get_tableau_credentials`, `get_teradata_credentials`.
 - **Paging:** one page per call; pass `next_cursor` back as `cursor` for the next page.
 
 ### Arguments
@@ -2094,6 +2094,74 @@ Delete Salesforce CRM credentials no connection uses. Monte Carlo stops using th
 
 - **Effect:** deletes; destructive and idempotent.
 - **Pairs with:** `get_salesforce_crm_credentials`, `list_credentials`.
+
+### Arguments
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `credentials_id` | `str` | yes | Id of the credentials, as returned when they are created or listed. |
+
+### Response
+
+Returns `credentials_id` and `deleted: true` once the credentials is gone.
+
+### What can fail
+
+- Authentication credentials are missing or invalid.
+- The request was authenticated, but the caller is not allowed to perform this operation. Read `code` to tell the reasons apart: `account_frozen` means the account is paused, rather than that the caller lacks permission.
+- The credentials does not exist, or is not visible to the caller.
+- The change conflicts with the current state of the credentials.
+- Monte Carlo is busy or temporarily unavailable; try again after a moment.
+- An unexpected error prevented the request from being processed.
+
+## `get_salesforce_data_cloud_credentials`: Get Salesforce Data Cloud credentials
+
+Get one set of Salesforce Data Cloud credentials, without the consumer secret or the
+private key.
+
+An id that does not exist, belongs to another account, or names credentials of another
+kind returns 404.
+
+- **Effect:** read-only.
+- **Pairs with:** `delete_salesforce_data_cloud_credentials`, `list_credentials`.
+
+### Arguments
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `credentials_id` | `str` | yes | Id of the credentials, as returned when they are created or listed. |
+
+### Response
+
+Response fields: id, connection_type, storage_type, created_time, auth_mode, domain, consumer_key, username, dataspaces, dataspace.
+
+| Field | Description |
+|---|---|
+| `id` | Unique identifier of the credentials. |
+| `connection_type` | The connection type the credentials are for, such as `snowflake`. Fixed once created. |
+| `storage_type` | Where the secret lives. Fixed once created. |
+| `created_time` | When the credentials were created. |
+| `auth_mode` | How Monte Carlo signs in. `oauth_client_credentials` takes `consumer_secret`. `jwt_bearer` takes `username` and `private_key`. Both take `domain` and `consumer_key`. |
+| `domain` | My Domain host of your org, such as `acme.my.salesforce.com`. |
+| `consumer_key` | Consumer key of the connected app Monte Carlo signs in as. |
+| `username` | Salesforce user the JWT signs in as, for `jwt_bearer`. |
+| `dataspaces` | Data spaces Monte Carlo collects metadata from. |
+| `dataspace` | The one data space a query connection runs in. Once set, it can be changed but not cleared. Sending it in an update, even unchanged, moves row count collection for that data space's tables to the query connections using these credentials. |
+
+### What can fail
+
+- Authentication credentials are missing or invalid.
+- The request was authenticated, but the caller is not allowed to perform this operation. Read `code` to tell the reasons apart: `account_frozen` means the account is paused, rather than that the caller lacks permission.
+- The credentials does not exist, or is not visible to the caller.
+- An unexpected error prevented the request from being processed.
+- Monte Carlo is busy or temporarily unavailable; try again after a moment.
+
+## `delete_salesforce_data_cloud_credentials`: Delete Salesforce Data Cloud credentials
+
+Delete Salesforce Data Cloud credentials no connection uses. Monte Carlo stops using the stored consumer secret or private key. Rotate the consumer secret, or remove the key's certificate from the connected app, if they must be retired.
+
+- **Effect:** deletes; destructive and idempotent.
+- **Pairs with:** `get_salesforce_data_cloud_credentials`, `list_credentials`.
 
 ### Arguments
 
