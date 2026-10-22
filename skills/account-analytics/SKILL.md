@@ -49,5 +49,5 @@ Follow [references/core.md](references/core.md): find the business question, bui
 in the chat, and build a dashboard only when asked. The core is shared with an internal twin of this skill; keep
 anything specific to this skill here, not there.
 
-Here a request runs as `query_metrics`. Use `get_metrics_catalog` with the chosen metrics before grouping by a
-dimension you have not used with them, and to list the metrics when the user asks what they can ask.
+Here a request runs as `query_metrics`; a request it refuses names what works. Use `get_metrics_catalog` to list
+the metrics when the user asks what they can ask, and before you decline (core.md, section 3).
