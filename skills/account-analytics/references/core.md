@@ -63,8 +63,8 @@ A question is ready when it says four things. Fill each from the question, from 
    asset health take no dates).
 4. **The shape**: one number, a ranking, a trend, or a list of tables or monitors.
 
-If all four are clear, or the docs give a default for the missing one, go to step 2 and name the defaults under
-"Choices I made".
+If all four are clear, or the docs give a default for the missing one (a default window, which meaning of a word is
+the default), go to step 2 and name the defaults under "Choices I made"; never ask about what the docs settle.
 
 If the question is vague ("how is our data quality?", "tell me about domain X", "is our monitoring good?"):
 
@@ -79,9 +79,6 @@ If the question is vague ("how is our data quality?", "tell me about domain X", 
   choices; offer the others as follow-ups.
 - Say early what the data cannot answer (history it does not keep, cost per table, predictions, other accounts) and
   offer the closest question it can.
-
-Do not ask about what the docs settle (a default window, which meaning of a word is the default); answer it and
-state the choice.
 
 ## 2. Build the request
 
