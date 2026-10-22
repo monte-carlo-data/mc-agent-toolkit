@@ -128,8 +128,9 @@ Choices I made:
 ```
 
 Numbers as the docs' Dashboard style writes them: percentages with one decimal (`40.0%`, not `0.4`), counts with
-thousands separators, hours with one decimal; an empty member named for what is missing ("No data quality
-dimension set", "No severity set"), last. If a number is computed from
+thousands separators, hours with one decimal; an empty member as its own row, last: "Not classified" for monitors
+without a data quality dimension (say once that the dimension is set on each monitor and these have none), "No
+severity set" for alerts without one. If a number is computed from
 returned rows (a share), say how under Choices. No labels the docs do not define
 ("Good", "Fair") and no scores they do not define (weighted, composite, "overall"): show the metrics and let the user
 combine them. End with one or two follow-up questions the data can answer, worded so the user can send them as they
@@ -147,8 +148,8 @@ One self-contained HTML file: inline CSS and SVG, no external scripts, fonts or 
   extra.
 - **One grouping per dashboard** (domains unless data products are asked for); never both side by side.
 - **Why a table fails.** Next to a failing table, list its failing data quality dimensions. When some of its failing
-  monitors have no data quality dimension set, name their monitor types instead of leaving it empty ("accuracy,
-  timeliness; no dimension set: table, comparison monitor"): group the same monitor-by-table request by
+  monitors have no data quality dimension, name their monitor types instead of leaving it empty ("accuracy,
+  timeliness; not classified: table, comparison"): group the same monitor-by-table request by
   `monitor__monitor_type` as well. Do not use the internal incident type for this.
 - **Every number** comes from a request listed under "How this was built"; a share of two returned numbers says so.
 - **A block the data cannot fill** stays, with one sentence on why.
