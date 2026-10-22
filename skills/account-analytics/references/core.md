@@ -44,7 +44,7 @@ The docs describe requests in words; translate them like this:
 | Filter: `f` on or before, or at most, `v` | `{"field": "f", "op": "lte", "values": ["v"]}` |
 | A date in words: "30 days ago", "the start of this quarter" | that date as `YYYY-MM-DD` |
 | Sorted by: `m`, highest first (lowest first) | `"order_by": [{"field": "m", "descending": true}]` (`false`) |
-| At most N rows | `"limit": N` (1,000 by default, at most 10,000) |
+| At most N rows | `"limit": N` (the default and the maximum are in How to query) |
 
 `true` and `false` are JSON booleans; other values are strings. To list the values a dimension has (domain names,
 monitor types), request a count grouped by that dimension, for example `monitor_count` grouped by

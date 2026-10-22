@@ -22,7 +22,6 @@ workflow to the routing system.
 | Table health | "health", "status", "check on", "how is table X" + specific table | asset-health (direct) |
 | Storage/cost | "cost", "storage", "unused tables", "zombie tables" | storage-cost-analysis (direct) |
 | Performance | "slow", "performance", "expensive query", "pipeline taking long" | performance-diagnosis (direct) |
-| Account analytics / dashboard | "how many alerts", "coverage per domain", "credits this quarter", "build a dashboard", "report on our monitors" (account-wide, no single table) | account-analytics (direct) |
 | Validation notebook | "validation notebook", "generate validation", "compare baseline" | generate-validation-notebook (direct) |
 | Push ingestion | "push ingestion", "metadata collector", "lineage collector" | push-ingestion (direct) |
 | Agent instrumentation | "instrument my agent", "instrument", "set up tracing", "set up Monte Carlo tracing", "setting up an agent", "add MC tracing" | instrument-agent (direct) |

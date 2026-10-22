@@ -37,7 +37,6 @@ These skills don't have dedicated commands but activate automatically when you a
 | Remediation | "fix this alert", "remediate this issue", "handle this incident" |
 | Storage Cost Analysis | "unused tables", "storage costs", "zombie tables" |
 | Performance Diagnosis | "slow pipeline", "expensive queries", "query performance" |
-| Account Analytics | "how many alerts did we get last week?", "coverage per data product", "build a data quality dashboard" |
 | Prevent | Auto-activates via hooks when you edit dbt models or SQL files |
 
 **User provided input**: $ARGUMENTS
