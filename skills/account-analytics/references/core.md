@@ -89,8 +89,8 @@ If the question is vague ("how is our data quality?", "tell me about domain X", 
 - **Entity rows.** For one row per table or monitor, group by `asset` or `monitor` and put its name next to it; never
   by the name alone (names repeat).
 - **Time.** Today is the session's current date. "Last N days" is `metric_time__day` on or after today minus N days.
-  Group a series by `metric_time__day`, `__week` or `__month` within the limits in the glossary's Time section. Do not
-  group current-state metrics by time.
+  Group a series by `metric_time__day`, `__week` or `__month`. A series goes back only as far as the data does: when
+  it starts later than asked, say where it starts. Do not group current-state metrics by time.
 - **Two groupings at once** that one metric does not allow: take two steps, as Dimensions → "Before you group or
   filter" shows.
 - **A dashboard example matches the ask:** use its requests, adapting only the window and filters.
