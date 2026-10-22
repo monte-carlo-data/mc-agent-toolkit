@@ -245,10 +245,7 @@ cases:
         account name, admin user and role, which databases to monitor) instead of defaulting to
         every database, and asks the customer to run the docs' existing future-grants check and
         report only the schemas and object types it lists. The connection waits for the grants.
-        It validates the credentials before creating the connection: a first apply without the
-        Monte Carlo credential, warehouse and connection (create_connection = false), then
-        validate_aws_secrets_manager_credentials from the new agent, then a second apply. It never
-        creates the connection in the first apply.
+        Everything is created in one apply, and it says it will validate the connection after it.
 
   - id: managed-credentials-discovered-not-hardcoded
     turns:

@@ -604,95 +604,29 @@ re-apply with the same `deployment_name` fails with "already scheduled for delet
 restore it (`aws secretsmanager restore-secret`) and `terraform import` it, use another name, or, for a
 throwaway test setup only, set `recovery_window_in_days = 0`.
 
-**Test the credentials before creating the connection: two applies of the same configuration.**
-Terraform cannot run Monte Carlo's validation in the middle of an apply, and SKILL.md's
-*Validate before creating* still applies. So the Monte Carlo credential, warehouse and connection
-are switched on by `create_connection`, which the customer sets in their `*.tfvars`:
-
-1. Apply with `create_connection = false`: the Snowflake side, the deployment and agent, the
-   secret and the agent's read grant. The customer sends back `validation_inputs`.
-2. Run `validate_aws_secrets_manager_credentials(deployment_id, connection_type="snowflake",
-   aws_secret=<secret_arn>)` and read the run with `get_validation_run`. It proves the agent reads
-   the secret and signs in to Snowflake as the new user. Go on only when every validation passed;
-   otherwise relay `friendly_message` and `resolution` and fix before creating anything in Monte Carlo.
-3. The customer sets `create_connection = true` and applies again. Then validate the connection
-   (Step 5).
-
-**NEVER create the connection in the first apply**, and never set `create_connection = true` before
-the credential validation passed. These blocks replace the Credentials example's credential
-resource and the whole *Warehouse and connection* section below: do not also emit that section's
-`locals` block or `created_ids` output, which refer to the resources without an index.
+**One apply, then validate.** The credential, warehouse and connection go in the same apply, using
+the *Warehouse and connection* section below with the self-hosted locals block. Terraform cannot run
+Monte Carlo's validation in the middle of an apply, so here SKILL.md's *Validate before creating*
+becomes validate after applying: once the apply finishes, validate the connection (Step 5), which
+also checks the agent reads the secret and signs in as the new user. If a check fails, relay its
+`friendly_message` and `resolution`, fix the cause, and apply again. Add to that section's
+`montecarlo_connection.snowflake`, so collection never starts before the grants exist:
 
 ```hcl
-variable "create_connection" { type = bool } # false for apply 1; true after the credentials validate
-variable "warehouse_name" { type = string }  # from the customer
-variable "connection_name" { type = string } # from the customer
-
-output "validation_inputs" { # ids and an ARN only, for the credential validation
-  value = {
-    deployment_id = montecarlo_deployment.agent.id
-    secret_arn    = aws_secretsmanager_secret.snowflake.arn
-  }
-}
-
-resource "montecarlo_self_hosted_aws_credentials" "snowflake" {
-  count           = var.create_connection ? 1 : 0
-  connection_type = "snowflake"
-  aws_secret      = aws_secretsmanager_secret.snowflake.arn
-  depends_on      = [aws_iam_role_policy.agent_read_secret, aws_secretsmanager_secret_version.snowflake]
-}
-
-locals {
-  snowflake_credentials_id = one(montecarlo_self_hosted_aws_credentials.snowflake[*].id)
-}
-
-resource "montecarlo_warehouse" "snowflake" {
-  count         = var.create_connection ? 1 : 0
-  name          = var.warehouse_name
-  type          = "snowflake"
-  deployment_id = montecarlo_deployment.agent.id
-  depends_on    = [montecarlo_aws_collection_agent.agent]
-}
-
-resource "montecarlo_connection" "snowflake" {
-  count          = var.create_connection ? 1 : 0
-  name           = var.connection_name
-  warehouse_id   = montecarlo_warehouse.snowflake[0].id
-  credentials_id = local.snowflake_credentials_id
-  # Collection never starts before the grants exist.
   depends_on = [terraform_data.snowflake_grants_ready]
-}
-
-output "created_ids" { # null for the credential, warehouse and connection after apply 1
-  value = {
-    deployment  = montecarlo_deployment.agent.id
-    agent       = montecarlo_aws_collection_agent.agent.id
-    credentials = local.snowflake_credentials_id
-    warehouse   = one(montecarlo_warehouse.snowflake[*].id)
-    connection  = one(montecarlo_connection.snowflake[*].id)
-  }
-}
 ```
 
 **Managed key-pair variant** (Monte Carlo stores the key, for example on the Cloud deployment): no
-AWS secret, policy or self-hosted credential. Replace those and the credential resource above with
-the block below, keep the warehouse, connection and outputs, and drop `secret_arn` from
-`validation_inputs`. The check between the applies is the CLI's (the key travels in the request, so
-it is not an MCP tool): `montecarlo credentials validate snowflake --deployment-id <id> --account
-<org>-<account> --user <user> --private-key @<private_key_path>`.
+AWS secret, policy or self-hosted credential. Use this credential resource instead, with the
+managed locals block of the *Warehouse and connection* section:
 
 ```hcl
 resource "montecarlo_snowflake_credentials" "snowflake" {
-  count                  = var.create_connection ? 1 : 0
   account                = "${var.snowflake_organization_name}-${var.snowflake_account_name}"
   user                   = snowflake_service_user.monte_carlo.name
   warehouse              = snowflake_warehouse.monte_carlo.name
   private_key_wo         = file(var.snowflake_private_key_path) # PEM text, BEGIN/END lines included
   private_key_wo_version = local.snowflake_key_version
-}
-
-locals {
-  snowflake_credentials_id = one(montecarlo_snowflake_credentials.snowflake[*].id)
 }
 ```
 
