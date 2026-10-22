@@ -1,6 +1,6 @@
-<!-- Shared core of two twin skills: account-analytics (mc-agent-toolkit, this file is the source) and
-customer-account-analytics (claude-skills, a checked copy). Edit only here, then run the sync script in
-claude-skills; its test fails when the copy differs. This file speaks of the docs and of requests only; each
+<!-- Shared core of two twin skills: account-analytics (this repo) and Monte Carlo's internal
+customer-account-analytics (monte-carlo-data/claude-skills). Both hold the same text: a change to how the skills work
+belongs in both, so open the matching PR in the other repo. This file speaks of the docs and of requests only; each
 SKILL.md says where the docs are and how a request runs. -->
 
 # Account analytics: shared core
