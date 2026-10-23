@@ -131,7 +131,7 @@ numbers (follow-ups too), never leaving out 3 and 4:
 
 <a table when there are several rows; at most 25, say how many more>
 
-Data as of <data_as_of in UTC, e.g. 2026-10-22 09:00 UTC>; the data is not real time.
+Data as of <data_as_of in UTC, e.g. 2026-10-22 09:00 UTC>.
 
 Choices I made:
 - <window, and the default it came from>
