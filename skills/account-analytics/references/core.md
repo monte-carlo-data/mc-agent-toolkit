@@ -149,7 +149,7 @@ combine them. End with one or two follow-up questions the data can answer, worde
 are.
 
 Link each alert, monitor, table, domain or data product you name to its page in Monte Carlo (Dashboard style, Links to
-Monte Carlo), only with an ID a request returned.
+Monte Carlo), only with a UUID or MCON a request returned.
 
 ## 5. Dashboards, when asked
 
