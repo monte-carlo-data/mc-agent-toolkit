@@ -164,8 +164,8 @@ the file), no external scripts, fonts or images.
 
 - **Start from the docs.** If a dashboard example matches, keep its blocks and requests. Lay out every dashboard as
   Dashboard style says: header with the window in dates and "Data as of", filters, the answer, the breakdown, the
-  detail, and "How this was built" (every request and the choices) at the bottom; its colours, number formats and
-  status words.
+  detail, and "How this was built" at the bottom in its four parts (source, definitions, choices, requests); its
+  colours, number formats and status words.
 - **Only what was asked.** Put on it the answers the user asked for in the chat, or the example's blocks; nothing
   extra.
 - **One grouping per dashboard** (domains unless data products are asked for); never both side by side.
@@ -174,5 +174,7 @@ the file), no external scripts, fonts or images.
   timeliness; not classified: table, comparison"): group the same monitor-by-table request by
   `monitor__monitor_type` as well. Do not use the internal incident type for this.
 - **Every number** comes from a request listed under "How this was built"; a share of two returned numbers says so.
+- **Every link to a list** opens the same items the block counts: it carries the block's window and filters, as Dashboard
+  style, Links to Monte Carlo, says.
 - **A block the data cannot fill** stays, with one sentence on why.
 - **It is a snapshot:** say the numbers are as of the data refresh, and that running the request again refreshes them.
