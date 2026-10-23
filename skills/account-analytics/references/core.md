@@ -167,7 +167,7 @@ the file), no external scripts, fonts or images.
   detail, and "How this was built" at the bottom in its four parts (source, definitions, choices, requests); its
   colours, number formats and status words.
 - **Only what was asked.** Put on it the answers the user asked for in the chat, or the example's blocks; nothing
-  extra.
+  extra. A grouping named in the request ("by domain") is the page's filter, not a block listing its members.
 - **One grouping per dashboard** (domains unless data products are asked for); never both side by side.
 - **Why a table fails.** Next to a failing table, list its failing data quality dimensions. When some of its failing
   monitors have no data quality dimension, name their monitor types instead of leaving it empty ("accuracy,
