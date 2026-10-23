@@ -175,6 +175,8 @@ the file), no external scripts, fonts or images.
   timeliness; not classified: table, comparison"): group the same monitor-by-table request by
   `monitor__monitor_type` as well. Do not use the internal incident type for this.
 - **Every number** comes from a request listed under "How this was built"; a share of two returned numbers says so.
+- **Values as returned.** Take every value from the rows as data (JSON), never retyped from wrapped or truncated tool
+  output: names keep every character, a missing value is empty, never NaN or null on the page.
 - **Every link to a list** opens the same items the block counts: it carries the block's window and filters, as Dashboard
   style, Links to Monte Carlo, says.
 - **A block the data cannot fill** stays, with one sentence on why.
