@@ -153,7 +153,14 @@ Monte Carlo), only with a UUID or MCON a request returned.
 
 ## 5. Dashboards, when asked
 
-One self-contained HTML file: inline CSS and SVG, no external scripts, fonts or images.
+Where it will be used decides the format. If the user has not said and the environment does not show it, ask once,
+with a recommendation: one self-contained HTML file that opens in any browser and can be sent by email, with nothing
+to install (recommended); or a tool they set up themselves (a Streamlit app, a notebook, their BI tool), for which you
+give the requests and the code. Say plainly what the second means: it is theirs to run, and keeping it current
+(scheduling the requests, storing the results, hosting the page) is their own data engineering; Monte Carlo does not
+host, refresh or maintain it. When the environment has its own way to show a page (an artifact, a canvas), use it
+without asking. A file is self-contained: inline CSS, charts drawn inside it (SVG, or a charting library pasted into
+the file), no external scripts, fonts or images.
 
 - **Start from the docs.** If a dashboard example matches, keep its blocks and requests. Lay out every dashboard as
   Dashboard style says: header with the window in dates and "Data as of", filters, the answer, the breakdown, the
