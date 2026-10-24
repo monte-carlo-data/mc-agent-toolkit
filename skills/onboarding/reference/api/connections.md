@@ -50,7 +50,7 @@ Returns `items` (response fields per item: id, connection_type, name, warehouse_
 | `etl_container_name` | Display name of that ETL container. Null when there is no ETL container. |
 | `deployment_id` | The deployment the connection runs through, taken from its warehouse, BI container or ETL container. Null when that has no deployment, as an Airflow ETL container has none. The id may name a deployment on Monte Carlo's older collection platform, which the deployments endpoints do not list. |
 | `deployment_name` | Display name of that deployment. Null when there is no deployment to name. |
-| `credentials_id` | The credentials the connection reads with. Null for a connection created before credentials became their own resource, and for one created outside this API. |
+| `credentials_id` | The credentials the connection reads with. Null for a connection created before credentials became their own resource, and for one created outside this API until an update sets `credentials_id`. |
 | `credentials_storage_type` | Where that secret lives. Null when there are no credentials to describe. |
 | `job_types` | The jobs Monte Carlo runs on this connection, such as `metadata`. |
 | `created_time` | When the connection was created. |
@@ -78,7 +78,7 @@ Add a connection to a warehouse, a BI container or an ETL container from credent
 | `warehouse_id` | `str` | no | The warehouse to add the connection to. Its type has to match what the credentials are for. Send exactly one of this, `bi_container_id` and `etl_container_id`. |
 | `bi_container_id` | `str` | no | The BI container to add the connection to, for Tableau, Looker or Power BI credentials. Its type has to match what the credentials are for: a `looker` container takes both `looker` and `looker-git-clone` credentials. A `custom-bi-connector` container takes a custom BI connector's credentials, or none when it has no deployment. Send exactly one of this, `warehouse_id` and `etl_container_id`. |
 | `etl_container_id` | `str` | no | The ETL container to add the connection to, for ETL tool credentials such as Fivetran or Airflow. The container's type has to equal the credentials' type, and the container must not have a connection yet. A `custom-etl-connector` container takes a custom ETL connector's credentials, or none when it has no deployment. Send exactly one of this, `warehouse_id` and `bi_container_id`. |
-| `credentials_id` | `str` | no | The credentials the connection reads with. They also decide the connection's type. Create them first, through one of the credentials endpoints. Required, except on a push-only container: a `custom-etl-connector` or `custom-bi-connector` container with no deployment. Its connection takes no credentials, and has the container's type. |
+| `credentials_id` | `str` | no | The credentials the connection reads with. They also decide the connection's type. Create them first, through one of the credentials endpoints. Required to create a connection, except on a push-only container: a `custom-etl-connector` or `custom-bi-connector` container with no deployment. Its connection takes no credentials, and has the container's type. A connection created outside this API, such as in the Monte Carlo app, has none until an update sets them. |
 | `job_types` | `list[str]` | no | The jobs to run on this connection. Omit it to run what the connection type runs by default, which is what the app does. Which values are accepted depends on the connection type. `etl` on a Snowflake, Power BI or Salesforce Data Cloud connection also creates its ETL container. An empty list is not accepted; omit the field to take the defaults. At least 1 items. |
 
 ### Response
@@ -98,7 +98,7 @@ Returns the new connection. Response fields: id, connection_type, name, warehous
 | `etl_container_name` | Display name of that ETL container. Null when there is no ETL container. |
 | `deployment_id` | The deployment the connection runs through, taken from its warehouse, BI container or ETL container. Null when that has no deployment, as an Airflow ETL container has none. The id may name a deployment on Monte Carlo's older collection platform, which the deployments endpoints do not list. |
 | `deployment_name` | Display name of that deployment. Null when there is no deployment to name. |
-| `credentials_id` | The credentials the connection reads with. Null for a connection created before credentials became their own resource, and for one created outside this API. |
+| `credentials_id` | The credentials the connection reads with. Null for a connection created before credentials became their own resource, and for one created outside this API until an update sets `credentials_id`. |
 | `credentials_storage_type` | Where that secret lives. Null when there are no credentials to describe. |
 | `job_types` | The jobs Monte Carlo runs on this connection, such as `metadata`. |
 | `created_time` | When the connection was created. |
@@ -147,7 +147,7 @@ Response fields: id, connection_type, name, warehouse_id, warehouse_name, bi_con
 | `etl_container_name` | Display name of that ETL container. Null when there is no ETL container. |
 | `deployment_id` | The deployment the connection runs through, taken from its warehouse, BI container or ETL container. Null when that has no deployment, as an Airflow ETL container has none. The id may name a deployment on Monte Carlo's older collection platform, which the deployments endpoints do not list. |
 | `deployment_name` | Display name of that deployment. Null when there is no deployment to name. |
-| `credentials_id` | The credentials the connection reads with. Null for a connection created before credentials became their own resource, and for one created outside this API. |
+| `credentials_id` | The credentials the connection reads with. Null for a connection created before credentials became their own resource, and for one created outside this API until an update sets `credentials_id`. |
 | `credentials_storage_type` | Where that secret lives. Null when there are no credentials to describe. |
 | `job_types` | The jobs Monte Carlo runs on this connection, such as `metadata`. |
 | `created_time` | When the connection was created. |
@@ -162,10 +162,10 @@ Response fields: id, connection_type, name, warehouse_id, warehouse_name, bi_con
 
 ## `update_connection`: Update a connection
 
-Rename a connection, or turn ETL on or off for a Snowflake, Power BI or Salesforce Data Cloud connection by sending its job_types with 'etl' added or removed. The type, the parent and the credentials are fixed once the connection exists.
+Rename a connection, turn ETL on or off for a Snowflake, Power BI or Salesforce Data Cloud connection by sending its job_types with 'etl' added or removed, or point it at other credentials of its own type with credentials_id. The type and the parent are fixed once the connection exists.
 
 - **Effect:** updates in place; idempotent.
-- **Pairs with:** `list_connections`, `create_connection`, `get_connection`, `delete_connection`.
+- **Pairs with:** `list_connections`, `create_connection`, `get_connection`, `delete_connection`, `list_credentials`.
 
 ### Arguments
 
@@ -174,6 +174,7 @@ Rename a connection, or turn ETL on or off for a Snowflake, Power BI or Salesfor
 | `connection_id` | `str` | yes | Id of the connection, as returned when it is created or listed. |
 | `name` | `str` | no | New display name for the connection. Omit it to leave the name unchanged. An explicit null is ignored, the same as omitting the field. Between 1 and 200 characters. |
 | `job_types` | `list[str]` | no | The connection's job types with `etl` added or removed. Adding `etl` turns on ETL collection for a Snowflake (Snowflake Tasks), Power BI (dataflows) or Salesforce Data Cloud connection, and creates the ETL container that `etl_container_id` then names. Removing it deletes that container. No other job can be added or removed. Omit it to leave the job types unchanged. At least 1 items. |
+| `credentials_id` | `str` | no | Credentials for the connection to read with from now on. They must be for the connection's own type, and may be stored by Monte Carlo or self-hosted. The previous credentials are kept, and can be deleted once nothing uses them. Omit it to keep the current credentials. An explicit null is ignored, the same as omitting the field. |
 
 ### Response
 
@@ -192,7 +193,7 @@ Returns the connection after the change. Response fields: id, connection_type, n
 | `etl_container_name` | Display name of that ETL container. Null when there is no ETL container. |
 | `deployment_id` | The deployment the connection runs through, taken from its warehouse, BI container or ETL container. Null when that has no deployment, as an Airflow ETL container has none. The id may name a deployment on Monte Carlo's older collection platform, which the deployments endpoints do not list. |
 | `deployment_name` | Display name of that deployment. Null when there is no deployment to name. |
-| `credentials_id` | The credentials the connection reads with. Null for a connection created before credentials became their own resource, and for one created outside this API. |
+| `credentials_id` | The credentials the connection reads with. Null for a connection created before credentials became their own resource, and for one created outside this API until an update sets `credentials_id`. |
 | `credentials_storage_type` | Where that secret lives. Null when there are no credentials to describe. |
 | `job_types` | The jobs Monte Carlo runs on this connection, such as `metadata`. |
 | `created_time` | When the connection was created. |
