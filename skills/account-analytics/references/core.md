@@ -116,7 +116,8 @@ If the question is vague ("how is our data quality?", "tell me about domain X", 
   they overlap and give the total from its own request next to them. This holds for the first sentence too: write a
   number there only after a request returned it.
 - **Counts of things** (how many data products, domains, monitors, tables) come from a count metric such as
-  `data_product_count` or `monitor_count`, never from counting rows by hand.
+  `data_product_count` or `monitor_count`, never from counting rows by hand. This holds for the sentences around a
+  dashboard too: a count of what the page lists is the length of its list, computed, not read.
 - **Small samples:** say how many rows a median, percentile or rate rests on ("p90 over 2 fixed alerts").
 - **Before you decline:** search the topic and dimension pages for the concept, and check the metric's allowed
   dimensions. One failed request or a missing name in your first guess is not proof the data lacks it.
@@ -153,13 +154,13 @@ Monte Carlo), only with a UUID or MCON a request returned.
 
 ## 5. Dashboards, when asked
 
-Where it will be used decides the format. If the user has not said and the environment does not show it, ask once,
-with a recommendation: one self-contained HTML file that opens in any browser and can be sent by email, with nothing
-to install (recommended); or a tool they set up themselves (a Streamlit app, a notebook, their BI tool), for which you
-give the requests and the code. Say plainly what the second means: it is theirs to run, and keeping it current
-(scheduling the requests, storing the results, hosting the page) is their own data engineering; Monte Carlo does not
-host, refresh or maintain it. When the environment has its own way to show a page (an artifact, a canvas), use it
-without asking. A file is self-contained: inline CSS, charts drawn inside it (SVG, or a charting library pasted into
+Where it will be used decides the format. If the user has not said and the environment does not show it, do not ask:
+build one self-contained HTML file that opens in any browser and can be sent by email, with nothing to install. Say in
+one line that you can instead give the requests and the code for a tool they set up themselves (a Streamlit app, a
+notebook, their BI tool), and what that means: it is theirs to run, and keeping it current (scheduling the requests,
+storing the results, hosting the page) is their own data engineering; Monte Carlo does not host, refresh or maintain
+it. A follow-up that does not name a format changes the same file. When the environment has its own way to show a
+page (an artifact, a canvas), use it. A file is self-contained: inline CSS, charts drawn inside it (SVG, or a charting library pasted into
 the file), no external scripts, fonts or images.
 
 - **Start from the docs.** If a dashboard example matches, keep its blocks and requests. Lay out every dashboard as
@@ -176,8 +177,14 @@ the file), no external scripts, fonts or images.
   `monitor__monitor_type` as well. Do not use the internal incident type for this.
 - **Every number** comes from a request listed under "How this was built"; a share of two returned numbers says so.
 - **Values as returned.** Take every value from the rows as data (JSON), never retyped from wrapped or truncated tool
-  output: names keep every character, a missing value is empty, never NaN or null on the page.
+  output: names keep every character, a missing value is empty, never NaN or null on the page. When you can run code, generate
+  the page's tables and chart data from the returned rows with a script instead of typing them, and round only once,
+  on the page.
 - **Every link to a list** opens the same items the block counts: it carries the block's window and filters, as Dashboard
   style, Links to Monte Carlo, says.
 - **A block the data cannot fill** stays, with one sentence on why.
 - **It is a snapshot:** say the numbers are as of the data refresh, and that running the request again refreshes them.
+- **Check it before handing it over.** When you can run code, check that the page's scripts parse (`node --check` on
+  them) and open it. Without a shell, keep the script small: the rows as JSON and one function that draws them.
+- **Nothing is remembered.** Do not save the user's choices (format, filters) to memory files; the next request starts
+  from these rules.
