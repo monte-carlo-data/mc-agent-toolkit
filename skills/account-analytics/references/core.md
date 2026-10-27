@@ -154,14 +154,16 @@ Monte Carlo), only with a UUID or MCON a request returned.
 
 ## 5. Dashboards, when asked
 
-Where it will be used decides the format. If the user has not said and the environment does not show it, do not ask:
-build one self-contained HTML file that opens in any browser and can be sent by email, with nothing to install. Say in
-one line that you can instead give the requests and the code for a tool they set up themselves (a Streamlit app, a
-notebook, their BI tool), and what that means: it is theirs to run, and keeping it current (scheduling the requests,
-storing the results, hosting the page) is their own data engineering; Monte Carlo does not host, refresh or maintain
-it. A follow-up that does not name a format changes the same file. When the environment has its own way to show a
-page (an artifact, a canvas), use it. A file is self-contained: inline CSS, charts drawn inside it (SVG, or a charting library pasted into
-the file), no external scripts, fonts or images.
+Where it will be used decides the format. If the user has not said and the environment does not show it, ask once,
+with a recommendation: one self-contained HTML file that opens in any browser and can be sent by email, with nothing
+to install (recommended); or a tool they set up themselves (a Streamlit app, a notebook, their BI tool), for which you
+give the requests and the code. Say plainly what the second means: it is theirs to run, and keeping it current
+(scheduling the requests, storing the results, hosting the page) is their own data engineering; Monte Carlo does not
+host, refresh or maintain it. The next reply answers the question: if it names no format ("go with what you
+recommend", or a change to the dashboard), build the recommended one; never ask it again in the same conversation.
+When the environment has its own way to show a page (an artifact, a canvas), use it without asking. A file is
+self-contained: inline CSS, charts drawn inside it (SVG, or a charting library pasted into the file), no external
+scripts, fonts or images.
 
 - **Start from the docs.** If a dashboard example matches, keep all of its blocks and requests, also when the
   request names only some of them: the page carries the whole layout, not only what the chat answered. Lay out every
@@ -178,9 +180,9 @@ the file), no external scripts, fonts or images.
   `monitor__monitor_type` as well. Do not use the internal incident type for this.
 - **Every number** comes from a request listed under "How this was built"; a share of two returned numbers says so.
 - **Values as returned.** Take every value from the rows as data (JSON), never retyped from wrapped or truncated tool
-  output: names keep every character, a missing value is empty, never NaN or null on the page. When you can run code, generate
-  the page's tables and chart data from the returned rows with a script instead of typing them, and round only once,
-  on the page.
+  output: names keep every character, a missing value is empty, never NaN or null on the page. When you can run
+  code, generate the page's tables and chart data from the returned rows with a script instead of typing them, and
+  round only once, on the page.
 - **Every link to a list** opens the same items the block counts: it carries the block's window and filters, as Dashboard
   style, Links to Monte Carlo, says.
 - **A block the data cannot fill** stays, with one sentence on why.
