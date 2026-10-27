@@ -163,10 +163,11 @@ it. A follow-up that does not name a format changes the same file. When the envi
 page (an artifact, a canvas), use it. A file is self-contained: inline CSS, charts drawn inside it (SVG, or a charting library pasted into
 the file), no external scripts, fonts or images.
 
-- **Start from the docs.** If a dashboard example matches, keep its blocks and requests. Lay out every dashboard as
-  Dashboard style says: header with the window in dates and "Data as of", filters, the answer, the breakdown, the
-  detail, and "How this was built" at the bottom in its four parts (source, definitions, choices, requests); its
-  colours, number formats and status words.
+- **Start from the docs.** If a dashboard example matches, keep all of its blocks and requests, also when the
+  request names only some of them: the page carries the whole layout, not only what the chat answered. Lay out every
+  dashboard as Dashboard style says: header with the window in dates and "Data as of", filters, the answer, the
+  breakdown, the detail, and "How this was built" at the bottom in its four parts (source, definitions, choices,
+  requests); its colours, number formats and status words.
 - **Only what was asked.** Put on it the answers the user asked for in the chat, or the example's blocks; nothing
   extra. A grouping named in the request ("by domain") is the page's filter; a block listing its members is built only
   when the dashboard example's Layout has one.
