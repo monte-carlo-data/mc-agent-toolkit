@@ -5,6 +5,12 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Cursor will be d
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.29.1] - 2026-10-28
+
+### Changed
+
+- tune-monitor: a judge-criteria rewrite of an agent evaluation prompt keeps its sections and defines every score of a numeric scale on its own line.
+
 ## [1.29.0] - 2026-10-22
 
 ### Added
