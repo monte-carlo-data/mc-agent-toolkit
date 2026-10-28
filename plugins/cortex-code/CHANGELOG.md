@@ -10,6 +10,7 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Changed
 
 - tune-monitor: a judge-criteria rewrite of an agent evaluation prompt keeps its sections and defines every score of a numeric scale on its own line.
+- monitoring-advisor: agent evaluation prompt templates and examples use the sectioned template structure (role, evaluation criteria, input, instructions with one line per score, answer format).
 
 ## [1.29.0] - 2026-10-22
 
