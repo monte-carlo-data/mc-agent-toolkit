@@ -124,6 +124,13 @@ Each writes an output column named by its `alias`, and that alias is what
   `"include_tool_calls": true` on the transform, `{{conversation}}` also carries the
   agent's tool calls as clearly identifiable TOOL entries (see Conversation-grain
   judges below).
+- **Write every `custom_prompt` in the template structure, never as one paragraph:** a
+  role line, `## Evaluation Criteria:` with numbered checks, the input section
+  (`## Conversation:` + `{{conversation}}`, or `## Input:` + `{{prompts}}` / `## Output:` +
+  `{{completions}}`), `## Evaluation Instructions:` with `Assign a score from 1 to 5 where:`
+  and one `- N = ...` line for each score from 5 down to 1, then `Answer with only the
+  number.` (or `Answer true or false.`). The line breaks are `\n` inside the JSON `prompt`
+  string. See the template library below for complete examples.
 - **`custom_sql` runs against warehouse columns.** On Snowflake Cortex agents,
   `prompts`/`completions` are arrays — reference the string columns
   `first_completion` / `full_completion` / `first_prompt` instead. The dry-run does
@@ -301,7 +308,7 @@ create_or_update_agent_evaluation_monitor(
         {
             "function": "custom_prompt",
             "alias": "disambiguated_product",
-            "prompt": "Did this response either ask which product the user meant, or state which product it assumed, before answering? Response: {{completions}}. Answer true or false.",
+            "prompt": "You are an expert evaluator checking whether a support response disambiguates the product before answering.\n\n## Evaluation Criteria:\n1. Check whether the response asks which product the user meant.\n2. Otherwise, check whether it states which product it assumed.\n3. Check that either happens before the answer itself.\n\n## Output:\n{{completions}}\n\n## Evaluation Instructions:\nAnswer true if the response asked which product the user meant, or stated which product it assumed, before answering. Answer false otherwise.\n\nAnswer true or false.",
             "output_type": "boolean"
         }
     ],
@@ -382,7 +389,8 @@ with the agent's actual name (from `get_agent_metadata`) and tailor the wording 
 failure modes you observed in its real conversations — a template proposed as generic boilerplate
 judges generically. `<AGENT_NAME>` is an authoring placeholder, **not** a template variable: never
 send it verbatim or turn it into a curly-brace variable — the agent name goes into the prompt as
-plain literal text. Always show the user the full rendered prompt text for approval before
+plain literal text. Tailor the wording inside the sections; keep the sections, the line breaks,
+and every score line. Always show the user the full rendered prompt text for approval before
 creating the monitor (dry-run first, as usual).
 
 ### `frustration_free_score` — was the experience frustration-free?
@@ -395,7 +403,7 @@ across the whole conversation. Part of the **baseline pack** — propose it for 
 {
     "function": "custom_prompt",
     "alias": "frustration_free_score",
-    "prompt": "Read this conversation between a user and <AGENT_NAME>: {{conversation}}. Rate from 1 to 5 how frustration-free the user's experience was. 5 = no sign of frustration; the user got what they needed without friction. 4 = minor friction (one clarification or retry) but the user stayed satisfied. 3 = noticeable friction; the user had to rephrase or repeat themselves to get a useful answer. 2 = clear frustration; the user complained, corrected the agent repeatedly, or expressed annoyance. 1 = severe frustration; the user gave up, abandoned the task, or ended the conversation visibly dissatisfied. Answer with only the number.",
+    "prompt": "You are an expert evaluator assessing how frustration-free a user's experience with <AGENT_NAME> was.\n\n## Evaluation Criteria:\n1. Look for the user rephrasing or repeating a request.\n2. Look for the user correcting the agent or complaining.\n3. Check whether the user got what they needed or gave up.\n\n## Conversation:\n{{conversation}}\n\n## Evaluation Instructions:\nRate how frustration-free the user's experience was across the whole conversation.\n\nAssign a score from 1 to 5 where:\n- 5 = no sign of frustration; the user got what they needed without friction\n- 4 = minor friction (one clarification or retry) but the user stayed satisfied\n- 3 = noticeable friction; the user had to rephrase or repeat themselves to get a useful answer\n- 2 = clear frustration; the user complained, corrected the agent repeatedly, or expressed annoyance\n- 1 = severe frustration; the user gave up, abandoned the task, or ended the conversation visibly dissatisfied\n\nAnswer with only the number.",
     "output_type": "number",
     "include_tool_calls": true
 }
@@ -416,7 +424,7 @@ confident deflection — so the prompt tells the judge to use them.
 {
     "function": "custom_prompt",
     "alias": "answer_attempt_score",
-    "prompt": "Read this conversation between a user and <AGENT_NAME>, an analytics agent that answers data questions: {{conversation}}. Rate from 1 to 5 how fully the agent attempted to answer the user's data questions. TOOL entries in the conversation show what the agent actually ran; a substantive answer attempt is normally backed by one. 5 = every question got a direct, substantive answer attempt (a query, a result, or a concrete data answer). 4 = answered with minor gaps or hedging. 3 = partial; some questions were deflected or met only with clarifying questions. 2 = mostly deflected, refused, or answered a different question than asked. 1 = no real answer attempt at all. Answer with only the number.",
+    "prompt": "You are an expert evaluator assessing how fully <AGENT_NAME>, an analytics agent that answers data questions, attempted to answer the user's data questions.\n\n## Evaluation Criteria:\n1. List the data questions the user asked.\n2. Use the TOOL entries to see what the agent actually ran; a substantive answer attempt is normally backed by one.\n3. Separate real answer attempts from deflections, refusals, and clarifying questions that never lead to an answer.\n\n## Conversation:\n{{conversation}}\n\n## Evaluation Instructions:\nRate how fully the agent attempted to answer the user's data questions.\n\nAssign a score from 1 to 5 where:\n- 5 = every question got a direct, substantive answer attempt (a query, a result, or a concrete data answer)\n- 4 = answered with minor gaps or hedging\n- 3 = partial; some questions were deflected or met only with clarifying questions\n- 2 = mostly deflected, refused, or answered a different question than asked\n- 1 = no real answer attempt at all\n\nAnswer with only the number.",
     "output_type": "number",
     "include_tool_calls": true
 }
@@ -435,7 +443,7 @@ see below). Framed so `true` = a correction occurred, making `TRUE_RATE` the cor
 {
     "function": "custom_prompt",
     "alias": "user_correction",
-    "prompt": "Read this conversation between a user and <AGENT_NAME>: {{conversation}}. Did the user correct the agent in a follow-up turn - for example saying a previous answer was wrong, restating what they actually meant, or re-asking the same question because the answer missed it? A clarifying question from the agent does not count as a correction. Answer true if at least one correction occurred, false otherwise.",
+    "prompt": "You are an expert evaluator checking whether the user had to correct <AGENT_NAME>.\n\n## Evaluation Criteria:\n1. Look for the user saying a previous answer was wrong.\n2. Look for the user restating what they actually meant.\n3. Look for the user re-asking the same question because the answer missed it.\n4. A clarifying question from the agent does not count as a correction.\n\n## Conversation:\n{{conversation}}\n\n## Evaluation Instructions:\nAnswer true if at least one correction occurred in a follow-up turn, false otherwise.\n\nAnswer true or false.",
     "output_type": "boolean",
     "include_tool_calls": true
 }
@@ -498,7 +506,7 @@ create_or_update_agent_evaluation_monitor(
         {
             "function": "custom_prompt",
             "alias": "frustration_free_score",
-            "prompt": "Read this conversation between a user and Support Bot: {{conversation}}. Rate from 1 to 5 how frustration-free the user's experience was. 5 = no sign of frustration; the user got what they needed without friction. 4 = minor friction (one clarification or retry) but the user stayed satisfied. 3 = noticeable friction; the user had to rephrase or repeat themselves to get a useful answer. 2 = clear frustration; the user complained, corrected the agent repeatedly, or expressed annoyance. 1 = severe frustration; the user gave up, abandoned the task, or ended the conversation visibly dissatisfied. Answer with only the number.",
+            "prompt": "You are an expert evaluator assessing how frustration-free a user's experience with Support Bot was.\n\n## Evaluation Criteria:\n1. Look for the user rephrasing or repeating a request.\n2. Look for the user correcting the agent or complaining.\n3. Check whether the user got what they needed or gave up.\n\n## Conversation:\n{{conversation}}\n\n## Evaluation Instructions:\nRate how frustration-free the user's experience was across the whole conversation.\n\nAssign a score from 1 to 5 where:\n- 5 = no sign of frustration; the user got what they needed without friction\n- 4 = minor friction (one clarification or retry) but the user stayed satisfied\n- 3 = noticeable friction; the user had to rephrase or repeat themselves to get a useful answer\n- 2 = clear frustration; the user complained, corrected the agent repeatedly, or expressed annoyance\n- 1 = severe frustration; the user gave up, abandoned the task, or ended the conversation visibly dissatisfied\n\nAnswer with only the number.",
             "output_type": "number",
             "include_tool_calls": true
         }

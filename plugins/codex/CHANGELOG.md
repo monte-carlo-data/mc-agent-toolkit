@@ -5,11 +5,26 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Codex will be do
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.28.2] - 2026-10-21
+## [1.29.2] - 2026-10-30
 
 ### Changed
 
 - Daily agent cost monitor tuning now preserves SUM / AUTO_HIGH on total_cost and the fixed daily schedule. Sensitivity is the only supported adjustment; other agent metrics retain their existing tuning guidance.
+
+## [1.29.1] - 2026-10-28
+
+### Changed
+
+- tune-monitor: a judge-criteria rewrite of an agent evaluation prompt keeps its sections and defines every score of a numeric scale on its own line.
+- monitoring-advisor: agent evaluation prompt templates and examples use the sectioned template structure (role, evaluation criteria, input, instructions with one line per score, answer format).
+
+## [1.29.0] - 2026-10-22
+
+### Added
+
+- onboarding: Terraform can create the Snowflake service user too. When the customer asks for it, the onboarding Terraform adds the `snowflakedb/snowflake` provider and creates user `MONTE_CARLO` (`TYPE=SERVICE`), role `MONTE_CARLO_ROLE`, warehouse `MONTE_CARLO_WH` and the grants from https://docs.getmontecarlo.com/docs/snowflake: `IMPORTED PRIVILEGES` on `SNOWFLAKE`, and grants on existing and future schemas and objects in each database the customer names. The skill proposes the docs' names. Terraform signs in to Snowflake as the customer's admin through a key file path. The customer generates the service user's key pair with `openssl`, and Terraform reads both files by path. The private key reaches the agent's Secrets Manager secret only through `secret_string_wo`, never state; `tls_private_key` is not used. The checklist asks for the future-grants check output (schemas and object types only) and flags row access policies.
+- onboarding: the generated Terraform for the Snowflake service user, agent and connection is applied once. The connection is validated right after the apply. Preconditions stop an encrypted or PKCS#1 private key, or a non-PEM public key, at plan. The secret's version is derived from the public key, so rotating the key pair re-sends the private key in the same apply. User, role and warehouse names are variables, with the docs' names proposed.
+- evals: `terraform-snowflake-service-user-end-to-end` checks the plan and the key handling.
 
 ## [1.28.1] - 2026-10-20
 

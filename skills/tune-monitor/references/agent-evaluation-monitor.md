@@ -56,6 +56,9 @@ content scoring differently run to run). Hard rules:
   quietly weaken the bar so alerts stop.
 - Present the **complete proposed prompt text**, and on apply pass it **verbatim** — never
   re-author it from a summary.
+- Keep the prompt's sections and line breaks, and define every score of a numeric scale on its
+  own line (`- 4 = ...`). A rubric that names only some scores leaves the judge guessing between
+  them.
 - Keep the grain's template variable intact (`{{conversation}}` at conversation grain;
   `{{prompts}}` / `{{completions}}` at span grain) and the same `output_type` — output-type
   changes break the alert conditions referencing the field.
