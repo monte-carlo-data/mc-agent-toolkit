@@ -5,6 +5,12 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Copilot CLI will
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.29.2] - 2026-10-30
+
+### Changed
+
+- tune-monitor: daily agent cost monitors (`SUM` on `total_cost`, `AUTO_HIGH`, fixed daily schedule) keep those settings when tuned; sensitivity is the only supported adjustment, and the report has a no-change outcome for monitors that should stay as they are. Other agent metrics keep their existing tuning guidance.
+
 ## [1.29.1] - 2026-10-28
 
 ### Changed

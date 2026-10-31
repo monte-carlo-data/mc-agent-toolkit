@@ -178,6 +178,10 @@ is only as of now. If `last_update_time` is more recent than the alerts you are 
 those alerts fired under an older configuration — say so, and check each lever against the current
 values rather than against what the alert pattern implies the monitor used to be set to.
 
+A per-type reference can limit which levers exist for a monitor, or say that the right outcome is
+no change. When it does, follow it: it overrides the lever-substitution rule above and the general
+recommendations below. Report that outcome with the no-change form of the Phase 4 template.
+
 ### General recommendations (all monitor types)
 
 #### Sensitivity tuning (ML thresholds only)
@@ -255,6 +259,10 @@ miscalibration, genuine issues, etc.}
 #### 3. {Third change} [OPTIONAL]
 ...
 
+{If the per-type reference says the monitor should stay as it is, replace the numbered list with
+**No change recommended** and one or two sentences of evidence, and list the settings left alone
+under What NOT to change.}
+
 ### What NOT to change
 {Any configurations that look correct and should be left alone — avoid over-tuning.}
 
@@ -263,7 +271,7 @@ miscalibration, genuine issues, etc.}
 ```
 
 **Next step:** "Want me to apply any of these changes to the monitor config, or explore the alert
-history further?"
+history further?" When nothing is recommended, offer only the alert-history exploration.
 
 ---
 

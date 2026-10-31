@@ -10,11 +10,35 @@ Extract these from the `get_monitors` config response for your Phase 2 analysis:
 
 - Agent name and **Agent reference** (from the report's `- Agent:` and `- Agent reference:` lines)
 - Trace table (the warehouse table holding the agent's spans)
-- Comparisons (metric + operator; `AUTO` means ML thresholds)
+- Comparisons (metric, operator and the field each one measures; `AUTO` / `AUTO_HIGH` / `AUTO_LOW`
+  mean ML thresholds). A comparison on `total_cost` is a daily cost monitor — see the exception below.
+- Sensitivity (monitor-level; only meaningful with ML thresholds)
 - Span filters (`agent_span_filters`: workflow / task / span name narrowing)
 - Trace aggregation (`is_agent_trace_aggregation`: metric computed per whole trace vs per span)
 - Time axis (`time_axis_field_name` + aggregation bucket)
 - Schedule (`FIXED` interval or `MANUAL`)
+
+---
+
+## Daily cost exception: `total_cost`
+
+A `total_cost` monitor measures the whole agent's daily reported Snowflake credits,
+including model usage and warehouse queries. It is not a span-level field or a dollar
+amount. The following constraints override the general tuning guidance:
+
+- Keep exactly one condition: `SUM` on `total_cost`, operator `AUTO_HIGH`.
+- Keep daily buckets (`aggregate_by="day"`) and a fixed daily schedule
+  (`schedule_type="fixed"`, `interval_minutes=1440`).
+- **Do not change** the field, metric, direction, thresholds, bucket, or schedule.
+  Do not use NOOP, splits, span filters, trace/conversation aggregation, or cluster scope.
+- **Sensitivity is the only tuning setting.** If it is already LOW, or the evidence
+  does not justify a sensitivity change, return no recommendation. Do not replace the
+  cost monitor with a token monitor or propose an unsupported change as a workaround.
+
+The threshold, span-filter, and aggregation guidance below applies to other agent metric
+monitors. The applying-changes instructions apply to both cost and other metric monitors.
+When no change is justified, report it with the no-change form of the Phase 4 template and do not
+offer to apply anything.
 
 ---
 
@@ -23,7 +47,8 @@ Extract these from the `get_monitors` config response for your Phase 2 analysis:
 For explicit-threshold comparisons (`GT`, `LT`, etc.), follow the same rules as metric monitors:
 explain what the threshold means for the agent metric ("error rate GT 0.05 means alert when more
 than 5% of spans error"), and never recommend a change without citing observed anomaly values
-from the report. For `AUTO` (ML) comparisons, use the general sensitivity guidance in the skill.
+from the report. For `AUTO` / `AUTO_HIGH` / `AUTO_LOW` (ML) comparisons, use the general sensitivity
+guidance in the skill.
 
 ---
 
