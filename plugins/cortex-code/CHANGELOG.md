@@ -9,7 +9,7 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- Daily agent cost monitor tuning now preserves SUM / AUTO_HIGH on total_cost and the fixed daily schedule. Sensitivity is the only supported adjustment; other agent metrics retain their existing tuning guidance.
+- tune-monitor: daily agent cost monitors (`SUM` on `total_cost`, `AUTO_HIGH`, fixed daily schedule) keep those settings when tuned; sensitivity is the only supported adjustment, and the report has a no-change outcome for monitors that should stay as they are. Other agent metrics keep their existing tuning guidance.
 
 ## [1.29.1] - 2026-10-28
 

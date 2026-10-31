@@ -10,7 +10,9 @@ Extract these from the `get_monitors` config response for your Phase 2 analysis:
 
 - Agent name and **Agent reference** (from the report's `- Agent:` and `- Agent reference:` lines)
 - Trace table (the warehouse table holding the agent's spans)
-- Comparisons (metric + operator; `AUTO` means ML thresholds)
+- Comparisons (metric, operator and the field each one measures; `AUTO` / `AUTO_HIGH` / `AUTO_LOW`
+  mean ML thresholds). A comparison on `total_cost` is a daily cost monitor — see the exception below.
+- Sensitivity (monitor-level; only meaningful with ML thresholds)
 - Span filters (`agent_span_filters`: workflow / task / span name narrowing)
 - Trace aggregation (`is_agent_trace_aggregation`: metric computed per whole trace vs per span)
 - Time axis (`time_axis_field_name` + aggregation bucket)
@@ -35,6 +37,8 @@ amount. The following constraints override the general tuning guidance:
 
 The threshold, span-filter, and aggregation guidance below applies to other agent metric
 monitors. The applying-changes instructions apply to both cost and other metric monitors.
+When no change is justified, report it with the no-change form of the Phase 4 template and do not
+offer to apply anything.
 
 ---
 
@@ -43,7 +47,8 @@ monitors. The applying-changes instructions apply to both cost and other metric 
 For explicit-threshold comparisons (`GT`, `LT`, etc.), follow the same rules as metric monitors:
 explain what the threshold means for the agent metric ("error rate GT 0.05 means alert when more
 than 5% of spans error"), and never recommend a change without citing observed anomaly values
-from the report. For `AUTO` (ML) comparisons, use the general sensitivity guidance in the skill.
+from the report. For `AUTO` / `AUTO_HIGH` / `AUTO_LOW` (ML) comparisons, use the general sensitivity
+guidance in the skill.
 
 ---
 
