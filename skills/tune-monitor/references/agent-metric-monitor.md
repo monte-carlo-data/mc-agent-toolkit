@@ -30,10 +30,22 @@ amount. The following constraints override the general tuning guidance:
 - Keep daily buckets (`aggregate_by="day"`) and a fixed daily schedule
   (`schedule_type="fixed"`, `interval_minutes=1440`).
 - **Do not change** the field, metric, direction, thresholds, bucket, or schedule.
-  Do not use NOOP, splits, span filters, trace/conversation aggregation, or cluster scope.
-- **Sensitivity is the only tuning setting.** If it is already LOW, or the evidence
-  does not justify a sensitivity change, return no recommendation. Do not replace the
-  cost monitor with a token monitor or propose an unsupported change as a workaround.
+  Do not use operator `NOOP`, `segment_fields`, `agent_span_filters`,
+  `is_agent_trace_aggregation`, `is_agent_conversation_aggregation`,
+  `clustering_space_uuid`, or `cluster_keys`.
+- **Sensitivity is the only detection setting you can change.** For noise reduction,
+  follow the skill's general sensitivity guidance: lower it one step (`HIGH` to `medium`,
+  `MEDIUM` / `AUTO` to `low`). If the monitor is noisy and already `LOW`, or the evidence
+  does not justify lowering sensitivity, do not recommend lowering it.
+  An explicit request to increase sensitivity is still supported, including `low` to
+  `medium`; explain that this may produce more alerts.
+- **Audience and notification routing recommendations still apply.** Changing who receives
+  alerts does not change the daily cost calculation. Preserve the existing audiences unless
+  the user approves a change. Return no recommendation only when neither a sensitivity
+  change nor a notification-routing change is justified. Do not replace the cost monitor
+  with a token monitor or propose an unsupported change as a workaround.
+- **For a platform agent such as Snowflake Cortex, do not pass `trace_table`.** The API
+  resolves the source from the agent reference.
 
 The threshold, span-filter, and aggregation guidance below applies to other agent metric
 monitors. The applying-changes instructions apply to both cost and other metric monitors.
@@ -97,8 +109,10 @@ preview-then-confirm rules from the metric monitor reference apply (always pass
   the agent was likely deleted, renamed, or moved, and the monitor can't be updated until that's
   resolved.
 - **NEVER** put an `agent` entry inside `agent_span_filters` (see above).
-- **`trace_table` is conditional on the store.** For a non-ClickHouse OTel agent (e.g. a
-  Snowflake trace table), pass the monitor's trace table (fullTableId form, e.g.
+- **`trace_table` depends on the agent type and store.** For a platform agent such as
+  Snowflake Cortex, never pass `trace_table`; the API resolves it from the agent reference.
+  For a non-ClickHouse OTel agent (e.g. OTel spans stored in a Snowflake table), pass the
+  monitor's trace table (fullTableId form, e.g.
   `ingest:opentelemetry.traces`) as `trace_table` on **every** edit — the API rejects the edit
   without it. For an agent on the Monte Carlo-managed ClickHouse store
   (`...otel_traces:otel_traces.spans_normalized`), **never** pass `trace_table` — the API

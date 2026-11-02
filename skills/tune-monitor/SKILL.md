@@ -179,8 +179,10 @@ those alerts fired under an older configuration — say so, and check each lever
 values rather than against what the alert pattern implies the monitor used to be set to.
 
 A per-type reference can limit which levers exist for a monitor, or say that the right outcome is
-no change. When it does, follow it: it overrides the lever-substitution rule above and the general
-recommendations below. Report that outcome with the no-change form of the Phase 4 template.
+no change. When it does, follow it: it overrides the instruction above to spend the slot on
+another lever, and any general recommendation below that conflicts with it. Other general
+recommendations still apply. Report a no-change outcome with the no-change form of the Phase 4
+template.
 
 ### General recommendations (all monitor types)
 
@@ -261,7 +263,7 @@ miscalibration, genuine issues, etc.}
 
 {If the per-type reference says the monitor should stay as it is, replace the numbered list with
 **No change recommended** and one or two sentences of evidence, and list the settings left alone
-under What NOT to change.}
+under What NOT to change. Omit **If these changes are made** when no change is recommended.}
 
 ### What NOT to change
 {Any configurations that look correct and should be left alone — avoid over-tuning.}

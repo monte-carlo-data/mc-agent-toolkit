@@ -9,7 +9,7 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- tune-monitor: daily agent cost monitors (`SUM` on `total_cost`, `AUTO_HIGH`, fixed daily schedule) keep those settings when tuned; sensitivity is the only supported adjustment, and the report has a no-change outcome for monitors that should stay as they are. Other agent metrics keep their existing tuning guidance.
+- tune-monitor: daily agent cost monitors (`SUM` on `total_cost`, `AUTO_HIGH`, fixed daily schedule) keep those settings when tuned; sensitivity is the only detection setting that can change, while audience and notification routing remain supported. Noise reduction lowers sensitivity one step; explicit requests to increase it are still supported. Cortex edits omit `trace_table`, and the report has a no-change outcome when neither detection nor notification settings need changing. Other agent metrics keep their existing tuning guidance.
 
 ## [1.29.1] - 2026-10-28
 
