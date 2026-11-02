@@ -95,8 +95,12 @@ If the question is vague ("how is our data quality?", "tell me about domain X", 
 - **Groupings.** To split a metric by domain, data product, asset tag, monitor domain, monitor tag or audience, use its
   per-grouping metric (`domain_...`, `data_product_...`). Tags are `name: value`: group by both unless the user names
   the tag.
-- **Entity rows.** For one row per table or monitor, group by `asset` or `monitor` and put its name next to it; never
-  by the name alone (names repeat).
+- **Group and filter by dimensions only.** An object such as `asset`, `monitor` or `domain` is not a dimension: the API
+  refuses it (422 "is an entity, not a dimension"). For one row per item, or a filter on a list of items, use its key:
+  `asset__asset_mcon`, `monitor__monitor_uuid`, `domain__domain_uuid`, `data_product__data_product_uuid`, and
+  `<object>__<object>_uuid` for the others (How to query lists them). Put the item's name next to the key; never group
+  by the name alone (names repeat). A dimension reached through another object keeps its path:
+  `asset__warehouse__warehouse_name` for tables, not `warehouse__warehouse_name`.
 - **Time.** Today is the session's current date. "Last N days" is `metric_time__day` on or after today minus N days.
   Group a series by `metric_time__day`, `__week` or `__month`. A series goes back only as far as the data does: when
   it starts later than asked, say where it starts. Do not group current-state metrics by time.
