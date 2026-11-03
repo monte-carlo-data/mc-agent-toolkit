@@ -5,6 +5,14 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Claude Code will
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.29.2] - 2026-10-30
+
+### Changed
+
+- tune-monitor: daily agent cost monitors (`SUM` on `total_cost`, `AUTO_HIGH`, fixed daily schedule) keep those settings when tuned; sensitivity is the only detection setting that can change, while audience and notification routing remain supported. Noise reduction lowers sensitivity one step; explicit requests to increase it are still supported. Cortex edits omit `trace_table`, and the report has a no-change outcome when neither detection nor notification settings need changing. Other agent metrics keep their existing tuning guidance.
+
+- tune-monitor: agent metric edits explicitly preserve alert and run-failure recipients, including audience conditions and empty lists, unless a routing change is approved.
+
 ## [1.29.1] - 2026-10-28
 
 ### Changed
