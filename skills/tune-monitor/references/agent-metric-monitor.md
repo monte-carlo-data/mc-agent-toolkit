@@ -13,6 +13,8 @@ Extract these from the `get_monitors` config response for your Phase 2 analysis:
 - Comparisons (metric, operator and the field each one measures; `AUTO` / `AUTO_HIGH` / `AUTO_LOW`
   mean ML thresholds). A comparison on `total_cost` is a daily cost monitor — see the exception below.
 - Sensitivity (monitor-level; only meaningful with ML thresholds)
+- Notification routing (`audiences` and `failure_audiences`, preserving conditions and explicit
+  empty lists from the config)
 - Span filters (`agent_span_filters`: workflow / task / span name narrowing)
 - Trace aggregation (`is_agent_trace_aggregation`: metric computed per whole trace vs per span)
 - Time axis (`time_axis_field_name` + aggregation bucket)
@@ -118,10 +120,14 @@ preview-then-confirm rules from the metric monitor reference apply (always pass
   (`...otel_traces:otel_traces.spans_normalized`), **never** pass `trace_table` — the API
   rejects an explicit reference to its own store (it resolves it from the agent automatically).
 - **PUT semantics** — same as all monitor types: omitted fields revert to defaults. Re-pass
-  everything you want to keep, and note two easy-to-miss fields:
+  everything you want to keep, and note these easy-to-miss fields:
   - `is_draft` — omitting it both un-drafts AND un-pauses a paused monitor.
   - `tags` — omitting them silently drops the monitor's tags (including the agent tags the
     platform uses for routing).
+  - `audiences` and `failure_audiences` — omitting `audiences` removes alert recipients;
+    omitting `failure_audiences` can replace separately configured failure recipients with
+    the default recipients. Re-pass their current values from the Phase 1 config, including
+    audience conditions and explicit empty lists, unless the user approved a routing change.
 - Sensitivity and `aggregate_by` values are lowercase (`"low"`, `"day"`).
 - **Cron-scheduled monitors can't be tuned via these tools** — the tools express only
   `interval_minutes`, so an edit would silently drop a cron expression. Stop and say so.
