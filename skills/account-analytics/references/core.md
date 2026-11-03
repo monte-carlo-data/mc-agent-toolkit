@@ -122,6 +122,11 @@ If the question is vague ("how is our data quality?", "tell me about domain X", 
 - **Counts of things** (how many data products, domains, monitors, tables) come from a count metric such as
   `data_product_count` or `monitor_count`, never from counting rows by hand. This holds for the sentences around a
   dashboard too: a count of what the page lists is the length of its list, computed, not read.
+- **Derived claims need their own request.** "N others", "only on X", "most of the drop came from one table": ask the
+  request that returns that number, or leave the claim out. Never subtract overlapping rows or count a subset by eye.
+- **Name a metric by its label:** `incident_count` is alerts, not declared incidents; the catalog's label is the name.
+- **Nothing on your machine:** never point the user at a file path, a tool result or "the results above" they cannot
+  see. Put what matters in the answer or the dashboard.
 - **Small samples:** say how many rows a median, percentile or rate rests on ("p90 over 2 fixed alerts").
 - **Before you decline:** search the topic and dimension pages for the concept, and check the metric's allowed
   dimensions. One failed request or a missing name in your first guess is not proof the data lacks it.
