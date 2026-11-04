@@ -8,7 +8,7 @@ SKILL.md says where the docs are and how a request runs. -->
 ## The docs
 
 The Analytics API docs hold every fact you use; this file holds only how to work. Read only the page you
-need:
+need, as Markdown (the `.md` addresses the SKILL.md gives): a summary of a page drops the exact names and rules.
 
 | Page | Read it for |
 |---|---|
@@ -103,7 +103,8 @@ If the question is vague ("how is our data quality?", "tell me about domain X", 
   `asset__warehouse__warehouse_name` for tables, not `warehouse__warehouse_name`.
 - **Time.** Today is the session's current date. "Last N days" is `metric_time__day` on or after today minus N days.
   Group a series by `metric_time__day`, `__week` or `__month`. A series goes back only as far as the data does: when
-  it starts later than asked, say where it starts. Do not group current-state metrics by time.
+  it starts later than asked, say where it starts. Do not group current-state metrics by time. A pace or run rate
+  for a period in progress divides by the time up to `data_as_of`, not by whole calendar days.
 - **Two groupings at once** that one metric does not allow: take two steps, as Dimensions → "Before you group or
   filter" shows.
 - **A dashboard example matches the ask:** use its requests, adapting only the window and filters.
@@ -120,9 +121,18 @@ If the question is vague ("how is our data quality?", "tell me about domain X", 
   they overlap and give the total from its own request next to them. This holds for the first sentence too: write a
   number there only after a request returned it, and never subtract rows or count a subset by eye: "N others" or
   "only on X" needs its own request.
+- **Members miss what has no member.** A per-grouping metric without its grouping counts only items that have a
+  member, so it is not the account total either: total alerts are `incident_count`, not
+  `monitor_domain_incident_count`. When you show members, request the account metric too (with the same other
+  grouping, in a matrix) and show what is in no member as its own row, last: "No domain", "No data product".
+- **A share is of the total** from its own request, never of the sum of the rows shown.
 - **Counts of things** (how many data products, domains, monitors, tables) come from a count metric such as
   `data_product_count` or `monitor_count`, never from counting rows by hand. This holds for the sentences around a
-  dashboard too: a count of what the page lists is the length of its list, computed, not read.
+  dashboard too: a count of what the page lists is the length of its list, computed, not read. To list the items
+  a count counts (the uncovered key tables), group that same metric by the item's key; never take the list from
+  another metric.
+- **A list too large for one answer:** split the request by a filter (one monitor, one day or one week per request)
+  and put the parts together; never drop the list.
 - **Small samples:** say how many rows a median, percentile or rate rests on ("p90 over 2 fixed alerts").
 - **Before you decline:** search the topic and dimension pages for the concept, and check the metric's allowed
   dimensions. One failed request or a missing name in your first guess is not proof the data lacks it.
@@ -162,19 +172,18 @@ matters in the answer.
 
 ## 5. Dashboards, when asked
 
-Where it will be used decides the format. If the user has not said and the environment does not show it, ask once,
-with a recommendation: one self-contained HTML file that opens in any browser and can be sent by email, with nothing
-to install (recommended); or a tool they set up themselves (a Streamlit app, a notebook, their BI tool), for which you
-give the requests and the code. Say plainly what the second means: it is theirs to run, and keeping it current
-(scheduling the requests, storing the results, hosting the page) is their own data engineering; Monte Carlo does not
-host, refresh or maintain it. The next reply answers the question: if it names no format ("go with what you
-recommend", or a change to the dashboard), build the recommended one; never ask it again in the same conversation.
-When the environment has its own way to show a page (an artifact, a canvas), use it without asking. A file is
+Asked to build or make a dashboard, build it; do not ask first. Unless the user named another format or the
+environment has its own way to show a page (an artifact, a canvas), write one self-contained HTML file that opens in
+any browser and can be sent by email, with nothing to install. After it, say in one line that they can also have the
+requests and code for a tool they set up themselves (a Streamlit app, a notebook, their BI tool), and what that means:
+it is theirs to run, and keeping it current (scheduling the requests, storing the results, hosting the page) is their
+own data engineering; Monte Carlo does not host, refresh or maintain it. A file is
 self-contained: inline CSS, charts drawn inside it (SVG, or a charting library pasted into the file), no external
 scripts, fonts or images.
 
-- **Start from the docs.** If a dashboard example matches, keep all of its blocks and requests, also when the
-  request names only some of them: the page carries the whole layout, not only what the chat answered. Lay out every
+- **Start from the docs.** Before every dashboard, read Dashboard examples and Dashboard style. If an example
+  matches, keep all of its blocks and requests, with their windows and grains (a 13-week chart stays 13 weeks), also
+  when the request names only some of them: the page carries the whole layout, not only what the chat answered. Lay out every
   dashboard as Dashboard style says: header with the window in dates and "Data as of", filters, the answer, the
   breakdown, the detail, and "How this was built" at the bottom in its four parts (source, definitions, choices,
   requests); its colours, number formats and status words.
