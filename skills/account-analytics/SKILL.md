@@ -2,7 +2,7 @@
 name: monte-carlo-account-analytics
 description: Answers questions about your Monte Carlo account (alerts, data quality, coverage, monitors, credits, monitor runs) from the Analytics API, helps sharpen vague questions, and builds dashboards on request.
 when_to_use: |
-  The user asks for numbers, lists, trends or a dashboard about their own Monte Carlo account: "how many alerts did we get last week", "which tables have no monitor", "coverage per data product", "how many credits this quarter", "how is our data quality", "build a data quality dashboard". Not for investigating one alert (incident-response) or one table's health (asset-health).
+  The user asks for numbers, lists, trends or a dashboard about their own Monte Carlo account: "how many alerts did we get last week", "which tables have no monitor", "which monitors are erroring and since when", "coverage per data product", "how many credits this quarter", "how is our data quality", "build a data quality dashboard". Not for investigating one alert (incident-response) or one table's health (asset-health).
 bucket: Monitoring
 ---
 
@@ -26,7 +26,7 @@ connected to: never compare with, or answer for, other accounts.
 ## Tools
 
 - **`get_account_analytics_catalog`**: without arguments, every metric you can query (name, label, description); with
-  `metrics`, the dimensions all of them can be grouped and filtered by; `search` keeps the names containing a text.
+  `metrics`, the dimensions all of them can be grouped and filtered by; `search` keeps the items whose name, label or description contains a text.
 - **`query_account_analytics`**: runs one request (`metrics`, `group_by`, `filters`, `order_by`, `limit`) and returns `columns`,
   `rows`, `data_as_of` and `truncated`. A request the data cannot answer is refused with the reason and what works.
 - **`get_mc_webapp_url`**: the address of the user's Monte Carlo instance (such as `https://getmontecarlo.com` or
@@ -40,13 +40,14 @@ other tools (`get_alerts`, `get_monitors` and the like): they count differently 
 
 The Analytics API, on the Monte Carlo docs:
 
-- Overview: https://docs.getmontecarlo.com/docs/analytics-api
-- How to query: https://docs.getmontecarlo.com/docs/analytics-api-querying
-- Data catalog (Metrics, Dimensions, Glossary): https://docs.getmontecarlo.com/docs/analytics-api-data-catalog
-- Dashboard examples: https://docs.getmontecarlo.com/docs/analytics-api-dashboard-examples
-- Dashboard style: https://docs.getmontecarlo.com/docs/analytics-api-dashboard-style
+- Overview: https://docs.getmontecarlo.com/docs/analytics-api.md
+- How to query: https://docs.getmontecarlo.com/docs/analytics-api-querying.md
+- Data catalog (Metrics, Dimensions, Glossary): https://docs.getmontecarlo.com/docs/analytics-api-data-catalog.md
+- Dashboard examples: https://docs.getmontecarlo.com/docs/analytics-api-dashboard-examples.md
+- Dashboard style: https://docs.getmontecarlo.com/docs/analytics-api-dashboard-style.md
 
-Fetch only the page you need. When the docs cannot be reached, use `get_account_analytics_catalog` for names and descriptions,
+Fetch only the page you need, at its `.md` address: it returns the page as written, where the address without `.md`
+can come back summarised. A page's links lead to more pages; add `.md` to them too. When the docs cannot be reached, use `get_account_analytics_catalog` for names and descriptions,
 and say that the topic rules could not be read.
 
 ## Workflow
