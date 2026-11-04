@@ -5,6 +5,12 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Claude Code will
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.29.3] - 2026-11-04
+
+### Changed
+
+- analyze-root-cause, monitoring-advisor, remediation: call `get_queries` instead of `get_queries_for_table`, the MCP tool's new name.
+
 ## [1.29.2] - 2026-10-30
 
 ### Changed

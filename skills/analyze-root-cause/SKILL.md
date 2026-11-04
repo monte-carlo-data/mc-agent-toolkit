@@ -71,7 +71,7 @@ Do not activate when the user is:
 | `get_field_lineage` | Field-level lineage (trace bad data to source column) |
 | `get_table_freshness` | Table update/freshness history |
 | `get_table_size_history` | Row count and size history |
-| `get_queries_for_table` | Read/write query history |
+| `get_queries` | Read/write query history |
 | `get_query_changes` | Detect SQL text modifications |
 | `get_query_rca` | Root cause analysis for failed/futile/missed queries |
 | `get_etl_issues` | ETL pipeline issues — pass `platform` ("airflow", "dbt", or "databricks") |
