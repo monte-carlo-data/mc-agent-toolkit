@@ -105,8 +105,8 @@ If the question is vague ("how is our data quality?", "tell me about domain X", 
 - **Time.** Today is the session's current date. "Last N days" is `metric_time__day` on or after today minus N days.
   Group a series by `metric_time__day`, `__week` or `__month`. A series goes back only as far as the data does: when
   it starts later than asked, say where it starts. Do not group current-state metrics by time. A pace or run rate
-  for a period in progress divides by the days the data covers (through the last day with rows), not by calendar
-  days.
+  for a period in progress divides by the time the data covers (credits through the last day with rows, alerts up to
+  `data_as_of`), not by calendar days.
 - **Two groupings at once** that one metric does not allow: take two steps, as Dimensions → "Before you group or
   filter" shows.
 - **A dashboard example matches the ask:** use its requests, adapting only the window and filters.
