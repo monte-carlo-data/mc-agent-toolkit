@@ -8,9 +8,6 @@ bucket: Monitoring
 
 # Account analytics
 
-> **Draft.** The account analytics API (`get_account_analytics_catalog`, `query_account_analytics`) and its MCP tools
-> are not released yet. Tool names are the planned ones (monolith#16782).
-
 Answer questions about the user's own Monte Carlo account from the Analytics API. Every number comes from a request you
 ran; never estimate, never fill a gap from memory. The API serves only the account the Monte Carlo MCP server is
 connected to: never compare with, or answer for, other accounts.
