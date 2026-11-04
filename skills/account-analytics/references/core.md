@@ -8,7 +8,8 @@ SKILL.md says where the docs are and how a request runs. -->
 ## The docs
 
 The Analytics API docs hold every fact you use; this file holds only how to work. Read only the page you
-need, as Markdown (the `.md` addresses the SKILL.md gives): a summary of a page drops the exact names and rules.
+need, as Markdown (the `.md` addresses the SKILL.md gives), and ask the fetch for the page verbatim: a summary
+drops the exact names, requests and rules.
 
 | Page | Read it for |
 |---|---|
@@ -104,7 +105,8 @@ If the question is vague ("how is our data quality?", "tell me about domain X", 
 - **Time.** Today is the session's current date. "Last N days" is `metric_time__day` on or after today minus N days.
   Group a series by `metric_time__day`, `__week` or `__month`. A series goes back only as far as the data does: when
   it starts later than asked, say where it starts. Do not group current-state metrics by time. A pace or run rate
-  for a period in progress divides by the time up to `data_as_of`, not by whole calendar days.
+  for a period in progress divides by the time the data covers (credits through the last day with rows, alerts up to
+  `data_as_of`), not by calendar days.
 - **Two groupings at once** that one metric does not allow: take two steps, as Dimensions → "Before you group or
   filter" shows.
 - **A dashboard example matches the ask:** use its requests, adapting only the window and filters.
@@ -124,7 +126,9 @@ If the question is vague ("how is our data quality?", "tell me about domain X", 
 - **Members miss what has no member.** A per-grouping metric without its grouping counts only items that have a
   member, so it is not the account total either: total alerts are `incident_count`, not
   `monitor_domain_incident_count`. When you show members, request the account metric too (with the same other
-  grouping, in a matrix) and show what is in no member as its own row, last: "No domain", "No data product".
+  grouping, in a matrix) and show what is in no member as its own row, last: "No domain", "No data product". That
+  row is the account metric minus the per-grouping metric without its grouping, never minus the summed member rows
+  (they overlap).
 - **A share is of the total** from its own request, never of the sum of the rows shown.
 - **Counts of things** (how many data products, domains, monitors, tables) come from a count metric such as
   `data_product_count` or `monitor_count`, never from counting rows by hand. This holds for the sentences around a
@@ -172,14 +176,22 @@ matters in the answer.
 
 ## 5. Dashboards, when asked
 
-Asked to build or make a dashboard, build it; do not ask first. Unless the user named another format or the
-environment has its own way to show a page (an artifact, a canvas), write one self-contained HTML file that opens in
-any browser and can be sent by email, with nothing to install. After it, say in one line that they can also have the
-requests and code for a tool they set up themselves (a Streamlit app, a notebook, their BI tool), and what that means:
-it is theirs to run, and keeping it current (scheduling the requests, storing the results, hosting the page) is their
-own data engineering; Monte Carlo does not host, refresh or maintain it. A file is
-self-contained: inline CSS, charts drawn inside it (SVG, or a charting library pasted into the file), no external
-scripts, fonts or images.
+The user picks the format. If the request names one (a file, inline, an artifact, a Streamlit app), build that
+without asking. If it does not, ask once, in one short message, with the formats this app offers and your
+recommendation:
+
+- In a chat app (Claude Desktop, claude.ai, ChatGPT and the like): the app's own saved page, such as a Claude
+  artifact or a ChatGPT canvas, which they can keep and reopen (recommended); charts and tables in the chat, for a
+  quick look; or one self-contained HTML file to send anyone. A Claude artifact can refresh its numbers (Dashboard
+  style, A Claude artifact that refreshes); other saved pages and the HTML file are snapshots that carry their rows.
+- In a coding agent (Claude Code, Cursor and the like): one self-contained HTML file that opens in any browser
+  (recommended); or the requests and code for a tool they set up themselves (a Streamlit app, a notebook, their BI
+  tool). Say what that means: it is theirs to run, and keeping it current (scheduling the requests, storing the
+  results, hosting the page) is their own data engineering; Monte Carlo does not host, refresh or maintain it.
+
+If the reply names no format ("go ahead", "you choose", a change to the dashboard), build the recommended one; never
+ask again in the same conversation. An HTML file is self-contained: inline CSS, charts drawn inside it (SVG, or a
+charting library pasted into the file), no external scripts, fonts or images.
 
 - **Start from the docs.** Before every dashboard, read Dashboard examples and Dashboard style. If an example
   matches, keep all of its blocks and requests, with their windows and grains (a 13-week chart stays 13 weeks), also
