@@ -177,7 +177,9 @@ without asking. If it does not, ask once, in one short message, with the formats
 recommendation:
 
 - In a Claude app (Claude Desktop, claude.ai, Cowork): charts and tables in the chat, for a quick look; a Claude
-  artifact, which they can keep, share and reopen (recommended); or one self-contained HTML file to send anyone.
+  artifact, which they can keep, share and reopen (recommended); or one self-contained HTML file to send anyone. An
+  artifact runs its requests through the Monte Carlo connector when it opens, so its reload button refreshes the
+  numbers; it does not carry pasted rows. An HTML file is a snapshot and carries its rows.
 - In a coding agent (Claude Code, Cursor and the like): one self-contained HTML file that opens in any browser
   (recommended); or the requests and code for a tool they set up themselves (a Streamlit app, a notebook, their BI
   tool). Say what that means: it is theirs to run, and keeping it current (scheduling the requests, storing the
