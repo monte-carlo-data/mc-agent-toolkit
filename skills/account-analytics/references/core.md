@@ -172,9 +172,10 @@ matters in the answer.
 
 ## 5. Dashboards, when asked
 
-Asked to build or make a dashboard, build it; do not ask first. Unless the user named another format or the
-environment has its own way to show a page (an artifact, a canvas), write one self-contained HTML file that opens in
-any browser and can be sent by email, with nothing to install. After it, say in one line that they can also have the
+Asked to build or make a dashboard, build it; do not ask first. Unless the user named another format, write one
+self-contained HTML file that opens in any browser and can be sent by email, with nothing to install. In an app that
+shows artifacts, the artifact is that HTML file, which the user can download; a chat widget or tables in the answer
+are not a dashboard. After it, say in one line that they can also have the
 requests and code for a tool they set up themselves (a Streamlit app, a notebook, their BI tool), and what that means:
 it is theirs to run, and keeping it current (scheduling the requests, storing the results, hosting the page) is their
 own data engineering; Monte Carlo does not host, refresh or maintain it. A file is
