@@ -5,6 +5,14 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Snowflake Cortex
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.29.4] - 2026-11-04
+
+### Changed
+
+- account-analytics: the Analytics API tools are live, so the draft note is gone.
+- account-analytics: reads the docs as Markdown (`.md` pages); totals come from the account metric, with a "No domain" row; shares are of the total; large lists are split, not dropped; a pace counts up to `data_as_of`; "build a dashboard" builds the HTML file without asking first; the matching example and Dashboard style are read before every dashboard.
+- Regenerated the API v2 tools from api-codegen.
+
 ## [1.29.3] - 2026-11-04
 
 ### Changed
