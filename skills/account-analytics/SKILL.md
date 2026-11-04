@@ -1,6 +1,6 @@
 ---
 name: monte-carlo-account-analytics
-description: Answers questions about your Monte Carlo account (alerts, data quality, coverage, monitors, credits, monitor runs) from the metrics API, helps sharpen vague questions, and builds dashboards on request.
+description: Answers questions about your Monte Carlo account (alerts, data quality, coverage, monitors, credits, monitor runs) from the Analytics API, helps sharpen vague questions, and builds dashboards on request.
 when_to_use: |
   The user asks for numbers, lists, trends or a dashboard about their own Monte Carlo account: "how many alerts did we get last week", "which tables have no monitor", "coverage per data product", "how many credits this quarter", "how is our data quality", "build a data quality dashboard". Not for investigating one alert (incident-response) or one table's health (asset-health).
 bucket: Monitoring
@@ -11,7 +11,7 @@ bucket: Monitoring
 > **Draft.** The account analytics API (`get_account_analytics_catalog`, `query_account_analytics`) and its MCP tools
 > are not released yet. Tool names are the planned ones (monolith#16782).
 
-Answer questions about the user's own Monte Carlo account from the metrics API. Every number comes from a request you
+Answer questions about the user's own Monte Carlo account from the Analytics API. Every number comes from a request you
 ran; never estimate, never fill a gap from memory. The API serves only the account the Monte Carlo MCP server is
 connected to: never compare with, or answer for, other accounts.
 
@@ -34,13 +34,13 @@ connected to: never compare with, or answer for, other accounts.
 
 ## Docs
 
-Composable dashboards, on the Monte Carlo docs:
+The Analytics API, on the Monte Carlo docs:
 
-- Overview: https://docs.getmontecarlo.com/docs/composable-dashboards
-- How to query: https://docs.getmontecarlo.com/docs/composable-dashboards-querying
-- Data catalog (Metrics, Dimensions, Glossary): https://docs.getmontecarlo.com/docs/composable-dashboards-data-catalog
-- Dashboard examples: https://docs.getmontecarlo.com/docs/composable-dashboards-examples
-- Dashboard style: https://docs.getmontecarlo.com/docs/composable-dashboards-style
+- Overview: https://docs.getmontecarlo.com/docs/analytics-api
+- How to query: https://docs.getmontecarlo.com/docs/analytics-api-querying
+- Data catalog (Metrics, Dimensions, Glossary): https://docs.getmontecarlo.com/docs/analytics-api-data-catalog
+- Dashboard examples: https://docs.getmontecarlo.com/docs/analytics-api-dashboard-examples
+- Dashboard style: https://docs.getmontecarlo.com/docs/analytics-api-dashboard-style
 
 Fetch only the page you need. When the docs cannot be reached, use `get_account_analytics_catalog` for names and descriptions,
 and say that the topic rules could not be read.

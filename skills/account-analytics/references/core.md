@@ -7,7 +7,7 @@ SKILL.md says where the docs are and how a request runs. -->
 
 ## The docs
 
-The Composable dashboards docs hold every fact you use; this file holds only how to work. Read only the page you
+The Analytics API docs hold every fact you use; this file holds only how to work. Read only the page you
 need:
 
 | Page | Read it for |
