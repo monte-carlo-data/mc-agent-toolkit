@@ -13,7 +13,7 @@ need:
 | Page | Read it for |
 |---|---|
 | How to query | the parts of a request, names, time, filters, access |
-| Data catalog → Metrics (one page per topic: data quality, coverage, consumption, monitor runs) | the metrics, their rules and example questions |
+| Data catalog → Metrics (one page per topic: data quality, coverage, consumption, monitor runs, activity) | the metrics, their rules and example questions |
 | Data catalog → Dimensions, Glossary | what a dimension means; words with two meanings; periods and how far back a series goes |
 | Dashboard examples | tested dashboards, each with its blocks and one request per block |
 | Dashboard style | how any dashboard looks |
