@@ -24,7 +24,7 @@ Connect to Monte Carlo's MCP server (`integrations.getmontecarlo.com/mcp`). The 
 | `get_field_lineage` | Field-level lineage (trace to source column) |
 | `get_table_freshness` | Update/freshness history |
 | `get_table_size_history` | Row count and size history |
-| `get_queries_for_table` | Read/write query history |
+| `get_queries` | Read/write query history for a table, or the queries an ETL job ran |
 | `get_query_changes` | Detect SQL text modifications |
 | `get_query_rca` | Failed/futile/missed query analysis |
 | `get_change_timeline` | Unified change timeline |

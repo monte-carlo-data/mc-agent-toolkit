@@ -192,9 +192,11 @@ get_monitors(
 The config contains the SQL query or validation conditions — this tells you exactly what the monitor checks, which is essential for understanding what went wrong and what the fix should be.
 
 ```
-get_queries_for_table(
+get_queries(
   mcon="<affected_table_mcon>",
   query_type="destination",
+  start_time="<7 days before the alert, ISO 8601>",
+  end_time="<alert time, ISO 8601>",
   limit=10
 )
 ```

@@ -29,7 +29,7 @@ The table is populated by an ETL pipeline. Check if the pipeline failed:
 
 ### 3. Check the write queries
 
-Call `get_queries_for_table(mcon=table_mcon, query_type="destination")` to see recent write queries:
+Call `get_queries(mcon=table_mcon, query_type="destination", start_time=..., end_time=...)`, with a window that covers the last expected update, to see recent write queries:
 - Did write queries stop running entirely? → pipeline scheduling issue
 - Did write queries run but with errors? → data or permission issue
 - Did write queries run successfully but produce no rows? → upstream data issue

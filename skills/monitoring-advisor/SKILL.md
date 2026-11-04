@@ -84,7 +84,7 @@ All tools are available via the `monte-carlo-mcp` MCP server.
 | `get_unmonitored_tables_with_anomalies` | Tables with muted OOTB anomalies but no monitors (takes ISO 8601 time range) |
 | `search` | Find tables by name; supports `is_monitored` filter |
 | `get_table` | Table details, fields, stats, domain membership |
-| `get_queries_for_table` | Query logs for a table (source/destination) |
+| `get_queries` | Query logs for a table (source/destination) or an ETL job |
 | `get_field_metric_definitions` | Available metrics per field type for a warehouse |
 | `get_domains` | List Monte Carlo domains |
 | `get_validation_predicates` | Available validation rule types |
@@ -220,7 +220,7 @@ When no use cases are defined, fall back to importance-based table discovery.
 
 If a database MCP server was detected in Step 3 of the coverage workflow:
 
-1. Call `get_queries_for_table` to see recent query patterns on candidate tables.
+1. Call `get_queries` to see recent query patterns on candidate tables.
 2. Use the database MCP tools (e.g. `snowflake_query`, `bigquery_query`) to profile table usage -- identify which tables are queried most frequently, which columns are used in JOINs and WHERE clauses.
 3. Use this information to refine monitor suggestions -- heavily-queried tables with no monitors are high-priority gaps.
 
