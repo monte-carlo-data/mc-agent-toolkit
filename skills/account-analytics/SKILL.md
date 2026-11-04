@@ -32,6 +32,10 @@ connected to: never compare with, or answer for, other accounts.
 - **`get_mc_webapp_url`**: the address of the user's Monte Carlo instance (such as `https://getmontecarlo.com` or
   `https://eu1.getmontecarlo.com`), for links to items. Call it once, before the first answer that names items.
 
+If `get_account_analytics_catalog` or `query_account_analytics` is not in the session, or either returns a 404, the
+Analytics API is not enabled for this account: say so and stop. Do not retry, and do not work the numbers out from
+other tools (`get_alerts`, `get_monitors` and the like): they count differently and would not match the Analytics API.
+
 ## Docs
 
 The Analytics API, on the Monte Carlo docs:
