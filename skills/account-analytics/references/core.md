@@ -176,9 +176,9 @@ The user picks the format. If the request names one (a file, inline, an artifact
 without asking. If it does not, ask once, in one short message, with the formats this app offers and your
 recommendation:
 
-- In a chat app (Claude Desktop, claude.ai, ChatGPT and the like): charts and tables in the chat, for a quick look;
-  the app's own saved page, such as a Claude artifact or a ChatGPT canvas, which they can keep and reopen
-  (recommended); or one self-contained HTML file to send anyone. A Claude artifact can run its requests through the
+- In a chat app (Claude Desktop, claude.ai, ChatGPT and the like): the app's own saved page, such as a Claude
+  artifact or a ChatGPT canvas, which they can keep and reopen (recommended); charts and tables in the chat, for a
+  quick look; or one self-contained HTML file to send anyone. A Claude artifact can run its requests through the
   Monte Carlo connector, so its refresh updates the numbers (Dashboard style, A Claude artifact that refreshes); other
   saved pages and the HTML file are snapshots that carry their rows.
 - In a coding agent (Claude Code, Cursor and the like): one self-contained HTML file that opens in any browser
