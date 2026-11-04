@@ -190,9 +190,8 @@ recommendation:
   results, hosting the page) is their own data engineering; Monte Carlo does not host, refresh or maintain it.
 
 If the reply names no format ("go ahead", "you choose", a change to the dashboard), build the recommended one; never
-ask again in the same conversation. A file is
-self-contained: inline CSS, charts drawn inside it (SVG, or a charting library pasted into the file), no external
-scripts, fonts or images.
+ask again in the same conversation. An HTML file is self-contained: inline CSS, charts drawn inside it (SVG, or a
+charting library pasted into the file), no external scripts, fonts or images.
 
 - **Start from the docs.** Before every dashboard, read Dashboard examples and Dashboard style. If an example
   matches, keep all of its blocks and requests, with their windows and grains (a 13-week chart stays 13 weeks), also

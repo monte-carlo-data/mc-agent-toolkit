@@ -5,6 +5,13 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Codex will be do
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.29.5] - 2026-11-04
+
+### Changed
+
+- account-analytics: the user picks the dashboard format again. With none named, the skill asks once, the recommended format first (in a chat app, the app's saved page such as a Claude artifact; in a coding agent, an HTML file), and builds the recommended one if the reply names none. Replaces "builds the HTML file without asking first" from 1.29.4.
+- account-analytics: a pace divides by the time the data covers; the "No domain" row is the account metric minus the per-grouping metric without its grouping; doc pages are fetched verbatim.
+
 ## [1.29.4] - 2026-11-04
 
 ### Changed
