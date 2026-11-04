@@ -84,7 +84,7 @@ All tools are available via the `monte-carlo-mcp` MCP server.
 | `get_unmonitored_tables_with_anomalies` | Tables with muted OOTB anomalies but no monitors (takes ISO 8601 time range) |
 | `search` | Find tables by name; supports `is_monitored` filter |
 | `get_table` | Table details, fields, stats, domain membership |
-| `get_queries` | Query logs for a table (source/destination) |
+| `get_queries` | Query logs for a table (source/destination) or an ETL job |
 | `get_field_metric_definitions` | Available metrics per field type for a warehouse |
 | `get_domains` | List Monte Carlo domains |
 | `get_validation_predicates` | Available validation rule types |

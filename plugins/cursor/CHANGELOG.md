@@ -9,7 +9,7 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- analyze-root-cause, monitoring-advisor, remediation: call `get_queries` instead of `get_queries_for_table`, the MCP tool's new name.
+- analyze-root-cause, monitoring-advisor, remediation: call `get_queries` instead of `get_queries_for_table`, the MCP tool's new name. It also reads the queries an ETL job ran. Query examples now pass the required `start_time` and `end_time`.
 
 ## [1.29.2] - 2026-10-30
 
