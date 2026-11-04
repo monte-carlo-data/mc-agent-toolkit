@@ -8,8 +8,8 @@ SKILL.md says where the docs are and how a request runs. -->
 ## The docs
 
 The Analytics API docs hold every fact you use; this file holds only how to work. Read only the page you
-need, as Markdown (the `.md` addresses the SKILL.md gives), and ask the fetch for the page's full text verbatim: a
-summary of a page drops the exact names, requests and rules.
+need, as Markdown (the `.md` addresses the SKILL.md gives), and ask the fetch for the page verbatim: a summary
+drops the exact names, requests and rules.
 
 | Page | Read it for |
 |---|---|
@@ -127,8 +127,8 @@ If the question is vague ("how is our data quality?", "tell me about domain X", 
   member, so it is not the account total either: total alerts are `incident_count`, not
   `monitor_domain_incident_count`. When you show members, request the account metric too (with the same other
   grouping, in a matrix) and show what is in no member as its own row, last: "No domain", "No data product". That
-  row is the account metric minus the per-grouping metric requested without its grouping; never subtract the sum of
-  the member rows, which overlap.
+  row is the account metric minus the per-grouping metric without its grouping, never minus the summed member rows
+  (they overlap).
 - **A share is of the total** from its own request, never of the sum of the rows shown.
 - **Counts of things** (how many data products, domains, monitors, tables) come from a count metric such as
   `data_product_count` or `monitor_count`, never from counting rows by hand. This holds for the sentences around a
@@ -182,9 +182,8 @@ recommendation:
 
 - In a chat app (Claude Desktop, claude.ai, ChatGPT and the like): the app's own saved page, such as a Claude
   artifact or a ChatGPT canvas, which they can keep and reopen (recommended); charts and tables in the chat, for a
-  quick look; or one self-contained HTML file to send anyone. A Claude artifact can run its requests through the
-  Monte Carlo connector, so its refresh updates the numbers (Dashboard style, A Claude artifact that refreshes); other
-  saved pages and the HTML file are snapshots that carry their rows.
+  quick look; or one self-contained HTML file to send anyone. A Claude artifact can refresh its numbers (Dashboard
+  style, A Claude artifact that refreshes); other saved pages and the HTML file are snapshots that carry their rows.
 - In a coding agent (Claude Code, Cursor and the like): one self-contained HTML file that opens in any browser
   (recommended); or the requests and code for a tool they set up themselves (a Streamlit app, a notebook, their BI
   tool). Say what that means: it is theirs to run, and keeping it current (scheduling the requests, storing the
