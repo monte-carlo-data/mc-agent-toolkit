@@ -172,13 +172,19 @@ matters in the answer.
 
 ## 5. Dashboards, when asked
 
-Asked to build or make a dashboard, build it; do not ask first. Unless the user named another format, write one
-self-contained HTML file that opens in any browser and can be sent by email, with nothing to install. In an app that
-shows artifacts, the artifact is that HTML file, which the user can download; a chat widget or tables in the answer
-are not a dashboard. After it, say in one line that they can also have the
-requests and code for a tool they set up themselves (a Streamlit app, a notebook, their BI tool), and what that means:
-it is theirs to run, and keeping it current (scheduling the requests, storing the results, hosting the page) is their
-own data engineering; Monte Carlo does not host, refresh or maintain it. A file is
+The user picks the format. If the request names one (a file, inline, an artifact, a Streamlit app), build that
+without asking. If it does not, ask once, in one short message, with the formats this app offers and your
+recommendation:
+
+- In a Claude app (Claude Desktop, claude.ai, Cowork): charts and tables in the chat, for a quick look; a Claude
+  artifact, which they can keep, share and reopen (recommended); or one self-contained HTML file to send anyone.
+- In a coding agent (Claude Code, Cursor and the like): one self-contained HTML file that opens in any browser
+  (recommended); or the requests and code for a tool they set up themselves (a Streamlit app, a notebook, their BI
+  tool). Say what that means: it is theirs to run, and keeping it current (scheduling the requests, storing the
+  results, hosting the page) is their own data engineering; Monte Carlo does not host, refresh or maintain it.
+
+If the reply names no format ("go ahead", "you choose", a change to the dashboard), build the recommended one; never
+ask again in the same conversation. A file is
 self-contained: inline CSS, charts drawn inside it (SVG, or a charting library pasted into the file), no external
 scripts, fonts or images.
 
