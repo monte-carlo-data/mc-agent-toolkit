@@ -47,30 +47,19 @@ so this section says how to discover them; it does not list them.
 
 | Where the secret lives | How the credentials are created | Which types |
 |---|---|---|
-| The customer's own store, read by a collection agent | MCP tools: `create_aws_secrets_manager_credentials`, `create_gcp_secret_manager_credentials`, `create_azure_key_vault_credentials`, `create_env_var_credentials`, `create_file_credentials`. Only a reference is passed. | A type that is itself a value of `create_warehouse`'s `type` list in this session. Any other connection type is settled as described below the table. |
-| Monte Carlo stores it (managed) | **Not an MCP tool**: the request carries the secret. A CLI or Terraform step the customer runs (rule 6). | A type with a `get_<type>_credentials` or `delete_<type>_credentials` tool in this session, or listed by `montecarlo credentials create --help` when the customer has mc-cli. |
+| The customer's own store, read by a collection agent | MCP tools: `create_aws_secrets_manager_credentials`, `create_gcp_secret_manager_credentials`, `create_azure_key_vault_credentials`, `create_env_var_credentials`, `create_file_credentials`. Only a reference is passed. | A type whose `self_hosted_credentials_storages` is not empty, in one of the stores it lists. |
+| Monte Carlo stores it (managed) | The operation in `mc_managed_credentials_operation`. When `mc_managed_credentials_secret` is true, the request carries the secret, so it is **not an MCP tool**: a CLI or Terraform step the customer runs (rule 6). When it is false, the operation is an MCP tool, such as `create_glue_credentials`. | A type with an `mc_managed_credentials_operation`. |
 | Neither | — | Hand off to the UI (Settings → Integrations). |
 
-- **CRITICAL: discover types from this session, NEVER from memory or from examples in these
-  references.** The managed getter/delete tools can lag the API; when they and the customer's
-  `montecarlo credentials create --help` disagree, the CLI is newer.
-- **CRITICAL: a BI tool is supported when this session serves `create_bi_container` and its
-  `type` list names the tool** (`tableau`, `looker` — also for `looker-git-clone` — or `power-bi`).
-  Its connections go on a BI container, never a warehouse; the rule below does not apply to them.
-  Without `create_bi_container`, hand the BI tool off to the UI.
-- **CRITICAL: a connection type that is not itself a warehouse `type` is settled by the API, not
-  by you.** The tools do not publish which warehouse type a connection type maps to, and several
-  connection types share one. So such a type counts as supported only when one of these shows it:
-  - an existing connection of that type in this account (`list_connections` returns
-    `connection_type`), whose warehouse type is then known; or
-  - the Monte Carlo docs page for that integration, read in this session, saying it connects
-    through a collection agent with self-hosted credentials.
-
-  Otherwise tell the customer support is unconfirmed. When the route **reuses** an existing
-  deployment, it can proceed: `create_warehouse(connection_type=<type>)` refuses a type it cannot
-  map and creates nothing, so that call is the check; on a refusal, hand off to the UI. When the
-  route needs a **new** deployment or agent, NEVER provision it for an unconfirmed type; offer the
-  UI instead. NEVER create a warehouse or connection only to probe support.
+- **CRITICAL: discover types from `list_connection_types` in this session, NEVER from memory or
+  from examples in these references.** It lists every type the account can connect, with where
+  its credentials can be kept. A type it does not list cannot be connected through these tools.
+- **CRITICAL: `parent` says what the connection goes on.** A `warehouse` type goes on a warehouse
+  of its `warehouse_type`. A `bi_container` type (`tableau`, `looker`, `looker-git-clone`,
+  `power-bi`) goes on a BI container of its `bi_container_type`, never a warehouse, and an
+  `etl_container` type on an ETL container of its `etl_container_type`. A BI or ETL type is
+  supported only when this session also serves `create_bi_container` or `create_etl_container`;
+  otherwise hand it off to the UI.
 - **CRITICAL: the options above are the whole menu.** Offer them in customer language (for
   example "a file on your machine that a command you run reads", "a secret in your AWS Secrets
   Manager, by its name or ARN"). NEVER offer, accept or suggest typing a password, key or token

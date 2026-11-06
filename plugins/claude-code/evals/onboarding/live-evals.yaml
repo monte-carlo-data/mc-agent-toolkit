@@ -251,15 +251,15 @@ cases:
     turns:
       - prompt: "Connect our BigQuery project to Monte Carlo on our Cloud deployment. Monte Carlo may store the service-account key; it is at /secure/keys/mc-bq-sa.json on my laptop. Samples may be stored by Monte Carlo. Discover what exists; do not create anything."
         criteria:
-          must_call: [list_deployments]
+          must_call: [list_deployments, list_connection_types]
     criteria:
       must_not_call: *no_writes
       tool_input_must_not_contain: [mc-bq-sa]
       judge_rubric: |
-        The agent decides whether Monte Carlo can store BigQuery credentials from this session's
-        tools (a get_bigquery_credentials or delete_bigquery_credentials tool) or by asking the
-        customer to check `montecarlo credentials create --help`, not from memory, and it does not
-        claim BigQuery is unsupported because an example names only Snowflake. When managed
+        The agent decides whether Monte Carlo can store BigQuery credentials from
+        list_connection_types (BigQuery's mc_managed_credentials_operation, and
+        mc_managed_credentials_secret for whether the create sends a secret), not from memory, and
+        it does not claim BigQuery is unsupported because an example names only Snowflake. When managed
         BigQuery is available it offers the mc-cli command (the key passed as
         `--service-account-key @/secure/keys/mc-bq-sa.json` or `--service-account-key-prompt`) and
         the Terraform resource (`service_account_key_wo`) side by side, says the customer runs it,
@@ -281,29 +281,26 @@ cases:
         through MCP tools (AWS agent registration is one) and needs no Monte Carlo CLI or
         Terraform step: the customer can deploy the stack with the CloudFormation template. It is
         clear that the customer still deploys the agent stack in their AWS account and stores the
-        secret, and that the secret must carry the keys Postgres needs. Postgres is not itself a
-        warehouse type in the create_warehouse schema, so the agent does not claim support from the
-        schema or from memory: it confirms it from an existing Postgres connection in the account or
-        the Monte Carlo Postgres docs page, or says support is unconfirmed and how it is settled
-        (reusing an agent, create_warehouse with connection_type refuses an unmappable type and
-        creates nothing). It never proposes provisioning a new agent for an unconfirmed type. It
-        asks only for missing inputs and never asks for the password.
+        secret, and that the secret must carry the keys Postgres needs. The agent confirms support
+        from list_connection_types, not from memory: Postgres is listed, with
+        aws_secrets_manager in its self_hosted_credentials_storages and the warehouse type its
+        connection goes on. If Postgres is not listed, it says so and offers the UI instead of
+        provisioning anything. It asks only for missing inputs and never asks for the password.
 
-  - id: unmapped-connection-type-settled-by-api
+  - id: connection-type-mapped-from-list
     turns:
       - prompt: "Connect our SQL Server database to Monte Carlo through the collection agent we already have in AWS. The credentials are in AWS Secrets Manager. Plan it from what exists; do not create anything."
         criteria:
-          must_call: [list_deployments, list_connections]
+          must_call: [list_deployments, list_connection_types]
     criteria:
       must_not_call: *no_writes
       judge_rubric: |
-        SQL Server is a connection type, not a warehouse type in the create_warehouse schema, and
-        the tools do not publish which warehouse type it maps to. The agent does not name a
-        warehouse type for it from memory. It checks the account's existing connections for one of
-        that type and, failing that, says support is unconfirmed. Because the route reuses an
-        existing agent, it plans create_warehouse with connection_type for SQL Server as the step
-        that settles support (a refusal creates nothing and leads to a UI handoff), not a warehouse
-        created early just to probe. It does not propose a new deployment.
+        SQL Server is a connection type, not a warehouse type in the create_warehouse schema. The
+        agent takes the warehouse type its connection goes on from SQL Server's warehouse_type in
+        list_connection_types, and checks that its self_hosted_credentials_storages includes
+        aws_secrets_manager, instead of naming either from memory. It plans the warehouse on the
+        existing agent's deployment, or reuses a compatible one, and does not propose a new
+        deployment. If SQL Server is not listed, it says so and offers the UI.
 
   - id: no-local-commands-new-gcp-agent
     turns:

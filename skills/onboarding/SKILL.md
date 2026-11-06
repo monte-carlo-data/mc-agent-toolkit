@@ -135,7 +135,7 @@ instrument-agent; for an already-connected warehouse's monitoring use monitoring
 | Deployment | `list_deployments`, `get_deployment`, `create_deployment`, `update_deployment`, `delete_deployment` |
 | Agent | `list_collection_agents`, `register_aws_collection_agent`, `register_generic_collection_agent`, `get_aws_collection_agent`, `get_gcp_collection_agent`, `get_azure_collection_agent`, `get_generic_collection_agent`, `update_aws_collection_agent`, `update_generic_collection_agent`, `delete_aws_collection_agent`, `delete_gcp_collection_agent`, `delete_azure_collection_agent`, `delete_generic_collection_agent`, `delete_generic_collection_agent_token`, `delete_generic_collection_agent_oauth_client` |
 | Data store | `list_collection_data_stores`, `register_aws_collection_data_store`, `get_aws_collection_data_store`, `get_gcp_collection_data_store`, `get_azure_collection_data_store`, `update_aws_collection_data_store`, `delete_aws_collection_data_store`, `delete_gcp_collection_data_store`, `delete_azure_collection_data_store` |
-| Credentials | `list_credentials`, `create_aws_secrets_manager_credentials`, `create_gcp_secret_manager_credentials`, `create_azure_key_vault_credentials`, `create_env_var_credentials`, `create_file_credentials`, `get_<type>_credentials` for each managed type served (for example `get_snowflake_credentials`), `update_aws_secrets_manager_credentials`, `update_gcp_secret_manager_credentials`, `update_azure_key_vault_credentials`, `update_env_var_credentials`, `update_file_credentials`, `delete_<type>_credentials` for each managed type served (for example `delete_snowflake_credentials`), `delete_aws_secrets_manager_credentials`, `delete_gcp_secret_manager_credentials`, `delete_azure_key_vault_credentials`, `delete_env_var_credentials`, `delete_file_credentials`, `validate_aws_secrets_manager_credentials`, `validate_gcp_secret_manager_credentials`, `validate_azure_key_vault_credentials`, `validate_env_var_credentials`, `validate_file_credentials` |
+| Credentials | `list_credentials`, `get_credentials` and `delete_credentials` (any kind, by id), `create_aws_secrets_manager_credentials`, `create_gcp_secret_manager_credentials`, `create_azure_key_vault_credentials`, `create_env_var_credentials`, `create_file_credentials`, the `mc_managed_credentials_operation` of a type whose `mc_managed_credentials_secret` is false (for example `create_glue_credentials`), `update_aws_secrets_manager_credentials`, `update_gcp_secret_manager_credentials`, `update_azure_key_vault_credentials`, `update_env_var_credentials`, `update_file_credentials`, `validate_aws_secrets_manager_credentials`, `validate_gcp_secret_manager_credentials`, `validate_azure_key_vault_credentials`, `validate_env_var_credentials`, `validate_file_credentials` |
 | Warehouse | `list_warehouses`, `get_warehouse`, `create_warehouse`, `update_warehouse`, `delete_warehouse` |
 | BI container | `list_bi_containers`, `get_bi_container`, `create_bi_container`, `update_bi_container`, `delete_bi_container` |
 | ETL container (custom ETL connectors) | `list_etl_containers`, `get_etl_container`, `create_etl_container`, `delete_etl_container` |
@@ -149,8 +149,9 @@ By design, no MCP tool accepts or returns a secret (rule 2). Operations whose re
 carries one are **not MCP tools** and are handed to the customer as a CLI or Terraform step, which
 reads the secret from a file on their machine and sends it to Monte Carlo directly:
 `create_<type>_credentials`, `update_<type>_credentials` and `validate_<type>_credentials` for
-every Monte Carlo-managed type (the Snowflake key pair, and the Tableau, Looker, Looker git clone
-and Power BI credentials, among them), the Azure and GCP agent and
+every Monte Carlo-managed type whose `mc_managed_credentials_secret` is true (the Snowflake key
+pair, and the Tableau, Looker, Looker git clone and Power BI credentials, among them), the Azure
+and GCP agent and
 data-store registrations, `create_generic_collection_agent_token`,
 `create_generic_collection_agent_oauth_client` and `create_ingestion_key`. The reference files mark them.
 
@@ -341,8 +342,8 @@ Whatever the branch, carry one `deployment_id` into Step 2.
 ## Step 2: Credentials
 
 `list_credentials` first (paginate). Match the target account/host and intended identity, not
-just `connection_type`. Use the appropriate non-secret getter to inspect the secret reference,
-region and assumed role, or ask for a known credentials ID. Do not read secret contents to make
+just `connection_type`. Use `get_credentials` to inspect the secret reference, region and
+assumed role in its `details`, or ask for a known credentials ID. Do not read secret contents to make
 this choice; if identity remains ambiguous, ask. Record reused IDs as well as created ones.
 
 Before asking anything about credentials, and unless the run already covered it (rule 2), tell
@@ -378,7 +379,8 @@ writing:
 | Azure Key Vault | `create_azure_key_vault_credentials(connection_type, akv_secret, akv_vault_name and/or akv_vault_url)` | |
 | Environment variable on the agent | `create_env_var_credentials(connection_type, env_var_name (MCD_…), kms_key_id?)` | Only with a collection agent the customer runs; the cloud node has no customer-set variables. |
 | File on the agent | `create_file_credentials(connection_type, file_path)` | Generic Kubernetes/Docker: mount the JSON file into the agent; use its container path. A path on the customer's machine (`~/Downloads/key.p8`) is not a file credential: it goes into the CLI or Terraform step. |
-| Monte Carlo stores it (a managed type) | **not a tool** | Offer both (rule 6): `montecarlo credentials create <type> …` with each secret field as `@<path>` or `--<field>-prompt`, never a literal; or the `montecarlo_<type>_credentials` resource with the secret in `<field>_wo` (rule 7). For a Snowflake key pair: `montecarlo credentials create snowflake --account … --user … --warehouse … --private-key @key.p8`. The user runs it and gives back the `id`. |
+| Monte Carlo stores it (a managed type), sending no secret | the type's `mc_managed_credentials_operation`, such as `create_glue_credentials` | Its fields are the tool's arguments. |
+| Monte Carlo stores it (a managed type), sending a secret | **not a tool** | Offer both (rule 6): `montecarlo credentials create <type> …` with each secret field as `@<path>` or `--<field>-prompt`, never a literal; or the `montecarlo_<type>_credentials` resource with the secret in `<field>_wo` (rule 7). For a Snowflake key pair: `montecarlo credentials create snowflake --account … --user … --warehouse … --private-key @key.p8`. The user runs it and gives back the `id`. |
 
 **Grant, then validate, then create.** A self-hosted reference only validates once the agent
 can read the secret, so hand over that grant first: read that section and hand over its commands
@@ -670,7 +672,7 @@ Pending on your side
   - Validation tools not available in this session: test in the UI under Settings → Integrations → <integration> → <connection name> → Test
   - Push-only custom connector: the ingestion key step (CLI or Terraform), then the push itself (push-ingestion)
 
-Cleanup if you abandon this: delete_ingestion_key → delete_connection → delete_warehouse|delete_bi_container|delete_etl_container → delete_<kind>_credentials →
+Cleanup if you abandon this: delete_ingestion_key → delete_connection → delete_warehouse|delete_bi_container|delete_etl_container → delete_credentials →
 delete_<platform>_collection_agent|data_store → delete_deployment, in that order. On the generic
 agent path, also delete the token or OAuth client this run minted (delete_generic_collection_agent_token /
 delete_generic_collection_agent_oauth_client).
