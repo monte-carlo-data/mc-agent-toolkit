@@ -452,6 +452,10 @@ type=<the type's warehouse_type from list_connection_types>)`; names are unique 
 whose `warehouse_type` is null (such as `dbt-cloud-webhook`) goes on an existing warehouse of any
 type: do not create a warehouse for it. Carry and record the `warehouse_id`.
 
+When the type lists `requires_one_of_connection_types` (such as `databricks-sql-warehouse`,
+`s3-metadata-events` and `s3-ql-events`), the warehouse needs a connection of one of those types
+before this one. Check the warehouse's connections and, if none is there, add one first.
+
 ### 3b. The BI container
 
 Use the BI containers discovered in Step 0. Match the tool and the instance (the same Tableau
