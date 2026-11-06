@@ -24,7 +24,7 @@ None.
 
 ### Response
 
-Response fields: user_id, email, first_name, last_name, identity_type, account_id, account_name, account_frozen, auth_groups.
+Response fields: user_id, email, first_name, last_name, identity_type, account_id, account_name, account_frozen, auth_groups, features.
 
 | Field | Description |
 |---|---|
@@ -37,6 +37,7 @@ Response fields: user_id, email, first_name, last_name, identity_type, account_i
 | `account_name` | Display name of the account. Null when the account has no name. |
 | `account_frozen` | Whether the account is paused. While it is, this endpoint still answers but every other one returns 403 with the code `account_frozen`. |
 | `auth_groups` | Names of the authorization groups this user belongs to. They determine what the user is permitted to do. |
+| `features` | Features in early access that are on for the account. Every operation of a resource in early access answers 404 until its feature is on. |
 
 ### What can fail
 
