@@ -8,8 +8,7 @@ SKILL.md says where the docs are and how a request runs. -->
 ## The docs
 
 The Analytics API docs hold every fact you use; this file holds only how to work. Read only the page you
-need, as Markdown (the `.md` addresses the SKILL.md gives), and ask the fetch for the page verbatim: a summary
-drops the exact names, requests and rules.
+need, the way the SKILL.md says, and use it verbatim: a summary drops the exact names, requests and rules.
 
 | Page | Read it for |
 |---|---|

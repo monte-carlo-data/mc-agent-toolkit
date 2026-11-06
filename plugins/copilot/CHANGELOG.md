@@ -5,6 +5,12 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Copilot CLI will
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.29.6] - 2026-11-06
+
+### Changed
+
+- account-analytics: reads the docs with the MCP server's `get_account_analytics_docs` tool (the page list, or one page as Markdown by its slug), which returns the same pages as the Monte Carlo docs. When the tool is missing or fails, it fetches the `.md` pages from the docs site as before.
+
 ## [1.29.5] - 2026-11-04
 
 ### Changed

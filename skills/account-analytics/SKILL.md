@@ -16,12 +16,14 @@ connected to: never compare with, or answer for, other accounts.
 > bundled server, whose fully-qualified tool names are
 > `mcp__plugin_mc-agent-toolkit_monte-carlo-mcp__<tool>` (e.g.
 > `mcp__plugin_mc-agent-toolkit_monte-carlo-mcp__query_account_analytics`). Bare tool names used in this skill
-> (`get_account_analytics_catalog`, `query_account_analytics`, `get_mc_webapp_url`) refer to that bundled server. If the session also has a
+> (`get_account_analytics_docs`, `get_account_analytics_catalog`, `query_account_analytics`, `get_mc_webapp_url`) refer to that bundled server. If the session also has a
 > separately-configured `monte-carlo-mcp` server, do **not** route to it — it may point at a
 > different endpoint or credentials.
 
 ## Tools
 
+- **`get_account_analytics_docs`**: without `slug`, the list of docs pages (slug, title, summary); with `slug`, that
+  page as Markdown, as written.
 - **`get_account_analytics_catalog`**: without arguments, every metric you can query (name, label, description); with
   `metrics`, the dimensions all of them can be grouped and filtered by; `search` keeps the items whose name, label or description contains a text.
 - **`query_account_analytics`**: runs one request (`metrics`, `group_by`, `filters`, `order_by`, `limit`) and returns `columns`,
@@ -35,17 +37,23 @@ other tools (`get_alerts`, `get_monitors` and the like): they count differently 
 
 ## Docs
 
-The Analytics API, on the Monte Carlo docs:
+Read the Analytics API docs with `get_account_analytics_docs`: once without `slug` for the list of pages, then one call
+per page you need. The pages:
 
-- Overview: https://docs.getmontecarlo.com/docs/analytics-api.md
-- How to query: https://docs.getmontecarlo.com/docs/analytics-api-querying.md
-- Data catalog (Metrics, Dimensions, Glossary): https://docs.getmontecarlo.com/docs/analytics-api-data-catalog.md
-- Dashboard examples: https://docs.getmontecarlo.com/docs/analytics-api-dashboard-examples.md
-- Dashboard style: https://docs.getmontecarlo.com/docs/analytics-api-dashboard-style.md
+| Page | Slug |
+|---|---|
+| Overview | `analytics-api` |
+| How to query | `analytics-api-querying` |
+| Data catalog (Metrics, Dimensions, Glossary) | `analytics-api-data-catalog` |
+| Dashboard examples | `analytics-api-dashboard-examples` |
+| Dashboard style | `analytics-api-dashboard-style` |
 
-Fetch only the page you need, at its `.md` address: it returns the page as written, where the address without `.md`
-can come back summarised. A page's links lead to more pages; add `.md` to them too. When the docs cannot be reached, use `get_account_analytics_catalog` for names and descriptions,
-and say that the topic rules could not be read.
+A link written `doc:<slug>` leads to another page: read it with that slug.
+
+When `get_account_analytics_docs` is not in the session or fails, fetch the same pages from the Monte Carlo docs at
+`https://docs.getmontecarlo.com/docs/<slug>.md`: the `.md` address returns the page as written, where the address
+without it can come back summarised. When neither works, use `get_account_analytics_catalog` for names and
+descriptions, and say that the topic rules could not be read.
 
 ## Workflow
 
