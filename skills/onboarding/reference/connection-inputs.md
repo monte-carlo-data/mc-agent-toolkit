@@ -47,30 +47,21 @@ so this section says how to discover them; it does not list them.
 
 | Where the secret lives | How the credentials are created | Which types |
 |---|---|---|
-| The customer's own store, read by a collection agent | MCP tools: `create_aws_secrets_manager_credentials`, `create_gcp_secret_manager_credentials`, `create_azure_key_vault_credentials`, `create_env_var_credentials`, `create_file_credentials`. Only a reference is passed. | A type that is itself a value of `create_warehouse`'s `type` list in this session. Any other connection type is settled as described below the table. |
-| Monte Carlo stores it (managed) | **Not an MCP tool**: the request carries the secret. A CLI or Terraform step the customer runs (rule 6). | A type with a `get_<type>_credentials` or `delete_<type>_credentials` tool in this session, or listed by `montecarlo credentials create --help` when the customer has mc-cli. |
+| The customer's own store, read by a collection agent | MCP tools: `create_aws_secrets_manager_credentials`, `create_gcp_secret_manager_credentials`, `create_azure_key_vault_credentials`, `create_env_var_credentials`, `create_file_credentials`. Only a reference is passed. | A type whose `self_hosted_credentials_storages` is not empty, in one of the stores it lists. |
+| Monte Carlo stores it (managed) | The operation in `mc_managed_credentials_operation`. When `mc_managed_credentials_secret` is true, the request carries the secret, so it is **not an MCP tool**: a CLI or Terraform step the customer runs (rule 6). When it is false, the operation is an MCP tool, such as `create_glue_credentials`. | A type with an `mc_managed_credentials_operation`. |
 | Neither | — | Hand off to the UI (Settings → Integrations). |
 
-- **CRITICAL: discover types from this session, NEVER from memory or from examples in these
-  references.** The managed getter/delete tools can lag the API; when they and the customer's
-  `montecarlo credentials create --help` disagree, the CLI is newer.
-- **CRITICAL: a BI tool is supported when this session serves `create_bi_container` and its
-  `type` list names the tool** (`tableau`, `looker` — also for `looker-git-clone` — or `power-bi`).
-  Its connections go on a BI container, never a warehouse; the rule below does not apply to them.
-  Without `create_bi_container`, hand the BI tool off to the UI.
-- **CRITICAL: a connection type that is not itself a warehouse `type` is settled by the API, not
-  by you.** The tools do not publish which warehouse type a connection type maps to, and several
-  connection types share one. So such a type counts as supported only when one of these shows it:
-  - an existing connection of that type in this account (`list_connections` returns
-    `connection_type`), whose warehouse type is then known; or
-  - the Monte Carlo docs page for that integration, read in this session, saying it connects
-    through a collection agent with self-hosted credentials.
-
-  Otherwise tell the customer support is unconfirmed. When the route **reuses** an existing
-  deployment, it can proceed: `create_warehouse(connection_type=<type>)` refuses a type it cannot
-  map and creates nothing, so that call is the check; on a refusal, hand off to the UI. When the
-  route needs a **new** deployment or agent, NEVER provision it for an unconfirmed type; offer the
-  UI instead. NEVER create a warehouse or connection only to probe support.
+- **CRITICAL: discover types from `list_connection_types` in this session, NEVER from memory or
+  from examples in these references.** It lists every type the account can connect, with where
+  its credentials can be kept. A type it does not list cannot be connected through these tools.
+- **CRITICAL: `parent` says what the connection goes on.** A `warehouse` type goes on a warehouse
+  of its `warehouse_type`; when `warehouse_type` is null (such as `dbt-cloud-webhook`), on an
+  existing warehouse of any type, and never a new one. A `bi_container` type (`tableau`,
+  `looker`, `looker-git-clone`, `power-bi`) goes on a BI container of its `bi_container_type`,
+  never a warehouse. A BI type is supported only when this session also serves
+  `create_bi_container`; otherwise hand it off to the UI. An `etl_container` type that is not a custom connector (not `is_custom`, not
+  `custom-etl-connector`) is handed off to the UI; a custom ETL connector follows SKILL.md
+  *Custom connectors*.
 - **CRITICAL: the options above are the whole menu.** Offer them in customer language (for
   example "a file on your machine that a command you run reads", "a secret in your AWS Secrets
   Manager, by its name or ARN"). NEVER offer, accept or suggest typing a password, key or token
@@ -290,7 +281,7 @@ built-in type.
 - Asking about deployments or credentials before checking the integration is supported, then
   discovering after an agent is provisioned that the type is UI-only on the chosen route.
 - Telling the customer a type is unsupported (or supported) from memory instead of from this
-  session's `create_warehouse` schema and managed credential tools.
+  session's `list_connection_types`.
 - Writing a managed secret as a literal CLI value instead of `@<path>` or `--<field>-prompt`.
 - Creating one deployment per integration when several fit the same one.
 - Planning a warehouse for Tableau, Looker or Power BI. They go on a BI container.
@@ -307,7 +298,7 @@ built-in type.
   connection: it has no deployment and nothing to validate.
 - Minting a push-only connector's ingestion key for a different container, or unscoped: a push
   with it is refused for that container.
-- Planning `create_warehouse(connection_type=…)` for a custom warehouse type: it is refused. Send
+- Sending a custom warehouse type's own name as the warehouse `type`: send
   `type="custom-integration"` instead.
 - Naming an environment variable for custom connector credentials without the `MCD_` prefix.
 - Treating a failed **Tables** check on a database the customer just created as missing grants:

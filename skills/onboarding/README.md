@@ -25,8 +25,9 @@ other supported platform, the skill:
    cloud-native inbound agents from the outbound Generic Agent (Docker/Kubernetes, preview).
    PrivateLink may support direct Cloud or an agent's connection to the integration; support
    depends on the integration, cloud and region, and the customer's origin policy still applies.
-4. References self-hosted credentials or hands over a local CLI/Terraform step for Monte
-   Carlo-managed credentials (a Snowflake key pair, for example). **No secret passes through chat.** See *How credentials are handled*.
+4. References self-hosted credentials. For Monte Carlo-managed credentials whose create carries a
+   secret (a Snowflake key pair, for example), hands over a local CLI/Terraform step. **No secret
+   passes through chat.** See *How credentials are handled*.
 5. Reconciles the intended warehouse or BI container and the connection before creating
    anything missing. A Looker API and a LookML repository connection share one Looker container.
    A custom connector goes on its agent's deployment: a custom ETL or BI container, or a
@@ -52,13 +53,10 @@ only the non-secret result. The assistant never runs it for you, even when it ha
 you gave it the file's path. Ask for Terraform or an SDK script for the whole onboarding instead,
 if you prefer.
 
-Supported integrations are read from the tools in your session rather than listed in the skill:
-the `create_warehouse` schema (plus existing connections or the integration's docs page, for a
-connection type that is not itself a warehouse type) for integrations connected through a
-collection agent, `create_bi_container`'s type list for BI tools, and the
-Monte Carlo-managed credential tools (or `montecarlo credentials create --help`) for credentials
-Monte Carlo stores. A type in neither is handed off to the UI. Sample storage choices do not relocate metadata, metrics
-or query logs from Monte Carlo.
+Supported integrations are read from `list_connection_types` in your session rather than listed
+in the skill. For each type it says where the credentials can be kept and what the connection
+goes on. A type it does not list is handed off to the UI. Sample storage choices do not relocate
+metadata, metrics or query logs from Monte Carlo.
 
 ## How credentials are handled
 
@@ -71,14 +69,16 @@ systems in between. So the skill works with credentials in one of two ways:
   Manager, GCP Secret Manager, Azure Key Vault, an environment variable or a file on the agent.
   The skill passes only the reference (secret name, ARN, vault, variable name or path), and the
   agent reads the value at query time.
-- **Run a local step.** Credentials Monte Carlo must hold, such as a Snowflake key pair or a
-  generic agent token, are created by a CLI command or a Terraform resource that the skill writes
-  for you. You run it on your machine; it reads the secret from a file and sends it to Monte
+- **Run a local step.** Credentials Monte Carlo must hold and whose create carries a secret,
+  such as a Snowflake key pair or a generic agent token, are created by a CLI command or a
+  Terraform resource that the skill writes for you. You run it on your machine; it reads the secret from a file and sends it to Monte
   Carlo directly, and you give back only the resulting id. Terraform takes a secret you supply,
   such as the key pair, as a write-only argument (Terraform 1.11 or later), so it is never stored
   in state or a plan. A secret Monte Carlo generates, such as the agent token, is returned once and
   stays in that resource's state, so keep state encrypted and access-limited.
 
+A Monte Carlo-managed create that sends no secret, such as Glue or Athena, is an MCP tool.
+Credentials are read and deleted with `get_credentials` and `delete_credentials`, by id.
 The operations this rules out as MCP tools are listed under *Not yet*. If you paste a secret into
 the chat anyway, the skill stops, asks you to rotate it, and continues with one of the paths above.
 
@@ -122,8 +122,8 @@ connection for the intended account. The workflow requires no particular assista
 ## Not yet
 
 - **Azure and GCP agent/data-store registration, generic agent credentials, Monte Carlo-managed
-  credentials (such as the Snowflake key pair, or Tableau, Looker and Power BI credentials), and
-  ingestion keys.**
+  credentials whose create carries a secret (such as the Snowflake key pair, or Tableau, Looker
+  and Power BI credentials), and ingestion keys.**
   Their requests or responses carry a secret, so they are CLI/Terraform steps rather than MCP
   tools, by design (see *How credentials are handled*).
 
