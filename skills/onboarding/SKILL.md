@@ -193,10 +193,9 @@ credential questions; they come after the target is known.
 
 Several integrations can be onboarded in one run. For each one requested:
 
-- **Check support first**, from the tool schemas in this session as the connection-inputs
-  support section describes, before
-  any other question about it. When the integration cannot be connected through these tools on
-  any deployment, or only through the UI on the one the customer wants, say so now and offer the
+- **Check support first**, from `list_connection_types` as the connection-inputs support
+  section describes, before any other question about it. When the integration cannot be
+  connected through these tools on any deployment, or only through the UI on the one the customer wants, say so now and offer the
   UI handoff or a route that is supported; do not provision anything for it. When
   `list_connection_types` marks the type `is_custom`, or the customer names their own connector,
   follow *Custom connectors* instead of Steps 1 to 5.
@@ -359,8 +358,9 @@ Otherwise the deployment from Step 1 decides what is possible:
   agent reads the secret at query time, so its role or identity needs read access to that secret.
 - **Hosted cloud node or data-store deployment** → nothing on the customer's side can be read, so
   the credentials are Monte Carlo managed. Through the v2 API that is a managed type, discovered
-  as the connection-inputs support section describes (CLI or Terraform step, last row below). A
-  type that is not managed is onboarded in the UI on these deployments. Hand off with the selected deployment and any existing IDs; do not
+  as the connection-inputs support section describes: the type's
+  `mc_managed_credentials_operation`, an MCP tool when `mc_managed_credentials_secret` is false,
+  otherwise a CLI or Terraform step (the two managed rows below). A type that is not managed is onboarded in the UI on these deployments. Hand off with the selected deployment and any existing IDs; do not
   create an empty warehouse until its reuse in that UI flow is established.
 
 Use the credential policy already resolved in Step 1; ask only for the missing reference or
@@ -447,11 +447,10 @@ connection (to a new agent, to Terraform, to a data store), note that the old co
 removed once the new one has collected, and name it. Removing it follows the rule below on how an
 existing resource was created.
 
-If none represents the target, `create_warehouse(name, deployment_id, type=<warehouse type>)` or
-`create_warehouse(name, deployment_id, connection_type=<connection type>)`. Send exactly one of
-`type` / `connection_type`; names are unique per type. For a connection type that is not itself a
-warehouse type, send `connection_type`: a refusal means the API cannot map it, nothing was
-created, and the integration is handed off to the UI (connection-inputs support section). Carry and record the `warehouse_id`.
+If none represents the target, `create_warehouse(name, deployment_id,
+type=<the type's warehouse_type from list_connection_types>)`; names are unique per type. A type
+whose `warehouse_type` is null (such as `dbt-cloud-webhook`) goes on an existing warehouse of any
+type: do not create a warehouse for it. Carry and record the `warehouse_id`.
 
 ### 3b. The BI container
 

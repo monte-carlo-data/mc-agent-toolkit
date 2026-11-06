@@ -55,11 +55,13 @@ so this section says how to discover them; it does not list them.
   from examples in these references.** It lists every type the account can connect, with where
   its credentials can be kept. A type it does not list cannot be connected through these tools.
 - **CRITICAL: `parent` says what the connection goes on.** A `warehouse` type goes on a warehouse
-  of its `warehouse_type`. A `bi_container` type (`tableau`, `looker`, `looker-git-clone`,
-  `power-bi`) goes on a BI container of its `bi_container_type`, never a warehouse, and an
-  `etl_container` type on an ETL container of its `etl_container_type`. A BI or ETL type is
-  supported only when this session also serves `create_bi_container` or `create_etl_container`;
-  otherwise hand it off to the UI.
+  of its `warehouse_type`; when `warehouse_type` is null (such as `dbt-cloud-webhook`), on an
+  existing warehouse of any type, and never a new one. A `bi_container` type (`tableau`,
+  `looker`, `looker-git-clone`, `power-bi`) goes on a BI container of its `bi_container_type`,
+  never a warehouse. A BI type is supported only when this session also serves
+  `create_bi_container`; otherwise hand it off to the UI. An `etl_container` type that is not a custom connector (not `is_custom`, not
+  `custom-etl-connector`) is handed off to the UI; a custom ETL connector follows SKILL.md
+  *Custom connectors*.
 - **CRITICAL: the options above are the whole menu.** Offer them in customer language (for
   example "a file on your machine that a command you run reads", "a secret in your AWS Secrets
   Manager, by its name or ARN"). NEVER offer, accept or suggest typing a password, key or token
@@ -279,7 +281,7 @@ built-in type.
 - Asking about deployments or credentials before checking the integration is supported, then
   discovering after an agent is provisioned that the type is UI-only on the chosen route.
 - Telling the customer a type is unsupported (or supported) from memory instead of from this
-  session's `create_warehouse` schema and managed credential tools.
+  session's `list_connection_types`.
 - Writing a managed secret as a literal CLI value instead of `@<path>` or `--<field>-prompt`.
 - Creating one deployment per integration when several fit the same one.
 - Planning a warehouse for Tableau, Looker or Power BI. They go on a BI container.
@@ -296,7 +298,7 @@ built-in type.
   connection: it has no deployment and nothing to validate.
 - Minting a push-only connector's ingestion key for a different container, or unscoped: a push
   with it is refused for that container.
-- Planning `create_warehouse(connection_type=…)` for a custom warehouse type: it is refused. Send
+- Sending a custom warehouse type's own name as the warehouse `type`: send
   `type="custom-integration"` instead.
 - Naming an environment variable for custom connector credentials without the `MCD_` prefix.
 - Treating a failed **Tables** check on a database the customer just created as missing grants:

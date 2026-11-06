@@ -10,8 +10,9 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Changed
 
 - onboarding: credentials of any kind are read with `get_credentials` and deleted with `delete_credentials`, by id. The MCP server no longer serves the per-type `get_<type>_credentials` and `delete_<type>_credentials` tools.
-- onboarding: supported types come from `list_connection_types`. A type can use a self-hosted reference when it lists stores in `self_hosted_credentials_storages`, and Monte Carlo can store its credentials when it has an `mc_managed_credentials_operation`. That create is an MCP tool when `mc_managed_credentials_secret` is false (Glue, Athena, Airflow), and a CLI or Terraform step otherwise. `parent` and `warehouse_type` say what the connection goes on, which replaces the rule that settled a non-warehouse type from existing connections, the docs or a `create_warehouse` refusal.
-- Live evals updated to match. `unmapped-connection-type-settled-by-api` is now `connection-type-mapped-from-list`.
+- onboarding: supported types come from `list_connection_types`. A type can use a self-hosted reference when it lists stores in `self_hosted_credentials_storages`, and Monte Carlo can store its credentials when it has an `mc_managed_credentials_operation`. That create is an MCP tool when `mc_managed_credentials_secret` is false (Glue, Athena), and a CLI or Terraform step otherwise. `parent` and `warehouse_type` say what the connection goes on, which replaces the rule that settled a non-warehouse type from existing connections, the docs or a `create_warehouse` refusal.
+- onboarding: built-in ETL tools such as Fivetran and Airflow are handed off to the UI.
+- onboarding: live evals updated to match; `unmapped-connection-type-settled-by-api` is now `connection-type-mapped-from-list`, and a new case covers a Glue connection planned with `create_glue_credentials`.
 
 ## [1.29.6] - 2026-11-06
 
