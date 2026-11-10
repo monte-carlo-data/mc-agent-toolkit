@@ -1,6 +1,10 @@
 ---
 name: monte-carlo-remediation
 description: Investigate and remediate data quality alerts using Monte Carlo MCP tools. Runs root cause analysis, assesses blast radius, discovers available tools (MCP/CLI/API), proposes and executes fixes, or escalates with full context when uncertain.
+when_to_use: |
+  Invoke when the user wants an alert fixed or wants to know the fix: "how do I fix this alert", "what's the fix for alert <id>", "remediate this", "handle this incident".
+  Reads Monte Carlo's existing troubleshooting analysis and remediation plan before doing any work itself.
+  Do NOT invoke for triage alone, monitor creation, or pre-change impact checks (use the prevent skill).
 bucket: Incident Response
 version: 1.0.0
 ---
@@ -107,6 +111,19 @@ This returns `incident_likelihood` (HIGH/MEDIUM/LOW), `alert_impact` (HIGH/MEDIU
 - **LOW impact or LOW incident likelihood** → still run TSA, but note to the user that this may not warrant immediate remediation
 
 #### Step 3: Root cause analysis (TSA)
+
+**Check for an existing analysis first.** The Troubleshooting Agent may already have analyzed
+this alert, from the UI, from Slack, or from an earlier session:
+
+```
+get_troubleshooting_agent_results(
+  incident_id="<alert_uuid>"
+)
+```
+
+- `success` → reuse it: read the `tldr` and verifications below, and do not start a new run.
+- `running` → poll it as described below; do not start a second run.
+- `not_found` or `failed` → start a run.
 
 **Always use async mode.** TSA analysis takes 4–8 minutes — sync mode will time out.
 
@@ -262,9 +279,37 @@ When no tool (MCP, CLI, or API) is available for a needed action:
 
 Read `references/patterns.md` for detailed examples of common remediation patterns.
 
-#### Step 1: Select remediation action
+#### Step 1: Get the remediation plan
 
-Based on the TSA root cause and available tools, determine the action:
+Once the troubleshooting analysis has succeeded, Monte Carlo's remediation agent has normally
+already written a plan for the alert. Read it before choosing an action yourself:
+
+```
+get_remediation_instructions(
+  alert_id="<alert_uuid>"
+)
+```
+
+Act on its `status` when there is no plan:
+
+- `plan_in_progress` → wait a few seconds and call again.
+- `troubleshooting_required` / `troubleshooting_in_progress` → finish Step 3 of Workflow 1 first.
+- `plan_unavailable` → use the fallback table below.
+
+When a plan comes back, show the user its `title` and `summary`, then follow its
+`destinations` (primary first). When there is more than one, the brief opens with a
+`## Decide` section: run that check to pick the branch.
+
+| Destination | What to do |
+| --- | --- |
+| `coding_agent` | Carry out the `instructions` brief yourself, with the safety rails in Step 3. Cite `reference_uuid` in any pull request you open. |
+| `monitor_tuning` | The alert is monitor noise. Show the `tuning` recommendations as given, with every `would_reset` warning. After the user approves, apply them with `tune_monitor(monitor_uuid=..., dry_run=false, recommendations=[<approved subset>])`. If the monitor was edited after `tuning.analyzed_at`, preview again with `tune_monitor` first. |
+| `alert_closure` | Offer to close the alert with the plan's explanation (Workflow 4). |
+| `human_owner` | Present the brief and escalate. It says who should act and why. |
+
+Use the plan's `instructions` as the remediation plan you present in Step 2.
+
+**Fallback (no plan):** based on the TSA root cause and available tools, determine the action:
 
 | Root Cause Signal (from TSA) | Typical Remediation | Required Capability |
 | ---------------------------- | ------------------- | ------------------- |
