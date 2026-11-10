@@ -87,10 +87,15 @@ Present results in this structure:
 
 ### Active Alerts
 
-| Date  | Type           | Priority | Status           | Link                                                    |
-|-------|----------------|----------|------------------|---------------------------------------------------------|
-| Apr 8 | Metric anomaly | P3       | Not acknowledged | {MC_WEBAPP_URL}/alerts/{alert_uuid} |
-| Apr 7 | Freshness      | P2       | Acknowledged     | {MC_WEBAPP_URL}/alerts/{alert_uuid} |
+| Date  | Type           | Priority | Triage           | Status           | Link                                                    |
+|-------|----------------|----------|------------------|------------------|---------------------------------------------------------|
+| Apr 8 | Metric anomaly | P3       | HIGH             | Not acknowledged | {MC_WEBAPP_URL}/alerts/{alert_uuid} |
+| Apr 7 | Freshness      | P2       | Not triaged      | Acknowledged     | {MC_WEBAPP_URL}/alerts/{alert_uuid} |
+
+**Triage** is Monte Carlo's triage verdict on the alert, from `get_alerts` → `triage_priority`
+(`HIGH` / `MEDIUM` / `LOW`). Show "Not triaged" when it is absent. It comes from the same
+`get_alerts` call, so it needs no extra tool. When an alert has a `triage_result.triage_summary`,
+use it in the Diagnosis.
 
 If there are more than 5 active alerts, display only 5. Do NOT put the overflow
 message inside the table as a row. Instead, put it as plain text on the line
