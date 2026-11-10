@@ -1,18 +1,20 @@
 ---
 name: tune-monitor
-description: Analyze a Monte Carlo monitor and recommend config changes to reduce alert noise. Supports metric, custom SQL, validation, table, and agent (metric, evaluation, trajectory, validation) monitors. Fetches the report, identifies patterns, and suggests tuning.
+description: Tune noisy Monte Carlo monitors, or find which ones to tune. Starts from Monte Carlo's tuning agent (stored suggestions or a fresh preview), applies only what the user approves. Metric, SQL, validation, table and agent monitors.
 when_to_use: |
-  Invoke when the user wants to tune, reduce noise on, or adjust sensitivity for a Monte Carlo monitor.
-  Example triggers: "tune monitor <uuid>", "this monitor is too noisy", "reduce alerts on this monitor", "adjust sensitivity for <uuid>".
+  Invoke when the user wants to tune, reduce noise on, or adjust sensitivity for a Monte Carlo monitor, or asks which monitors to tune.
+  Example triggers: "tune monitor <uuid>", "this monitor is too noisy", "reduce alerts on this monitor", "adjust sensitivity for <uuid>", "which monitors should I tune?", "my monitors are noisy".
 bucket: Monitoring
 version: 1.1.1
 ---
 
 # Tune Monitor: Noise Reduction Analysis
 
-You are a Monte Carlo monitor tuning agent. Your job is to fetch a monitor's report, dump it to
-a file for reference, analyze the alert patterns, and recommend concrete configuration changes to
-reduce noise without sacrificing real signal.
+Monte Carlo runs a monitor tuning agent. It analyzes noisy monitors in the background and stores
+its recommendations, and it can analyze any supported monitor on request. Your job is to bring
+that analysis to the user, explain it, and apply only the changes they approve. Do your own
+analysis of the monitor's report only when the tuning agent cannot analyze the monitor
+(Phases 1–4 below are that fallback).
 
 > **Monte Carlo tool routing (required):** Always call Monte Carlo MCP tools through this plugin's
 > bundled server, whose fully-qualified tool names are
@@ -48,6 +50,8 @@ them:
 
 | Tool | Purpose |
 |---|---|
+| `get_monitor_tuning_suggestions` | Read the tuning agent's stored analysis: no arguments for the account-wide list of monitors with a pending suggestion, `monitor_uuid` for one monitor's full recommendations (Phase 0.5) |
+| `tune_monitor` | Ask the tuning agent for a fresh analysis (`dry_run=true`, the default), or apply approved recommendations (`dry_run=false`, Phase 5) |
 | `get_monitor_report` | Fetch a monitor's alert history, incident details, and troubleshooting summaries |
 | `get_monitors` | Fetch monitor configuration (type, thresholds, schedule, segments) |
 | `create_or_update_metric_monitor` | Update a metric monitor in place (pass `monitor_uuid`; used in Phase 5) |
@@ -63,18 +67,57 @@ All the `create_or_update_*` tools follow a **two-call preview-then-confirm patt
 
 ---
 
-## Phase 0: Validate Input
+## Phase 0: Find the monitor
 
-Extract the monitor UUID from `$ARGUMENTS`. It must be a valid UUID (format:
-`xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`).
+Look for a monitor UUID in `$ARGUMENTS` or the conversation (format:
+`xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`; an alert from `get_alerts` lists its monitors in
+`monitor_uuids`).
 
-If no UUID is provided or it doesn't look like a UUID, stop and tell the user:
-
-> Please provide a monitor UUID. Example: `/tune-monitor 94c2dd3a-ef49-40f8-b1c1-741ba057cabf`
+**No monitor named** ("which monitors should I tune?", "my monitors are noisy"): call
+`get_monitor_tuning_suggestions` with no arguments. It lists the monitors Monte Carlo has flagged
+as noisy, each with a pending suggestion. Present them as markdown links (text = monitor name,
+destination = `monitor_url`) with their alert counts and recommendation titles, and ask which one
+to go through. The titles are Monte Carlo's, not yours: don't write them up as recommendations
+and don't add your own. When the list is empty, say nothing is pending and offer to analyze a
+specific monitor. Continue at Phase 0.5 once the user picks one.
 
 ---
 
-## Phase 1: Fetch Monitor Report
+## Phase 0.5: Start from the tuning agent
+
+Call `get_monitor_tuning_suggestions(monitor_uuid=<uuid>)`.
+
+- **Recommendations returned:** present them (Phase 4.5). Say whether `source` is Monte Carlo's
+  background analysis or a preview the user ran. If `changes_applied_since` is not empty, someone
+  retuned the monitor after the analysis: say so, and call `tune_monitor(monitor_uuid=<uuid>)`
+  for a fresh preview instead of presenting stale recommendations.
+- **No recommendations on record:** call `tune_monitor(monitor_uuid=<uuid>)`. It defaults to
+  `dry_run=true`, so it only previews. It can take a minute or two.
+- **`tune_monitor` returns recommendations:** present them (Phase 4.5).
+- **`tune_monitor` returns `skip_reason`, or fails:** an empty list does not mean the monitor is
+  well tuned. Relay `skip_reason` as given, then fall back to your own analysis (Phases 1–4).
+  Do not call `tune_monitor` again until its cause is fixed.
+
+Either way, skip Phases 1–4 when the tuning agent produced recommendations.
+
+### Phase 4.5: Present the tuning agent's recommendations
+
+For each recommendation, show its title, reasoning and change summary, and the affected asset
+for table monitors. Flag every `would_reset: true`: applying it resets the monitor's learned
+thresholds, and it relearns from scratch. A recommendation whose `recommendation_type` is
+`advisory` is a note to relay, not a change to apply. If `is_template_managed` is true, the
+monitor is deployed with Monitors-as-Code: show the recommendations but do not offer to apply
+them (see Phase 5).
+
+**Next step:** "Which of these do you want me to apply?" Nothing is applied until the user names
+the changes.
+
+---
+
+## Phase 1: Fetch Monitor Report (fallback)
+
+Phases 1–4 run only when Phase 0.5 produced no recommendations (`skip_reason` set, or the tuning
+agent failed).
 
 Call `get_monitor_report` with:
 - `monitor_uuid`: the UUID from `$ARGUMENTS`
@@ -279,8 +322,16 @@ history further?" When nothing is recommended, offer only the alert-history expl
 
 ## Phase 5: Apply Changes (if user requests)
 
-To apply changes, follow the apply-changes instructions in the per-type reference loaded in
-Phase 1.5. Each reference specifies the correct tool and constraints for that monitor type.
+**Tuning agent recommendations (from Phase 0.5):** call
+`tune_monitor(monitor_uuid=<uuid>, dry_run=false, recommendations=[<the approved subset>])`.
+Pass the approved recommendations back exactly as returned. Leaving `recommendations` out
+re-analyzes the monitor and applies whatever that finds, which is not what the user approved.
+Report `apply_result`. For a monitor with `is_template_managed: true`, do not call `tune_monitor`:
+hand off to the manage-mac skill so the user edits their Monitors-as-Code YAML.
+
+**Your own recommendations (from the Phases 1–4 fallback):** follow the apply-changes
+instructions in the per-type reference loaded in Phase 1.5. Each reference specifies the correct
+tool and constraints for that monitor type.
 
 General rules for all types:
 1. **Always preview first** — show the user what will change before applying.
