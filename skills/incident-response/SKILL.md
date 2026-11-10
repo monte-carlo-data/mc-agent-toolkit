@@ -54,6 +54,25 @@ Step 3: Remediation — fix or escalate
 Step 4 (optional): Prevent Recurrence — add monitoring
 ```
 
+### Read what is already known
+
+When the user names an alert, or it is clear which alert they mean, first read what Monte
+Carlo's agents already found. Do this before choosing an entry point:
+
+1. The triage verdict, from that alert's `get_alerts` fields `triage_priority` and
+   `triage_result` (no extra call).
+2. `get_troubleshooting_agent_results(incident_id=...)`: an existing root cause.
+3. If that succeeded, `get_remediation_instructions(alert_id=...)`: the recommended fix.
+
+Do not call `triage_alert` or `run_troubleshooting_agent` before these reads. Full order,
+empty-result handling, tuning and teammate activity: `references/prior-agent-work.md`.
+
+Then use what you found:
+
+- A root cause and plan exist → report them and go to **Step 3: Remediation**.
+- A root cause exists, with no plan → report it and offer Step 3.
+- Nothing exists yet → continue with the entry point below.
+
 ### Determine entry point
 
 Before starting, determine which step to enter based on the user's context:
