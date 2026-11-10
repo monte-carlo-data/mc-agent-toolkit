@@ -13,7 +13,7 @@ Credentials are returned oldest first. Each entry says what connection type it i
 where its secret lives. Get one by id to see the other fields of its kind.
 
 - **Effect:** read-only.
-- **Pairs with:** `create_airflow_credentials`, `create_athena_credentials`, `validate_athena_credentials`, `validate_athena_credentials_change`, `create_glue_credentials`, `validate_glue_credentials`, `validate_glue_credentials_change`, `create_aws_secrets_manager_credentials`, `validate_aws_secrets_manager_credentials`, `validate_aws_secrets_manager_credentials_change`, `create_azure_key_vault_credentials`, `validate_azure_key_vault_credentials`, `validate_azure_key_vault_credentials_change`, `create_env_var_credentials`, `validate_env_var_credentials`, `validate_env_var_credentials_change`, `create_file_credentials`, `validate_file_credentials`, `validate_file_credentials_change`, `create_gcp_secret_manager_credentials`, `validate_gcp_secret_manager_credentials`, `validate_gcp_secret_manager_credentials_change`, `get_credentials`.
+- **Pairs with:** `create_airflow_credentials`, `create_athena_credentials`, `validate_athena_credentials`, `validate_athena_credentials_change`, `create_glue_credentials`, `validate_glue_credentials`, `validate_glue_credentials_change`, `create_hive_s3_credentials`, `create_s3_credentials`, `create_aws_secrets_manager_credentials`, `validate_aws_secrets_manager_credentials`, `validate_aws_secrets_manager_credentials_change`, `create_azure_key_vault_credentials`, `validate_azure_key_vault_credentials`, `validate_azure_key_vault_credentials_change`, `create_env_var_credentials`, `validate_env_var_credentials`, `validate_env_var_credentials_change`, `create_file_credentials`, `validate_file_credentials`, `validate_file_credentials_change`, `create_gcp_secret_manager_credentials`, `validate_gcp_secret_manager_credentials`, `validate_gcp_secret_manager_credentials_change`, `get_credentials`.
 - **Paging:** one page per call; pass `next_cursor` back as `cursor` for the next page.
 
 ### Arguments
@@ -461,6 +461,168 @@ Returns the accepted request as-is. Response fields: id, status, revision, targe
 - The request was authenticated, but the caller is not allowed to perform this operation. Read `code` to tell the reasons apart: `account_frozen` means the account is paused, rather than that the caller lacks permission.
 - The credentials does not exist, or is not visible to the caller.
 - The change conflicts with the current state of the credentials.
+- An argument is invalid; the error names the field.
+- Monte Carlo is busy or temporarily unavailable; the tool retries once after the wait Monte Carlo asks for.
+- An unexpected error prevented the request from being processed.
+
+## `create_hive_s3_credentials`: Create Hive (S3) credentials
+
+Store the S3 location of Hive query logs from EMR and the IAM role Monte Carlo assumes to read them, as credentials for a hive-s3 connection. Takes `bucket`, `prefix` (the key prefix, not empty) and `assumable_role`, the ARN of a role in the customer's AWS account that the deployment assumes to read the bucket, plus `external_id` when the role's trust policy requires one. Hive (S3) needs no secret. Then call create_connection on a data-lake warehouse. Refused once the account holds its limit of credentials.
+
+- **Effect:** creates; repeating it creates again.
+- **Pairs with:** `update_hive_s3_credentials`, `list_credentials`.
+
+### Arguments
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `assumable_role` | `str` | yes | ARN of the IAM role in your AWS account that the deployment assumes. Between 1 and 2048 characters. |
+| `bucket` | `str` | yes | S3 bucket Monte Carlo reads from. Between 3 and 255 characters. |
+| `prefix` | `str` | yes | Key prefix of the EMR log root, such as `emr/prod`. Leave out the bucket, a leading `/` and any `s3://` scheme. Send an empty string when the cluster's EMR log URI is the bucket root. Monte Carlo reads each cluster's Hive logs under `<prefix>/<cluster-id>/node/<instance-id>/applications/hive/`. Up to 1024 characters. |
+| `external_id` | `str` | no | External id your role's trust policy requires, if it requires one. It is not the deployment's `aws_external_id`. Between 1 and 1224 characters. |
+
+### Response
+
+Returns the new credentials. Response fields: id, connection_type, storage_type, created_time, assumable_role, external_id, bucket, prefix.
+
+| Field | Description |
+|---|---|
+| `id` | Unique identifier of the credentials. |
+| `connection_type` | The connection type the credentials are for, such as `snowflake`. Fixed once created. |
+| `storage_type` | Where the secret lives. Fixed once created. |
+| `created_time` | When the credentials were created. |
+| `assumable_role` | ARN of the IAM role in your AWS account that the deployment assumes. |
+| `external_id` | External id your role's trust policy requires, if it requires one. It is not the deployment's `aws_external_id`. Null unless set. |
+| `bucket` | S3 bucket Monte Carlo reads from. |
+| `prefix` | Key prefix the objects sit under, such as `emr/prod`. Leave out the bucket, a leading `/` and any `s3://` scheme. |
+
+### What can fail
+
+- Authentication credentials are missing or invalid.
+- The request was authenticated, but the caller is not allowed to perform this operation. Read `code` to tell the reasons apart: `account_frozen` means the account is paused, rather than that the caller lacks permission.
+- The change conflicts with the current state of the credentials.
+- An argument is invalid; the error names the field.
+- Monte Carlo is busy or temporarily unavailable; the tool retries once after the wait Monte Carlo asks for.
+- An unexpected error prevented the request from being processed.
+
+## `update_hive_s3_credentials`: Update Hive (S3) credentials
+
+Change Hive (S3) credentials. Every connection using them picks up the change. `external_id` set to null is cleared. `bucket`, `prefix` and `assumable_role` cannot be cleared. An empty body returns them unchanged.
+
+- **Effect:** updates in place; idempotent.
+- **Pairs with:** `create_hive_s3_credentials`, `list_credentials`.
+
+### Arguments
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `credentials_id` | `str` | yes | Id of the credentials, as returned when they are created or listed. |
+| `assumable_role` | `str` | no | ARN of the IAM role in your AWS account that the deployment assumes. Between 1 and 2048 characters. |
+| `external_id` | `str` | no | External id your role's trust policy requires, if it requires one. It is not the deployment's `aws_external_id`. Between 1 and 1224 characters. |
+| `bucket` | `str` | no | S3 bucket Monte Carlo reads from. Between 3 and 255 characters. |
+| `prefix` | `str` | no | Key prefix of the EMR log root, such as `emr/prod`. Leave out the bucket, a leading `/` and any `s3://` scheme. Send an empty string when the cluster's EMR log URI is the bucket root. Monte Carlo reads each cluster's Hive logs under `<prefix>/<cluster-id>/node/<instance-id>/applications/hive/`. Up to 1024 characters. |
+
+### Response
+
+Returns the credentials after the change. Response fields: id, connection_type, storage_type, created_time, assumable_role, external_id, bucket, prefix.
+
+| Field | Description |
+|---|---|
+| `id` | Unique identifier of the credentials. |
+| `connection_type` | The connection type the credentials are for, such as `snowflake`. Fixed once created. |
+| `storage_type` | Where the secret lives. Fixed once created. |
+| `created_time` | When the credentials were created. |
+| `assumable_role` | ARN of the IAM role in your AWS account that the deployment assumes. |
+| `external_id` | External id your role's trust policy requires, if it requires one. It is not the deployment's `aws_external_id`. Null unless set. |
+| `bucket` | S3 bucket Monte Carlo reads from. |
+| `prefix` | Key prefix the objects sit under, such as `emr/prod`. Leave out the bucket, a leading `/` and any `s3://` scheme. |
+
+### What can fail
+
+- Authentication credentials are missing or invalid.
+- The request was authenticated, but the caller is not allowed to perform this operation. Read `code` to tell the reasons apart: `account_frozen` means the account is paused, rather than that the caller lacks permission.
+- The credentials does not exist, or is not visible to the caller.
+- An argument is invalid; the error names the field.
+- Monte Carlo is busy or temporarily unavailable; the tool retries once after the wait Monte Carlo asks for.
+- An unexpected error prevented the request from being processed.
+
+## `create_s3_credentials`: Create S3 credentials
+
+Store an S3 location and the IAM role Monte Carlo assumes to read it, as credentials for an s3 connection. Takes `bucket`, `prefix` (the key prefix, not empty) and `assumable_role`, the ARN of a role in the customer's AWS account that the deployment assumes to read the bucket, plus `external_id` when the role's trust policy requires one. S3 needs no secret. Then call create_connection on a data-lake warehouse. An s3 connection runs no jobs on its own. Refused once the account holds its limit of credentials.
+
+- **Effect:** creates; repeating it creates again.
+- **Pairs with:** `update_s3_credentials`, `list_credentials`.
+
+### Arguments
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `assumable_role` | `str` | yes | ARN of the IAM role in your AWS account that the deployment assumes. Between 1 and 2048 characters. |
+| `bucket` | `str` | yes | S3 bucket Monte Carlo reads from. Between 3 and 255 characters. |
+| `prefix` | `str` | yes | Key prefix the objects sit under, such as `emr/prod`. Leave out the bucket, a leading `/` and any `s3://` scheme. Between 1 and 1024 characters. |
+| `external_id` | `str` | no | External id your role's trust policy requires, if it requires one. It is not the deployment's `aws_external_id`. Between 1 and 1224 characters. |
+
+### Response
+
+Returns the new credentials. Response fields: id, connection_type, storage_type, created_time, assumable_role, external_id, bucket, prefix.
+
+| Field | Description |
+|---|---|
+| `id` | Unique identifier of the credentials. |
+| `connection_type` | The connection type the credentials are for, such as `snowflake`. Fixed once created. |
+| `storage_type` | Where the secret lives. Fixed once created. |
+| `created_time` | When the credentials were created. |
+| `assumable_role` | ARN of the IAM role in your AWS account that the deployment assumes. |
+| `external_id` | External id your role's trust policy requires, if it requires one. It is not the deployment's `aws_external_id`. Null unless set. |
+| `bucket` | S3 bucket Monte Carlo reads from. |
+| `prefix` | Key prefix the objects sit under, such as `emr/prod`. Leave out the bucket, a leading `/` and any `s3://` scheme. |
+
+### What can fail
+
+- Authentication credentials are missing or invalid.
+- The request was authenticated, but the caller is not allowed to perform this operation. Read `code` to tell the reasons apart: `account_frozen` means the account is paused, rather than that the caller lacks permission.
+- The change conflicts with the current state of the credentials.
+- An argument is invalid; the error names the field.
+- Monte Carlo is busy or temporarily unavailable; the tool retries once after the wait Monte Carlo asks for.
+- An unexpected error prevented the request from being processed.
+
+## `update_s3_credentials`: Update S3 credentials
+
+Change S3 credentials. Every connection using them picks up the change. `external_id` set to null is cleared. `bucket`, `prefix` and `assumable_role` cannot be cleared. An empty body returns them unchanged.
+
+- **Effect:** updates in place; idempotent.
+- **Pairs with:** `create_s3_credentials`, `list_credentials`.
+
+### Arguments
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `credentials_id` | `str` | yes | Id of the credentials, as returned when they are created or listed. |
+| `assumable_role` | `str` | no | ARN of the IAM role in your AWS account that the deployment assumes. Between 1 and 2048 characters. |
+| `external_id` | `str` | no | External id your role's trust policy requires, if it requires one. It is not the deployment's `aws_external_id`. Between 1 and 1224 characters. |
+| `bucket` | `str` | no | S3 bucket Monte Carlo reads from. Between 3 and 255 characters. |
+| `prefix` | `str` | no | Key prefix the objects sit under, such as `emr/prod`. Leave out the bucket, a leading `/` and any `s3://` scheme. Between 1 and 1024 characters. |
+
+### Response
+
+Returns the credentials after the change. Response fields: id, connection_type, storage_type, created_time, assumable_role, external_id, bucket, prefix.
+
+| Field | Description |
+|---|---|
+| `id` | Unique identifier of the credentials. |
+| `connection_type` | The connection type the credentials are for, such as `snowflake`. Fixed once created. |
+| `storage_type` | Where the secret lives. Fixed once created. |
+| `created_time` | When the credentials were created. |
+| `assumable_role` | ARN of the IAM role in your AWS account that the deployment assumes. |
+| `external_id` | External id your role's trust policy requires, if it requires one. It is not the deployment's `aws_external_id`. Null unless set. |
+| `bucket` | S3 bucket Monte Carlo reads from. |
+| `prefix` | Key prefix the objects sit under, such as `emr/prod`. Leave out the bucket, a leading `/` and any `s3://` scheme. |
+
+### What can fail
+
+- Authentication credentials are missing or invalid.
+- The request was authenticated, but the caller is not allowed to perform this operation. Read `code` to tell the reasons apart: `account_frozen` means the account is paused, rather than that the caller lacks permission.
+- The credentials does not exist, or is not visible to the caller.
 - An argument is invalid; the error names the field.
 - Monte Carlo is busy or temporarily unavailable; the tool retries once after the wait Monte Carlo asks for.
 - An unexpected error prevented the request from being processed.
