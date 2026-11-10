@@ -59,6 +59,8 @@ Before doing anything else, check whether the user's message unambiguously match
 | "Create a [monitor type] on [named table]" | `../monitoring-advisor/SKILL.md` |
 | "Investigate alert on [named table]" / "why is [named table] stale/broken?" | `../incident-response/SKILL.md` |
 | "What should I monitor?" / "where are my coverage gaps?" | `../proactive-monitoring/SKILL.md` |
+| "This monitor is noisy" / "my monitors keep firing for nothing" / "which monitors should I tune?" | `../tune-monitor/SKILL.md` |
+| "How do I fix this alert?" / "what's the fix for [alert]?" / "remediate this" | `../remediation/SKILL.md` |
 | "Instrument my agent" / "set up Monte Carlo tracing on [named framework] agent" / "setting up an agent" | `../instrument-agent/SKILL.md` |
 
 Context-detection is for **ambiguous** requests only. If the request is clear, routing through this skill wastes turns and tokens.
@@ -115,6 +117,8 @@ Based on the combined signals from Steps 1-3:
 | Coverage intent + data project detected | High | **Auto-activate** proactive monitoring workflow: read and follow `../proactive-monitoring/SKILL.md` |
 | User asks to create a specific monitor (type + table known) | High | **Auto-activate** monitoring-advisor: read and follow `../monitoring-advisor/SKILL.md` |
 | Table mentioned + "health" / "status" / "check" intent | High | **Auto-activate** asset-health: read and follow `../asset-health/SKILL.md` |
+| Monitor noise intent (noisy, too many alerts, alerts that turn out to be nothing, tune) | High | **Auto-activate** tune-monitor: read and follow `../tune-monitor/SKILL.md`. It starts from Monte Carlo's stored tuning suggestions, so no monitor needs to be named first |
+| Fix intent on an alert ("how do I fix", "what's the fix", "remediate") | High | **Auto-activate** remediation: read and follow `../remediation/SKILL.md`. It reads the existing troubleshooting analysis and remediation plan before doing any work |
 | Agent instrumentation intent (instrument / set up tracing / setting up an agent) + Python codebase context | High | **Auto-activate** instrument-agent: read and follow `../instrument-agent/SKILL.md` |
 | Ambiguous or conflicting signals | Low | **Suggest** options and wait for user to choose |
 
