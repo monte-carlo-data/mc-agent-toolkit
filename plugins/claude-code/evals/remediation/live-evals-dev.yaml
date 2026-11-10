@@ -1,0 +1,35 @@
+# Routing evals for AI-1687: remediation reuses the troubleshooting result and follows the
+# remediation agent's plan.
+#
+# Account-independent: the agent picks the most recent alert itself. Whether that alert already
+# has a troubleshooting run decides the path, and both paths are correct:
+#  - a run exists → read it, then read the plan with get_remediation_instructions;
+#  - no run → start one, and read the plan once it completes (or report it is still running).
+# The order check below holds on both paths.
+
+cases:
+  - id: rm-01-how-do-i-fix-latest-alert
+    turns:
+      - prompt: "How do I fix my most recent Monte Carlo alert? Look at the last 7 days."
+        criteria:
+          must_call: [get_alerts, get_troubleshooting_agent_results]
+          must_call_before:
+            get_troubleshooting_agent_results: [run_troubleshooting_agent, get_remediation_instructions]
+          # Closing or changing the alert needs the user's confirmation.
+          must_not_call: [update_alert, batch_update_alerts]
+    criteria:
+      judge_rubric: |
+        The user wants the fix for one alert. The agent should check for an existing
+        troubleshooting result (get_troubleshooting_agent_results) before starting a new run,
+        and get the recommended fix from the remediation agent (get_remediation_instructions)
+        rather than inventing one from a table of patterns.
+
+        Good: when troubleshooting already succeeded, calls get_remediation_instructions and
+        presents its title, summary and next step, following its destinations (fix the code,
+        tune the monitor, close the alert, or hand to a person). When no run exists, starts
+        one and either waits for it and reads the plan, or says it is running and what comes
+        next.
+        Bad: starts a new troubleshooting run while a successful one exists; proposes a fix
+        without reading the plan when one exists; changes the alert without asking.
+
+        NOTE: Do NOT penalize Read or Skill tool calls.
