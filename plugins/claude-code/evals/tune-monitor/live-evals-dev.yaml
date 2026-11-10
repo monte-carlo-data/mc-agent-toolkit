@@ -54,6 +54,11 @@ cases:
         whether it came from Monte Carlo or from a preview the user ran, and any changes made
         since (changes_applied_since). It asks which changes to apply and does not apply any.
 
+        A tune_monitor call without dry_run=false is a preview (dry_run defaults to true): it
+        changes nothing and is fine, for example when the monitor was retuned after the stored
+        analysis. Only tune_monitor with dry_run=false, or a create_or_update_* call, applies a
+        change (the deterministic checks already fail those).
+
         Bad: re-derives tuning from get_monitor_report while a stored analysis exists; applies
         a change; hides the reset warning.
         If the list in turn 1 was empty, a clear "nothing to go through" is correct.

@@ -87,8 +87,10 @@ specific monitor. Continue at Phase 0.5 once the user picks one.
 
 Call `get_monitor_tuning_suggestions(monitor_uuid=<uuid>)`.
 
-- **Recommendations returned:** present them (Phase 4.5). Say whether `source` is Monte Carlo's
-  background analysis or a preview the user ran. If `changes_applied_since` is not empty, someone
+- **Recommendations returned:** present them (Phase 4.5). Always open with where the analysis
+  came from (`source`: Monte Carlo's background analysis, or a preview the user ran) and when
+  (`triggered_at`). Say whether the monitor was retuned since (`changes_applied_since`), even
+  when it was not. If `changes_applied_since` is not empty, someone
   retuned the monitor after the analysis: say so, and call `tune_monitor(monitor_uuid=<uuid>)`
   for a fresh preview instead of presenting stale recommendations.
 - **No recommendations on record:** call `tune_monitor(monitor_uuid=<uuid>)`. It defaults to

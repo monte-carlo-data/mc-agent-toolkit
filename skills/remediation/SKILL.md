@@ -27,6 +27,18 @@ Reference files live next to this skill file. **Use the Read tool** (not MCP res
 - How to discover available tools at runtime: `references/tool-discovery.md` (relative to this file)
 - Safety rails and escalation criteria: `references/safety.md` (relative to this file)
 
+## Start from Monte Carlo's agents
+
+Monte Carlo's Troubleshooting Agent root-causes alerts, and its remediation agent turns each
+completed analysis into a fix. Read their work before doing your own:
+
+1. `get_troubleshooting_agent_results(incident_id=...)`: is there a root cause already?
+2. If it succeeded, `get_remediation_instructions(alert_id=...)`. This is the fix. Present it
+   and follow its `destinations` (Workflow 3, Step 1).
+
+Never write your own remediation options while a plan exists. Your own analysis is for the
+gaps: no completed troubleshooting, or no plan.
+
 ## When to activate this skill
 
 Activate when the user:
@@ -122,6 +134,11 @@ get_troubleshooting_agent_results(
 ```
 
 - `success` → reuse it: read the `tldr` and verifications below, and do not start a new run.
+  Then read the remediation plan right away. It is a read, and the plan already exists:
+  `get_remediation_instructions(alert_id="<alert_uuid>")` (see Workflow 3, Step 1 for its
+  statuses and destinations). Put the plan's title, summary and next step in your investigation
+  summary. If the user asked how to fix the alert, lead with it. Do not write your own fix
+  while a plan exists.
 - `running` → poll it as described below; do not start a second run.
 - `not_found` or `failed` → start a run.
 
@@ -222,6 +239,9 @@ Use `query_type="destination"` to find queries that write to this table (pipelin
 
 #### Investigation summary
 
+When TSA is new and completes here, call `get_remediation_instructions` as soon as it succeeds,
+before presenting findings. A plan is produced automatically when the analysis completes.
+
 **Wait for TSA to complete before presenting findings.** Do not present partial results — the TSA root cause analysis and its verifications section are critical for choosing the right remediation action. If TSA is still running, keep polling; gather Steps 4–6 in the meantime.
 
 After all steps are complete, synthesize your findings into a clear summary:
@@ -232,6 +252,9 @@ After all steps are complete, synthesize your findings into a clear summary:
 4. **Blast radius:** N downstream consumers, any key assets affected
 5. **Pipeline context:** which queries/jobs write to this table, when they last ran
 6. **Monitoring:** what monitors exist, any gaps. Note recurring patterns (e.g., "16 incidents in 30 days" signals a chronic issue, not a one-off)
+7. **Remediation plan:** the plan's title, summary and primary destination, from
+   `get_remediation_instructions`, or why there is none (its `status`). This is the
+   recommended fix. Do not replace it with options of your own.
 
 Present this summary to the user before proceeding to remediation.
 
