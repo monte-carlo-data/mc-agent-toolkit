@@ -7,8 +7,7 @@
 no_apply: &no_apply
   # Nothing is changed without the user's confirmation.
   tool_input_must_not_contain: ['"dry_run": false']
-  # `update_alert` is a substring of `create_or_update_alert_comment`; tune-monitor never posts comments.
-  must_not_call: [create_or_update_, mark_, update_alert, batch_update_alerts]
+  must_not_call: [create_or_update_, mark_, __update_alert, batch_update_alerts]
 
 cases:
   - id: tm-01-which-monitors-to-tune
@@ -50,8 +49,10 @@ cases:
         Turn 2: the agent fetches the stored analysis for that one monitor
         (get_monitor_tuning_suggestions with its monitor_uuid) and explains it: each
         recommendation's reasoning and change, whether it resets the monitor (would_reset),
-        whether it came from Monte Carlo or from a preview the user ran, and any changes made
-        since (changes_applied_since). It asks which changes to apply and does not apply any.
+        whether it came from Monte Carlo or from a preview the user ran, and whether it is still
+        current (the monitor is on the turn-1 list with the same run_uuid and
+        changes_applied_since is empty). If it is not current, a fresh tune_monitor preview
+        replaces it. It asks which changes to apply and does not apply any.
 
         A tune_monitor call without dry_run=false is a preview (dry_run defaults to true): it
         changes nothing and is fine, for example when the monitor was retuned after the stored

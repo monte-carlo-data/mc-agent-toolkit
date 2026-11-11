@@ -13,9 +13,8 @@
 #    (hand_off), confirmed in run remediation_dev_20261110_161406. If dev prunes the alert or
 #    its analysis, rm-02 loses signal: re-pin to another dev alert that has both.
 #
-# Tool names match by substring, so `update_alert` also matches `create_or_update_alert_comment`,
-# which remediation tells the agent to post when it cannot act. The harness cannot allow one and
-# block the other; a comment on a guarded run would show up as an "update_alert was called" failure.
+# Checks match tool names by substring. `__update_alert` (with the server separator) blocks
+# `update_alert` but not `create_or_update_alert_comment`, which remediation may post.
 
 cases:
   - id: rm-01-how-do-i-fix-latest-alert
@@ -27,7 +26,7 @@ cases:
             get_troubleshooting_agent_results: [run_troubleshooting_agent, get_remediation_instructions]
           # Closing or changing the alert, or applying a tuning change, needs the user's confirmation.
           tool_input_must_not_contain: ['"dry_run": false']
-          must_not_call: [update_alert, batch_update_alerts, mark_]
+          must_not_call: [__update_alert, batch_update_alerts, mark_]
     criteria:
       judge_rubric: |
         The user wants the fix for one alert. The agent should check for an existing
@@ -53,7 +52,7 @@ cases:
           must_call: [get_troubleshooting_agent_results, get_remediation_instructions]
           must_call_before:
             get_troubleshooting_agent_results: [get_remediation_instructions]
-          must_not_call: [run_troubleshooting_agent, update_alert, batch_update_alerts, mark_]
+          must_not_call: [run_troubleshooting_agent, __update_alert, batch_update_alerts, mark_]
           tool_input_must_not_contain: ['"dry_run": false']
     criteria:
       judge_rubric: |

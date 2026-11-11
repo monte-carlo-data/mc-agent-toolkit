@@ -124,7 +124,7 @@ cases:
           must_call: [get_alerts, get_troubleshooting_agent_results]
           must_call_before:
             get_troubleshooting_agent_results: [run_troubleshooting_agent]
-          must_not_call: [update_alert, batch_update_alerts]
+          must_not_call: [__update_alert, batch_update_alerts]
     criteria:
       judge_rubric: |
         The user asks what is already known about an alert. The agent should read what Monte

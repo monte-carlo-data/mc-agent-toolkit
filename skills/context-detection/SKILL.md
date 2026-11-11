@@ -122,7 +122,7 @@ Based on the combined signals from Steps 1-3:
 | User asks to create a specific monitor (type + table known) | High | **Auto-activate** monitoring-advisor: read and follow `../monitoring-advisor/SKILL.md` |
 | Table mentioned + "health" / "status" / "check" intent | High | **Auto-activate** asset-health: read and follow `../asset-health/SKILL.md` |
 | Monitor noise intent (noisy, too many alerts, alerts that turn out to be nothing, tune) | High | **Auto-activate** tune-monitor: read and follow `../tune-monitor/SKILL.md`. It starts from Monte Carlo's stored tuning suggestions, so no monitor needs to be named first |
-| Fix intent on an alert ("how do I fix", "what's the fix", "remediate") | High | **Auto-activate** remediation: read and follow `../remediation/SKILL.md`. It reads the existing troubleshooting analysis and remediation plan before doing any work |
+| Fix intent on an alert ("how do I fix", "what's the fix", "remediate") | High | **Auto-activate** remediation: read and follow `../remediation/SKILL.md`. It reads the existing troubleshooting analysis and remediation plan before doing any work, and starts troubleshooting when there is none, even for a low-priority alert. Don't write your own fix in place of the plan |
 | Agent instrumentation intent (instrument / set up tracing / setting up an agent) + Python codebase context | High | **Auto-activate** instrument-agent: read and follow `../instrument-agent/SKILL.md` |
 | Ambiguous or conflicting signals | Low | **Suggest** options and wait for user to choose |
 

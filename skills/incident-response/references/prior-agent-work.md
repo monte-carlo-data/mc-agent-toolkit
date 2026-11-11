@@ -49,9 +49,12 @@ get_monitor_tuning_suggestions(monitor_uuid="<monitor_uuid>")
 Make this call only when the root cause points at monitor noise rather than a data problem.
 The call returns the latest stored analysis, whatever it is. Check `source`, `status` and
 `changes_applied_since` first: skip an analysis that is no longer pending or was already
-applied. Say Monte Carlo's tuning agent flagged the monitor only when the monitor appears in
-the no-argument `get_monitor_tuning_suggestions()` list. Otherwise describe the analysis by its
-`source` and `triggered_at`; a `MANUAL` one was run on demand, not flagged by Monte Carlo.
+applied. Treat it as current, and say Monte Carlo's tuning agent flagged the monitor, only when
+the no-argument `get_monitor_tuning_suggestions()` list has the monitor with the same `run_uuid`
+and `changes_applied_since` is empty. `changes_applied_since` misses edits made in the UI or
+through Monitors-as-Code; the list does not. Otherwise describe the analysis by its `source` and
+`triggered_at` as possibly out of date; a `MANUAL` one was run on demand, not flagged by Monte
+Carlo.
 
 ## 5. What the Bayes teammate did: only when `get_teammate_activity` is available
 

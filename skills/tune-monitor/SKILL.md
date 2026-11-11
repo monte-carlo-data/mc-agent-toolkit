@@ -91,13 +91,20 @@ user if more than one matches. If it can't be resolved, ask for the UUID. Then g
 
 Call `get_monitor_tuning_suggestions(monitor_uuid=<uuid>)`.
 
-- **Recommendations returned:** present them (Phase 0.6). Always open with where the analysis
-  came from (`source`: a background analysis by Monte Carlo, or `MANUAL`, an on-demand analysis
-  requested by a user or started by Monte Carlo while planning a remediation) and when
-  (`triggered_at`). Say whether the monitor was retuned since (`changes_applied_since`), even
-  when it was not. If `changes_applied_since` is not empty, someone
-  retuned the monitor after the analysis: say so, and call `tune_monitor(monitor_uuid=<uuid>)`
-  for a fresh preview instead of presenting stale recommendations.
+A stored analysis is **current** only when both hold:
+- the no-argument `get_monitor_tuning_suggestions()` list has a row for this monitor with the same
+  `run_uuid`. The list drops monitors edited since their analysis, including edits in the UI or
+  through Monitors-as-Code;
+- `changes_applied_since` is empty. It only covers changes made by tuning runs, so it is not
+  enough on its own.
+
+- **Recommendations returned and current:** present them (Phase 0.6). Always open with where the
+  analysis came from (`source`: a background analysis by Monte Carlo, or `MANUAL`, an on-demand
+  analysis requested by a user or started by Monte Carlo while planning a remediation) and when
+  (`triggered_at`). Keep its `run_uuid`: Phase 5 checks it again before applying.
+- **Recommendations returned but not current:** don't present them as advice. Say why in one line
+  (retuned since, per `changes_applied_since`, or no longer the pending analysis on the list),
+  then call `tune_monitor(monitor_uuid=<uuid>)` for a fresh preview.
 - **No recommendations on record:** call `tune_monitor(monitor_uuid=<uuid>)`. It defaults to
   `dry_run=true`, so it only previews. It can take a minute or two.
 - **`tune_monitor` returns recommendations:** present them (Phase 0.6).
@@ -334,11 +341,20 @@ history further?" When nothing is recommended, offer only the alert-history expl
 
 ## Phase 5: Apply Changes (if user requests)
 
-**Tuning agent recommendations (from Phase 0.5):** first call `get_monitor_tuning_suggestions()`
-with no arguments and confirm the monitor is still listed; read `is_template_managed` from its
-row. If it is not listed (dismissed, aged out, or edited since the analysis), preview with
-`tune_monitor(monitor_uuid=<uuid>)` and apply from that preview, which carries
-`is_template_managed` and `recommendation_type`. For a monitor with `is_template_managed: true`,
+**Tuning agent recommendations:** check freshness first. Which check depends on where the
+approved recommendations came from:
+- **A stored analysis** (from `get_monitor_tuning_suggestions`, or handed off by remediation with
+  its `run_uuid` and `analyzed_at`): call `get_monitor_tuning_suggestions()` with no arguments.
+  Apply only if the monitor's row is there with the same `run_uuid` as the analysis the user
+  approved; read `is_template_managed` from that row. If the row is missing or carries a different
+  `run_uuid` (the monitor was edited, the suggestion was dismissed or aged out, or a newer
+  analysis replaced it), do not apply. Preview with `tune_monitor(monitor_uuid=<uuid>)`, present
+  the result (Phase 0.6), say what differs from what the user approved, and wait for a new
+  approval.
+- **A preview you ran with `tune_monitor` in this conversation:** it is current. Read
+  `is_template_managed` and `recommendation_type` from the preview response.
+
+For a monitor with `is_template_managed: true`,
 do not call `tune_monitor`: hand off to the manage-mac skill so the user edits their
 Monitors-as-Code YAML. Otherwise leave out `advisory` items (relay them only) and call
 `tune_monitor(monitor_uuid=<uuid>, dry_run=false, recommendations=[<the approved subset>])`.
