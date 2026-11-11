@@ -26,7 +26,7 @@ cases:
         The agent should recognize the user's intent is ambiguous and ask
         clarifying questions (what symptom? which table or pipeline? when
         did it start?). It should NOT make Monte Carlo MCP API calls
-        (get_alerts, search, get_table, etc.) before gathering context.
+        (get_alerts, search, get_asset, etc.) before gathering context.
 
         NOTE: Do NOT penalize Read or Skill tool calls — those are the agent
         loading skill instructions, which is normal and expected.
@@ -47,7 +47,7 @@ cases:
         criteria:
           # Turn 2: user named the specific table — agent should investigate.
           # `search` is expected (needed to resolve table name → MCON for
-          # downstream get_table call). get_alerts should also fire.
+          # downstream get_asset call). get_alerts should also fire.
           must_call:
             - search
             - get_alerts
@@ -64,7 +64,7 @@ cases:
 
         Turn 2: The user has named a specific table and warehouse. The
         agent should begin root cause analysis:
-        - Query the table directly (get_table, get_alerts for that table)
+        - Query the table directly (get_asset, get_alerts for that table)
         - `search` is NOT required — per skill guidance, skip it when
           table + warehouse are already named
         - Check freshness/lineage/queries to investigate root cause
@@ -82,17 +82,17 @@ cases:
         criteria:
           # Clear intent + table + warehouse. Agent should proceed directly
           # with a health check: search (to resolve name → MCON) then
-          # get_table for details.
+          # get_asset for details.
           must_call:
             - search
-            - get_table
+            - get_asset
     criteria:
       judge_rubric: |
         This is a clear, specific health check request. Table + warehouse
         are named, so the agent should proceed directly:
         - Use search (tightly scoped — limit + warehouse filter) to resolve
           the name to an MCON
-        - Fetch details via get_table, then freshness, alerts, monitoring coverage
+        - Fetch details via get_asset, then freshness, alerts, monitoring coverage
         - Report health
 
         It should NOT stop to ask scoping questions for this prompt —
@@ -134,7 +134,7 @@ cases:
             - get_warehouses
             - get_use_cases
             - search
-            - get_table
+            - get_asset
     criteria:
       judge_rubric: |
         This is a general programming question with no Monte Carlo or data

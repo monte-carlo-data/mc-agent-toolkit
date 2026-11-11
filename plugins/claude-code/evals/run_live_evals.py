@@ -80,14 +80,25 @@ def parse_judge_score(raw: str) -> tuple[float, str]:
         return 0.0, f"Judge returned invalid JSON: {raw}"
 
 
+def _matches(tool: str, called: str) -> bool:
+    """Match a YAML tool name against a called tool's short name.
+
+    - `mcp__<server>__get_asset` has short name `get_asset`.
+    - A name ending in `_` is a prefix: `create_` matches every create tool.
+    - Any other name must match exactly, so `get_asset` does not match `get_asset_lineage`.
+    """
+    short = called.rsplit("__", 1)[-1]
+    return short.startswith(tool) if tool.endswith("_") else short == tool
+
+
 def _first_index(tool: str, tools_called: list[str]) -> int | None:
-    return next((i for i, called in enumerate(tools_called) if tool in called), None)
+    return next((i for i, called in enumerate(tools_called) if _matches(tool, called)), None)
 
 
 def check_deterministic(criteria: TurnCriteria, trace: ConversationTrace) -> tuple[bool, list[str]]:
     """Run deterministic checks against a trace. Returns (passed, failures).
 
-    Tool names match by substring against the full MCP tool name.
+    Tool names match the called tool's short name exactly; a name ending in `_` is a prefix.
     """
     failures: list[str] = []
 

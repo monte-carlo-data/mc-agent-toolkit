@@ -6,7 +6,7 @@ Use this when columns were added, removed, or had their types changed.
 
 ### 1. Identify what changed
 
-Call `get_table(mcon=table_mcon, include_fields=true)` to see the current schema.
+Call `get_asset(mcon=table_mcon, include=["fields"])` to see the current schema.
 Compare against the alert details — what columns were added/removed/modified?
 
 ### 2. Check for query changes

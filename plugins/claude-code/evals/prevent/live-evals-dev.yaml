@@ -24,7 +24,7 @@ cases:
     turns:
       - prompt: "I want to add an is_active column with default true to client_hub in the MC-Snowflake-test warehouse. What's the impact?"
         criteria:
-          must_call: [search, get_table, get_asset_lineage, get_monitors]
+          must_call: [search, get_asset, get_asset_lineage, get_monitors]
           must_not_call: [Edit, Write]
     criteria:
       judge_rubric: |
@@ -41,7 +41,7 @@ cases:
     turns:
       - prompt: "I'm planning to add an is_active column with default true to client_hub in MC-Snowflake-test. Run the impact assessment."
         criteria:
-          must_call: [search, get_table, get_asset_lineage, get_monitors]
+          must_call: [search, get_asset, get_asset_lineage, get_monitors]
           must_not_call: [Edit]
       - prompt: "Looks fine. Now generate validation queries for this change."
     criteria:
@@ -65,7 +65,7 @@ cases:
     turns:
       - prompt: "Add an is_active column with default true to client_hub in MC-Snowflake-test. Run the impact assessment first."
         criteria:
-          must_call: [search, get_table, get_asset_lineage, get_monitors]
+          must_call: [search, get_asset, get_asset_lineage, get_monitors]
           must_not_call: [Edit, Write]
       - prompt: "Yes generate a monitor for this new column."
     criteria:

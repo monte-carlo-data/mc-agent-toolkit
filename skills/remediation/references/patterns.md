@@ -22,7 +22,7 @@ Stale data usually means the pipeline that feeds this table has either failed or
 1. Check upstream lineage — is the source table also stale?
    ```
    getAssetLineage(mcons=["<table_mcon>"], direction="UPSTREAM")
-   getTable(mcon="<upstream_mcon>")  # check freshness
+   get_asset(mcon="<upstream_mcon>")  # check freshness
    ```
 
 2. Check recent write queries — what pipeline usually updates this table?
@@ -56,7 +56,7 @@ Stale data usually means the pipeline that feeds this table has either failed or
 
 After triggering the pipeline:
 - Wait for the job to complete (check status via the orchestrator MCP)
-- Re-check table freshness: `getTable(mcon="<table_mcon>")` — has `last_updated_on` moved forward?
+- Re-check table freshness: `get_asset(mcon="<table_mcon>")` — has `last_updated_on` moved forward?
 - Re-check the alert: `getAlerts(alert_ids=["<alert_id>"])` — has it resolved?
 
 ---
@@ -105,7 +105,7 @@ dbt failures can be compilation errors (code issues), database errors (permissio
 ### Verification
 
 - Check dbt job status via dbt Cloud MCP (if available)
-- Re-check table: `getTable(mcon="<table_mcon>")` — has the model been rebuilt?
+- Re-check table: `get_asset(mcon="<table_mcon>")` — has the model been rebuilt?
 - Verify downstream tables are also refreshing
 
 ---
@@ -126,7 +126,7 @@ Schema changes can be intentional (upstream team made a planned change) or accid
 
 1. Identify what changed:
    ```
-   getTable(mcon="<table_mcon>", include_fields=true)
+   get_asset(mcon="<table_mcon>", include=["fields"])
    ```
 
 2. Check blast radius — who consumes this table?
@@ -166,7 +166,7 @@ Schema changes can be intentional (upstream team made a planned change) or accid
 
 ### Verification
 
-- Re-check table schema: `getTable(mcon="<table_mcon>", include_fields=true)`
+- Re-check table schema: `get_asset(mcon="<table_mcon>", include=["fields"])`
 - Verify downstream models are rebuilding successfully
 - Check that schema change alerts resolve
 
@@ -189,13 +189,13 @@ Volume anomalies can indicate: data loss (rows missing), data duplication (rows 
 
 1. Quantify the anomaly:
    ```
-   getTable(mcon="<table_mcon>")  # current row count
+   get_asset(mcon="<table_mcon>")  # current row count
    ```
 
 2. Check if the issue is in this table or upstream:
    ```
    getAssetLineage(mcons=["<table_mcon>"], direction="UPSTREAM")
-   getTable(mcon="<upstream_mcon>")  # check upstream row counts
+   get_asset(mcon="<upstream_mcon>")  # check upstream row counts
    ```
 
 3. Analyze recent write queries for clues:
@@ -233,7 +233,7 @@ Volume anomalies can indicate: data loss (rows missing), data duplication (rows 
 
 ### Verification
 
-- Re-check row counts: `getTable(mcon="<table_mcon>")`
+- Re-check row counts: `get_asset(mcon="<table_mcon>")`
 - Compare against expected values
 - Monitor over the next few pipeline runs to confirm stability
 

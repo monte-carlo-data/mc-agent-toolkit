@@ -62,6 +62,27 @@ class ExistingChecks(unittest.TestCase):
         self.assertTrue(check_deterministic(criteria, t)[0])
 
 
+class ToolNameMatching(unittest.TestCase):
+    def test_exact_name_does_not_match_longer_tool(self):
+        criteria = TurnCriteria(must_call=["get_asset"])
+        passed, failures = check_deterministic(criteria, trace(("get_asset_lineage", {})))
+        self.assertFalse(passed)
+        self.assertEqual(failures, ["must_call: get_asset not found in trace"])
+
+    def test_exact_name_matches_under_any_server_prefix(self):
+        criteria = TurnCriteria(must_call=["get_asset"])
+        t = ConversationTrace(tools_called=["mcp__plugin_mc-agent-toolkit_monte-carlo-mcp__get_asset"])
+        self.assertTrue(check_deterministic(criteria, t)[0])
+
+    def test_trailing_underscore_is_a_prefix(self):
+        criteria = TurnCriteria(must_not_call=["create_"])
+        self.assertFalse(check_deterministic(criteria, trace(("create_warehouse", {})))[0])
+
+    def test_builtin_tool_name_matches(self):
+        criteria = TurnCriteria(must_not_call=["Bash"])
+        self.assertFalse(check_deterministic(criteria, ConversationTrace(tools_called=["Bash"]))[0])
+
+
 class CaseParsing(unittest.TestCase):
     def test_surface_defaults_to_skill(self):
         case = EvalCase.from_dict({"id": "a", "turns": [{"prompt": "p"}]})

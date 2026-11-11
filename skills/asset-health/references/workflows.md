@@ -41,7 +41,7 @@ Every row must include the Warehouse column.
 Run all 4 calls in a single turn:
 
 ```
-get_table(mcon="<mcon>")
+get_asset(mcon="<mcon>")
 → last updated, row count, importance score, is_important (key asset flag)
 
 get_alerts(created_after="<7 days ago>", created_before="<now>", table_mcons=["<mcon>"], statuses=["NOT_ACKNOWLEDGED", "ACKNOWLEDGED", "WORK_IN_PROGRESS"])
@@ -66,14 +66,14 @@ Check at most **10** upstream parents. If there are more than 10, check the firs
 For each upstream parent, run both calls in parallel:
 
 ```
-get_table(mcon="<parent_mcon>")
+get_asset(mcon="<parent_mcon>")
 → freshness, importance
 
 get_alerts(created_after="<7 days ago>", created_before="<now>", table_mcons=["<parent_mcon>"], statuses=["NOT_ACKNOWLEDGED", "ACKNOWLEDGED", "WORK_IN_PROGRESS"])
 → active alerts on this parent
 ```
 
-All parents are checked in parallel with each other. Each parent's `get_table` and
+All parents are checked in parallel with each other. Each parent's `get_asset` and
 `get_alerts` are also parallel (no dependency between them).
 
 ### Phase 4 — Synthesize the health report
@@ -120,7 +120,7 @@ get_asset_lineage(mcons=["<parent_mcon>"], direction="UPSTREAM", hops=1)
 For each grandparent:
 
 ```
-get_table(mcon="<grandparent_mcon>")
+get_asset(mcon="<grandparent_mcon>")
 get_alerts(created_after="<7 days ago>", created_before="<now>", table_mcons=["<grandparent_mcon>"], statuses=["NOT_ACKNOWLEDGED", "ACKNOWLEDGED", "WORK_IN_PROGRESS"])
 ```
 
