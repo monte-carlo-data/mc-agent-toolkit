@@ -76,15 +76,19 @@ Read `references/signal-definitions.md` for the full signal catalog. Determine w
 | **Specific asset** | User mentions a table name, or has a `.sql` model file open in their IDE | "what's wrong with stg_payments?", "check this table" |
 | **Active incident** | Keywords: alert, broken, stale, failing, incident, triage, wrong data | "I have alerts firing", "data looks wrong", "something broke" |
 | **Coverage/monitoring** | Keywords: monitor, coverage, gaps, unmonitored, what should I watch | "what should I monitor?", "where are my gaps?" |
+| **Monitor noise** | Keywords: noisy, false positives, alerts that turn out to be nothing, tune, sensitivity, combined with monitor or alert context | "we get a lot of alerts on payments that don't look real, what do I do with these monitors?", "tune my monitors" |
+| **Alert fix intent** | Keywords: how do I fix, what's the fix, remediate, combined with an alert | "how do I fix this alert?", "remediate the payments alert" |
 | **Agent instrumentation** | Keywords: instrument, set up tracing, set up Monte Carlo tracing, setting up an agent. Often mentions an AI framework (LangChain, LangGraph, OpenAI, Anthropic, CrewAI, Bedrock, SageMaker, Vertex AI) | "instrument my agent", "set up MC tracing on my LangGraph agent", "setting up an agent" |
 | **General/exploratory** | No clear category, broad question | "help me with data quality", "what can Monte Carlo do?" |
+
+**Monitor noise** and **Alert fix intent** take precedence over the bare "alert" (Active incident) and "monitor" (Coverage/monitoring) keywords.
 
 ### Step 2: Gather scope (only if needed)
 
 - **Specific asset known** (from file context or user mention) → proceed to Step 3
 - **Active incident, no scope** → ask: "Want me to check recent alerts? Any specific time range or severity?"
 - **Coverage/monitoring, no scope** → ask: "Which warehouse should I look at, or should I check across all?"
-- **General/exploratory** → present the categories: "I can help with: (1) investigating active alerts or data issues, (2) analyzing monitoring coverage and creating monitors, or (3) checking the health of specific tables. What are you looking for?"
+- **General/exploratory** → present the categories: "I can help with: (1) investigating active alerts or data issues, (2) analyzing monitoring coverage and creating monitors, (3) checking the health of specific tables, (4) tuning noisy monitors, or (5) fixing an alert. What are you looking for?"
 
 ### Step 3: Scoped API probe (when scope is available)
 

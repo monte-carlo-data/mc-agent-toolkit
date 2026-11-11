@@ -5,6 +5,17 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Snowflake Cortex
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.30.0] - 2026-11-11
+
+### Changed
+
+- tune-monitor: starts from Monte Carlo's tuning agent. With no monitor named, it lists the monitors with a pending suggestion (`get_monitor_tuning_suggestions`). For one monitor, it reads the stored analysis or previews with `tune_monitor`, and applies only the changes the user approves, after checking the monitor is still listed and not managed as code. Its own report analysis is the fallback when the agent cannot analyze the monitor.
+- remediation: reuses an existing troubleshooting result instead of starting a new run, and reuses the alert's triage verdict instead of calling `alert_assessment`. It follows the remediation plan from `get_remediation_instructions` and its destinations, and asks before running any check or step from the plan. Monitor tuning from a plan goes through tune-monitor's apply step.
+- incident-response: reads the alert's triage verdict, troubleshooting result and remediation plan before running anything, reports them, and offers the missing step instead of running it unasked (`references/prior-agent-work.md`).
+- asset-health, prevent: show each alert's triage verdict from `get_alerts` (`triage_priority`).
+- context-detection: routes monitor noise to tune-monitor and "how do I fix this alert" to remediation.
+- evals: routing cases for tune-monitor, remediation, incident-response and context-detection, and trigger evals for tune-monitor and remediation.
+
 ## [1.29.7] - 2026-11-06
 
 ### Changed

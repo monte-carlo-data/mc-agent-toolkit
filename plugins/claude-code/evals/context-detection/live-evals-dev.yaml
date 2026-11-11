@@ -154,6 +154,7 @@ cases:
         criteria:
           must_call: [get_monitor_tuning_suggestions]
           tool_input_must_not_contain: ['"dry_run": false']
+          must_not_call: [create_or_update_, mark_, update_alert, batch_update_alerts]
     criteria:
       judge_rubric: |
         Monitor noise is a tuning request. The agent should route to the tune-monitor flow and
@@ -172,7 +173,10 @@ cases:
           must_call: [get_alerts, get_troubleshooting_agent_results]
           must_call_before:
             get_troubleshooting_agent_results: [run_troubleshooting_agent, get_remediation_instructions]
-          must_not_call: [update_alert, batch_update_alerts]
+          # `update_alert` also matches `create_or_update_alert_comment`, which remediation may post
+          # (substring matching cannot allow one and block the other).
+          tool_input_must_not_contain: ['"dry_run": false']
+          must_not_call: [update_alert, batch_update_alerts, mark_]
     criteria:
       judge_rubric: |
         The user wants the fix for one alert, so this routes to remediation. The agent should

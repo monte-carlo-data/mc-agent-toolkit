@@ -93,7 +93,8 @@ Present results in this structure:
 | Apr 7 | Freshness      | P2       | Not triaged      | Acknowledged     | {MC_WEBAPP_URL}/alerts/{alert_uuid} |
 
 **Triage** is Monte Carlo's triage verdict on the alert, from `get_alerts` → `triage_priority`
-(`HIGH` / `MEDIUM` / `LOW`). Show "Not triaged" when it is absent. It comes from the same
+(never absent): `HIGH` / `MEDIUM` / `LOW` = triaged, shown as is; `PENDING` = triage running, show
+"Triage running"; `NOT_TRIAGED` = show "Not triaged". It comes from the same
 `get_alerts` call, so it needs no extra tool. When an alert has a `triage_result.triage_summary`,
 use it in the Diagnosis.
 

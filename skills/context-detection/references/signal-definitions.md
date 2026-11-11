@@ -18,6 +18,8 @@ workflow to the routing system.
 |--------|-------------------|---------|
 | Incident intent | "alert", "broken", "stale", "failing", "incident", "triage", "wrong data", "data issue" | Incident response workflow |
 | Coverage intent | "monitor", "coverage", "gaps", "unmonitored", "what should I watch", "what should I monitor" | Proactive monitoring workflow |
+| Monitor noise | "noisy", "false positives", "alerts that turn out to be nothing", "tune", "sensitivity" + monitor | tune-monitor (direct) |
+| Alert fix intent | "how do I fix", "what's the fix", "remediate" + an alert | remediation (direct) |
 | Specific monitor creation | "create a monitor", "add a freshness check", "set up validation" + specific table | monitoring-advisor (direct) |
 | Table health | "health", "status", "check on", "how is table X" + specific table | asset-health (direct) |
 | Storage/cost | "cost", "storage", "unused tables", "zombie tables" | storage-cost-analysis (direct) |

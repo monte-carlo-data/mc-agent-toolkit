@@ -10,13 +10,13 @@ Read in this order. Each step names what to do when its result is empty.
 
 `get_alerts` returns it on every alert:
 
-- `triage_priority`: `HIGH`, `MEDIUM` or `LOW` once the alert is triaged.
-- `triage_result`: `alert_confidence`, `alert_impact`, `alert_description`, `triage_summary`,
-  `triaged_at`.
-
-If `triage_priority` is empty, the alert is untriaged. Offer `triage_alert(alert_id=...)`. It
-waits 1–2 minutes and returns an earlier verdict right away if one exists, so a repeat call never
-starts a second triage.
+- `triage_priority`: never absent. Branch on its value:
+  - `HIGH`, `MEDIUM`, `LOW`: triaged. Use `triage_result`: `alert_confidence`, `alert_impact`,
+    `alert_description`, `triage_summary`, `triaged_at`.
+  - `PENDING`: the first triage is running. Say so; do not offer another run.
+  - `NOT_TRIAGED`: untriaged. Offer `triage_alert(alert_id=...)`. It waits 1–2 minutes and
+    returns an earlier verdict right away if one exists, so a repeat call never starts a second
+    triage.
 
 ## 2. Root cause
 
@@ -46,13 +46,19 @@ For each UUID in the alert's `monitor_uuids`:
 get_monitor_tuning_suggestions(monitor_uuid="<monitor_uuid>")
 ```
 
-Recommendations on record mean the tuning agent already considers this monitor noisy. Mention
-it when the root cause points at monitor noise rather than a data problem.
+Make this call only when the root cause points at monitor noise rather than a data problem.
+The call returns the latest stored analysis, whatever it is. Check `source`, `status` and
+`changes_applied_since` first: skip an analysis that is no longer pending or was already
+applied. Say Monte Carlo's tuning agent flagged the monitor only when the monitor appears in
+the no-argument `get_monitor_tuning_suggestions()` list. Otherwise describe the analysis by its
+`source` and `triggered_at`; a `MANUAL` one was run on demand, not flagged by Monte Carlo.
 
 ## 5. What the Bayes teammate did: only when `get_teammate_activity` is available
 
 Bayes, the Monte Carlo teammate in a domain's Slack channel, tunes monitors, watches issues and
 skips alerts on its own. Skip this step when `get_teammate_activity` is not in your tool list.
+Confirm the tool name and arguments below against AI-1666
+(https://linear.app/montecarloai/issue/AI-1666) when it lands.
 
 1. Find the Bayes domain: `get_domains(mcon="<table mcon>", bayes_only=true)`. One domain: use
    it. Several: ask the user which. None: skip this step.
@@ -64,4 +70,5 @@ skips alerts on its own. Skip this step when `get_teammate_activity` is not in y
 
 Before running anything, tell the user what is already known (triage verdict, root cause, plan,
 tuning, teammate activity) and what is missing. Then offer to run what is missing rather than
-running it unasked.
+running it unasked. This holds for every branch, including a root cause with a plan: report it
+and offer remediation.

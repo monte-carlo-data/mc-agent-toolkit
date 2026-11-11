@@ -6,9 +6,9 @@ Investigate and fix data quality issues detected by Monte Carlo — automaticall
 
 When you have a data quality alert (freshness, volume, schema change, etc.), this skill guides an AI coding agent through the full remediation lifecycle:
 
-1. **Investigate** — fetches alert details, runs TSA root cause analysis, maps blast radius via lineage, checks table state and monitoring coverage
-2. **Discover capabilities** — scans connected MCP servers to determine what remediation actions are possible (pipeline restarts, dbt reruns, code fixes, notifications)
-3. **Remediate** — proposes a fix with clear reasoning, confirms with the user, executes via available tools, and verifies the result
+1. **Reuse Monte Carlo's analysis** — fetches the alert and its existing troubleshooting result and remediation plan; runs troubleshooting only if none exists
+2. **Follow the plan** — carries out the recommended action (code fix, monitor tuning, alert closure or hand-off), confirming with the user and verifying the result
+3. **Fall back to its own fix** — only when no plan exists: maps blast radius via lineage, discovers available MCP tools, and proposes a fix with clear reasoning
 4. **Close out** — updates alert status, documents what was done, and suggests prevention measures
 
 The skill works with whatever tools you have connected. If an Airflow MCP is available, it can restart pipelines. If no external MCPs are connected, it produces a detailed remediation plan with manual commands and asks you how to proceed.

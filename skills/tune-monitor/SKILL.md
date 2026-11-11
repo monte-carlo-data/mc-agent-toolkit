@@ -81,35 +81,45 @@ to go through. The titles are Monte Carlo's, not yours: don't write them up as r
 and don't add your own. When the list is empty, say nothing is pending and offer to analyze a
 specific monitor. Continue at Phase 0.5 once the user picks one.
 
+**Monitor described but no UUID** (a table plus monitor type, or a monitor name): resolve the
+table with `search`, list its monitors with `get_monitors(mcons=[<mcon>])`, and confirm with the
+user if more than one matches. If it can't be resolved, ask for the UUID. Then go to Phase 0.5.
+
 ---
 
 ## Phase 0.5: Start from the tuning agent
 
 Call `get_monitor_tuning_suggestions(monitor_uuid=<uuid>)`.
 
-- **Recommendations returned:** present them (Phase 4.5). Always open with where the analysis
-  came from (`source`: Monte Carlo's background analysis, or a preview the user ran) and when
+- **Recommendations returned:** present them (Phase 0.6). Always open with where the analysis
+  came from (`source`: a background analysis by Monte Carlo, or `MANUAL`, an on-demand analysis
+  requested by a user or started by Monte Carlo while planning a remediation) and when
   (`triggered_at`). Say whether the monitor was retuned since (`changes_applied_since`), even
   when it was not. If `changes_applied_since` is not empty, someone
   retuned the monitor after the analysis: say so, and call `tune_monitor(monitor_uuid=<uuid>)`
   for a fresh preview instead of presenting stale recommendations.
 - **No recommendations on record:** call `tune_monitor(monitor_uuid=<uuid>)`. It defaults to
   `dry_run=true`, so it only previews. It can take a minute or two.
-- **`tune_monitor` returns recommendations:** present them (Phase 4.5).
-- **`tune_monitor` returns `skip_reason`, or fails:** an empty list does not mean the monitor is
-  well tuned. Relay `skip_reason` as given, then fall back to your own analysis (Phases 1–4).
-  Do not call `tune_monitor` again until its cause is fixed.
+- **`tune_monitor` returns recommendations:** present them (Phase 0.6).
+- **`tune_monitor` returns no recommendations and no `skip_reason`:** the tuning agent analyzed the
+  monitor and found nothing to change. Say so; run Phases 1–4 only if the user asks.
+- **`skip_reason` names a deleted monitor or a collection failure:** relay it with its fix and
+  stop. Do not fall back to your own analysis. If the alerts are run failures, point to
+  remediation.
+- **Any other `skip_reason` (the agent's changes were dropped), or `tune_monitor` fails:** relay
+  `skip_reason` as given, then fall back to your own analysis (Phases 1–4). Do not call
+  `tune_monitor` again until its cause is fixed.
 
 Either way, skip Phases 1–4 when the tuning agent produced recommendations.
 
-### Phase 4.5: Present the tuning agent's recommendations
+### Phase 0.6: Present the tuning agent's recommendations
 
 For each recommendation, show its title, reasoning and change summary, and the affected asset
 for table monitors. Flag every `would_reset: true`: applying it resets the monitor's learned
 thresholds, and it relearns from scratch. A recommendation whose `recommendation_type` is
-`advisory` is a note to relay, not a change to apply. If `is_template_managed` is true, the
-monitor is deployed with Monitors-as-Code: show the recommendations but do not offer to apply
-them (see Phase 5).
+`advisory` is a note to relay, not a change to apply. If the monitor is `is_template_managed`
+(Phase 5 says where to read it), it is deployed with Monitors-as-Code: show the recommendations
+but do not offer to apply them.
 
 **Next step:** "Which of these do you want me to apply?" Nothing is applied until the user names
 the changes.
@@ -118,11 +128,11 @@ the changes.
 
 ## Phase 1: Fetch Monitor Report (fallback)
 
-Phases 1–4 run only when Phase 0.5 produced no recommendations (`skip_reason` set, or the tuning
-agent failed).
+Phases 1–4 run only when Phase 0.5 sends you here: `skip_reason` set (other than a deleted monitor
+or collection failure), or the tuning agent failed.
 
 Call `get_monitor_report` with:
-- `monitor_uuid`: the UUID from `$ARGUMENTS`
+- `monitor_uuid`: the UUID resolved in Phase 0
 - `max_incidents`: 50
 
 If the tool returns an error or empty result, tell the user the monitor was not found and stop.
@@ -324,18 +334,25 @@ history further?" When nothing is recommended, offer only the alert-history expl
 
 ## Phase 5: Apply Changes (if user requests)
 
-**Tuning agent recommendations (from Phase 0.5):** call
+**Tuning agent recommendations (from Phase 0.5):** first call `get_monitor_tuning_suggestions()`
+with no arguments and confirm the monitor is still listed; read `is_template_managed` from its
+row. If it is not listed (dismissed, aged out, or edited since the analysis), preview with
+`tune_monitor(monitor_uuid=<uuid>)` and apply from that preview, which carries
+`is_template_managed` and `recommendation_type`. For a monitor with `is_template_managed: true`,
+do not call `tune_monitor`: hand off to the manage-mac skill so the user edits their
+Monitors-as-Code YAML. Otherwise leave out `advisory` items (relay them only) and call
 `tune_monitor(monitor_uuid=<uuid>, dry_run=false, recommendations=[<the approved subset>])`.
 Pass the approved recommendations back exactly as returned. Leaving `recommendations` out
 re-analyzes the monitor and applies whatever that finds, which is not what the user approved.
-Report `apply_result`. For a monitor with `is_template_managed: true`, do not call `tune_monitor`:
-hand off to the manage-mac skill so the user edits their Monitors-as-Code YAML.
+Report `apply_result` and any `skip_reason`.
 
 **Your own recommendations (from the Phases 1–4 fallback):** follow the apply-changes
 instructions in the per-type reference loaded in Phase 1.5. Each reference specifies the correct
 tool and constraints for that monitor type.
 
-General rules for all types:
+General rules. Rule 2 applies to both paths above; rules 1, 3 and 4 apply only to your own
+recommendations (the `create_or_update_*` path). On the tuning agent path, the user's approval of
+the shown recommendations is the preview, and `is_template_managed` is the Monitors-as-Code check.
 1. **Always preview first** — show the user what will change before applying.
 2. **Get explicit confirmation** before applying any change.
 3. **Validate the preview YAML against the schema** — before presenting the preview YAML to the user, fetch the published MaC JSON Schema from `https://clidocs.getmontecarlo.com/mac/schema.json` (WebFetch) and check the preview YAML against it. If any field in the YAML does not appear in the schema for the given monitor type, flag it and correct it. Note: the schema validates field names, types, and enum values only — cross-field semantic constraints are enforced by the backend at apply time, not by the schema.
