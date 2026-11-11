@@ -4,7 +4,7 @@ Detailed reference for building `create_or_update_sql_monitor` tool calls. The t
 
 ## Critical Constraints
 
-- **NEVER guess column names.** Always verify column names from `get_table` before referencing them in SQL queries. A typo or assumed column name causes the monitor to fail on every scheduled run.
+- **NEVER guess column names.** Always verify column names from `get_asset` before referencing them in SQL queries. A typo or assumed column name causes the monitor to fail on every scheduled run.
 
 ---
 

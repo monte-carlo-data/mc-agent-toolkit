@@ -135,7 +135,7 @@ Each case is scored in two layers:
      after the first call to the earlier one
 2. **LLM judge** (0.0-1.0): Scores against the `judge_rubric`
 
-A case passes if all deterministic checks pass AND judge score >= 0.7. Tool names in YAML use short names (e.g. `get_warehouses`); the runner matches via substring against full MCP tool names, so a prefix such as `create_` matches every create tool.
+A case passes if all deterministic checks pass AND judge score >= 0.7. Tool names in YAML use short names (e.g. `get_warehouses`). The runner matches them exactly against the called tool's name without its `mcp__<server>__` prefix, so `get_asset` does not match `get_asset_lineage`. A name ending in `_` is a prefix: `create_` matches every create tool.
 
 ### Guidance surfaces
 

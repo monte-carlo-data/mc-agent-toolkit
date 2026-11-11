@@ -15,7 +15,7 @@ monitoring coverage, importance, and upstream dependency health.
 > bundled server, whose fully-qualified tool names are
 > `mcp__plugin_mc-agent-toolkit_monte-carlo-mcp__<tool>` (e.g.
 > `mcp__plugin_mc-agent-toolkit_monte-carlo-mcp__get_alerts`). Bare tool names used in this skill
-> (`get_alerts`, `search`, `get_table`, …) refer to that bundled server. If the session also has a
+> (`get_alerts`, `search`, `get_asset`, …) refer to that bundled server. If the session also has a
 > separately-configured `monte-carlo-mcp` server, do **not** route to it — it may point at a
 > different endpoint or credentials.
 
@@ -151,17 +151,17 @@ embellish values beyond what the tool returns.
 
 | Metric | Data source | What to show | Signal |
 |--------|------------|-------------|--------|
-| **Last Updated** | `get_table` → `last_updated_on` | Date of last data update (e.g., "Apr 6, 2025") | 🟢 Recent (within 7 days) / 🟡 Stale (older than 7 days) |
+| **Last Updated** | `get_asset` → `last_updated_on` | Date of last data update (e.g., "Apr 6, 2025") | 🟢 Recent (within 7 days) / 🟡 Stale (older than 7 days) |
 | **Alerts** | `get_alerts` → count | "N active" or "No active alerts" | 🔴 Has alerts / 🟢 No alerts |
 | **Monitoring** | `get_monitors` → count where `is_paused` is false | "N active monitors" or "0 active monitors (M paused)". Include relevant details from monitor fields (incident counts, error counts, types). | 🟢 Monitored (≥1 active) / 🔴 Unmonitored (0 active) |
 | **Upstream** | `get_asset_lineage` (upstream) + Phase 3 checks | "N/M sources unhealthy" or "All N sources healthy" | 🔴 Issues (any unhealthy) / 🟢 Healthy (all healthy) |
 
 **Importance** is shown next to the Status line (not in the metrics table). Source:
-`get_table` → `importance_score` + `is_important`. Show "X.XX (key asset ⭐️)" if
+`get_asset` → `importance_score` + `is_important`. Show "X.XX (key asset ⭐️)" if
 key asset or importance > 0.8, otherwise just "X.XX".
 
 **Avg Reads/Day** and **Avg Writes/Day** are shown below the Status line. Source:
-`get_table` → `table_stats.avg_reads_per_active_day` and `table_stats.avg_writes_per_active_day`.
+`get_asset` → `table_stats.avg_reads_per_active_day` and `table_stats.avg_writes_per_active_day`.
 
 **Do NOT include downstream data.** This skill only queries upstream lineage.
 

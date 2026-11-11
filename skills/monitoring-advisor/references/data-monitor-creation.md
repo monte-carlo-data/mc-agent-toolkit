@@ -31,26 +31,26 @@ If the user's intent is unclear, ask a focused question before proceeding.
 If you don't have the table MCON:
 1. Use `search` with the table name and `include_fields: ["field_names"]` to find the MCON and get column names.
 2. If the user provided a full table ID like `database:schema.table`, search for it.
-3. Once you have the MCON, call `get_table` with `include_fields: true` and `include_table_capabilities: true` to verify capabilities and get domain info.
+3. Once you have the MCON, call `get_asset` with `include: ["fields", "capabilities"]` to verify capabilities and get domain info.
 
 If you already have the MCON:
-1. Call `get_table` with the MCON, `include_fields: true`, and `include_table_capabilities: true`.
+1. Call `get_asset` with the MCON and `include: ["fields", "capabilities"]`.
 
-**If `search` returns zero results, or `get_table` shows the table is not ingested:** STOP. The table must already exist in Monte Carlo before a monitor can be created against it. Ask the user to confirm the correct table name, or to ingest the table first — do not call the creation tool with an unverified table.
+**If `search` returns zero results, or `get_asset` shows the table is not ingested:** STOP. The table must already exist in Monte Carlo before a monitor can be created against it. Ask the user to confirm the correct table name, or to ingest the table first — do not call the creation tool with an unverified table.
 
-**CRITICAL: You need the actual column names from `get_table` results. NEVER guess or hallucinate column names.** This is the most common source of monitor creation failures.
+**CRITICAL: You need the actual column names from `get_asset` results. NEVER guess or hallucinate column names.** This is the most common source of monitor creation failures.
 
 **Pre-call column-verification gate (run this immediately before calling any creation tool):**
 
 1. List every column name you plan to put in the tool arguments, in every slot the per-type reference describes (see the Tier-3 file for the authoritative list of column-bearing parameters).
-2. For each name, confirm it appears verbatim in the `get_table.fields` list you fetched in this step. Names are case-sensitive on most warehouses (Snowflake often returns uppercase column names — match exactly).
+2. For each name, confirm it appears verbatim in the `table_schema.fields` list from `get_asset` you fetched in this step. Names are case-sensitive on most warehouses (Snowflake often returns uppercase column names — match exactly).
 3. If any name is missing, STOP. Do not call the creation tool. Ask the user to confirm the correct column name, or suggest the closest matches from the actual column list — do NOT substitute a similar-sounding name on your own.
 
-If you reached this step without calling `get_table` (or equivalent) for the target table, go back — you cannot skip the fetch.
+If you reached this step without calling `get_asset` (or equivalent) for the target table, go back — you cannot skip the fetch.
 
 For monitor types that require a timestamp column (metric monitors), review the column names and identify likely timestamp candidates. Present them to the user if ambiguous.
 
-**CRITICAL: The `warehouse` parameter on creation tools is a UUID, not a name.** Extract it from the `get_table` response (the resource / warehouse UUID). If you only have a warehouse name and no MCON, call `get_warehouses` to resolve it -- NEVER pass a warehouse name string like `databricks-aws-agent` or `snowflake-prod`, the backend will reject with `Warehouse not found`.
+**CRITICAL: The `warehouse` parameter on creation tools is a UUID, not a name.** Extract it from the `get_asset` response (the resource / warehouse UUID). If you only have a warehouse name and no MCON, call `get_warehouses` to resolve it -- NEVER pass a warehouse name string like `databricks-aws-agent` or `snowflake-prod`, the backend will reject with `Warehouse not found`.
 
 ### Step 3: Handle domain assignment
 
@@ -58,7 +58,7 @@ For monitor types that require a timestamp column (metric monitors), review the 
 
 The tool field is `domain_uuids` (a list). For data monitors, provide exactly one UUID.
 
-Use the `domains` list on the `get_table` response (each entry has `uuid` and `name`):
+Use the `domains` list on the `get_asset` response (each entry has `uuid` and `name`):
 
 1. If the table's `domains` has exactly one entry: default `domain_uuids` to `[<that uuid>]`.
 2. If the table's `domains` has multiple entries: present only those domains and ask the user to pick.
@@ -79,7 +79,7 @@ Verified column names are not enough. Schema alone does not tell you whether a c
 | **Validation** monitor (any predicate) | **Required** | Membership predicates (`in_set`/`not_in_set`/equality): sample distinct values. Range/regex/cross-field: sample the actual distribution. |
 | **Custom SQL** monitor | **Required** | Run the proposed SQL once first -- confirm it parses, returns the expected shape, and produces values consistent with the threshold. |
 
-How to profile depends on the environment: use `get_table` field stats where they suffice, or an optional database MCP (`snowflake_query`, `bigquery_query`, etc.) for distributions and distinct values. **If you cannot profile** (no query access, permission denied, user declines): do NOT invent values. Fall back to **auto / ML thresholds** where the monitor supports them, propose a metadata-only sketch for the user to refine, or pause -- and say which. A user instruction like "use my number directly", "skip profiling", or "just give me the dry-run" is a valid pre-opt-out; honor it without re-prompting.
+How to profile depends on the environment: use `get_asset` field stats where they suffice, or an optional database MCP (`snowflake_query`, `bigquery_query`, etc.) for distributions and distinct values. **If you cannot profile** (no query access, permission denied, user declines): do NOT invent values. Fall back to **auto / ML thresholds** where the monitor supports them, propose a metadata-only sketch for the user to refine, or pause -- and say which. A user instruction like "use my number directly", "skip profiling", or "just give me the dry-run" is a valid pre-opt-out; honor it without re-prompting.
 
 ### Step 3c: Field monitors require a live table monitor (prerequisite)
 
@@ -260,7 +260,7 @@ All tools are available via the `monte-carlo-mcp` MCP server.
 | ------------------------------- | ------------------------------------------------------------ |
 | `test_connection`               | Verify auth and connectivity before starting                 |
 | `search`                        | Find tables/assets by name; use `include_fields` for columns |
-| `get_table`                     | Schema, stats, metadata, domain membership, capabilities     |
+| `get_asset`                     | Schema, stats, metadata, domain membership, capabilities     |
 | `get_validation_predicates`     | List available validation rule types for a warehouse         |
 | `get_domains`                   | List MC domains (only needed if table has no domain info)    |
 | `get_warehouses`                          | Resolve warehouse UUIDs from names; needed when a name is the only identifier |

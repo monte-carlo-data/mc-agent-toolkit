@@ -39,7 +39,7 @@ Response field mapping for the alert table:
 ## `search` — finding the right table identifier
 
 MC uses MCONs (Monte Carlo Object Names) as table identifiers. Always use
-`search` first to resolve a table name to its MCON before calling `get_table`,
+`search` first to resolve a table name to its MCON before calling `get_asset`,
 `get_asset_lineage`, or `get_alerts`.
 
 ```
@@ -50,7 +50,7 @@ The `properties` field contains tags (key-value pairs) associated with the asset
 
 ---
 
-## `get_table` — table metadata and stats
+## `get_asset` — table metadata and stats
 
 Pass the MCON as: `mcon="<mcon>"` (single string, not an array).
 

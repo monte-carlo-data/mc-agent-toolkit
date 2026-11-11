@@ -37,7 +37,7 @@ Even without an alert, check the table directly:
 
 - **Freshness:** `get_table_freshness` — when was it last updated? Is it overdue?
 - **Volume:** `get_table_size_history` — has the row count changed unexpectedly?
-- **Schema:** `get_table(mcon=..., include_fields=true)` — check current schema
+- **Schema:** `get_asset(mcon=..., include=["fields"])` — check current schema
 - **Query activity:** `get_queries` — are write queries still running?
 
 ### 5. Classify the issue type

@@ -4,8 +4,8 @@ Detailed reference for building `create_or_update_metric_monitor` tool calls. Th
 
 ## Critical Constraints
 
-- **NEVER guess column names.** Always get them from `get_table`. This is the most common source of monitor creation failures.
-- **`aggregate_time_field` MUST be a real timestamp column** from the table schema. Never assume or guess this value -- verify it exists in the `get_table` output.
+- **NEVER guess column names.** Always get them from `get_asset`. This is the most common source of monitor creation failures.
+- **`aggregate_time_field` MUST be a real timestamp column** from the table schema. Never assume or guess this value -- verify it exists in the `get_asset` output.
 
 ---
 
@@ -87,7 +87,7 @@ When omitted, the monitor queries all rows on each run. This works well for smal
 
 ### How to pick it
 
-1. You should already have the column names **and their data types** from `get_table` with `include_fields: true` (done in Step 2 of the main skill).
+1. You should already have the column names **and their data types** from `get_asset` with `include: ["fields"]` (done in Step 2 of the main skill).
 2. Look for columns whose names suggest a timestamp: `created_at`, `updated_at`, `modified_at`, `timestamp`, `event_timestamp`, or columns with `_ts`, `_dt`, `_time` suffixes, or `date`, `datetime`.
 3. **Verify the column's data type is an actual datetime/timestamp/date type** — not a string, number, or other type that happens to have a timestampy name. The backend rejects non-datetime types with `Field <name> is not a valid type to group the metrics by; it cannot be interpreted as a datetime.`
 4. If the user specified one, verify it exists in the column list AND has a datetime type.
@@ -95,19 +95,19 @@ When omitted, the monitor queries all rows on each run. This works well for smal
 6. If multiple candidates exist, present them and ask the user.
 7. If NO datetime-typed columns exist, omit the field — the monitor will do a whole-table scan. For very large tables, consider whether a custom SQL monitor would be more efficient.
 
-**NEVER** guess a timestamp field name, and never pick a column based on its name alone — always confirm the datatype from `get_table`, or omit the field.
+**NEVER** guess a timestamp field name, and never pick a column based on its name alone — always confirm the datatype from `get_asset`, or omit the field.
 
 ### Common timestamp field mistakes
 
 - **Using a DATE column (not TIMESTAMP):** This may work, but aggregation granularity is limited. For example, `aggregate_by: "hour"` is meaningless on a DATE column because the time component is always midnight. Warn the user and default to `aggregate_by: "day"` or coarser.
-- **Using a field that contains many nulls:** If the timestamp column has significant null values, rows with null timestamps are excluded from aggregation windows, producing unreliable or misleading results. Check the column's null rate from `get_table` field stats if available, and warn the user if it is high.
-- **Guessing a field name that does not exist:** Always verify the column name against the `get_table` output. A typo or assumed name (e.g., `created_date` when the actual column is `created_at`) causes the monitor creation to fail silently or error.
+- **Using a field that contains many nulls:** If the timestamp column has significant null values, rows with null timestamps are excluded from aggregation windows, producing unreliable or misleading results. Check the column's null rate from `get_asset` field stats if available, and warn the user if it is high.
+- **Guessing a field name that does not exist:** Always verify the column name against the `get_asset` output. A typo or assumed name (e.g., `created_date` when the actual column is `created_at`) causes the monitor creation to fail silently or error.
 
 ---
 
 ## Field-Type-to-Metric Compatibility Matrix
 
-**Before selecting a metric, check the column's data type from `get_table` results.** Passing a metric incompatible with the column type is the most common source of creation failures after timestamp issues.
+**Before selecting a metric, check the column's data type from `get_asset` results.** Passing a metric incompatible with the column type is the most common source of creation failures after timestamp issues.
 
 | Column Type | Compatible Metrics |
 |-------------|-------------------|

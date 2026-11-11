@@ -33,7 +33,7 @@ When referencing Monte Carlo MCP tools in skill files (SKILL.md, references/*.md
 get_alerts(...)
 run_troubleshooting_agent(...)
 get_asset_lineage(...)
-get_table(...)
+get_asset(...)
 get_monitors(...)
 get_queries(...)
 get_troubleshooting_agent_results(...)
@@ -66,13 +66,13 @@ This cannot be hard-blocked per skill: `allowed-tools` frontmatter only *pre-app
 > bundled server, whose fully-qualified tool names are
 > `mcp__plugin_mc-agent-toolkit_monte-carlo-mcp__<tool>` (e.g.
 > `mcp__plugin_mc-agent-toolkit_monte-carlo-mcp__get_alerts`). Bare tool names used in this skill
-> (`get_alerts`, `search`, `get_table`, …) refer to that bundled server. If the session also has a
+> (`get_alerts`, `search`, `get_asset`, …) refer to that bundled server. If the session also has a
 > separately-configured `monte-carlo-mcp` server, do **not** route to it — it may point at a
 > different endpoint or credentials.
 ```
 
 The two example tool names inside the block (`get_alerts` in the fully-qualified example and the
-`(get_alerts, search, get_table, …)` list) may be replaced with tools the skill calls, so a skill
+`(get_alerts, search, get_asset, …)` list) may be replaced with tools the skill calls, so a skill
 never names a tool it must not use; everything else stays verbatim.
 
 When the plugin name or server name changes, update the prefix **here and in every skill carrying the block in the same change**. To find them: `grep -rl 'Monte Carlo tool routing (required)' skills/*/SKILL.md`.

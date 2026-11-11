@@ -18,7 +18,7 @@ This skill helps investigate data incidents — freshness delays, volume anomali
 > bundled server, whose fully-qualified tool names are
 > `mcp__plugin_mc-agent-toolkit_monte-carlo-mcp__<tool>` (e.g.
 > `mcp__plugin_mc-agent-toolkit_monte-carlo-mcp__get_alerts`). Bare tool names used in this skill
-> (`get_alerts`, `search`, `get_table`, …) refer to that bundled server. If the session also has a
+> (`get_alerts`, `search`, `get_asset`, …) refer to that bundled server. If the session also has a
 > separately-configured `monte-carlo-mcp` server, do **not** route to it — it may point at a
 > different endpoint or credentials.
 
@@ -66,7 +66,7 @@ Do not activate when the user is:
 |------|---------|
 | `get_alerts` | Fetch incident/alert details |
 | `search` | Find tables by name or keyword |
-| `get_table` | Table metadata and fields |
+| `get_asset` | Table metadata and fields |
 | `get_asset_lineage` | Table-level upstream/downstream lineage |
 | `get_field_lineage` | Field-level lineage (trace bad data to source column) |
 | `get_table_freshness` | Table update/freshness history |

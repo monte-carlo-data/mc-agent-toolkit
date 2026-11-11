@@ -4,10 +4,10 @@ Detailed reference for building `create_or_update_validation_monitor` tool calls
 
 ## Critical Constraints
 
-- **NEVER guess column names.** Always get them from `get_table`. Every field referenced in a validation condition must exist in the table schema exactly as spelled.
+- **NEVER guess column names.** Always get them from `get_asset`. Every field referenced in a validation condition must exist in the table schema exactly as spelled.
 - **IMPORTANT: Conditions match INVALID data, not valid data.** The monitor alerts when it finds rows matching the condition, so the condition must describe the BAD rows. Getting this backwards is the number one mistake with validation monitors.
 - **NEVER put a SELECT statement in a condition-level `SQL` node.** `{"type": "SQL", "sql": "..."}` as a top-level condition must be a boolean predicate expression (e.g. `amount < 0 OR amount > 1e9`), not a full query. Backend error: `Invalid SQL expression. Please provide a direct expression; it shouldn't begin with SELECT.`
-- **NEVER use an aggregate or SQL expression in a `FIELD` value.** `{"type": "FIELD", "field": "COUNT(*)"}` is rejected as `Field "COUNT(*)" doesn't exist`. Fields are column names only — use `get_table` to list valid ones. For counts/aggregates, fall back to a custom SQL monitor.
+- **NEVER use an aggregate or SQL expression in a `FIELD` value.** `{"type": "FIELD", "field": "COUNT(*)"}` is rejected as `Field "COUNT(*)" doesn't exist`. Fields are column names only — use `get_asset` to list valid ones. For counts/aggregates, fall back to a custom SQL monitor.
 - **NEVER put a `SQL` value on the LEFT side of a BINARY condition.** Only `FIELD` references are allowed on the left. A `SQL` value is valid only on the right side (typically as a scalar subquery). Backend error: `Filter left side value must be a field or map key: FilterValueSql(...)`.
 - **`alert_condition` is a dict (JSON object), NEVER a JSON-encoded string.** Pass the condition tree as a structured object — `{"type": "GROUP", "operator": "AND", "conditions": [...]}`. Serializing it to a string first is rejected with `Input should be a valid dictionary [type=dict_type, input_value='{"conditions":[...]'...]`.
 
@@ -46,7 +46,7 @@ Think of it this way: the monitor scans rows and fires an alert when it finds ro
 
 Before constructing the `alert_condition`, verify that every field name you plan to reference exists in the table's column list. This is the number two source of validation monitor failures -- referencing columns that do not exist or are misspelled.
 
-1. You should already have the column list from `get_table` with `include_fields: true` (done in Step 2 of the main skill).
+1. You should already have the column list from `get_asset` with `include: ["fields"]` (done in Step 2 of the main skill).
 2. For every field name in your planned conditions, confirm it appears in the column list exactly as spelled (field names are case-sensitive on most warehouses).
 3. If a field does not exist, stop and ask the user to clarify the correct column name. Do not guess.
 
@@ -210,7 +210,7 @@ Any predicate can be inverted by setting `"negated": true` in the predicate obje
 
 Two constraints the backend enforces that don't show up in the predicate list:
 
-- **Predicate/field-type compatibility.** Predicates have a target data type. `is_not_a_number` (NaN detection), `is_negative`, `is_between_0_and_1`, `numeric_*` — these only work on numeric columns; the backend rejects them on string/text fields with messages like `'not a number (NaN)' does not support fields of type 'string'`. Same pattern for `is_future_date` on non-timestamp columns. Use `get_validation_predicates` to confirm a predicate is supported for the target column type, and check the column's type from `get_table` before picking one.
+- **Predicate/field-type compatibility.** Predicates have a target data type. `is_not_a_number` (NaN detection), `is_negative`, `is_between_0_and_1`, `numeric_*` — these only work on numeric columns; the backend rejects them on string/text fields with messages like `'not a number (NaN)' does not support fields of type 'string'`. Same pattern for `is_future_date` on non-timestamp columns. Use `get_validation_predicates` to confirm a predicate is supported for the target column type, and check the column's type from `get_asset` before picking one.
 - **Field references on the RIGHT side of a BINARY.** The right-hand side is usually a `LITERAL` or `SQL` (subquery). You can put a `FIELD` reference on the right **only** when the left field is a date/timestamp column, OR when the operator is `in_set` (`in`). Other combinations are rejected with `Fields are only allowed on the right side for date and timestamp fields, or when using the 'in' operator`.
 
 ---
@@ -219,7 +219,7 @@ Two constraints the backend enforces that don't show up in the predicate list:
 
 ### Alert when id is null
 
-Verify that `id` exists in the table schema from `get_table` before proceeding.
+Verify that `id` exists in the table schema from `get_asset` before proceeding.
 
 ```json
 {
@@ -244,7 +244,7 @@ The condition matches rows where `id` IS NULL -- these are the invalid rows we w
 
 ### Alert when status is not in allowed set
 
-Verify that `status` exists in the table schema from `get_table` before proceeding.
+Verify that `status` exists in the table schema from `get_asset` before proceeding.
 
 ```json
 {
@@ -274,7 +274,7 @@ Note `negated: true` -- the predicate is `in_set`, but we want to alert when the
 
 ### Alert when amount is negative
 
-Verify that `amount` exists in the table schema from `get_table` before proceeding.
+Verify that `amount` exists in the table schema from `get_asset` before proceeding.
 
 ```json
 {
@@ -299,7 +299,7 @@ The condition matches rows where `amount` is negative -- these are the invalid r
 
 ### Combined conditions: null OR negative
 
-Verify that both `amount` and `quantity` exist in the table schema from `get_table` before proceeding.
+Verify that both `amount` and `quantity` exist in the table schema from `get_asset` before proceeding.
 
 ```json
 {
@@ -329,7 +329,7 @@ The OR operator means an alert fires if either condition matches -- the row has 
 
 ### Between check with nested AND/OR
 
-Verify that `score` and `status` exist in the table schema from `get_table` before proceeding.
+Verify that `score` and `status` exist in the table schema from `get_asset` before proceeding.
 
 ```json
 {
@@ -364,7 +364,7 @@ This uses `between` with `negated: true` to alert when score is outside the 0-10
 
 ### Referential integrity with SQL subquery
 
-Verify that `customer_id` exists in the table schema from `get_table` before proceeding.
+Verify that `customer_id` exists in the table schema from `get_asset` before proceeding.
 
 ```json
 {
@@ -388,7 +388,7 @@ The SQL condition type is useful for referential integrity checks that require s
 
 ### Contains and starts_with checks
 
-Verify that `email` and `phone` exist in the table schema from `get_table` before proceeding.
+Verify that `email` and `phone` exist in the table schema from `get_asset` before proceeding.
 
 ```json
 {
