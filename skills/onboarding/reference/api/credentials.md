@@ -13,7 +13,7 @@ Credentials are returned oldest first. Each entry says what connection type it i
 where its secret lives. Get one by id to see the other fields of its kind.
 
 - **Effect:** read-only.
-- **Pairs with:** `create_airflow_credentials`, `create_athena_credentials`, `validate_athena_credentials`, `validate_athena_credentials_change`, `create_glue_credentials`, `validate_glue_credentials`, `validate_glue_credentials_change`, `create_hive_s3_credentials`, `create_s3_credentials`, `create_aws_secrets_manager_credentials`, `validate_aws_secrets_manager_credentials`, `validate_aws_secrets_manager_credentials_change`, `create_azure_key_vault_credentials`, `validate_azure_key_vault_credentials`, `validate_azure_key_vault_credentials_change`, `create_env_var_credentials`, `validate_env_var_credentials`, `validate_env_var_credentials_change`, `create_file_credentials`, `validate_file_credentials`, `validate_file_credentials_change`, `create_gcp_secret_manager_credentials`, `validate_gcp_secret_manager_credentials`, `validate_gcp_secret_manager_credentials_change`, `get_credentials`.
+- **Pairs with:** `create_airflow_credentials`, `create_athena_credentials`, `validate_athena_credentials`, `validate_athena_credentials_change`, `create_glue_credentials`, `validate_glue_credentials`, `validate_glue_credentials_change`, `create_hive_credentials`, `create_hive_s3_credentials`, `create_s3_credentials`, `create_aws_secrets_manager_credentials`, `validate_aws_secrets_manager_credentials`, `validate_aws_secrets_manager_credentials_change`, `create_azure_key_vault_credentials`, `validate_azure_key_vault_credentials`, `validate_azure_key_vault_credentials_change`, `create_env_var_credentials`, `validate_env_var_credentials`, `validate_env_var_credentials_change`, `create_file_credentials`, `validate_file_credentials`, `validate_file_credentials_change`, `create_gcp_secret_manager_credentials`, `validate_gcp_secret_manager_credentials`, `validate_gcp_secret_manager_credentials_change`, `get_credentials`.
 - **Paging:** one page per call; pass `next_cursor` back as `cursor` for the next page.
 
 ### Arguments
@@ -465,6 +465,48 @@ Returns the accepted request as-is. Response fields: id, status, revision, targe
 - Monte Carlo is busy or temporarily unavailable; the tool retries once after the wait Monte Carlo asks for.
 - An unexpected error prevented the request from being processed.
 
+## `create_hive_credentials`: Create Hive credentials
+
+Store the address of a HiveServer2 and the user Monte Carlo signs in as, as credentials for a hive connection. Takes `host` and `user`, plus `port`, `db_name` and `auth_mode` (`SASL` when left out). Hive needs no secret. Then call create_connection with them on a data-lake warehouse. Refused once the account holds its limit of credentials.
+
+- **Effect:** creates; repeating it creates again.
+- **Pairs with:** `update_hive_credentials`, `list_credentials`.
+
+### Arguments
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `host` | `str` | yes | Hostname of the HiveServer2. Between 1 and 255 characters. |
+| `user` | `str` | yes | User Monte Carlo signs in as. Hive takes no password. Between 1 and 200 characters. |
+| `port` | `int` | no | Port the HiveServer2 listens on in binary mode. Between 1 and 65535. |
+| `db_name` | `str` | no | Database Monte Carlo connects to. Between 1 and 200 characters. |
+| `auth_mode` | one of `SASL`, `NOSASL` | no | How Monte Carlo signs in. Omit it for `SASL`. |
+
+### Response
+
+Returns the new credentials. Response fields: id, connection_type, storage_type, created_time, host, port, user, db_name, auth_mode.
+
+| Field | Description |
+|---|---|
+| `id` | Unique identifier of the credentials. |
+| `connection_type` | The connection type the credentials are for, such as `snowflake`. Fixed once created. |
+| `storage_type` | Where the secret lives. Fixed once created. |
+| `created_time` | When the credentials were created. |
+| `host` | Hostname of the HiveServer2. |
+| `port` | Port the HiveServer2 listens on in binary mode. Null means the client's default. |
+| `user` | User Monte Carlo signs in as. Hive takes no password. |
+| `db_name` | Database Monte Carlo connects to. Null means the default database. |
+| `auth_mode` | How Monte Carlo signs in. |
+
+### What can fail
+
+- Authentication credentials are missing or invalid.
+- The request was authenticated, but the caller is not allowed to perform this operation. Read `code` to tell the reasons apart: `account_frozen` means the account is paused, rather than that the caller lacks permission.
+- The change conflicts with the current state of the credentials.
+- An argument is invalid; the error names the field.
+- Monte Carlo is busy or temporarily unavailable; the tool retries once after the wait Monte Carlo asks for.
+- An unexpected error prevented the request from being processed.
+
 ## `create_hive_s3_credentials`: Create Hive (S3) credentials
 
 Store the S3 location of Hive query logs from EMR and the IAM role Monte Carlo assumes to read them, as credentials for a hive-s3 connection. Takes `bucket`, `prefix` (the key prefix, not empty) and `assumable_role`, the ARN of a role in the customer's AWS account that the deployment assumes to read the bucket, plus `external_id` when the role's trust policy requires one. Hive (S3) needs no secret. Then call create_connection on a data-lake warehouse. Refused once the account holds its limit of credentials.
@@ -536,6 +578,49 @@ Returns the credentials after the change. Response fields: id, connection_type, 
 | `external_id` | External id your role's trust policy requires, if it requires one. It is not the deployment's `aws_external_id`. Null unless set. |
 | `bucket` | S3 bucket Monte Carlo reads from. |
 | `prefix` | Key prefix the objects sit under, such as `emr/prod`. Leave out the bucket, a leading `/` and any `s3://` scheme. |
+
+### What can fail
+
+- Authentication credentials are missing or invalid.
+- The request was authenticated, but the caller is not allowed to perform this operation. Read `code` to tell the reasons apart: `account_frozen` means the account is paused, rather than that the caller lacks permission.
+- The credentials does not exist, or is not visible to the caller.
+- An argument is invalid; the error names the field.
+- Monte Carlo is busy or temporarily unavailable; the tool retries once after the wait Monte Carlo asks for.
+- An unexpected error prevented the request from being processed.
+
+## `update_hive_credentials`: Update Hive credentials
+
+Change Hive credentials. Every connection using them picks up the change. `port` and `db_name` set to null are cleared, and `auth_mode` set to null goes back to `SASL`. `host` and `user` cannot be cleared. An empty body returns them unchanged.
+
+- **Effect:** updates in place; idempotent.
+- **Pairs with:** `create_hive_credentials`, `list_credentials`.
+
+### Arguments
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `credentials_id` | `str` | yes | Id of the credentials, as returned when they are created or listed. |
+| `host` | `str` | no | Hostname of the HiveServer2. Between 1 and 255 characters. |
+| `port` | `int` | no | Port the HiveServer2 listens on in binary mode. Between 1 and 65535. |
+| `user` | `str` | no | User Monte Carlo signs in as. Hive takes no password. Between 1 and 200 characters. |
+| `db_name` | `str` | no | Database Monte Carlo connects to. Between 1 and 200 characters. |
+| `auth_mode` | one of `SASL`, `NOSASL` | no | How Monte Carlo signs in. Omit it for `SASL`. |
+
+### Response
+
+Returns the credentials after the change. Response fields: id, connection_type, storage_type, created_time, host, port, user, db_name, auth_mode.
+
+| Field | Description |
+|---|---|
+| `id` | Unique identifier of the credentials. |
+| `connection_type` | The connection type the credentials are for, such as `snowflake`. Fixed once created. |
+| `storage_type` | Where the secret lives. Fixed once created. |
+| `created_time` | When the credentials were created. |
+| `host` | Hostname of the HiveServer2. |
+| `port` | Port the HiveServer2 listens on in binary mode. Null means the client's default. |
+| `user` | User Monte Carlo signs in as. Hive takes no password. |
+| `db_name` | Database Monte Carlo connects to. Null means the default database. |
+| `auth_mode` | How Monte Carlo signs in. |
 
 ### What can fail
 
