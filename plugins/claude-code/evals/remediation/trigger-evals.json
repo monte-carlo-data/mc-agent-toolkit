@@ -1,0 +1,48 @@
+{
+  "skill": "remediation",
+  "description": "Trigger accuracy evals for remediation (AI-1687): fix-this-alert requests trigger it; generic incidents, monitor noise and monitor creation do not.",
+  "cases": [
+    {
+      "id": "should-01",
+      "prompt": "How do I fix alert 2c7b1d25-95cb-42ed-8000-f69da52efb5c?",
+      "expected": "trigger",
+      "rationale": "Explicit fix request for one alert"
+    },
+    {
+      "id": "should-02",
+      "prompt": "What's the fix for this alert?",
+      "expected": "trigger",
+      "rationale": "Fix intent for an alert"
+    },
+    {
+      "id": "should-03",
+      "prompt": "Remediate this alert and tell me what to do next.",
+      "expected": "trigger",
+      "rationale": "Explicit remediation request"
+    },
+    {
+      "id": "should-not-01",
+      "prompt": "Alerts are firing, what should I do?",
+      "expected": "no-trigger",
+      "rationale": "Vague active incident (incident-response)"
+    },
+    {
+      "id": "should-not-02",
+      "prompt": "My orders table is stale, figure out why.",
+      "expected": "no-trigger",
+      "rationale": "Incident root cause on a table (incident-response)"
+    },
+    {
+      "id": "should-not-03",
+      "prompt": "This monitor is too noisy.",
+      "expected": "no-trigger",
+      "rationale": "Monitor noise (tune-monitor)"
+    },
+    {
+      "id": "should-not-04",
+      "prompt": "Create a volume monitor on the payments table.",
+      "expected": "no-trigger",
+      "rationale": "Monitor creation (monitoring-advisor)"
+    }
+  ]
+}

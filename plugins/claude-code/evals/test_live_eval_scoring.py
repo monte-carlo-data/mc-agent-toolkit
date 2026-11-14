@@ -4,6 +4,9 @@ Run: uv run python -m unittest test_live_eval_scoring
 """
 import unittest
 
+import yaml
+
+from constants import EVALS_DIR
 from models import ConversationTrace, EvalCase, TurnCriteria
 from run_live_evals import check_deterministic
 
@@ -60,6 +63,35 @@ class ExistingChecks(unittest.TestCase):
         criteria = TurnCriteria(must_not_call=["get_warehouses", "get_user"])
         t = trace(("get_warehouse", {}), ("get_current_user", {}))
         self.assertTrue(check_deterministic(criteria, t)[0])
+
+
+class AlertGuards(unittest.TestCase):
+    """Remediation may comment on an alert but must not change it without asking."""
+
+    COMMENTING_CASES = {
+        "remediation": ["rm-01-how-do-i-fix-latest-alert", "rm-02-existing-analysis-reads-plan"],
+        "context-detection": ["cd-07-how-do-i-fix-routes-to-remediation"],
+    }
+
+    def _turn_criteria(self, skill: str, case_id: str) -> list[TurnCriteria]:
+        data = yaml.safe_load((EVALS_DIR / skill / "live-evals-dev.yaml").read_text())
+        case = next(EvalCase.from_dict(c) for c in data["cases"] if c["id"] == case_id)
+        return [turn.criteria for turn in case.turns]
+
+    def test_exact_guard_allows_comments(self):
+        criteria = TurnCriteria(must_not_call=["update_alert"])
+        self.assertTrue(check_deterministic(criteria, trace(("create_or_update_alert_comment", {})))[0])
+        self.assertFalse(check_deterministic(criteria, trace(("update_alert", {})))[0])
+
+    def test_remediation_cases_allow_comments_and_block_status_changes(self):
+        for skill, case_ids in self.COMMENTING_CASES.items():
+            for case_id in case_ids:
+                for criteria in self._turn_criteria(skill, case_id):
+                    guard = TurnCriteria(must_not_call=criteria.must_not_call)
+                    with self.subTest(case=case_id):
+                        self.assertTrue(
+                            check_deterministic(guard, trace(("create_or_update_alert_comment", {})))[0])
+                        self.assertFalse(check_deterministic(guard, trace(("update_alert", {})))[0])
 
 
 class ToolNameMatching(unittest.TestCase):

@@ -115,3 +115,27 @@ cases:
         Bad: calls get_alerts or treats this as an incident.
 
         NOTE: Do NOT penalize Read or Skill tool calls.
+
+  # AI-1687: account-independent. Reads what the agents already found before running them.
+  - id: ir-06-same-alert-again
+    turns:
+      - prompt: "My most recent alert from the last 7 days is back. What do we already know about it?"
+        criteria:
+          must_call: [get_alerts, get_troubleshooting_agent_results]
+          must_call_before:
+            get_troubleshooting_agent_results: [run_troubleshooting_agent]
+          must_not_call: [update_alert, batch_update_alerts]
+    criteria:
+      judge_rubric: |
+        The user asks what is already known about an alert. The agent should read what Monte
+        Carlo's agents already produced before running anything: the triage verdict that
+        get_alerts returns (triage_priority, triage_result), the troubleshooting result
+        (get_troubleshooting_agent_results) and, when that succeeded, the remediation plan
+        (get_remediation_instructions).
+
+        Good: reports the existing triage verdict, root cause and plan, and says which are
+        missing. Offers to run what is missing rather than running it unasked.
+        Bad: starts a new troubleshooting run or triage without checking for existing results;
+        re-investigates by hand (lineage, queries) while a root cause is already recorded.
+
+        NOTE: Do NOT penalize Read or Skill tool calls.

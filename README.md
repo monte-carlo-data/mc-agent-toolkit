@@ -23,7 +23,7 @@ Skills are grouped by the job they help you do. Orchestrated workflows sequence 
 | **Incident Response** _(workflow)_ | Orchestrates full incident lifecycle — triage → root cause → remediation → prevent recurrence. | [SKILL](skills/incident-response/SKILL.md) |
 | **Automated Triage** | Scores and prioritizes active alerts; runs deep troubleshooting on high-signal ones. | [SKILL](skills/automated-triage/SKILL.md) |
 | **Analyze Root Cause** | Investigates incidents via lineage tracing, ETL checks, query analysis, and data profiling. | [README](skills/analyze-root-cause/README.md) |
-| **Remediation** | Proposes and executes fixes for data-quality alerts; assesses blast radius before acting, or escalates with full context. | [README](skills/remediation/README.md) |
+| **Remediation** | Reuses Monte Carlo's troubleshooting result and follows its remediation plan (code fix, monitor tuning, alert closure or hand-off); proposes its own fix only when no plan exists. | [README](skills/remediation/README.md) |
 | **Troubleshoot Agent Traces** | Investigates AI-agent alerts (evaluation, metric, trajectory, validation) and agent traces — kicks off the trace troubleshooting agent and guides a backend-aware manual investigation. | [README](skills/troubleshoot-agent-traces/README.md) |
 
 ### Monitoring — coverage gaps, monitor creation, noise reduction
@@ -33,7 +33,7 @@ Skills are grouped by the job they help you do. Orchestrated workflows sequence 
 | **Proactive Monitoring** _(workflow)_ | Sequences coverage analysis → gap identification → monitor creation into a guided flow. | [SKILL](skills/proactive-monitoring/SKILL.md) |
 | **Monitoring Advisor** | Identifies coverage gaps and creates monitors for warehouse tables or AI agents — validates tables and fields against your live workspace, emits monitors-as-code YAML. | [README](skills/monitoring-advisor/README.md) |
 | **Manage MaC** | Create, edit, validate, and import Monitors-as-Code YAML files — authors new monitors from scratch, modifies existing files, validates against the published JSON Schema, and exports live monitors to YAML. | [SKILL](skills/manage-mac/SKILL.md) |
-| **Tune Monitor** | Recommends sensitivity, segment, and schedule changes to reduce alert noise on an existing metric monitor. | [SKILL](skills/tune-monitor/SKILL.md) |
+| **Tune Monitor** | Tunes noisy monitors, or finds which ones to tune. Starts from Monte Carlo's tuning agent and applies only approved changes (own analysis is the fallback). | [SKILL](skills/tune-monitor/SKILL.md) |
 | **Account Analytics** | Answers questions about your own Monte Carlo account (alerts, data quality, coverage, monitors, credits, monitor runs) from the Analytics API, helps sharpen vague questions, and builds dashboards on request. | [SKILL](skills/account-analytics/SKILL.md) |
 
 ### Prevent — catch issues before they ship
