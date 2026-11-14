@@ -19,7 +19,7 @@ Connect to Monte Carlo's MCP server (`integrations.getmontecarlo.com/mcp`). The 
 |------|---------|
 | `get_alerts` | Fetch incident/alert details |
 | `search` | Find tables by name |
-| `get_table` | Table metadata and fields |
+| `get_asset` | Table metadata and fields |
 | `get_asset_lineage` | Table-level lineage |
 | `get_field_lineage` | Field-level lineage (trace to source column) |
 | `get_table_freshness` | Update/freshness history |

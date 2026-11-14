@@ -13,7 +13,7 @@ This skill analyzes a data warehouse for stale tables that can be removed to red
 > bundled server, whose fully-qualified tool names are
 > `mcp__plugin_mc-agent-toolkit_monte-carlo-mcp__<tool>` (e.g.
 > `mcp__plugin_mc-agent-toolkit_monte-carlo-mcp__get_alerts`). Bare tool names used in this skill
-> (`get_alerts`, `search`, `get_table`, …) refer to that bundled server. If the session also has a
+> (`get_alerts`, `search`, `get_asset`, …) refer to that bundled server. If the session also has a
 > separately-configured `monte-carlo-mcp` server, do **not** route to it — it may point at a
 > different endpoint or credentials.
 
@@ -80,7 +80,7 @@ The tool output contains two regions:
 
 Present ONLY the `<!-- PRESENT_AS_IS -->` block — copy it verbatim, preserving every column, row, and value. Add a brief intro sentence if needed, then paste the block unchanged. The user will see the summary and top tables, then choose a category to drill into.
 
-**CRITICAL — do NOT call any other tool after `analyze_storage_costs` succeeds.** No `search`, no `get_table`, no troubleshooting agents, no cross-checks. The analysis result IS the final answer; your only remaining job is to present the `<!-- PRESENT_AS_IS -->` block verbatim.
+**CRITICAL — do NOT call any other tool after `analyze_storage_costs` succeeds.** No `search`, no `get_asset`, no troubleshooting agents, no cross-checks. The analysis result IS the final answer; your only remaining job is to present the `<!-- PRESENT_AS_IS -->` block verbatim.
 
 **CRITICAL — preserve markdown-linked MCONs verbatim.** The pre-formatted tables already contain properly linked MCONs (e.g., `` [`db:schema.table`](https://getmontecarlo.com/assets/MCON++...) ``). Never output bare MCON strings as plain text.
 

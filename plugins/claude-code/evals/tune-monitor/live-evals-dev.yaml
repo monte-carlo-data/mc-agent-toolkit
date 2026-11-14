@@ -7,7 +7,7 @@
 no_apply: &no_apply
   # Nothing is changed without the user's confirmation.
   tool_input_must_not_contain: ['"dry_run": false']
-  must_not_call: [create_or_update_, mark_, __update_alert, batch_update_alerts]
+  must_not_call: [create_or_update_, mark_, update_alert, batch_update_alerts]
 
 cases:
   - id: tm-01-which-monitors-to-tune

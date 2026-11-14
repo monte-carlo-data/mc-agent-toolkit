@@ -78,8 +78,8 @@ class AlertGuards(unittest.TestCase):
         case = next(EvalCase.from_dict(c) for c in data["cases"] if c["id"] == case_id)
         return [turn.criteria for turn in case.turns]
 
-    def test_separator_anchored_guard(self):
-        criteria = TurnCriteria(must_not_call=["__update_alert"])
+    def test_exact_guard_allows_comments(self):
+        criteria = TurnCriteria(must_not_call=["update_alert"])
         self.assertTrue(check_deterministic(criteria, trace(("create_or_update_alert_comment", {})))[0])
         self.assertFalse(check_deterministic(criteria, trace(("update_alert", {})))[0])
 
@@ -92,6 +92,27 @@ class AlertGuards(unittest.TestCase):
                         self.assertTrue(
                             check_deterministic(guard, trace(("create_or_update_alert_comment", {})))[0])
                         self.assertFalse(check_deterministic(guard, trace(("update_alert", {})))[0])
+
+
+class ToolNameMatching(unittest.TestCase):
+    def test_exact_name_does_not_match_longer_tool(self):
+        criteria = TurnCriteria(must_call=["get_asset"])
+        passed, failures = check_deterministic(criteria, trace(("get_asset_lineage", {})))
+        self.assertFalse(passed)
+        self.assertEqual(failures, ["must_call: get_asset not found in trace"])
+
+    def test_exact_name_matches_under_any_server_prefix(self):
+        criteria = TurnCriteria(must_call=["get_asset"])
+        t = ConversationTrace(tools_called=["mcp__plugin_mc-agent-toolkit_monte-carlo-mcp__get_asset"])
+        self.assertTrue(check_deterministic(criteria, t)[0])
+
+    def test_trailing_underscore_is_a_prefix(self):
+        criteria = TurnCriteria(must_not_call=["create_"])
+        self.assertFalse(check_deterministic(criteria, trace(("create_warehouse", {})))[0])
+
+    def test_builtin_tool_name_matches(self):
+        criteria = TurnCriteria(must_not_call=["Bash"])
+        self.assertFalse(check_deterministic(criteria, ConversationTrace(tools_called=["Bash"]))[0])
 
 
 class CaseParsing(unittest.TestCase):

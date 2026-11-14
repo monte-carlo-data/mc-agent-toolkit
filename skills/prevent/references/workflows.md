@@ -34,7 +34,7 @@ artifact.
    table name. Wait for the full health report.
 
 2. Do **not** duplicate any of the MCP calls asset-health makes
-   (`get_table`, `get_alerts`, `get_asset_lineage` upstream-only, `get_monitors`).
+   (`get_asset`, `get_alerts`, `get_asset_lineage` upstream-only, `get_monitors`).
    Asset-health is the source of truth for those.
 
 3. Asset-health only fetches **upstream** lineage. To complete the picture for
@@ -121,13 +121,13 @@ without a prior file-open trigger), call MCP tools yourself in this order:
    If multiple results are returned, present them in a table (full_table_id,
    warehouse, importance, key-asset flag) and ask the engineer which one to
    assess. Do not pick one automatically. Once they choose, call
-   getTable(mcon="<mcon>") for that single MCON.
+   get_asset(mcon="<mcon>") for that single MCON.
    → importance score, query volume (reads/writes per day), key asset flag
 
 2. getAssetLineage(mcon="<mcon>")
    → full list of downstream dependents; for each, note whether it is a key asset
 
-3. getTable(mcon="<downstream_mcon>") for each key downstream asset
+3. get_asset(mcon="<downstream_mcon>") for each key downstream asset
    → importance score, last updated, monitoring status
 
 4. getAlerts(

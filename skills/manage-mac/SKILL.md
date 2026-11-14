@@ -23,7 +23,7 @@ validate, and import MaC YAML files that define Monte Carlo monitors.
 > bundled server, whose fully-qualified tool names are
 > `mcp__plugin_mc-agent-toolkit_monte-carlo-mcp__<tool>` (e.g.
 > `mcp__plugin_mc-agent-toolkit_monte-carlo-mcp__get_alerts`). Bare tool names used in this skill
-> (`get_alerts`, `search`, `get_table`, …) refer to that bundled server. If the session also has a
+> (`get_alerts`, `search`, `get_asset`, …) refer to that bundled server. If the session also has a
 > separately-configured `monte-carlo-mcp` server, do **not** route to it — it may point at a
 > different endpoint or credentials.
 
@@ -97,7 +97,7 @@ If ambiguous, ask which workflow is needed.
 | Tool | Used for |
 |---|---|
 | `search` | Resolve a table name to its MCON and `full_table_id` |
-| `get_table` | Verify column names and retrieve table schema |
+| `get_asset` | Verify column names and retrieve table schema |
 | `get_warehouses` | Resolve warehouse UUID |
 | `create_or_update_metric_monitor` | Author `metric` monitors (`dry_run=True`) |
 | `create_or_update_sql_monitor` | Author `custom_sql` monitors (`dry_run=True`) |
@@ -145,7 +145,7 @@ Ask for any information not already provided:
 
 Follow steps 1–3 from `../monitoring-advisor/references/data-monitor-creation.md` to:
 - Resolve the MCON and `full_table_id` via `search`
-- Verify column names via `get_table`
+- Verify column names via `get_asset`
 - Resolve domain UUID and warehouse UUID
 
 Never guess column names, warehouse UUIDs, or domain UUIDs.

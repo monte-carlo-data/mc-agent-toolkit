@@ -13,7 +13,7 @@ This skill handles all monitoring requests -- coverage analysis, data monitor cr
 > bundled server, whose fully-qualified tool names are
 > `mcp__plugin_mc-agent-toolkit_monte-carlo-mcp__<tool>` (e.g.
 > `mcp__plugin_mc-agent-toolkit_monte-carlo-mcp__get_alerts`). Bare tool names used in this skill
-> (`get_alerts`, `search`, `get_table`, …) refer to that bundled server. If the session also has a
+> (`get_alerts`, `search`, `get_asset`, …) refer to that bundled server. If the session also has a
 > separately-configured `monte-carlo-mcp` server, do **not** route to it — it may point at a
 > different endpoint or credentials.
 
@@ -83,7 +83,7 @@ All tools are available via the `monte-carlo-mcp` MCP server.
 | `get_audiences` | List notification audiences |
 | `get_unmonitored_tables_with_anomalies` | Tables with muted OOTB anomalies but no monitors (takes ISO 8601 time range) |
 | `search` | Find tables by name; supports `is_monitored` filter |
-| `get_table` | Table details, fields, stats, domain membership |
+| `get_asset` | Table details, fields, stats, domain membership |
 | `get_queries` | Query logs for a table (source/destination) or an ETL job |
 | `get_field_metric_definitions` | Available metrics per field type for a warehouse |
 | `get_domains` | List Monte Carlo domains |
@@ -204,7 +204,7 @@ When no use cases are defined, fall back to importance-based table discovery.
 
 1. **Find unmonitored tables:** Use `search(query="", is_monitored=false)` to find unmonitored tables sorted by importance.
 2. **Find tables with anomalies:** Use `get_unmonitored_tables_with_anomalies` with a recent time window (last 14-30 days) to find tables with recent anomalies but no monitors.
-3. **Inspect top candidates:** Use `get_table` to check table details, fields, and stats for the most important unmonitored tables.
+3. **Inspect top candidates:** Use `get_asset` to check table details, fields, and stats for the most important unmonitored tables.
 4. **Understand criticality via lineage:** Use `get_asset_lineage` with `direction="DOWNSTREAM"` to understand which tables are most connected -- a table with many downstream dependents is a stronger candidate for monitoring.
 5. **Prioritize:** Rank candidates by importance score and anomaly activity. Present the top candidates to the user with reasoning.
 
@@ -283,7 +283,7 @@ Example for a use-case tag monitor:
 Some tables show 0 rows when queried directly but have recent write activity in Monte Carlo metadata. These are **transient tables** -- fully replaced on each pipeline run (truncate-and-reload pattern). Recognize this pattern early to avoid wasting time querying empty tables.
 
 Signs of a transient table:
-- `get_table` shows a recent `last_updated_on` and high read/write activity
+- `get_asset` shows a recent `last_updated_on` and high read/write activity
 - Direct SQL query returns 0 rows or all-NULL timestamp columns
 - Monte Carlo detected freshness anomalies (the table stayed empty longer than expected between loads)
 

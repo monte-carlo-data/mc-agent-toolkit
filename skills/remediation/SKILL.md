@@ -17,7 +17,7 @@ This skill teaches you to investigate and remediate data quality issues detected
 > bundled server, whose fully-qualified tool names are
 > `mcp__plugin_mc-agent-toolkit_monte-carlo-mcp__<tool>` (e.g.
 > `mcp__plugin_mc-agent-toolkit_monte-carlo-mcp__get_alerts`). Bare tool names used in this skill
-> (`get_alerts`, `search`, `get_table`, …) refer to that bundled server. If the session also has a
+> (`get_alerts`, `search`, `get_asset`, …) refer to that bundled server. If the session also has a
 > separately-configured `monte-carlo-mcp` server, do **not** route to it — it may point at a
 > different endpoint or credentials.
 
@@ -204,10 +204,9 @@ Note: `has_relationships=false` means no dependencies tracked — do not assume 
 #### Step 5: Gather table context
 
 ```
-get_table(
+get_asset(
   mcon="<affected_table_mcon>",
-  include_fields=true,
-  include_table_capabilities=true
+  include=["fields", "capabilities"]
 )
 ```
 
@@ -215,7 +214,7 @@ Extract: last activity timestamps, row counts, schema, monitoring status, import
 
 For key downstream tables identified in Step 4, also fetch their details:
 ```
-get_table(mcon="<downstream_mcon>")
+get_asset(mcon="<downstream_mcon>")
 ```
 
 #### Step 6: Check alert context, monitoring, and recent queries

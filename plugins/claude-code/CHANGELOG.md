@@ -16,6 +16,13 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - context-detection: routes monitor noise to tune-monitor and "how do I fix this alert" to remediation.
 - evals: routing cases for tune-monitor, remediation, incident-response and context-detection, and trigger evals for tune-monitor and remediation.
 
+## [1.29.8] - 2026-11-11
+
+### Changed
+
+- Skills read tables with `get_asset` instead of `get_table`. Columns and monitoring capabilities are asked for with `include=["fields", "capabilities"]`.
+- Live evals expect `get_asset`. Tool names in eval criteria now match exactly, so `get_asset` no longer matches `get_asset_lineage`; a name ending in `_` is still a prefix.
+
 ## [1.29.7] - 2026-11-06
 
 ### Changed

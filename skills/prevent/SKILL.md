@@ -24,7 +24,7 @@ This skill brings Monte Carlo's data observability context directly into your ed
 > bundled server, whose fully-qualified tool names are
 > `mcp__plugin_mc-agent-toolkit_monte-carlo-mcp__<tool>` (e.g.
 > `mcp__plugin_mc-agent-toolkit_monte-carlo-mcp__get_alerts`). Bare tool names used in this skill
-> (`get_alerts`, `search`, `get_table`, …) refer to that bundled server. If the session also has a
+> (`get_alerts`, `search`, `get_asset`, …) refer to that bundled server. If the session also has a
 > separately-configured `monte-carlo-mcp` server, do **not** route to it — it may point at a
 > different endpoint or credentials.
 
@@ -209,7 +209,7 @@ Each workflow has detailed step-by-step instructions in `references/workflows.md
 ### 2. Change impact assessment — REQUIRED before modifying a model
 
 **When:** Any intent to modify a dbt model's logic, columns, joins, or filters.
-**What:** Surfaces blast radius, downstream dependencies, active incidents, monitor coverage, and query exposure. Reuses asset-health's data when Workflow 1 ran earlier this session; otherwise calls `get_table` / `get_alerts` / `get_asset_lineage` / `get_monitors` directly. Produces a risk-tiered report with synthesis connecting findings to specific code recommendations.
+**What:** Surfaces blast radius, downstream dependencies, active incidents, monitor coverage, and query exposure. Reuses asset-health's data when Workflow 1 ran earlier this session; otherwise calls `get_asset` / `get_alerts` / `get_asset_lineage` / `get_monitors` directly. Produces a risk-tiered report with synthesis connecting findings to specific code recommendations.
 
 ### 3. Change validation queries
 

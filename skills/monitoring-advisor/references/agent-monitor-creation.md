@@ -247,7 +247,7 @@ tables:
    in this playbook.
 2. **Optionally wrap the tables in a data product** named
    `Context for {AGENT_NAME}` via `create_or_update_data_product`: pass the
-   tables' `mcons` (from `search` / `get_table` — do not guess them) and a
+   tables' `mcons` (from `search` / `get_asset` — do not guess them) and a
    `description` naming the agent. Keep the default `dry_run=True` to show
    the asset-footprint preview; set `dry_run=False` only on explicit
    confirmation. The preview's asset count can exceed the tables you

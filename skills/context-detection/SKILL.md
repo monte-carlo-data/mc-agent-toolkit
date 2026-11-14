@@ -5,7 +5,7 @@ when_to_use: |
   Invoke for ambiguous or incomplete data-observability requests that don't clearly name a specific skill.
   Example triggers: "something is wrong with my data", "I have alerts firing", "check my pipelines", "what should I monitor?", "my data looks off".
 
-  CRITICAL on vague first turns: ALWAYS ask 1–3 targeted clarifying questions FIRST (what symptom? which table/warehouse? when did it start?). Do NOT call Monte Carlo MCP tools (get_alerts, search, get_table, etc.) on turn 1 until the user has named a specific table, warehouse, or alert. Calling tools prematurely on a vague prompt wastes turns and frustrates the user.
+  CRITICAL on vague first turns: ALWAYS ask 1–3 targeted clarifying questions FIRST (what symptom? which table/warehouse? when did it start?). Do NOT call Monte Carlo MCP tools (get_alerts, search, get_asset, etc.) on turn 1 until the user has named a specific table, warehouse, or alert. Calling tools prematurely on a vague prompt wastes turns and frustrates the user.
 
   Do NOT invoke when the user's intent clearly matches a single existing skill (e.g. "check health of orders table" → asset-health; "create a volume monitor on X" → monitoring-advisor).
 bucket: Agent-routing
@@ -20,7 +20,7 @@ This skill determines which Monte Carlo skill or workflow best fits the user's c
 > bundled server, whose fully-qualified tool names are
 > `mcp__plugin_mc-agent-toolkit_monte-carlo-mcp__<tool>` (e.g.
 > `mcp__plugin_mc-agent-toolkit_monte-carlo-mcp__get_alerts`). Bare tool names used in this skill
-> (`get_alerts`, `search`, `get_table`, …) refer to that bundled server. If the session also has a
+> (`get_alerts`, `search`, `get_asset`, …) refer to that bundled server. If the session also has a
 > separately-configured `monte-carlo-mcp` server, do **not** route to it — it may point at a
 > different endpoint or credentials.
 
@@ -102,7 +102,7 @@ Only make API calls when you have enough context to scope them:
 **Always scope MCP calls tightly.** Unscoped `get_alerts`, `search`, or `get_monitors` on large accounts can return hundreds of results, overflow the tool-result token limit, spill to disk, and force expensive chunk reads — burning user tokens and risking workflow failure. Minimum scoping:
 
 - `get_alerts` → time filter (`created_after`, default last 7 days) + at least one of `warehouse`, `table_names`, `severity`
-- `search` → needed to resolve a table name to its MCON (`get_table` requires MCON). ALWAYS pass `limit` (e.g. 5), the table name as `query`, and filter by `warehouse_uuid` or `database`/`schema`. `warehouse_types` alone ("snowflake") matches thousands of tables. Disambiguation rules when multiple matches return:
+- `search` → needed to resolve a table name to its MCON (`get_asset` is most reliable with an MCON). ALWAYS pass `limit` (e.g. 5), the table name as `query`, and filter by `warehouse_uuid` or `database`/`schema`. `warehouse_types` alone ("snowflake") matches thousands of tables. Disambiguation rules when multiple matches return:
   1. If the user named a warehouse (e.g. "analytics-snowflake") → auto-pick the match whose `warehouse_display_name` matches and proceed. Do NOT stop to ask.
   2. If the user named a database/schema → auto-pick the match in that database/schema.
   3. If one match is flagged `is_key_asset: true` and others aren't → auto-pick the key asset.
