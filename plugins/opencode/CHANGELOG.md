@@ -10,7 +10,7 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Added
 
 - reinforce-agent: starts from one issue handed over from Monte Carlo, an agent health issue link, or a prompt naming `agent_name`, `trace_table_mcon` and `issue_uuid`, and reads it with `get_reinforcement_loop_report(issue_uuid=...)`.
-- reinforce-agent: fixes a Snowflake Cortex agent by committing a new agent version instead of opening a pull request. `scripts/patch_agent_spec.py` builds the new specification from the current one and a merge patch, and reports every changed path, so the spec is never retyped. It checks first that the session's roles can change the agent; when they can't, it prints complete SQL for someone who can. Committing pins the default version first when the user wants to test before releasing.
+- reinforce-agent: fixes a Snowflake Cortex agent by committing a new agent version instead of opening a pull request. `scripts/patch_agent_spec.py` builds the new specification from the current one and a merge patch, and reports every changed path, so the spec is never retyped. It checks first that the session's roles can change the agent; when they can't, it prints complete SQL for someone who can. Before writing it checks the agent hasn't changed, and before committing that the new version holds exactly the new spec. Committing pins the default version first when the user wants to test before releasing.
 - reinforce-agent: after the user confirms the fix is released, marks the issue fixed with `update_reinforcement_loop_issue` (`MARK_FIXED`), passing the pull request when there is one.
 
 ## [1.29.8] - 2026-11-11

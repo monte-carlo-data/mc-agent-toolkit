@@ -18,7 +18,8 @@ Prints a JSON report to stdout:
     {"changed": [{"path": "instructions.orchestration", "before": null, "after": "..."}],
      "out": "new.json"}
 
-Exits 1 when the inputs aren't JSON objects, 2 when the patch changes nothing.
+Exits 1 when the inputs aren't JSON objects, 3 when the patch changes nothing (argparse
+uses 2 for usage errors).
 """
 
 from __future__ import annotations
@@ -45,6 +46,17 @@ def merge_patch(target: Any, patch: Any) -> Any:
     return result
 
 
+def json_equal(a: Any, b: Any) -> bool:
+    """Equality that keeps JSON types apart: Python's own == treats true as 1 and false as 0."""
+    if type(a) is not type(b):
+        return False
+    if isinstance(a, dict):
+        return a.keys() == b.keys() and all(json_equal(a[key], b[key]) for key in a)
+    if isinstance(a, list):
+        return len(a) == len(b) and all(json_equal(x, y) for x, y in zip(a, b))
+    return a == b
+
+
 def changed_paths(before: Any, after: Any, prefix: str = "") -> list[dict[str, Any]]:
     """Every leaf path whose value differs, objects walked key by key."""
     if isinstance(before, dict) and isinstance(after, dict):
@@ -64,7 +76,7 @@ def changed_paths(before: Any, after: Any, prefix: str = "") -> list[dict[str, A
             else:
                 changes.extend(changed_paths(old, new, path))
         return changes
-    if before == after:
+    if json_equal(before, after):
         return []
     return [{"path": prefix or "(root)", "before": before, "after": after}]
 
@@ -97,7 +109,7 @@ def main(argv: list[str] | None = None) -> int:
     changes = changed_paths(spec, new_spec)
     if not changes:
         print("error: the patch changes nothing in the spec", file=sys.stderr)
-        return 2
+        return 3
 
     args.out.write_text(json.dumps(new_spec, indent=2, ensure_ascii=False) + "\n")
     print(json.dumps({"changed": changes, "out": str(args.out)}, indent=2, ensure_ascii=False))

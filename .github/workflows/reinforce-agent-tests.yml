@@ -1,4 +1,4 @@
-name: Reinforce Agent Skill Tests
+name: Reinforce Agent Spec Patch Tests
 
 on:
   push:

@@ -118,10 +118,29 @@ class PatchAgentSpecTest(unittest.TestCase):
             [change["path"] for change in report["changed"]], ["orchestration", "skills"]
         )
 
+    def test_reports_a_change_of_json_type_alone(self) -> None:
+        spec = {"flag": True, "count": 0, "name": "a"}
+        code, report, _, _ = run(spec, {"flag": 1, "count": False})
+
+        self.assertEqual(code, 0)
+        self.assertEqual(
+            report["changed"],
+            [
+                {"path": "count", "before": 0, "after": False},
+                {"path": "flag", "before": True, "after": 1},
+            ],
+        )
+
+    def test_reports_a_change_of_json_type_beside_another_change(self) -> None:
+        code, report, _, _ = run({"flag": True, "name": "a"}, {"flag": 1, "name": "b"})
+
+        self.assertEqual(code, 0)
+        self.assertEqual([change["path"] for change in report["changed"]], ["flag", "name"])
+
     def test_a_patch_that_changes_nothing_fails(self) -> None:
         code, _, new_spec, stderr = run(SPEC, {"models": {"orchestration": "claude-opus-4-6"}})
 
-        self.assertEqual(code, 2)
+        self.assertEqual(code, 3)
         self.assertIsNone(new_spec)
         self.assertIn("changes nothing", stderr)
 
