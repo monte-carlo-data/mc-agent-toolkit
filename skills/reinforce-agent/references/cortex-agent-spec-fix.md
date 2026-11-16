@@ -27,8 +27,8 @@ search service is a change to that object: propose it and its SQL, and let the u
   itself contains `$$`, use a single-quoted string with every `\` and every `'` doubled: in
   single quotes Snowflake reads `\` as an escape, so `\n` or `\"` in the spec would change.
 - **Issue text never goes into SQL.** It is generated from the agent's conversations. Version
-  comments carry only the issue UUID; a commit comment is your own short summary, with any `'`
-  doubled.
+  and commit comments start with `Monte Carlo issue <issue uuid>`; the rest of a commit comment
+  is your own short summary, with any `'` doubled.
 - **NEVER `CREATE OR REPLACE AGENT`.** It resets the agent to `VERSION$1` and drops its grants
   and history.
 - **Committing can change production.** Unless `DEFAULT_VERSION` was set explicitly, the
@@ -40,9 +40,16 @@ search service is a change to that object: propose it and its SQL, and let the u
   narrows the gap but can't close it.
 - **One live version at a time.** If `ADD LIVE VERSION` fails because one exists, someone may
   have uncommitted edits, though a new agent also starts with one that holds its first version's
-  spec. Run `SHOW VERSIONS` again and, in a query over `RESULT_SCAN(LAST_QUERY_ID())`, compare
-  the live version's `agent_spec` with the default version's using `PARSE_JSON` equality. Only
-  when it is TRUE, and the user agrees after hearing that callers of the live version will see
+  spec. Compare the live version's spec with the default version's:
+
+  ```sql
+  SHOW VERSIONS IN AGENT <agent>;
+  SELECT PARSE_JSON(l."agent_spec") = PARSE_JSON(d."agent_spec") AS matches
+  FROM TABLE(RESULT_SCAN(LAST_QUERY_ID())) l, TABLE(RESULT_SCAN(LAST_QUERY_ID())) d
+  WHERE (l."name" IS NULL OR l."name" = '') AND d."is_default" = 'true';
+  ```
+
+  Only when it is TRUE, and the user agrees after hearing that callers of the live version will see
   the change at once, set the spec on that live version instead of adding one. If it isn't TRUE,
   or `SHOW VERSIONS` doesn't return `agent_spec` (that depends on account settings), stop and
   ask; NEVER overwrite the edits.
@@ -147,12 +154,12 @@ ALTER AGENT <agent> MODIFY LIVE VERSION SET SPECIFICATION = $$<contents of new.j
 ```
 
 Check the live version holds `new.json` before committing. In `SHOW VERSIONS`, it is the row
-without a committed version name:
+without a name:
 
 ```sql
 SHOW VERSIONS IN AGENT <agent>;
 SELECT PARSE_JSON("agent_spec") = PARSE_JSON($$<contents of new.json>$$) AS matches
-FROM TABLE(RESULT_SCAN(LAST_QUERY_ID())) WHERE <the live version's row>;
+FROM TABLE(RESULT_SCAN(LAST_QUERY_ID())) WHERE "name" IS NULL OR "name" = '';
 ```
 
 If it isn't TRUE, don't commit: tell the user what differs. If `SHOW VERSIONS` doesn't return
@@ -169,7 +176,7 @@ ALTER AGENT <agent> SET DEFAULT_VERSION = '<current default version>';
 Then commit and read back the new version's name. Don't assume the next number:
 
 ```sql
-ALTER AGENT <agent> COMMIT COMMENT = '<your summary of the fix>';
+ALTER AGENT <agent> COMMIT COMMENT = 'Monte Carlo issue <issue uuid>: <your summary of the fix>';
 SHOW VERSIONS IN AGENT <agent>;
 ```
 
