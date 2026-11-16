@@ -1,0 +1,45 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "edit|write|multi_edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${CORTEX_PLUGIN_ROOT}/hooks/prevent/pre_edit_hook.py"
+          }
+        ]
+      },
+      {
+        "matcher": "bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${CORTEX_PLUGIN_ROOT}/hooks/prevent/pre_commit_hook.py"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "edit|write|multi_edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${CORTEX_PLUGIN_ROOT}/hooks/prevent/post_edit_hook.py"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${CORTEX_PLUGIN_ROOT}/hooks/prevent/turn_end_hook.py"
+          }
+        ]
+      }
+    ]
+  }
+}

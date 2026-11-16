@@ -1,0 +1,13 @@
+[tool.poetry]
+name = "mixed-agent"
+version = "0.1.0"
+description = "Mixed Poetry + requirements.txt fixture"
+authors = ["Test <test@example.com>"]
+
+[tool.poetry.dependencies]
+python = ">=3.10"
+langchain = "^0.1.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

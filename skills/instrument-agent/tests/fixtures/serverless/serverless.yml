@@ -1,0 +1,2 @@
+service: my-agent
+provider: aws

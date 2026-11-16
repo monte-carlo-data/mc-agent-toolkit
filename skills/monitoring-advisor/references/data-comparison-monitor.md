@@ -1,0 +1,454 @@
+# Comparison Monitor Reference
+
+Detailed reference for building `create_or_update_comparison_monitor` tool calls. The tool follows the **two-call preview-then-confirm pattern** — see `data-monitor-creation.md` for the full flow.
+
+## Critical Constraints
+
+- **NEVER guess column names.** Always get them from `get_asset` for both the source and target tables. Verify that `source_field` exists in the source table and `target_field` exists in the target table before building alert conditions.
+
+---
+
+## When to Use
+
+Use a comparison monitor when the user wants to:
+
+- Compare data between two tables (e.g., source vs target, dev vs prod)
+- Validate data consistency after migration or replication
+- Check row count parity across environments
+- Compare field-level metrics between tables (null counts, sums, distributions)
+
+---
+
+## Pre-Step: Verify Both Tables and Fields
+
+Before constructing alert conditions, you MUST verify that both tables exist and that any referenced fields are real columns. This is the most common source of comparison monitor failures.
+
+1. **Resolve both MCONs.** Use `search` to find the source and target tables. If the user provided `database:schema.table` format, search for each to get the MCON.
+2. **Get full schemas.** Call `get_asset` with `include: ["fields"]` on BOTH the source table and the target table. You need the column lists from both.
+3. **For field-level metrics, verify fields exist on both sides.** Confirm that `source_field` exists in the source table's column list AND `target_field` exists in the target table's column list. Field names are case-sensitive on most warehouses.
+4. **Check field type compatibility.** The metric must be compatible with the column types on both sides. For example, `NUMERIC_MEAN` requires numeric columns in both the source and target tables. If the source column is numeric but the target is a string, the comparison will fail.
+5. If any field does not exist or types are incompatible, stop and ask the user to clarify. Do not guess.
+
+---
+
+## Required Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `name` | string | Unique identifier for the monitor. Use a descriptive slug (e.g., `orders_dev_prod_compare`). |
+| `description` | string | Human-readable description of what the monitor checks. |
+| `source_table` | string | Source table MCON (preferred) or `database:schema.table` format. If not MCON, also pass `source_warehouse`. |
+| `target_table` | string | Target table MCON (preferred) or `database:schema.table` format. If not MCON, also pass `target_warehouse`. |
+| `alert_conditions` | array | List of comparison conditions (see Alert Conditions below). |
+
+## Optional Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `source_warehouse` | string | Warehouse name or UUID for the source table. Required if `source_table` is not an MCON. |
+| `target_warehouse` | string | Warehouse name or UUID for the target table. Required if `target_table` is not an MCON. |
+| `segment_fields` | array of string | Fields to segment the comparison by. Must exist in BOTH tables with the same name. |
+| `domain_uuids` | array of string (uuid) | Domain UUIDs (use `get_domains` to list). Data monitors accept exactly one UUID in the list. |
+| `schedule_type` | string | Schedule type: `"fixed"` (default), `"dynamic"`, `"manual"`. |
+| `interval_minutes` | int | Schedule interval in minutes (only for `schedule_type="fixed"`). |
+| `audiences` | array of string | Notification audience **names** (not UUIDs) to alert when the monitor triggers. |
+| `failure_audiences` | array of string | Notification audience names to alert on query execution failures. |
+| `notes` | string | Free-text notes shown in the UI (separate from `description`). |
+| `priority` | string | Monitor priority (e.g. `"P1"`, `"P2"`). |
+| `tags` | array of `{name, value}` | Key-value tags to attach. |
+| `is_draft` | bool | When `True`, saves the monitor as a draft (not active). Default `False`. |
+| `monitor_uuid` | string (uuid) | UUID of an existing monitor to update in place. Omit to create a new monitor. **PUT semantics:** the call fully replaces the monitor's configuration — fields you omit revert to tool defaults, they are NOT left untouched. Before editing, read the current config with `get_monitors(monitor_ids=[<uuid>], include_fields=["config"])` and re-pass every field you want to keep. See `data-monitor-creation.md` (Step 7) for the safe-edit workflow. |
+| `dry_run` | bool | Default `True`. Preview mode. When omitted or `True`, returns YAML preview in `result.yaml`. When `False`, actually creates/updates the monitor and returns `result.monitor_uuid` + a deep link in `result.instructions`. See `data-monitor-creation.md`. |
+
+---
+
+## Cross-Warehouse Comparisons
+
+When the source and target tables live in different warehouses (e.g., comparing a Snowflake staging table against a BigQuery production table), you MUST provide both `source_warehouse` and `target_warehouse` explicitly. The tool cannot auto-resolve warehouses when tables are in different environments.
+
+Even when both tables are MCONs, if they belong to different warehouses, pass both warehouse parameters to be safe. Omitting them in cross-warehouse scenarios causes silent failures or incorrect results.
+
+Common cross-warehouse patterns:
+- **Dev vs prod:** same warehouse type, different databases or schemas
+- **Migration validation:** source in old warehouse, target in new warehouse
+- **Replication checks:** primary warehouse vs replica or downstream warehouse
+
+---
+
+## Alert Conditions
+
+Each condition compares a metric between the source and target tables.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `metric` | string | Yes | The metric to compare (see Metrics Reference below). |
+| `type` | string | Yes (for non-AUTO thresholds) | Threshold type — one of `comparison_delta` (static threshold on source↔target diff) or `AUTO` (anomaly detection). Omitting `type` defaults to AUTO-style behavior. |
+| `source_field` | string | For field-level metrics | Column in the source table. Required for ALL metrics except `ROW_COUNT`. |
+| `target_field` | string | For field-level metrics | Column in the target table. Required for ALL metrics except `ROW_COUNT`. |
+| `threshold_value` | number | **Required for `comparison_delta`-type conditions**; optional for `AUTO`-type anomaly detection. | Threshold for acceptable difference between source and target. Omitting it on a delta-type condition is rejected with `threshold_value is required for comparison_delta type`. |
+| `is_threshold_relative` | boolean | No | `false` = absolute difference (default), `true` = percentage difference. |
+| `custom_metric` | object | No | Custom SQL expressions for source and target (see Custom Metrics below). |
+
+### Threshold types
+
+Two threshold types are supported on comparison alert conditions:
+
+| `type` | Behavior | Required fields |
+|---|---|---|
+| `AUTO` (default when `type` is omitted) | Monte Carlo learns normal variance and alerts on anomalies. | `metric`, `source_field` / `target_field` (unless `ROW_COUNT`) |
+| `comparison_delta` | Static threshold on the source↔target difference. | `metric`, `source_field` / `target_field` (unless `ROW_COUNT`), `threshold_value` |
+
+If the user wants a specific numeric tolerance (e.g. "alert if source and target row counts differ by more than 100"), use `comparison_delta` and set `threshold_value`. If they want "alert when the difference looks unusual," use `AUTO` — no `threshold_value` needed.
+
+---
+
+## ROW_COUNT and Fields: A Critical Rule
+
+> **NEVER pass `source_field` or `target_field` when using the `ROW_COUNT` metric.**
+
+`ROW_COUNT` is a table-level metric -- it counts all rows in the table, not values in a column. Passing field names with `ROW_COUNT` causes the API call to fail or produce unexpected behavior.
+
+This is the single most common mistake with comparison monitors. Before submitting any alert condition with `ROW_COUNT`, verify that `source_field` and `target_field` are both absent from the condition object.
+
+| Metric | Fields needed? | What happens if you pass fields? |
+|--------|---------------|----------------------------------|
+| `ROW_COUNT` | **No -- NEVER pass fields** | API error or undefined behavior |
+| All other metrics | **Yes -- always pass both fields** | Required for the comparison to work |
+
+---
+
+## Metrics Reference
+
+### Table-level metric (no fields needed)
+
+| Metric | Description |
+|--------|-------------|
+| `ROW_COUNT` | Compare total row counts between source and target. |
+
+### Field-level metrics (require `source_field` and `target_field`)
+
+#### Uniqueness and duplicates
+
+| Metric | Description |
+|--------|-------------|
+| `UNIQUE_COUNT` | Count of distinct values. |
+| `DUPLICATE_COUNT` | Count of duplicate (non-unique) values. |
+| `APPROX_DISTINCT_COUNT` | Approximate distinct count (faster on large tables). |
+
+#### Null and empty checks
+
+| Metric | Description |
+|--------|-------------|
+| `NULL_COUNT` | Count of null values. |
+| `NON_NULL_COUNT` | Count of non-null values. |
+| `EMPTY_STRING_COUNT` | Count of empty string values. |
+| `TEXT_ALL_SPACES_COUNT` | Count of values that are all whitespace. |
+| `NAN_COUNT` | Count of NaN values. |
+| `TEXT_NULL_KEYWORD_COUNT` | Count of values containing null-like keywords (e.g., "NULL", "None"). |
+
+#### Numeric statistics
+
+| Metric | Description |
+|--------|-------------|
+| `NUMERIC_MEAN` | Mean of numeric field. |
+| `NUMERIC_MEDIAN` | Median of numeric field. |
+| `NUMERIC_MIN` | Minimum value. |
+| `NUMERIC_MAX` | Maximum value. |
+| `NUMERIC_STDDEV` | Standard deviation. |
+| `SUM` | Sum of numeric field. |
+| `ZERO_COUNT` | Count of zero values. |
+| `NEGATIVE_COUNT` | Count of negative values. |
+
+#### Percentiles
+
+| Metric | Description |
+|--------|-------------|
+| `PERCENTILE_20` | 20th percentile value. |
+| `PERCENTILE_40` | 40th percentile value. |
+| `PERCENTILE_60` | 60th percentile value. |
+| `PERCENTILE_80` | 80th percentile value. |
+
+#### Text statistics
+
+| Metric | Description |
+|--------|-------------|
+| `TEXT_MAX_LENGTH` | Maximum string length. |
+| `TEXT_MIN_LENGTH` | Minimum string length. |
+| `TEXT_MEAN_LENGTH` | Mean string length. |
+| `TEXT_STD_LENGTH` | Standard deviation of string length. |
+
+#### Text format checks
+
+| Metric | Description |
+|--------|-------------|
+| `TEXT_NOT_INT_COUNT` | Count of values not parseable as integers. |
+| `TEXT_NOT_NUMBER_COUNT` | Count of values not parseable as numbers. |
+| `TEXT_NOT_UUID_COUNT` | Count of values not matching UUID format. |
+| `TEXT_NOT_SSN_COUNT` | Count of values not matching SSN format. |
+| `TEXT_NOT_US_PHONE_COUNT` | Count of values not matching US phone format. |
+| `TEXT_NOT_US_STATE_CODE_COUNT` | Count of values not matching US state codes. |
+| `TEXT_NOT_US_ZIP_CODE_COUNT` | Count of values not matching US zip codes. |
+| `TEXT_NOT_EMAIL_ADDRESS_COUNT` | Count of values not matching email format. |
+| `TEXT_NOT_TIMESTAMP_COUNT` | Count of values not parseable as timestamps. |
+
+#### Boolean
+
+| Metric | Description |
+|--------|-------------|
+| `TRUE_COUNT` | Count of true values. |
+| `FALSE_COUNT` | Count of false values. |
+
+#### Timestamp
+
+| Metric | Description |
+|--------|-------------|
+| `FUTURE_TIMESTAMP_COUNT` | Count of timestamps in the future. |
+| `PAST_TIMESTAMP_COUNT` | Count of timestamps unreasonably far in the past. |
+| `UNIX_ZERO_COUNT` | Count of timestamps equal to Unix epoch zero (1970-01-01). |
+
+---
+
+## Choosing the Right Metric
+
+| User intent | Correct metric | Fields needed? |
+|-------------|---------------|----------------|
+| Row count parity | `ROW_COUNT` | **No** -- never pass fields |
+| Distinct values in a column | `UNIQUE_COUNT` | Yes |
+| Null values in a column | `NULL_COUNT` | Yes |
+| Sum, average, min, max | `SUM`, `NUMERIC_MEAN`, `NUMERIC_MIN`, `NUMERIC_MAX` | Yes |
+| Data completeness | `NON_NULL_COUNT` | Yes |
+| String format validation | `TEXT_NOT_EMAIL_ADDRESS_COUNT`, `TEXT_NOT_UUID_COUNT`, etc. | Yes |
+| Custom computed expressions | Use `custom_metric` instead of `metric` | No (SQL handles it) |
+
+---
+
+## Custom Metrics
+
+Use custom metrics when:
+
+- **Column names differ** between source and target and you need a computed expression (not just a direct field comparison).
+- **You need a derived calculation** like `SUM(quantity * unit_price)` rather than a simple column metric.
+- **Standard metrics do not cover the comparison** (e.g., comparing a ratio, a conditional aggregate, or a windowed calculation).
+
+If the columns simply have different names but you want a standard metric (e.g., compare `SUM` of `revenue` in source vs `total_revenue` in target), you do NOT need a custom metric -- just use the standard metric with different `source_field` and `target_field` values.
+
+Custom metric structure:
+
+```json
+{
+  "custom_metric": {
+    "display_name": "Revenue Sum",
+    "source_sql_expression": "SUM(revenue)",
+    "target_sql_expression": "SUM(total_revenue)"
+  }
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `display_name` | string | Yes | Human-readable name for the metric in alerts and dashboards. |
+| `source_sql_expression` | string | Yes | SQL expression evaluated against the source table. |
+| `target_sql_expression` | string | Yes | SQL expression evaluated against the target table. |
+
+When using `custom_metric`, do NOT also pass `metric`, `source_field`, or `target_field` in the same alert condition. The custom metric replaces all of those.
+
+---
+
+## Threshold Guidance
+
+### Absolute thresholds (`is_threshold_relative: false` or omitted)
+
+The `threshold_value` is the maximum acceptable absolute difference between the source and target metric values.
+
+- `threshold_value: 0` -- source and target must match exactly.
+- `threshold_value: 100` -- up to 100 units of difference is acceptable.
+
+### Relative (percentage) thresholds (`is_threshold_relative: true`)
+
+The `threshold_value` is the maximum acceptable percentage difference.
+
+- `threshold_value: 5` -- up to 5% difference is acceptable.
+- `threshold_value: 0.1` -- up to 0.1% difference is acceptable.
+
+### When to use each
+
+| Scenario | Recommended threshold type |
+|----------|---------------------------|
+| Exact replication (row counts must match) | Absolute, `threshold_value: 0` |
+| Near-real-time sync with small lag | Absolute, small value (e.g., 10-100) |
+| Tables at different scales | Relative, percentage-based |
+| Aggregated metrics (sums, means) | Relative, to handle floating-point differences |
+
+---
+
+## Examples
+
+### Row count parity with absolute threshold
+
+Compare row counts between dev and prod, alerting if they differ by more than 100 rows.
+
+```json
+{
+  "name": "orders_dev_prod_row_count",
+  "description": "Verify dev and prod orders tables have similar row counts",
+  "source_table": "MCON++a1b2c3d4-e5f6-7890-abcd-ef1234567890++1++1++dev_warehouse:core.orders",
+  "target_table": "MCON++b2c3d4e5-f6a7-8901-bcde-f12345678901++1++1++prod_warehouse:core.orders",
+  "alert_conditions": [
+    {
+      "metric": "ROW_COUNT",
+      "threshold_value": 100,
+      "is_threshold_relative": false
+    }
+  ]
+}
+```
+
+Note: no `source_field` or `target_field` -- `ROW_COUNT` is table-level.
+
+### Row count parity with percentage threshold
+
+Alert if row counts differ by more than 5%.
+
+```json
+{
+  "name": "orders_replication_check",
+  "description": "Verify replicated orders table is within 5% of source row count",
+  "source_table": "MCON++a1b2c3d4-e5f6-7890-abcd-ef1234567890++1++1++primary:sales.orders",
+  "target_table": "MCON++b2c3d4e5-f6a7-8901-bcde-f12345678901++1++1++replica:sales.orders",
+  "alert_conditions": [
+    {
+      "metric": "ROW_COUNT",
+      "threshold_value": 5,
+      "is_threshold_relative": true
+    }
+  ]
+}
+```
+
+### Field-level comparison (different column names)
+
+Compare the sum of `revenue` in the source table against `total_revenue` in the target table.
+
+```json
+{
+  "name": "revenue_source_target_sum",
+  "description": "Verify revenue sums match between staging and production",
+  "source_table": "MCON++a1b2c3d4-e5f6-7890-abcd-ef1234567890++1++1++staging:finance.transactions",
+  "target_table": "MCON++b2c3d4e5-f6a7-8901-bcde-f12345678901++1++1++production:finance.transactions",
+  "alert_conditions": [
+    {
+      "metric": "SUM",
+      "source_field": "revenue",
+      "target_field": "total_revenue",
+      "threshold_value": 1,
+      "is_threshold_relative": true
+    }
+  ]
+}
+```
+
+### Segmented comparison
+
+Compare null counts on `email` between source and target, segmented by `country`. The `country` field must exist in both tables.
+
+```json
+{
+  "name": "email_nulls_by_country",
+  "description": "Compare email null counts by country between ETL source and target",
+  "source_table": "MCON++a1b2c3d4-e5f6-7890-abcd-ef1234567890++1++1++raw:crm.contacts",
+  "target_table": "MCON++b2c3d4e5-f6a7-8901-bcde-f12345678901++1++1++analytics:crm.contacts",
+  "segment_fields": ["country"],
+  "alert_conditions": [
+    {
+      "metric": "NULL_COUNT",
+      "source_field": "email",
+      "target_field": "email",
+      "threshold_value": 0,
+      "is_threshold_relative": false
+    }
+  ]
+}
+```
+
+### Cross-warehouse comparison with explicit warehouses
+
+When source and target are in different warehouses, both warehouse parameters must be provided.
+
+```json
+{
+  "name": "migration_users_row_count",
+  "description": "Validate user row counts match after Snowflake to BigQuery migration",
+  "source_table": "snowflake_db:public.users",
+  "source_warehouse": "snowflake-prod",
+  "target_table": "bigquery_project:public.users",
+  "target_warehouse": "bigquery-prod",
+  "alert_conditions": [
+    {
+      "metric": "ROW_COUNT",
+      "threshold_value": 0,
+      "is_threshold_relative": false
+    }
+  ]
+}
+```
+
+### Custom metric comparison
+
+Compare a computed revenue expression when the SQL differs between source and target.
+
+```json
+{
+  "name": "computed_revenue_compare",
+  "description": "Compare total revenue computation between legacy and new schema",
+  "source_table": "MCON++a1b2c3d4-e5f6-7890-abcd-ef1234567890++1++1++warehouse:legacy.orders",
+  "target_table": "MCON++b2c3d4e5-f6a7-8901-bcde-f12345678901++1++1++warehouse:v2.orders",
+  "alert_conditions": [
+    {
+      "custom_metric": {
+        "display_name": "Total Revenue",
+        "source_sql_expression": "SUM(quantity * unit_price)",
+        "target_sql_expression": "SUM(total_amount)"
+      },
+      "threshold_value": 0.01,
+      "is_threshold_relative": true
+    }
+  ]
+}
+```
+
+### Multiple alert conditions
+
+Compare both row counts and field-level metrics in a single monitor.
+
+```json
+{
+  "name": "orders_full_comparison",
+  "description": "Full comparison of orders between staging and production",
+  "source_table": "MCON++a1b2c3d4-e5f6-7890-abcd-ef1234567890++1++1++staging:core.orders",
+  "target_table": "MCON++b2c3d4e5-f6a7-8901-bcde-f12345678901++1++1++production:core.orders",
+  "domain_uuids": ["f47ac10b-58cc-4372-a567-0e02b2c3d479"],
+  "alert_conditions": [
+    {
+      "metric": "ROW_COUNT",
+      "threshold_value": 0,
+      "is_threshold_relative": false
+    },
+    {
+      "metric": "NULL_COUNT",
+      "source_field": "customer_id",
+      "target_field": "customer_id",
+      "threshold_value": 0,
+      "is_threshold_relative": false
+    },
+    {
+      "metric": "SUM",
+      "source_field": "amount",
+      "target_field": "amount",
+      "threshold_value": 0.1,
+      "is_threshold_relative": true
+    }
+  ]
+}
+```
+
+Note: the `ROW_COUNT` condition has no fields, while the field-level conditions each specify both `source_field` and `target_field`.

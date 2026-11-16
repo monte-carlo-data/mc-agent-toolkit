@@ -1,0 +1,305 @@
+# Connection inputs: what each path requires
+
+Every value a deployment, credential, warehouse or connection needs is either **known** (the
+customer said it, or discovery read it) or **missing**. There is no third state. This reference
+lists the inputs per path and connection type, so the checklist is complete before anything is
+created, emitted or handed over.
+
+## Rules
+
+- **CRITICAL: never fill a required input with a guess.** Not an example value from these
+  references or the docs (`MONTE_CARLO`, `MONTE_CARLO_WH`, `xy12345.us-east-1`, `prod-vpc-agent`),
+  not a conventional name, not a value inferred from another field. A wrong user or warehouse still
+  creates the credentials and the connection; they only fail at validation, after everything exists.
+- **CRITICAL: resolve the checklist before the first write.** Build the checklist for the chosen
+  deployment, credential path and connection type from the tables below. Present it in the plan
+  (rule 4) with each value and where it came from (customer / discovery). Ask for every missing
+  entry in one message. Do not call a create tool, emit a create command, or hand over an artifact
+  while any entry is missing.
+- **IMPORTANT: "optional" in the API is not "optional for this customer".** The tables mark inputs
+  that the API accepts without but that the connection needs to work (the Snowflake warehouse is the
+  common one). Ask about those too; leave them out only when the customer confirms the fallback
+  applies (for example, the Snowflake user has a default warehouse).
+- **IMPORTANT: ask for names and references, never secret values.** For a secret, the input is
+  where it lives (file path, secret name/ARN, variable name) and, for self-hosted secrets, whether
+  its contents carry every required key. The customer checks the keys; you never see the values.
+- **CRITICAL: NEVER give a credential field a default value, in any output mode.** This covers the
+  account, user, warehouse, role, host, port, database, key file path and secret reference, and
+  every other field of a credential or its connection. A missing value fails at once with an error
+  that names the missing field, and the customer supplies it. A default value fails later, after the
+  credentials and connection exist, with an error that does not point at the field (a wrong
+  Snowflake user surfaces as `JWT token is invalid`), and someone has to work out which value was
+  wrong. So a value the customer has not given stays missing:
+  - Terraform: a `variable` with no `default`, so `terraform plan` stops and asks for it. No
+    example value in `default`, in a committed `*.tfvars`, or in a `locals` block.
+  - Script: `os.environ["NAME"]` (fails if unset), never `os.environ.get("NAME", "<value>")`.
+  - CLI: a visible `<placeholder>` left for the customer, never a filled-in guess.
+  - Tool call: no call until the customer gives the value.
+
+  Values discovery verified (a reused `deployment_id`, an existing warehouse's name) may be written
+  literally.
+
+## Support: what these tools can connect, and how
+
+Check every requested integration **before** asking about its deployment or credentials, and use
+the same reads to tell the customer what can be added. Supported types change as the API grows,
+so this section says how to discover them; it does not list them.
+
+| Where the secret lives | How the credentials are created | Which types |
+|---|---|---|
+| The customer's own store, read by a collection agent | MCP tools: `create_aws_secrets_manager_credentials`, `create_gcp_secret_manager_credentials`, `create_azure_key_vault_credentials`, `create_env_var_credentials`, `create_file_credentials`. Only a reference is passed. | A type whose `self_hosted_credentials_storages` is not empty, in one of the stores it lists. |
+| Monte Carlo stores it (managed) | The operation in `mc_managed_credentials_operation`. When `mc_managed_credentials_secret` is true, the request carries the secret, so it is **not an MCP tool**: a CLI or Terraform step the customer runs (rule 6). When it is false, the operation is an MCP tool, such as `create_glue_credentials`. | A type with an `mc_managed_credentials_operation`. |
+| Neither | — | Hand off to the UI (Settings → Integrations). |
+
+- **CRITICAL: discover types from `list_connection_types` in this session, NEVER from memory or
+  from examples in these references.** It lists every type the account can connect, with where
+  its credentials can be kept. A type it does not list cannot be connected through these tools.
+- **CRITICAL: `parent` says what the connection goes on.** A `warehouse` type goes on a warehouse
+  of its `warehouse_type`; when `warehouse_type` is null (such as `dbt-cloud-webhook`), on an
+  existing warehouse of any type, and never a new one. A `bi_container` type (`tableau`,
+  `looker`, `looker-git-clone`, `power-bi`) goes on a BI container of its `bi_container_type`,
+  never a warehouse. A BI type is supported only when this session also serves
+  `create_bi_container`; otherwise hand it off to the UI. An `etl_container` type that is not a custom connector (not `is_custom`, not
+  `custom-etl-connector`) is handed off to the UI; a custom ETL connector follows SKILL.md
+  *Custom connectors*.
+- **CRITICAL: the options above are the whole menu.** Offer them in customer language (for
+  example "a file on your machine that a command you run reads", "a secret in your AWS Secrets
+  Manager, by its name or ARN"). NEVER offer, accept or suggest typing a password, key or token
+  into the chat, and NEVER offer to read one from a file, a secret store or anywhere else.
+- **IMPORTANT: the credential choice can decide the deployment.** A self-hosted reference needs a
+  collection agent; a secret file on the customer's machine means Monte Carlo-managed credentials,
+  which only managed types have. Say which deployment an answer implies instead of asking the
+  deployment question separately, and ask it only when both fit.
+- **IMPORTANT: only some agent routes need no local Monte Carlo command.** When the customer
+  wants to finish in the chat, or cannot run mc-cli or Terraform, recommend a collection agent
+  with a self-hosted reference only when every remaining setup operation of that route is an MCP
+  tool: reusing an enabled agent that fits, or a new AWS agent (registration is an MCP tool; the
+  customer can deploy the stack with the CloudFormation template instead of the Terraform
+  module). A new GCP or Azure agent (registration carries the agent's credentials) and a new
+  Generic agent (its token or OAuth client is minted by an mc-cli or Terraform step) still need
+  one. Check the whole route before recommending it. When none fits, hand the step off to the UI
+  or to a teammate or admin who can run mc-cli or Terraform; NEVER create a deployment the
+  customer cannot finish. Their own infrastructure step (deploying the agent, storing the secret)
+  still runs on their side.
+- **CRITICAL: a custom connector is supported through its own type, not a warehouse `type`.**
+  `list_connection_types` marks one with `is_custom`, and `list_custom_connector_types` lists
+  the ones the account's agents registered, with each one's `asset_class` and deployment. An
+  `etl` or `bi` type is supported when `create_etl_container` or `create_bi_container` names
+  `custom-etl-connector` or `custom-bi-connector` in its `type` list; a push-only connector is
+  supported on the same condition. A `warehouse` type goes on a warehouse on its agent's
+  deployment, usually `custom-integration` (SKILL.md *Custom connectors*). NEVER provision a deployment or agent for a custom connector: the type
+  already runs on its agent's deployment.
+- NEVER provision a deployment or agent for an integration before it passes this check. An agent
+  built for an unsupported type is a deployment with nothing behind it (SKILL.md rule 3).
+
+## Deployment inputs
+
+| Path | Required | Source and checks |
+|---|---|---|
+| Any | Target Monte Carlo account and environment | `get_current_user`. The artifact's credentials (CLI profile, provider `profile`, SDK env) must reach this same account: compare the account the customer's profile resolves to before carrying discovered ids into an artifact. |
+| Reuse | `deployment_id` | Discovery (Step 1a). |
+| AWS agent | Region | Customer or existing infrastructure. |
+| AWS agent, CloudFormation or CLI | Collection AWS account ID | Account information → Collection → AWS account ID, read by the customer. Terraform reads it from the `montecarlo_hosting_private_link` data source instead; don't ask for it there. NEVER the AWS account the agent is deployed into. If both are equal, stop and re-check: registration then fails after several minutes with "Could not connect to Agent" because Monte Carlo is denied `sts:AssumeRole`. |
+| AWS agent | External ID | `get_deployment` → `aws_external_id` (Step 1b). |
+| AWS agent, private warehouse | Subnets that route to the warehouse | Customer. |
+| GCP / Azure / Generic agent | The module or guide's required inputs | The linked module or official guide; ask for each one it marks required. |
+| AWS data store | Region, bucket name | Customer; the bucket is created by the customer's step. |
+
+## Credential inputs by path
+
+### Monte Carlo-managed credentials
+
+The inputs of a managed type are the parameters of its create operation: the flags of
+`montecarlo credentials create <type> --help`, or the arguments of the Terraform resource
+`montecarlo_<type>_credentials`. The secret fields are the ones with a `--<field>-prompt` flag in
+the CLI and a `<field>_wo` argument in Terraform.
+
+- **CRITICAL: a secret field is NEVER written as a literal value.** In the CLI it is `@<path>` (read
+  from a file) or `--<field>-prompt` (hidden prompt); a literal is visible in the process list and
+  shell history. In Terraform it is the `<field>_wo` argument (SKILL.md rule 7).
+- Every other field follows the rules above: from the customer or discovery, never a default.
+
+The Snowflake key pair below is the worked example; other managed types follow the same pattern.
+
+#### Example: Snowflake key pair
+
+| Input | Required | Notes |
+|---|---|---|
+| `account` | yes | The customer's Snowflake account identifier (`<locator>.<region>` or `<org>-<account>`). `SELECT CURRENT_ACCOUNT(), CURRENT_REGION();` confirms it. |
+| `user` | yes | The Snowflake user **the public key is set on**. Snowflake rejects any other user with `JWT token is invalid`. The customer can compare `DESC USER <user>` → `RSA_PUBLIC_KEY_FP` with the key file's fingerprint locally. |
+| Private key | yes | A file path on the customer's machine, PEM with BEGIN/END lines. Never its contents, and never open the file to check it: the customer's command reads it. |
+| `warehouse` | **in practice** | API-optional. Without it, queries fail with "No active warehouse selected" unless the user has a default warehouse. Ask for it. |
+| Passphrase | only for an encrypted key | Ask whether the key is encrypted; the passphrase itself stays with the customer (environment variable or prompt). |
+
+The user also needs the grants from https://docs.getmontecarlo.com/docs/snowflake, including
+`IMPORTED PRIVILEGES` on the `SNOWFLAKE` database for query logs. Confirm the grants script ran for
+this user and warehouse.
+
+When Terraform creates the service user (output-modes reference, *Snowflake service user, in the
+same configuration*), the user, warehouse and key come from those resources, and the checklist
+asks instead for:
+
+| Input | Required | Notes |
+|---|---|---|
+| Organization and account name | yes | `SELECT CURRENT_ORGANIZATION_NAME(), CURRENT_ACCOUNT_NAME();`. The secret's `account` is `<org>-<account>`. |
+| Admin login and role | yes | The user the Snowflake provider signs in with, and a role that can create users, roles and warehouses and grant `IMPORTED PRIVILEGES` on `SNOWFLAKE` (for example `ACCOUNTADMIN`). |
+| Admin private key | yes | A file path, as above. Never its contents. Ask whether it is encrypted: the passphrase stays in the customer's `SNOWFLAKE_PRIVATE_KEY_PASSPHRASE` environment variable. |
+| User, role and warehouse names | yes | Propose the docs' `MONTE_CARLO`, `MONTE_CARLO_ROLE`, `MONTE_CARLO_WH` for the customer to confirm. If one already exists, another name or `terraform import`. |
+| Databases | yes | The databases Monte Carlo monitors. Never default to all of them. |
+| New key pair | yes | Two file paths: the public and the private key the customer generated for the service user. The private key is unencrypted PKCS#8 (`openssl pkcs8 -topk8 -nocrypt`). |
+| Schema-level future grants | yes | From the docs' check: the schemas and object types it lists, or "none". Never the grants' full output. |
+
+#### BI tools
+
+The four BI types are managed. Each table lists the create operation's inputs; secret inputs are a
+file path or a prompt, never a value. CLI flags are the field names with dashes (`server_name` →
+`--server-name`); Terraform secrets are `<field>_wo` with `<field>_wo_version`.
+
+#### Tableau
+
+| Input | Required | Notes |
+|---|---|---|
+| `server_name` | yes | The server URL, starting with `https://` or `http://`. |
+| `site_name` | **in practice** | The site to connect to. Leave it out only for the server's default site; ask which. |
+| Sign-in method | yes | **exactly one sign-in method**, below. Sending inputs of two methods is refused. |
+| `verify_ssl` | no | Verified when left out. Set `false` only when the customer asks, for a self-signed certificate. |
+
+| Sign-in method | Inputs |
+|---|---|
+| Personal access token | `token_name`, and the token's secret as `token_value` (secret). No `username`. |
+| Username and password | `username`, `password` (secret). |
+| Connected app | `username`, `connected_app_client_id`, `connected_app_secret_id` (an identifier, not the secret), `connected_app_secret_value` (secret). A deployment on an older collector version refuses it with an upgrade-required error. |
+
+#### Looker API
+
+| Input | Required | Notes |
+|---|---|---|
+| `base_url` | yes | The instance's API URL. |
+| `api_client_id` | yes | Client ID of the Looker API key Monte Carlo signs in with. |
+| `api_client_secret` | yes, secret | |
+| `verify_ssl` | no | Verified when left out. |
+
+#### Looker git clone
+
+The LookML repository, on the same `looker` container as the Looker API connection.
+
+| Input | Required | Notes |
+|---|---|---|
+| `repo_url` | yes | Clone URL, HTTPS or SSH. |
+| Clone method | yes | HTTPS: `username` and `token` (secret). SSH: `ssh_key` (secret), the private key file with its BEGIN/END lines; the customer's command reads the file. |
+| `ssl_ca_data` | no | PEM of the CA that signed the git server's certificate, for a private CA. |
+| `ssl_skip_cert_verification` | no | Only when the customer asks. |
+
+#### Power BI
+
+| Input | Required | Notes |
+|---|---|---|
+| `tenant_id` | yes | The Microsoft Entra ID tenant. |
+| `app_client_id` | yes | The app registration Monte Carlo signs in with. |
+| `auth_mode` | yes | `service_principal` with `app_client_secret` (secret), or `primary_user` with `username` and `password` (secret). Ask which; there is no default. |
+
+### Self-hosted reference (the customer keeps the secret)
+
+| Store | Required | Optional |
+|---|---|---|
+| AWS Secrets Manager | `connection_type`, `aws_secret` | `aws_region`, `assumable_role`, `external_id` |
+| GCP Secret Manager | `connection_type`, `gcp_secret` | |
+| Azure Key Vault | `connection_type`, `akv_secret`, and `akv_vault_name` or `akv_vault_url` | |
+| Environment variable on the agent | `connection_type`, `env_var_name` | `kms_key_id` |
+| File on the agent | `connection_type`, `file_path` | |
+
+Add `bq_project_id` for BigQuery and `databricks_warehouse_id` for Databricks where the operation
+takes them. Then confirm the **secret's contents** carry every key the connection type needs,
+below. The customer checks; do not ask to see the secret.
+
+### Required keys inside a self-hosted secret
+
+From https://docs.getmontecarlo.com/docs/self-hosted-credentials; if the page and this table
+disagree, the page is right. Keys sit inside `connect_args` unless noted.
+
+| Connection type | Required | Optional or conditional |
+|---|---|---|
+| Snowflake | `user`, `private_key` (decrypted PKCS#8 body, no BEGIN/END lines), `account` | `warehouse` (**in practice**, as above) |
+| BigQuery | `type`, `project_id`, `private_key_id`, `private_key`, `client_email`, `client_id`, `auth_uri`, `token_uri`, `auth_provider_x509_cert_url`, `client_x509_cert_url` (the service-account key file) | also pass `bq_project_id` on the credential |
+| Databricks | the page marks no key required; ask which auth method the customer uses and confirm its keys: `databricks_workspace_url` with `databricks_token`, or with `databricks_client_id` + `databricks_client_secret` (plus `azure_tenant_id`, `azure_workspace_resource_id` on Azure) | the SQL warehouse id goes on the credential, not in the secret |
+| Redshift | `host`, `dbname`, `port`, `user`, `password` | `autocommit` |
+| Postgres | `dbname`, `user`, `password`, `host`, `port` | |
+| MySQL | `host`, `port`, `user`, `password` | none: MySQL has no `database` key; schemas are discovered |
+| SQL Server, Azure SQL Database, Azure Dedicated SQL Pool | `connect_args` (a connection string) | `login_timeout`, `query_timeout` (`query_timeout_in_seconds` for SQL Server) |
+| Oracle | `dsn`, `user`, `password` | `ssl_options` |
+| DB2 | `hostname`, `port`, `database`, `uid`, `pwd` | `ssl_options.ca_data` |
+| SAP HANA | `address`, `port`, `user`, `password`, `databaseName` | |
+| Teradata | `host`, `user`, `password`, `dbs_port`, `tmode`, `sslmode`, `logmech` | `request_timeout`, `logon_timeout`, `ssl_options` |
+| ClickHouse | `host`, `port`, `username`, `password`, `database` | |
+| Microsoft Fabric | `server`, `database`, `tenant_id`, `client_id`, `client_secret` | `port` |
+| Starburst Enterprise | `host`, `port`, `user`, `password` | `ssl_options` |
+| Starburst Galaxy | `host`, `user`, `password` | `port`, `catalog` |
+| Dremio | `token` (top level), `connect_args.location` | |
+| Motherduck | `connect_args` (`md:<database>?motherduck_token=<token>`) | |
+| Salesforce CRM | token auth: `user`, `password`, `security_token`; or OAuth: `consumer_key`, `consumer_secret`, `domain` | |
+| Salesforce Data Cloud | `domain`, `client_id`, `client_secret` | |
+| Fivetran | `fivetran_api_key`, `fivetran_api_password` | |
+| Informatica | `username`, `password`, `base_url` | |
+| Looker | `client_id`, `client_secret`, `base_url` (top level) | |
+| Looker Git | `repo_url`, `ssh_key` (top level) | |
+| Power BI | `client_id`, `client_secret`, `tenant_id` (top level) | |
+| Tableau | `username`, `client_id`, `secret_id`, `secret_value`, `server_name` (top level) | `site_name`, `verify_ssl`, `token_expiration_seconds` |
+
+The BI rows (Looker, Looker Git, Power BI, Tableau) are what a self-hosted secret holds when a
+collection agent reads it; the credential's `connection_type` is `looker`, `looker-git-clone`,
+`power-bi` or `tableau`. Their connections go on a BI container (SKILL.md Step 3b). NEVER create a
+warehouse for a BI tool: `create_warehouse` has no BI type.
+
+For a type not listed, read its section on that page and apply the same rule before continuing.
+
+A **custom connector** type is not on that page: the keys are whatever the customer's connector
+reads. Ask the customer to confirm the secret carries them; do not guess them from a similar
+built-in type.
+
+## Warehouse and connection inputs
+
+| Resource | Required | Source |
+|---|---|---|
+| Warehouse | `name`, `deployment_id`, and exactly one of `type` / `connection_type` | Name from the customer or an existing warehouse; never reuse a different target's warehouse because the type matches. |
+| BI container | `type` (`tableau`, `looker` or `power-bi`), `name`, `deployment_id` | Name from the customer or an existing container; one container per BI instance, and one `looker` container for both Looker connections. |
+| ETL container (custom ETL connector) | `type` `custom-etl-connector`, `name`; `deployment_id` for an agent-registered connector, none for a push-only one | Name from the customer or an existing empty container; the deployment from the type in `list_custom_connector_types`, never chosen or provisioned. One connection per container. |
+| BI container (custom BI connector) | `type` `custom-bi-connector`, `name`; `deployment_id` as for ETL | As for ETL. |
+| Connection | `name`, `credentials_id`, and exactly one of `warehouse_id` / `bi_container_id` / `etl_container_id` | Name from the customer; ids from the earlier steps. A BI connection takes `bi_container_id`, a custom ETL one `etl_container_id`. A push-only custom connector's connection takes no `credentials_id`. |
+| Warehouse (custom warehouse connector) | `name`, `deployment_id`, `type` `custom-integration` | Reuse a warehouse on the type's deployment when one fits; the deployment from the type. |
+| Custom connector credentials | a self-hosted reference with `connection_type` set to the type's `id`; an environment variable name starting with `MCD_` | The customer, for the store and the reference; the type's `id` from discovery. None for push-only. |
+| Ingestion key (push-only) | exactly one of `etl_container_id` / `bi_container_id` | The push-only container this run created or reused. Created by the customer's CLI or Terraform step; only the key's id comes back. |
+
+## Common mistakes
+
+- Emitting `user = "MONTE_CARLO"` and `warehouse = "MONTE_CARLO_WH"` because the example shows
+  them. The connection is created, then validation fails: `JWT token is invalid` for the user,
+  "No active warehouse selected" for the warehouse.
+- Setting the Collection AWS account ID to the account the agent runs in.
+- Writing a Terraform variable with an example `default`, so `plan` never asks for the real value.
+- Discovering over one Monte Carlo account and generating an artifact whose profile reaches another.
+- Treating a secret reference as complete without confirming the secret carries the type's keys.
+- Asking about deployments or credentials before checking the integration is supported, then
+  discovering after an agent is provisioned that the type is UI-only on the chosen route.
+- Telling the customer a type is unsupported (or supported) from memory instead of from this
+  session's `list_connection_types`.
+- Writing a managed secret as a literal CLI value instead of `@<path>` or `--<field>-prompt`.
+- Creating one deployment per integration when several fit the same one.
+- Planning a warehouse for Tableau, Looker or Power BI. They go on a BI container.
+- Creating a second `looker` container for the LookML repository instead of adding the
+  `looker-git-clone` connection to the existing one.
+- Sending a Tableau `username` with a personal access token, or the inputs of two sign-in methods.
+- Creating a second connection to an account or host that is already connected, on any
+  deployment, without saying so: the same data is collected twice.
+- Validating a self-hosted reference before the agent's read grant on the secret is applied: it
+  only fails, and looks like a bad secret.
+- Creating or choosing a deployment for a custom connector, or validating its credentials on a
+  deployment other than the type's: it is refused as `custom_connector_deployment_mismatch`.
+- Sending credentials for a push-only custom connector, or calling `validate_connection` on its
+  connection: it has no deployment and nothing to validate.
+- Minting a push-only connector's ingestion key for a different container, or unscoped: a push
+  with it is refused for that container.
+- Sending a custom warehouse type's own name as the warehouse `type`: send
+  `type="custom-integration"` instead.
+- Naming an environment variable for custom connector credentials without the `MCD_` prefix.
+- Treating a failed **Tables** check on a database the customer just created as missing grants:
+  an empty database fails it too. Ask whether it has tables yet.

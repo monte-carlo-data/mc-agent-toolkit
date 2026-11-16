@@ -1,0 +1,135 @@
+# Tuning Agent Metric Monitors
+
+This reference covers type-specific tuning guidance for agent metric monitors — monitors that
+track a metric (row count, latency, error rate, token usage, ...) over an AI agent's trace
+table. Read this file after determining the monitor type in Phase 1.5.
+
+## Config fields to extract
+
+Extract these from the `get_monitors` config response for your Phase 2 analysis:
+
+- Agent name and **Agent reference** (from the report's `- Agent:` and `- Agent reference:` lines)
+- Trace table (the warehouse table holding the agent's spans)
+- Comparisons (metric, operator and the field each one measures; `AUTO` / `AUTO_HIGH` / `AUTO_LOW`
+  mean ML thresholds). A comparison on `total_cost` is a daily cost monitor — see the exception below.
+- Sensitivity (monitor-level; only meaningful with ML thresholds)
+- Notification routing (`audiences` and `failure_audiences`, preserving conditions and explicit
+  empty lists from the config)
+- Span filters (`agent_span_filters`: workflow / task / span name narrowing)
+- Trace aggregation (`is_agent_trace_aggregation`: metric computed per whole trace vs per span)
+- Time axis (`time_axis_field_name` + aggregation bucket)
+- Schedule (`FIXED` interval or `MANUAL`)
+
+---
+
+## Daily cost exception: `total_cost`
+
+A `total_cost` monitor measures the whole agent's daily reported Snowflake credits,
+including model usage and warehouse queries. It is not a span-level field or a dollar
+amount. The following constraints override the general tuning guidance:
+
+- Keep exactly one condition: `SUM` on `total_cost`, operator `AUTO_HIGH`.
+- Keep daily buckets (`aggregate_by="day"`) and a fixed daily schedule
+  (`schedule_type="fixed"`, `interval_minutes=1440`).
+- **Do not change** the field, metric, direction, thresholds, bucket, or schedule.
+  Do not use operator `NOOP`, `segment_fields`, `agent_span_filters`,
+  `is_agent_trace_aggregation`, `is_agent_conversation_aggregation`,
+  `clustering_space_uuid`, or `cluster_keys`.
+- **Sensitivity is the only detection setting you can change.** For noise reduction,
+  follow the skill's general sensitivity guidance: lower it one step (`HIGH` to `medium`,
+  `MEDIUM` / `AUTO` to `low`). If the monitor is noisy and already `LOW`, or the evidence
+  does not justify lowering sensitivity, do not recommend lowering it.
+  An explicit request to increase sensitivity is still supported, including `low` to
+  `medium`; explain that this may produce more alerts.
+- **Audience and notification routing recommendations still apply.** Changing who receives
+  alerts does not change the daily cost calculation. Preserve the existing audiences unless
+  the user approves a change. Return no recommendation only when neither a sensitivity
+  change nor a notification-routing change is justified. Do not replace the cost monitor
+  with a token monitor or propose an unsupported change as a workaround.
+- **For a platform agent such as Snowflake Cortex, do not pass `trace_table`.** The API
+  resolves the source from the agent reference.
+
+The threshold, span-filter, and aggregation guidance below applies to other agent metric
+monitors. The applying-changes instructions apply to both cost and other metric monitors.
+When no change is justified, report it with the no-change form of the Phase 4 template and do not
+offer to apply anything.
+
+---
+
+## Threshold adjustment
+
+For explicit-threshold comparisons (`GT`, `LT`, etc.), follow the same rules as metric monitors:
+explain what the threshold means for the agent metric ("error rate GT 0.05 means alert when more
+than 5% of spans error"), and never recommend a change without citing observed anomaly values
+from the report. For `AUTO` / `AUTO_HIGH` / `AUTO_LOW` (ML) comparisons, use the general sensitivity
+guidance in the skill.
+
+---
+
+## Span-filter narrowing
+
+If anomalies concentrate in one workflow, task, or span name, narrowing `agent_span_filters`
+scopes the metric to just that slice — or excludes a noisy slice by monitoring the rest.
+
+**Write shape rules (strict — the API rejects violations):**
+
+- At most **one** span filter entry.
+- Each sub-field is a nested object: `{"workflow": {"value": "TTSA"}}` — never a bare string.
+- Field names are snake_case throughout, including nested ones (`span_name`), and the tool
+  parameter itself (`agent_span_filters`).
+- **NEVER include an `agent` entry inside `agent_span_filters`.** The agent is identified by the
+  top-level `agent` parameter, not a span filter. An `agent` sub-field is rejected.
+
+**Trade-off:** a narrower filter no longer sees anomalies outside the slice. Always state what
+the monitor stops watching.
+
+---
+
+## Aggregation
+
+`is_agent_trace_aggregation=True` computes the metric once per trace (e.g. total tokens per
+conversation) instead of per span. Trace aggregation and span-level filters are mutually
+exclusive — **do not** combine `is_agent_trace_aggregation=True` with `agent_span_filters`.
+
+Recommend switching to trace aggregation when per-span values are inherently spiky but the
+per-trace total is stable (and vice versa). Schedule intervals must be `fixed`/`manual`, at
+least 60 minutes, and a multiple of 60.
+
+---
+
+## Applying changes
+
+Use `create_or_update_agent_metric_monitor` to update the monitor in place. The general
+preview-then-confirm rules from the metric monitor reference apply (always pass
+`monitor_uuid=<uuid>`, always dry-run first, stale-uuid handling).
+
+### Common mistakes
+
+- **CRITICAL: the `agent` parameter takes the Agent reference, verbatim.** Copy the report's
+  `- Agent reference:` value exactly (e.g. `analytics:prod_agents.rothbot`) — **never** the bare
+  agent name and **never** the trace table's MCON. If the report shows no Agent reference, stop:
+  the agent was likely deleted, renamed, or moved, and the monitor can't be updated until that's
+  resolved.
+- **NEVER** put an `agent` entry inside `agent_span_filters` (see above).
+- **`trace_table` depends on the agent type and store.** For a platform agent such as
+  Snowflake Cortex, never pass `trace_table`; the API resolves it from the agent reference.
+  For a non-ClickHouse OTel agent (e.g. OTel spans stored in a Snowflake table), pass the
+  monitor's trace table (fullTableId form, e.g.
+  `ingest:opentelemetry.traces`) as `trace_table` on **every** edit — the API rejects the edit
+  without it. For an agent on the Monte Carlo-managed ClickHouse store
+  (`...otel_traces:otel_traces.spans_normalized`), **never** pass `trace_table` — the API
+  rejects an explicit reference to its own store (it resolves it from the agent automatically).
+- **PUT semantics** — same as all monitor types: omitted fields revert to defaults. Re-pass
+  everything you want to keep, and note these easy-to-miss fields:
+  - `is_draft` — omitting it both un-drafts AND un-pauses a paused monitor.
+  - `tags` — omitting them silently drops the monitor's tags (including the agent tags the
+    platform uses for routing).
+  - `audiences` and `failure_audiences` — omitting `audiences` removes alert recipients;
+    omitting `failure_audiences` can replace separately configured failure recipients with
+    the default recipients. Re-pass their current values from the Phase 1 config, including
+    audience conditions and explicit empty lists, unless the user approved a routing change.
+- Sensitivity and `aggregate_by` values are lowercase (`"low"`, `"day"`).
+- **Cron-scheduled monitors can't be tuned via these tools** — the tools express only
+  `interval_minutes`, so an edit would silently drop a cron expression. Stop and say so.
+- **Diff the preview against the original** before `dry_run=False`, exactly as for metric
+  monitors.

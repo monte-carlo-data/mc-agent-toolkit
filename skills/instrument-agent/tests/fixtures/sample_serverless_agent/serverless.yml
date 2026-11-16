@@ -1,0 +1,16 @@
+service: sample-serverless-agent
+
+provider:
+  name: aws
+  runtime: python3.11
+  region: us-east-1
+
+functions:
+  agent:
+    handler: agent.lambda_handler
+    timeout: 30
+    memorySize: 512
+    environment:
+      OTEL_ENDPOINT: ${env:OTEL_ENDPOINT}
+      MCD_DEFAULT_API_ID: ${env:MCD_DEFAULT_API_ID}
+      MCD_DEFAULT_API_TOKEN: ${env:MCD_DEFAULT_API_TOKEN}
