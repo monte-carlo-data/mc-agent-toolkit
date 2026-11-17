@@ -75,15 +75,21 @@ DESCRIBE AGENT <db>.<schema>.<agent>;
 SHOW VERSIONS IN AGENT <db>.<schema>.<agent>;
 ```
 
-Save the `agent_spec` column (JSON) to `current.json` exactly as returned. If it is NULL, the
-agent is secure and the role can't read its spec: stop and say which role can. From
-`SHOW VERSIONS`, note the versions, which one is the default, and whether `VERSION$1` is the
-only committed version. From `DESCRIBE AGENT`, note `default_version_name`: `LAST` means no
-default was set, so callers get whichever version was committed last.
+Save the `agent_spec` of the default version's row in `SHOW VERSIONS` (`is_default` is true) to
+`current.json` exactly as returned. Don't take it from `DESCRIBE AGENT`: on an agent with no live
+version, `DESCRIBE` can return an empty `agent_spec`. If `SHOW VERSIONS` doesn't return
+`agent_spec` (that depends on account settings), use `DESCRIBE AGENT`'s, here and in every check
+below that reads the default version's spec. If the spec is NULL or empty, stop: the agent may be
+secure, which hides its spec from roles other than its owner. Say so, and name the owner from
+`DESCRIBE AGENT`. From `SHOW VERSIONS`, note the versions, which one is the default, whether
+`VERSION$1` is the only committed version, and whether there is a live version (the row without
+a name). From `DESCRIBE AGENT`, note `default_version_name`: `LAST` means no default was set, so
+callers get whichever version was committed last.
 
 If the default isn't the most recently committed version, a committed version is waiting to be
-released, perhaps a fix held back for testing. Snowflake doesn't document which of the two
-`DESCRIBE AGENT` returns, so a new version could carry that change or silently drop it. Write
+released, perhaps a fix held back for testing. Step 5 builds the new version with
+`ADD LIVE VERSION FROM LAST`, which copies the newest commit, not the default, so it could carry
+that change unnoticed. Write
 nothing yet. List each committed version newer than the default with its comment from
 `SHOW VERSIONS`, ask the user what it is, and offer three choices:
 
@@ -103,12 +109,12 @@ slip in copying it, such as a lost escape in a long description, would otherwise
 spec unnoticed:
 
 ```sql
-DESCRIBE AGENT <db>.<schema>.<agent>;
+SHOW VERSIONS IN AGENT <db>.<schema>.<agent>;
 SELECT PARSE_JSON("agent_spec") = PARSE_JSON($$<contents of current.json>$$) AS matches
-FROM TABLE(RESULT_SCAN(LAST_QUERY_ID()));
+FROM TABLE(RESULT_SCAN(LAST_QUERY_ID())) WHERE "is_default" = 'true';
 ```
 
-If `matches` isn't TRUE, write `current.json` again from the `DESCRIBE` output and recheck.
+If `matches` isn't TRUE, write `current.json` again from that row and recheck.
 NEVER patch an unchecked file.
 
 Check that this session can change the agent, so a missing grant shows up now, not after the
@@ -180,17 +186,18 @@ picks one:
 First check the agent hasn't changed since step 1, since the user may have taken a while:
 
 ```sql
-DESCRIBE AGENT <agent>;
-SELECT PARSE_JSON("agent_spec") = PARSE_JSON($$<contents of current.json>$$) AS matches
-FROM TABLE(RESULT_SCAN(LAST_QUERY_ID()));
 SHOW VERSIONS IN AGENT <agent>;
+SELECT PARSE_JSON("agent_spec") = PARSE_JSON($$<contents of current.json>$$) AS matches
+FROM TABLE(RESULT_SCAN(LAST_QUERY_ID())) WHERE "is_default" = 'true';
 ```
 
-If `matches` isn't TRUE, or the default version differs from step 1, stop: start again from
-step 1 and ask again.
+If `matches` isn't TRUE, or the versions or the default differ from step 1, stop: start again
+from step 1 and ask again.
 
 If `VERSION$1` is the only committed version, the live version is what production callers get,
-so it must not be edited. Check it still holds `VERSION$1`'s spec:
+so it must not be edited. If `SHOW VERSIONS` lists no live version (no row without a name), such
+as after a later version was dropped, skip this check: there are no live edits to keep. Otherwise
+check the live version still holds `VERSION$1`'s spec:
 
 ```sql
 SHOW VERSIONS IN AGENT <agent>;
@@ -221,9 +228,16 @@ after the pin, tell the user the default is now pinned to that version. If step 
 ALTER AGENT <agent> SET DEFAULT_VERSION = LAST;
 ```
 
-If `VERSION$1` is the only committed version and `matches` was TRUE, commit the live version
-unchanged. Callers that don't name a version then get the default version, which holds the
-same spec:
+If `VERSION$1` is the only committed version, commit the live version unchanged. Callers that
+don't name a version then get the default version, which holds the same spec. Only when
+`SHOW VERSIONS` listed no live version, add one first. It copies `VERSION$1`, so callers see no
+change:
+
+```sql
+ALTER AGENT <agent> ADD LIVE VERSION FROM LAST;
+```
+
+Then commit:
 
 ```sql
 ALTER AGENT <agent> COMMIT COMMENT = 'Monte Carlo issue <issue uuid>: VERSION$1 unchanged, committed before the fix';
@@ -263,9 +277,9 @@ exactly `new.json`:
 
 ```sql
 ALTER AGENT <agent> SET DEFAULT_VERSION = '<new version>';
-DESCRIBE AGENT <agent>;
+SHOW VERSIONS IN AGENT <agent>;
 SELECT PARSE_JSON("agent_spec") = PARSE_JSON($$<contents of new.json>$$) AS matches
-FROM TABLE(RESULT_SCAN(LAST_QUERY_ID()));
+FROM TABLE(RESULT_SCAN(LAST_QUERY_ID())) WHERE "is_default" = 'true';
 ```
 
 If `matches` isn't TRUE, roll back and tell the user.
