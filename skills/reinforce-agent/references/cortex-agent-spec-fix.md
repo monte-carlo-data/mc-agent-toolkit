@@ -41,6 +41,9 @@ search service is a change to that object: propose it and its SQL, and let the u
   committed. An agent made with `CREATE AGENT`, or made in Snowsight and never published, is in
   this state. Step 5 commits the unedited live version first, so no edit reaches those callers
   before the user's choice.
+- **Run one statement at a time, in the order given.** Send the next statement only after the
+  previous one has returned, never two at once: each check reads what the statement before it
+  did, and a `COMMIT` that lands before its `SET DEFAULT_VERSION` releases the fix.
 - **Nothing stops a concurrent edit.** Snowflake has no conditional update, and `SET
   SPECIFICATION` overwrites whatever is there. Step 5 checks again right before writing, which
   narrows the gap but can't close it.
@@ -144,10 +147,10 @@ placeholder. Leave `<new version>` for them to fill from `SHOW VERSIONS`; don't 
 number. Tell them to stop at the first error or the first `matches` that isn't TRUE, and to ask
 for new SQL if `ADD LIVE VERSION` fails or the agent changed. End with the rollback.
 
-If `VERSION$1` is the only committed version, say in the message that asks, before the
-choices, that applying starts by committing the live version unchanged as a new version, so
-callers that don't name a version stay on today's spec and see nothing until the fix is
-released.
+If `VERSION$1` is the only committed version, put this in the question itself, the text shown
+with the choices, since your reasoning isn't shown to the user: applying starts by committing
+the live version unchanged as a new version, so callers that don't name a version stay on
+today's spec and see nothing until the fix is released.
 
 When the session can change the agent, offer three choices, and run nothing until the user
 picks one:
@@ -172,6 +175,18 @@ SHOW VERSIONS IN AGENT <agent>;
 If `matches` isn't TRUE, or the default version differs from step 1, stop: start again from
 step 1 and ask again.
 
+For **keep the current default**, pin the default now, before any write, to the default from
+step 1. A pinned default stays put through every commit below. Setting it again is harmless if
+it was already pinned. If step 1 didn't show which version is the default, write nothing: give
+the user the SQL instead.
+
+```sql
+ALTER AGENT <agent> SET DEFAULT_VERSION = '<default version from step 1>';
+SHOW VERSIONS IN AGENT <agent>;
+```
+
+Go on only if `SHOW VERSIONS` shows that version as the default.
+
 If `VERSION$1` is the only committed version, the live version is what production callers get,
 so it must not be edited. Check it still holds `VERSION$1`'s spec:
 
@@ -183,7 +198,7 @@ WHERE (l."name" IS NULL OR l."name" = '') AND v."name" = 'VERSION$1';
 ```
 
 If it is TRUE, commit the live version unchanged. Callers that don't name a version then get
-the new committed version, which holds the same spec:
+the default version, which holds the same spec:
 
 ```sql
 ALTER AGENT <agent> COMMIT COMMENT = 'Monte Carlo issue <issue uuid>: VERSION$1 unchanged, committed before the fix';
@@ -212,16 +227,6 @@ FROM TABLE(RESULT_SCAN(LAST_QUERY_ID())) WHERE "name" IS NULL OR "name" = '';
 
 If it isn't TRUE, don't commit: tell the user what differs. If `SHOW VERSIONS` doesn't return
 `agent_spec`, say the spec can't be checked before committing and ask whether to go on.
-
-For **keep the current default**, pin the default to the default from step 1 before committing:
-`VERSION$1` on an agent that started with only `VERSION$1`, even though the unchanged commit
-made the new version the default, since both hold the same spec. Setting it again is harmless
-if it was already pinned. If step 1 didn't show which version is the default, don't commit:
-give the user the SQL instead.
-
-```sql
-ALTER AGENT <agent> SET DEFAULT_VERSION = '<current default version>';
-```
 
 Then commit and read back the new version's name. Don't assume the next number:
 
