@@ -137,6 +137,39 @@ class PatchAgentSpecTest(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual([change["path"] for change in report["changed"]], ["flag", "name"])
 
+    def test_reports_a_change_of_json_type_inside_an_array(self) -> None:
+        code, report, _, _ = run({"flags": [True]}, {"flags": [1]})
+
+        self.assertEqual(code, 0)
+        self.assertEqual(report["changed"], [{"path": "flags[0]", "before": True, "after": 1}])
+
+    def test_reports_each_changed_field_inside_an_array(self) -> None:
+        tools = json.loads(json.dumps(SPEC["tools"]))
+        tools[0]["tool_spec"]["description"] = "New description."
+        tools[1]["tool_spec"]["description"] = "Added by mistake."
+        code, report, _, _ = run(SPEC, {"tools": tools})
+
+        self.assertEqual(code, 0)
+        self.assertEqual(
+            report["changed"],
+            [
+                {
+                    "path": "tools[0].tool_spec.description",
+                    "before": LONG_DESCRIPTION,
+                    "after": "New description.",
+                },
+                {"path": "tools[1].tool_spec.description", "before": None, "after": "Added by mistake."},
+            ],
+        )
+
+    def test_an_array_that_changes_length_is_reported_whole(self) -> None:
+        code, report, _, _ = run(SPEC, {"skills": [{"name": "s"}]})
+
+        self.assertEqual(code, 0)
+        self.assertEqual(
+            report["changed"], [{"path": "skills", "before": [], "after": [{"name": "s"}]}]
+        )
+
     def test_a_patch_that_changes_nothing_fails(self) -> None:
         code, _, new_spec, stderr = run(SPEC, {"models": {"orchestration": "claude-opus-4-6"}})
 

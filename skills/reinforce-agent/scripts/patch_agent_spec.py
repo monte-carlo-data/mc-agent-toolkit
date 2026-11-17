@@ -47,18 +47,21 @@ def merge_patch(target: Any, patch: Any) -> Any:
 
 
 def json_equal(a: Any, b: Any) -> bool:
-    """Equality that keeps JSON types apart: Python's own == treats true as 1 and false as 0."""
-    if type(a) is not type(b):
-        return False
-    if isinstance(a, dict):
-        return a.keys() == b.keys() and all(json_equal(a[key], b[key]) for key in a)
-    if isinstance(a, list):
-        return len(a) == len(b) and all(json_equal(x, y) for x, y in zip(a, b))
-    return a == b
+    """Equality that keeps JSON types apart: Python's own == treats true as 1 and false as 0.
+    Only reached for values changed_paths doesn't walk, so containers here differ in length."""
+    return type(a) is type(b) and a == b
 
 
 def changed_paths(before: Any, after: Any, prefix: str = "") -> list[dict[str, Any]]:
-    """Every leaf path whose value differs, objects walked key by key."""
+    """Every leaf path whose value differs. Objects are walked key by key, and arrays of the same
+    length item by item: a patch must repeat a whole array, such as `tools`, so a slip in one
+    item has to show as its own path. An array whose length changed is reported whole."""
+    if isinstance(before, list) and isinstance(after, list) and len(before) == len(after):
+        return [
+            change
+            for index, (old, new) in enumerate(zip(before, after))
+            for change in changed_paths(old, new, f"{prefix}[{index}]")
+        ]
     if isinstance(before, dict) and isinstance(after, dict):
         changes: list[dict[str, Any]] = []
         for key in sorted(set(before) | set(after)):

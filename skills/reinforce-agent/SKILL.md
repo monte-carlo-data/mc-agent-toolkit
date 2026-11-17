@@ -77,7 +77,7 @@ Activate when the user:
 | `get_agent_metadata` | List AI agents with their canonical `agentName`, friendly `displayName`, `traceTableMcon`, source type, and warehouse. Used to **resolve the agent the user named** to the exact `agent_name` + `trace_table_mcon` the reinforcement loop tools require (match on canonical name *or* display name; disambiguate when several match) |
 | `get_reinforcement_loop_summaries` | Per-workflow health rollups for one agent — `issue_count` + worst-severity `health` + `detection_time` per workflow. The cheap triage layer; rank on this before expanding anything |
 | `get_reinforcement_loop_report` | The latest reinforcement loop report for **one** workflow, as a single actionable markdown brief — diagnosed issues with evidence (trace deep-links), recommended fixes, any existing Linear ticket, and any proposed monitor. The expensive call; fetch only for workflows the user chose. With `issue_uuid`, returns just that issue |
-| `update_reinforcement_loop_issue` | Records the user's fix on the issue with `action: "MARK_FIXED"` and an optional `link_url` (the pull request). The skill's only write to Monte Carlo; run it only after the user confirms the fix is applied |
+| `update_reinforcement_loop_issue` | Records the user's fix on the issue: `action: "MARK_FIXED"` once it is released, or `"MARK_IN_PROGRESS"` while it isn't, with an optional `link_url` (the pull request). The skill's only write to Monte Carlo; run it only after the user confirms |
 
 ## Workflow
 
@@ -91,7 +91,7 @@ When the user hands over one issue, skip Steps 2–4. Take `agent_name`, `trace_
 (URL-decode the MCON and agent name), and call
 `get_reinforcement_loop_report(agent_name, trace_table_mcon, issue_uuid=issue_uuid)`. Then call
 `get_agent_metadata` and find the entry with that same `agentName` and `traceTableMcon`: Step 5
-needs its source type and warehouse. If no entry matches, ask the user how the agent is built.
+needs its `backend_class`. If no entry matches, ask the user how the agent is built.
 Summarize the issue and its recommendation, confirm it's the one to fix, then go to Step 5.
 
 ### Step 1: Resolve the agent
@@ -152,15 +152,19 @@ before writing any code.
 
 ### Step 5: Land the fix
 
-How the fix lands depends on how the agent is built. `get_agent_metadata` gives its source type
-and warehouse; a trace table MCON containing `++aiagent++` is a platform agent.
+How the fix lands depends on how the agent is built. Take that ONLY from the agent's
+`backend_class` in `get_agent_metadata`, Monte Carlo's own classification; never guess it from
+the agent's name, its MCON or its warehouse.
 
-- **Snowflake Cortex agent:** there is no repo. Follow `references/cortex-agent-spec-fix.md`: read the
-  spec, build the new one with `scripts/patch_agent_spec.py`, show the difference, and commit a new
-  agent version only after the user picks how to apply it.
-- **Other platform agents** (Databricks Genie and the like): no automated path yet. Show the user
-  the change to make in the platform and stop at Step 6.
-- **Agent built in code:** open a pull request, as below.
+- **`platform_agent` (Snowflake Cortex agent):** there is no repo. Follow
+  `references/cortex-agent-spec-fix.md`: read the spec, build the new one with
+  `scripts/patch_agent_spec.py`, show the difference, and commit a new agent version only after
+  the user picks how to apply it.
+- **`databricks_genie`, `databricks_mlflow_ka`** and other platform-hosted agents: no automated
+  path yet. Show the user the change to make in the platform and go to Step 6.
+- **`ao_clickhouse_otel`, `customer_otel_trace_table`, `databricks_mlflow_sdk` (agent built in
+  code):** open a pull request, as below.
+- **Null or a value not listed here:** ask the user how the agent is built.
 
 For an agent built in code:
 
@@ -183,8 +187,14 @@ Once the fix is applied — the PR is merged, or the new agent version is the de
 whether to mark the issue fixed in Monte Carlo. On yes, call
 `update_reinforcement_loop_issue(action="MARK_FIXED", issue_uuid=..., link_url=...)`, passing the
 pull request as `link_url` when there is one. If the issue comes back in later conversations,
-Monte Carlo reopens it. A fix not yet released (an open PR, a version that isn't
-the default) isn't fixed: offer to mark the issue fixed later instead.
+Monte Carlo reopens it.
+
+A fix not yet released isn't fixed: an open PR, a version that isn't the default, SQL handed to
+someone else, or a change the user makes in their platform. Ask whether to mark the issue in
+progress instead, so Monte Carlo shows someone is on it. On yes, call
+`update_reinforcement_loop_issue(action="MARK_IN_PROGRESS", issue_uuid=..., link_url=...)`,
+with the PR as `link_url` when there is one. Tell the user to mark it fixed once the fix is
+released, from Monte Carlo or by asking you again.
 
 Then, if the user wants, return to Step 4 for the next issue (or Step 2 for the next workflow).
 
@@ -205,5 +215,5 @@ Then, if the user wants, return to Step 4 for the next issue (or Step 2 for the 
   "reinforcement loop" is the pipeline and the tool names.
 - **Don't re-file tracked issues.** If an issue already carries a Linear ticket, reference/update it.
 - **Read-only diagnosis.** The diagnosis tools are read-only and consume no Monte Carlo credits. The
-  side effects are the PR or agent version the user approves, and `MARK_FIXED`, which runs only
-  after the user confirms.
+  side effects are the PR or agent version the user approves, and `MARK_FIXED` or
+  `MARK_IN_PROGRESS`, which run only after the user confirms.
