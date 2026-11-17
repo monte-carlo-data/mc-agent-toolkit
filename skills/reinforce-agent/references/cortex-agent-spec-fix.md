@@ -9,13 +9,15 @@ search service is a change to that object: propose it and its SQL, and let the u
 
 - SQL access to the customer's Snowflake account with **OWNERSHIP or MODIFY** on the agent.
   Snowflake Cortex Code (CoCo) has this through its connection. Without SQL access, give the
-  user the SQL from step 4 and stop.
+  user the SQL from step 4, then go to the skill's "Mark the issue fixed" step.
 - `python3` to run `scripts/patch_agent_spec.py` (stdlib only), which ships with the toolkit
   plugin. Without the script, don't build the new spec yourself: give the user the merge patch
-  from step 2 and stop.
+  from step 2, then go to the skill's "Mark the issue fixed" step.
 
 ## Rules
 
+- **Every exit that hands the user SQL or a patch goes on to the skill's "Mark the issue fixed"
+  step**, which offers to mark the issue in progress, so Monte Carlo shows someone is on it.
 - **NEVER retype the specification.** `SET SPECIFICATION` replaces the whole spec, and any field
   left out is removed. Build the new spec with `scripts/patch_agent_spec.py` from the spec
   Snowflake returns, and pass the file it writes, unedited.
@@ -76,13 +78,25 @@ SHOW VERSIONS IN AGENT <db>.<schema>.<agent>;
 Save the `agent_spec` column (JSON) to `current.json` exactly as returned. If it is NULL, the
 agent is secure and the role can't read its spec: stop and say which role can. From
 `SHOW VERSIONS`, note the versions, which one is the default, and whether `VERSION$1` is the
-only committed version.
+only committed version. From `DESCRIBE AGENT`, note `default_version_name`: `LAST` means no
+default was set, so callers get whichever version was committed last.
 
-If the default isn't the most recently committed version, stop. A committed version is waiting
-to be released, perhaps a fix held back for testing, and Snowflake doesn't document which of
-the two `DESCRIBE AGENT` returns, so the new version could carry that change or silently drop
-it. Tell the user which version is waiting and that they can release it with
-`ALTER AGENT <agent> SET DEFAULT_VERSION = '<version>'` before starting again.
+If the default isn't the most recently committed version, a committed version is waiting to be
+released, perhaps a fix held back for testing. Snowflake doesn't document which of the two
+`DESCRIBE AGENT` returns, so a new version could carry that change or silently drop it. Write
+nothing yet. List each committed version newer than the default with its comment from
+`SHOW VERSIONS`, ask the user what it is, and offer three choices:
+
+- **Release it**: `ALTER AGENT <agent> SET DEFAULT_VERSION = '<version>';`
+- **Drop it**: `ALTER AGENT <agent> DROP VERSION <version>;` for each waiting version, newest
+  first, with the name unquoted. A dropped version can't be restored. If Snowflake refuses a
+  drop, stop and show the user the error.
+- **Stop** while they keep testing it.
+
+A version commented `Monte Carlo issue <uuid>: VERSION$1 unchanged, committed before the fix`
+holds the same spec as `VERSION$1`, so releasing or dropping it changes nothing callers get.
+Run the chosen statement only if the session can change the agent, otherwise give the user the
+SQL. After a release or a drop, start again from step 1.
 
 The patch script trusts `current.json`, so check the file against Snowflake before going on. A
 slip in copying it, such as a lost escape in a long description, would otherwise reach the new
@@ -175,18 +189,6 @@ SHOW VERSIONS IN AGENT <agent>;
 If `matches` isn't TRUE, or the default version differs from step 1, stop: start again from
 step 1 and ask again.
 
-For **keep the current default**, pin the default now, before any write, to the default from
-step 1. A pinned default stays put through every commit below. Setting it again is harmless if
-it was already pinned. If step 1 didn't show which version is the default, write nothing: give
-the user the SQL instead.
-
-```sql
-ALTER AGENT <agent> SET DEFAULT_VERSION = '<default version from step 1>';
-SHOW VERSIONS IN AGENT <agent>;
-```
-
-Go on only if `SHOW VERSIONS` shows that version as the default.
-
 If `VERSION$1` is the only committed version, the live version is what production callers get,
 so it must not be edited. Check it still holds `VERSION$1`'s spec:
 
@@ -197,17 +199,38 @@ FROM TABLE(RESULT_SCAN(LAST_QUERY_ID())) l, TABLE(RESULT_SCAN(LAST_QUERY_ID())) 
 WHERE (l."name" IS NULL OR l."name" = '') AND v."name" = 'VERSION$1';
 ```
 
-If it is TRUE, commit the live version unchanged. Callers that don't name a version then get
-the default version, which holds the same spec:
+If `matches` isn't TRUE, the live version's edits are already in production: stop and ask, and
+NEVER overwrite them. If `SHOW VERSIONS` doesn't return `agent_spec`, give the user the SQL,
+then go to the skill's "Mark the issue fixed" step. Either way, nothing has been written yet.
+
+For **keep the current default**, pin the default now, before any write, to the default from
+step 1. A pinned default stays put through every commit below. Setting it again is harmless if
+it was already pinned. If step 1 didn't show which version is the default, write nothing: give
+the user the SQL, then go to the skill's "Mark the issue fixed" step.
+
+```sql
+ALTER AGENT <agent> SET DEFAULT_VERSION = '<default version from step 1>';
+SHOW VERSIONS IN AGENT <agent>;
+```
+
+Go on only if `SHOW VERSIONS` shows that version as the default. If the run stops at any point
+after the pin, tell the user the default is now pinned to that version. If step 1's
+`default_version_name` was `LAST`, also give them the statement that restores it:
+
+```sql
+ALTER AGENT <agent> SET DEFAULT_VERSION = LAST;
+```
+
+If `VERSION$1` is the only committed version and `matches` was TRUE, commit the live version
+unchanged. Callers that don't name a version then get the default version, which holds the
+same spec:
 
 ```sql
 ALTER AGENT <agent> COMMIT COMMENT = 'Monte Carlo issue <issue uuid>: VERSION$1 unchanged, committed before the fix';
 SHOW VERSIONS IN AGENT <agent>;
 ```
 
-Go on only if `SHOW VERSIONS` now lists a committed version after `VERSION$1`. If `matches`
-isn't TRUE, the live version's edits are already in production: stop and ask, and NEVER
-overwrite them. If `SHOW VERSIONS` doesn't return `agent_spec`, stop and give the user the SQL.
+Go on only if `SHOW VERSIONS` now lists a committed version after `VERSION$1`.
 
 Add the live version and set the new spec:
 

@@ -74,7 +74,7 @@ Activate when the user:
 
 | Tool | Purpose |
 |------|---------|
-| `get_agent_metadata` | List AI agents with their canonical `agentName`, friendly `displayName`, `traceTableMcon`, source type, and warehouse. Used to **resolve the agent the user named** to the exact `agent_name` + `trace_table_mcon` the reinforcement loop tools require (match on canonical name *or* display name; disambiguate when several match) |
+| `get_agent_metadata` | List AI agents with their canonical `agentName`, friendly `displayName`, `traceTableMcon`, source type, `backend_class` (how the agent is built, which picks how a fix lands in Step 5) and warehouse. Used to **resolve the agent the user named** to the exact `agent_name` + `trace_table_mcon` the reinforcement loop tools require (match on canonical name *or* display name; disambiguate when several match) |
 | `get_reinforcement_loop_summaries` | Per-workflow health rollups for one agent — `issue_count` + worst-severity `health` + `detection_time` per workflow. The cheap triage layer; rank on this before expanding anything |
 | `get_reinforcement_loop_report` | The latest reinforcement loop report for **one** workflow, as a single actionable markdown brief — diagnosed issues with evidence (trace deep-links), recommended fixes, any existing Linear ticket, and any proposed monitor. The expensive call; fetch only for workflows the user chose. With `issue_uuid`, returns just that issue |
 | `update_reinforcement_loop_issue` | Records the user's fix on the issue: `action: "MARK_FIXED"` once it is released, or `"MARK_IN_PROGRESS"` while it isn't, with an optional `link_url` (the pull request). The skill's only write to Monte Carlo; run it only after the user confirms |
