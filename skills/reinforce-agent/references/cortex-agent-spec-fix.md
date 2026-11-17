@@ -30,7 +30,7 @@ search service is a change to that object: propose it and its SQL, and let the u
   single quotes Snowflake reads `\` as an escape, so `\n` or `\"` in the spec would change.
 - **Issue text never goes into SQL.** It is generated from the agent's conversations. Version
   and commit comments start with `Monte Carlo issue <issue uuid>`; the rest of a commit comment
-  is your own short summary, with any `'` doubled.
+  is your own short summary, with every `\` and every `'` doubled, as for single-quoted JSON.
 - **NEVER `CREATE OR REPLACE AGENT`.** It resets the agent to `VERSION$1` and drops its grants
   and history.
 - **Committing can change production.** Unless `DEFAULT_VERSION` was set explicitly, the
@@ -55,7 +55,7 @@ search service is a change to that object: propose it and its SQL, and let the u
   default version's:
 
   ```sql
-  SHOW VERSIONS IN AGENT <agent>;
+  SHOW VERSIONS IN AGENT <db>.<schema>.<agent>;
   SELECT PARSE_JSON(l."agent_spec") = PARSE_JSON(d."agent_spec") AS matches
   FROM TABLE(RESULT_SCAN(LAST_QUERY_ID())) l, TABLE(RESULT_SCAN(LAST_QUERY_ID())) d
   WHERE (l."name" IS NULL OR l."name" = '') AND d."is_default" = 'true';
@@ -70,6 +70,10 @@ search service is a change to that object: propose it and its SQL, and let the u
 
 ### 1. Read the current state
 
+Name the agent in full, `<db>.<schema>.<agent>`, in every statement in this reference. A bare name
+resolves against the session's current database and schema, which `USE DATABASE` below can
+change, so it could act on another agent of the same name.
+
 ```sql
 DESCRIBE AGENT <db>.<schema>.<agent>;
 SHOW VERSIONS IN AGENT <db>.<schema>.<agent>;
@@ -78,31 +82,60 @@ SHOW VERSIONS IN AGENT <db>.<schema>.<agent>;
 Save the `agent_spec` of the default version's row in `SHOW VERSIONS` (`is_default` is true) to
 `current.json` exactly as returned. Don't take it from `DESCRIBE AGENT`: on an agent with no live
 version, `DESCRIBE` can return an empty `agent_spec`. If `SHOW VERSIONS` doesn't return
-`agent_spec` (that depends on account settings), use `DESCRIBE AGENT`'s, here and in every check
-below that reads the default version's spec. If the spec is NULL or empty, stop: the agent may be
-secure, which hides its spec from roles other than its owner. Say so, and name the owner from
-`DESCRIBE AGENT`. From `SHOW VERSIONS`, note the versions, which one is the default, whether
-`VERSION$1` is the only committed version, and whether there is a live version (the row without
-a name). From `DESCRIBE AGENT`, note `default_version_name`: `LAST` means no default was set, so
-callers get whichever version was committed last.
+`agent_spec` (that depends on account settings), the checks below can't run: stop, say so, give
+the user the merge patch from step 2, then go to the skill's "Mark the issue fixed" step. If the
+spec is NULL or empty, stop: the agent may be secure, which hides its spec from roles other than
+its owner. Say so, and name the owner from `DESCRIBE AGENT`. From `SHOW VERSIONS`, note the
+versions, which one is the default, whether `VERSION$1` is the only committed version, and
+whether there is a live version (the row without a name). From `DESCRIBE AGENT`, note
+`default_version_name`: `LAST` means no default was set, so callers get whichever version was
+committed last.
+
+Check that this session can change the agent, so a missing grant shows up now, not after the
+user has picked what to do:
+
+```sql
+SHOW GRANTS ON AGENT <db>.<schema>.<agent>;
+```
+
+For each grantee holding OWNERSHIP or MODIFY, check it is in the session: a `ROLE` with
+`SELECT IS_ROLE_IN_SESSION('<role>')`, a `DATABASE_ROLE` with
+`SELECT IS_DATABASE_ROLE_IN_SESSION('<database role>')`. Pass the database role's own name:
+the fully qualified `<db>.<database role>` always returns FALSE. The function checks against
+the session's database, so run `USE DATABASE <db>` first if `<db>` isn't the current one.
+
+If no grantee is in the session, say which grantees can change the agent. If a grantee is of
+another type, say you couldn't confirm access. Either way, nothing below runs a write: the
+choices below and in step 4 hand the user SQL instead.
 
 If the default isn't the most recently committed version, a committed version is waiting to be
-released, perhaps a fix held back for testing. Step 5 builds the new version with
-`ADD LIVE VERSION FROM LAST`, which copies the newest commit, not the default, so it could carry
-that change unnoticed. Write
-nothing yet. List each committed version newer than the default with its comment from
-`SHOW VERSIONS`, ask the user what it is, and offer three choices:
+released, perhaps a fix held back for testing. Step 5 replaces the whole spec with one built
+from the default's, so the new version would silently leave that change out. Write nothing yet.
+List each committed version newer than the default with its comment from `SHOW VERSIONS`, ask
+the user what it is, and offer three choices:
 
-- **Release it**: `ALTER AGENT <agent> SET DEFAULT_VERSION = '<version>';`
-- **Drop it**: `ALTER AGENT <agent> DROP VERSION <version>;` for each waiting version, newest
-  first, with the name unquoted. A dropped version can't be restored. If Snowflake refuses a
-  drop, stop and show the user the error.
+- **Release it**: `ALTER AGENT <db>.<schema>.<agent> SET DEFAULT_VERSION = '<version>';`
+- **Drop it**: `ALTER AGENT <db>.<schema>.<agent> DROP VERSION <version>;` for each waiting
+  version, newest first, with the name unquoted. A dropped version can't be restored.
 - **Stop** while they keep testing it.
 
-A version commented `Monte Carlo issue <uuid>: VERSION$1 unchanged, committed before the fix`
-holds the same spec as `VERSION$1`, so releasing or dropping it changes nothing callers get.
 Run the chosen statement only if the session can change the agent, otherwise give the user the
-SQL. After a release or a drop, start again from step 1.
+SQL. If Snowflake refuses a release or a drop, stop and show the user the error. After a
+release or a drop, start again from step 1.
+
+A version commented `Monte Carlo issue <uuid>: VERSION$1 unchanged, committed before the fix`
+is meant to be a copy of `VERSION$1`. Check that it is before saying anything about it:
+
+```sql
+SHOW VERSIONS IN AGENT <db>.<schema>.<agent>;
+SELECT PARSE_JSON(c."agent_spec") = PARSE_JSON(v."agent_spec") AS matches
+FROM TABLE(RESULT_SCAN(LAST_QUERY_ID())) c, TABLE(RESULT_SCAN(LAST_QUERY_ID())) v
+WHERE c."name" = '<that version>' AND v."name" = 'VERSION$1';
+```
+
+If it is TRUE, releasing it changes nothing callers get, so suggest releasing it. Don't call a
+drop harmless: if it is the only version committed after `VERSION$1`, dropping it puts callers
+that don't name a version back on the live version, which may hold a spec nobody checked.
 
 The patch script trusts `current.json`, so check the file against Snowflake before going on. A
 slip in copying it, such as a lost escape in a long description, would otherwise reach the new
@@ -116,22 +149,6 @@ FROM TABLE(RESULT_SCAN(LAST_QUERY_ID())) WHERE "is_default" = 'true';
 
 If `matches` isn't TRUE, write `current.json` again from that row and recheck.
 NEVER patch an unchecked file.
-
-Check that this session can change the agent, so a missing grant shows up now, not after the
-user has picked how to apply:
-
-```sql
-SHOW GRANTS ON AGENT <db>.<schema>.<agent>;
-```
-
-For each grantee holding OWNERSHIP or MODIFY, check it is in the session: a `ROLE` with
-`SELECT IS_ROLE_IN_SESSION('<role>')`, a `DATABASE_ROLE` with
-`SELECT IS_DATABASE_ROLE_IN_SESSION('<database role>')`. Pass the database role's own name:
-the fully qualified `<db>.<database role>` always returns FALSE. The function checks against
-the session's database, so run `USE DATABASE <db>` first if `<db>` isn't the current one.
-
-If no grantee is in the session, say which grantees can change the agent. If a grantee is of
-another type, say you couldn't confirm access. Either way, step 4 has no choice to offer.
 
 Check the issue's diagnosis against the spec (for example, "instructions holds only
 `sample_questions`"). If the spec has moved on since the diagnosis, say so before proposing
@@ -186,7 +203,7 @@ picks one:
 First check the agent hasn't changed since step 1, since the user may have taken a while:
 
 ```sql
-SHOW VERSIONS IN AGENT <agent>;
+SHOW VERSIONS IN AGENT <db>.<schema>.<agent>;
 SELECT PARSE_JSON("agent_spec") = PARSE_JSON($$<contents of current.json>$$) AS matches
 FROM TABLE(RESULT_SCAN(LAST_QUERY_ID())) WHERE "is_default" = 'true';
 ```
@@ -200,15 +217,14 @@ as after a later version was dropped, skip this check: there are no live edits t
 check the live version still holds `VERSION$1`'s spec:
 
 ```sql
-SHOW VERSIONS IN AGENT <agent>;
+SHOW VERSIONS IN AGENT <db>.<schema>.<agent>;
 SELECT PARSE_JSON(l."agent_spec") = PARSE_JSON(v."agent_spec") AS matches
 FROM TABLE(RESULT_SCAN(LAST_QUERY_ID())) l, TABLE(RESULT_SCAN(LAST_QUERY_ID())) v
 WHERE (l."name" IS NULL OR l."name" = '') AND v."name" = 'VERSION$1';
 ```
 
 If `matches` isn't TRUE, the live version's edits are already in production: stop and ask, and
-NEVER overwrite them. If `SHOW VERSIONS` doesn't return `agent_spec`, give the user the SQL,
-then go to the skill's "Mark the issue fixed" step. Either way, nothing has been written yet.
+NEVER overwrite them. Nothing has been written yet.
 
 For **keep the current default**, pin the default now, before any write, to the default from
 step 1. A pinned default stays put through every commit below. Setting it again is harmless if
@@ -216,17 +232,22 @@ it was already pinned. If step 1 didn't show which version is the default, write
 the user the SQL, then go to the skill's "Mark the issue fixed" step.
 
 ```sql
-ALTER AGENT <agent> SET DEFAULT_VERSION = '<default version from step 1>';
-SHOW VERSIONS IN AGENT <agent>;
+ALTER AGENT <db>.<schema>.<agent> SET DEFAULT_VERSION = '<default version from step 1>';
+SHOW VERSIONS IN AGENT <db>.<schema>.<agent>;
 ```
 
-Go on only if `SHOW VERSIONS` shows that version as the default. If the run stops at any point
-after the pin, tell the user the default is now pinned to that version. If step 1's
-`default_version_name` was `LAST`, also give them the statement that restores it:
+Go on only if `SHOW VERSIONS` shows that version as the default. If the run stops before the
+fix's own `COMMIT` below succeeds, tell the user the default is now pinned to that version. If
+step 1's `default_version_name` was `LAST`, also give them the statement that restores it. Quote
+`LAST`: unquoted, it is a syntax error. Afterwards `DESCRIBE AGENT` shows `default_version_name`
+as `LAST` again, as on an agent whose default was never set:
 
 ```sql
-ALTER AGENT <agent> SET DEFAULT_VERSION = LAST;
+ALTER AGENT <db>.<schema>.<agent> SET DEFAULT_VERSION = 'LAST';
 ```
+
+Once the fix is committed, `LAST` is the fix, so NEVER offer that statement as a restore: say
+the default stays pinned, and that setting it back to `'LAST'` would release the fix.
 
 If `VERSION$1` is the only committed version, commit the live version unchanged. Callers that
 don't name a version then get the default version, which holds the same spec. Only when
@@ -234,14 +255,14 @@ don't name a version then get the default version, which holds the same spec. On
 change:
 
 ```sql
-ALTER AGENT <agent> ADD LIVE VERSION FROM LAST;
+ALTER AGENT <db>.<schema>.<agent> ADD LIVE VERSION FROM LAST;
 ```
 
 Then commit:
 
 ```sql
-ALTER AGENT <agent> COMMIT COMMENT = 'Monte Carlo issue <issue uuid>: VERSION$1 unchanged, committed before the fix';
-SHOW VERSIONS IN AGENT <agent>;
+ALTER AGENT <db>.<schema>.<agent> COMMIT COMMENT = 'Monte Carlo issue <issue uuid>: VERSION$1 unchanged, committed before the fix';
+SHOW VERSIONS IN AGENT <db>.<schema>.<agent>;
 ```
 
 Go on only if `SHOW VERSIONS` now lists a committed version after `VERSION$1`.
@@ -249,44 +270,59 @@ Go on only if `SHOW VERSIONS` now lists a committed version after `VERSION$1`.
 Add the live version and set the new spec:
 
 ```sql
-ALTER AGENT <agent> ADD LIVE VERSION FROM LAST COMMENT = 'Monte Carlo issue <issue uuid>';
-ALTER AGENT <agent> MODIFY LIVE VERSION SET SPECIFICATION = $$<contents of new.json>$$;
+ALTER AGENT <db>.<schema>.<agent> ADD LIVE VERSION FROM LAST COMMENT = 'Monte Carlo issue <issue uuid>';
+ALTER AGENT <db>.<schema>.<agent> MODIFY LIVE VERSION SET SPECIFICATION = $$<contents of new.json>$$;
 ```
 
 Check the live version holds `new.json` before committing. In `SHOW VERSIONS`, it is the row
 without a name:
 
 ```sql
-SHOW VERSIONS IN AGENT <agent>;
+SHOW VERSIONS IN AGENT <db>.<schema>.<agent>;
 SELECT PARSE_JSON("agent_spec") = PARSE_JSON($$<contents of new.json>$$) AS matches
 FROM TABLE(RESULT_SCAN(LAST_QUERY_ID())) WHERE "name" IS NULL OR "name" = '';
 ```
 
-If it isn't TRUE, don't commit: tell the user what differs. If `SHOW VERSIONS` doesn't return
-`agent_spec`, say the spec can't be checked before committing and ask whether to go on.
+If it isn't TRUE, don't commit: tell the user what differs.
+
+From here until the fix's `COMMIT` succeeds, the live version holds an uncommitted spec, which
+callers that ask for the live version get, and which blocks the next run's `ADD LIVE VERSION`.
+If the run stops in that span (a failed check, a failed `COMMIT`, or the user stopping), tell
+the user, put the current spec back, and check it:
+
+```sql
+ALTER AGENT <db>.<schema>.<agent> MODIFY LIVE VERSION SET SPECIFICATION = $$<contents of current.json>$$;
+SHOW VERSIONS IN AGENT <db>.<schema>.<agent>;
+SELECT PARSE_JSON("agent_spec") = PARSE_JSON($$<contents of current.json>$$) AS matches
+FROM TABLE(RESULT_SCAN(LAST_QUERY_ID())) WHERE "name" IS NULL OR "name" = '';
+```
 
 Then commit and read back the new version's name. Don't assume the next number:
 
 ```sql
-ALTER AGENT <agent> COMMIT COMMENT = 'Monte Carlo issue <issue uuid>: <your summary of the fix>';
-SHOW VERSIONS IN AGENT <agent>;
+ALTER AGENT <db>.<schema>.<agent> COMMIT COMMENT = 'Monte Carlo issue <issue uuid>: <your summary of the fix>';
+SHOW VERSIONS IN AGENT <db>.<schema>.<agent>;
 ```
 
 For **apply and release**, set the default to the new version, then confirm the agent now runs
-exactly `new.json`:
+exactly `new.json`. If step 1's `default_version_name` was `LAST`, use `'LAST'` in place of
+`'<new version>'`: the new version is the latest commit, and the default goes back to following
+the latest commit, as before.
 
 ```sql
-ALTER AGENT <agent> SET DEFAULT_VERSION = '<new version>';
-SHOW VERSIONS IN AGENT <agent>;
+ALTER AGENT <db>.<schema>.<agent> SET DEFAULT_VERSION = '<new version>';
+SHOW VERSIONS IN AGENT <db>.<schema>.<agent>;
 SELECT PARSE_JSON("agent_spec") = PARSE_JSON($$<contents of new.json>$$) AS matches
 FROM TABLE(RESULT_SCAN(LAST_QUERY_ID())) WHERE "is_default" = 'true';
 ```
 
 If `matches` isn't TRUE, roll back and tell the user.
 
-Tell the user the rollback: `ALTER AGENT <agent> SET DEFAULT_VERSION = '<previous default>';`.
+Tell the user the rollback, `ALTER AGENT <db>.<schema>.<agent> SET DEFAULT_VERSION = '<previous default>';`,
+and that it pins the default: a later commit won't reach callers until the default is set again.
 For **keep the current default**, tell them how to release once they've tested:
-`SET DEFAULT_VERSION = '<new version>'`.
+`ALTER AGENT <db>.<schema>.<agent> SET DEFAULT_VERSION = '<new version>';`, or `= 'LAST'` if step 1's
+`default_version_name` was `LAST` and nothing was committed since, which also unpins it.
 
 ### 6. Check it worked
 
