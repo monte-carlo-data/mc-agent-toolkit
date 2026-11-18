@@ -6,6 +6,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import yaml
+
 from run_evals import SKILLS_DIR, load_skill_metadata
 
 
@@ -39,12 +41,25 @@ class LoadSkillMetadata(unittest.TestCase):
             with self.assertRaises(ValueError):
                 load_skill_metadata(Path(directory))
 
-    def test_onboarding(self):
-        name, description, when_to_use = load_skill_metadata(SKILLS_DIR / "onboarding")
-        self.assertEqual(name, "monte-carlo-onboarding")
-        self.assertTrue(description.startswith("Connect warehouses"), description)
-        self.assertTrue(description.endswith("Terraform or scripts."), description)
-        self.assertEqual(when_to_use, "")
+    def test_closing_fence_at_end_of_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            (Path(directory) / "SKILL.md").write_text("---\nname: x\ndescription: d\n---")
+            self.assertEqual(load_skill_metadata(Path(directory)), ("x", "d", ""))
+
+    def test_frontmatter_that_is_not_a_mapping_raises(self):
+        for frontmatter in ("[]", "- x"):
+            with self.subTest(frontmatter):
+                with self.assertRaisesRegex(ValueError, "SKILL.md"):
+                    self.load(frontmatter)
+
+    def test_onboarding_quoted_description_is_decoded(self):
+        text = (SKILLS_DIR / "onboarding" / "SKILL.md").read_text()
+        self.assertIn('\ndescription: "', text)
+        expected = yaml.safe_load(text.split("\n---\n", 1)[0].removeprefix("---\n"))
+        self.assertEqual(
+            load_skill_metadata(SKILLS_DIR / "onboarding"),
+            (expected["name"], expected["description"], ""),
+        )
 
 
 if __name__ == "__main__":

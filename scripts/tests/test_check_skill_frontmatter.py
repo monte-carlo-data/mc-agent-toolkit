@@ -69,7 +69,7 @@ class CheckSkillFrontmatter(unittest.TestCase):
         # Parser compatibility: shipped skills use | and > blocks, and a block may hold an indented ---.
         self.skill(
             "example",
-            "---\nname: monte-carlo-example\ndescription: |\n  Line one: with a colon.\n  ---\n  Line two.\n---\nBody.\n",
+            "---\ndescription: |\n  Line one: with a colon.\n  ---\n  Line two.\nname: monte-carlo-example\n---\nBody.\n",
         )
         self.assertEqual(run(self.root).returncode, 0)
 
@@ -124,6 +124,36 @@ class CheckSkillFrontmatter(unittest.TestCase):
         result = run(self.root, other)
         self.assertEqual(result.returncode, 1)
         self.assertIn(str(other / "broken" / "SKILL.md"), result.stdout)
+
+    def test_closing_fence_at_end_of_file_passes(self):
+        self.skill("example", "---\nname: x\ndescription: y\n---")
+        self.assertEqual(run(self.root).returncode, 0)
+
+    def test_every_unreadable_or_unloadable_file_is_reported(self):
+        bad_date = self.skill("a-bad-date", "---\nname: x\ndescription: 2026-02-30\n---\nBody.\n")
+        (self.root / "b-bad-bytes").mkdir()
+        bad_bytes = self.root / "b-bad-bytes" / "SKILL.md"
+        bad_bytes.write_bytes(b"---\nname: x\ndescription: caf\xe9\n---\nBody.\n")
+        no_description = self.skill("c-no-description", "---\nname: x\n---\nBody.\n")
+        result = run(self.root)
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.stderr, "")
+        for path in (bad_date, bad_bytes, no_description):
+            self.assertIn(f"::error file={path}::", result.stdout)
+
+    def test_default_roots_are_skills_and_claude_skills(self):
+        checkout = Path(self._tmp.name) / "checkout"
+        (checkout / "scripts").mkdir(parents=True)
+        script = checkout / "scripts" / SCRIPT.name
+        script.write_text(SCRIPT.read_text())
+        (checkout / "skills" / "good").mkdir(parents=True)
+        (checkout / "skills" / "good" / "SKILL.md").write_text(GOOD)
+        broken = checkout / ".claude" / "skills" / "author" / "SKILL.md"
+        broken.parent.mkdir(parents=True)
+        broken.write_text("---\nname: author\n---\nBody.\n")
+        result = subprocess.run([sys.executable, str(script)], capture_output=True, text=True, cwd=checkout)
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("::error file=.claude/skills/author/SKILL.md::", result.stdout)
 
     def test_missing_root_fails(self):
         result = run(Path(self._tmp.name) / "skils")

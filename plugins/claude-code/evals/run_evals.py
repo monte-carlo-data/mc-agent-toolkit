@@ -60,10 +60,14 @@ def load_skill_metadata(skill_dir: Path) -> tuple[str, str, str]:
     skill_md = skill_dir / "SKILL.md"
     content = skill_md.read_text()
 
-    frontmatter = re.match(r"---\n(.*?)\n---\n", content, re.DOTALL)
+    frontmatter = re.match(r"---\n(.*?)\n---(?:\n|\Z)", content, re.DOTALL)
     if not frontmatter:
         raise ValueError(f"No frontmatter found in {skill_md}")
-    fields = yaml.safe_load(frontmatter.group(1)) or {}
+    fields = yaml.safe_load(frontmatter.group(1))
+    if fields is None:
+        fields = {}
+    if not isinstance(fields, dict):
+        raise ValueError(f"Frontmatter in {skill_md} is not a mapping of keys to values")
 
     name = str(fields.get("name") or "unknown").strip()
     description = re.sub(r"\s+", " ", str(fields.get("description") or "")).strip()

@@ -22,7 +22,10 @@ REQUIRED = ("name", "description")
 
 
 def check(path: Path) -> list[str]:
-    lines = path.read_text(encoding="utf-8").split("\n")
+    try:
+        lines = path.read_text(encoding="utf-8").split("\n")
+    except UnicodeDecodeError as e:
+        return [f"file is not valid UTF-8: {e}"]
     if lines[0] != "---":
         return ["no frontmatter (the first line must be ---)"]
     try:
@@ -31,7 +34,7 @@ def check(path: Path) -> list[str]:
         return ["frontmatter has no closing --- line"]
     try:
         data = yaml.safe_load("\n".join(lines[1:end]))
-    except yaml.YAMLError as e:
+    except (yaml.YAMLError, ValueError) as e:  # ValueError: a value PyYAML can't build, e.g. 2026-02-30
         reason = " ".join(str(e).split())
         return [f"frontmatter is not valid YAML: {reason}. Quote a value that contains ': ' or ' #'."]
     if not isinstance(data, dict):
