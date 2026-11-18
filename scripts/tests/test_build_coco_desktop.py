@@ -282,18 +282,29 @@ class RealPluginBuildTest(unittest.TestCase):
     def tearDownClass(cls):
         cls._tmp.cleanup()
 
+    def expected_conversion(self):
+        """What the current tree should convert to, derived from it so adding a command or skill needs no edit here."""
+        plugin = REPO_ROOT / "plugins/cortex-code"
+        skill_dirs = {p.name for p in (plugin / "skills").iterdir()}
+        skill_names = set()
+        for skill_md in (plugin / "skills").glob("*/SKILL.md"):
+            fields, _ = build_mod.parse_frontmatter(skill_md.read_text())
+            skill_names.add((fields or {}).get("name") or skill_md.parent.name)
+        stems = sorted(p.stem for p in (plugin / "commands").rglob("*.md"))
+        dropped = [s for s in stems if s in skill_names]
+        kept = [s for s in stems if s not in skill_names]
+        renamed = sorted(f"{s}-cmd" for s in kept if s in skill_dirs)
+        converted = sorted(f"{s}-cmd" if s in skill_dirs else s for s in kept)
+        return dropped, renamed, converted
+
     def test_command_conversion(self):
-        self.assertEqual(
-            self.report["dropped"],
-            [
-                "monte-carlo-incident-response", "monte-carlo-onboarding",
-                "monte-carlo-proactive-monitoring", "monte-carlo-troubleshoot-agent-traces",
-            ],
-        )
-        self.assertEqual(self.report["renamed"], ["instrument-agent-cmd", "monitoring-advisor-cmd"])
-        self.assertIn("mc", self.report["converted"])
-        self.assertIn("mc-validate-lineage", self.report["converted"])
-        self.assertEqual(len(self.report["converted"]), 14)
+        dropped, renamed, converted = self.expected_conversion()
+        self.assertEqual(self.report["dropped"], dropped)
+        self.assertEqual(self.report["renamed"], renamed)
+        self.assertEqual(self.report["converted"], converted)
+        # The tree exercises every conversion path, so a regression in one shows up here too.
+        self.assertTrue(dropped and renamed)
+        self.assertIn("mc", converted)
 
     def test_every_source_skill_ships(self):
         source = sorted(p.name for p in (REPO_ROOT / "plugins/cortex-code/skills").iterdir())
@@ -302,7 +313,7 @@ class RealPluginBuildTest(unittest.TestCase):
                 src_tree = tree((REPO_ROOT / "plugins/cortex-code/skills" / name).resolve())
                 expected = {k: v for k, v in src_tree.items() if not build_mod.is_excluded(f"skills/{name}/{k}")}
                 self.assertEqual(tree(self.out / "skills" / name), expected)
-        self.assertEqual(len(self.report["skills"]), len(source) + 14)
+        self.assertEqual(len(self.report["skills"]), len(source) + len(self.expected_conversion()[2]))
 
     def test_hooks_ship_whole(self):
         src = REPO_ROOT / "plugins/cortex-code/hooks"

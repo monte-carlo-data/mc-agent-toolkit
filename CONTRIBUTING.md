@@ -51,9 +51,10 @@ mc-agent-toolkit/
 │   │
 │   └── cortex-code/                     # Snowflake Cortex Code — wraps Claude Code (6th editor)
 │       ├── .cortex-plugin/plugin.json
+│       ├── hooks/hooks.json            # Every Cortex hook (CoCo Desktop reads only this file)
 │       ├── hooks/prevent/              # Hook adapters (thin, call shared lib)
 │       ├── hooks/telemetry/           # SessionStart id-mint + skill-usage beacon
-│       ├── skills/ (17 skills → symlinks)
+│       ├── skills/ (21 skills → symlinks)
 │       └── commands/ (prevent/, push-ingestion/, catalog/, monitoring-advisor/, …)
 │
 ├── .claude-plugin/marketplace.json
@@ -279,6 +280,15 @@ Two automated checks help catch missing version bumps:
 
 When a version bump merges to `main`, the GitHub Actions workflow (`.github/workflows/release-on-tag.yml`) automatically creates a git tag and GitHub Release with auto-generated release notes from PR titles.
 
+### CoCo Desktop build
+
+The same workflow then publishes the Cortex Code plugin in CoCo Desktop's format. `scripts/publish_coco_desktop.py` builds `plugins/cortex-code` at the release tag with `scripts/build_coco_desktop.py`. It commits the result to the `coco-desktop` branch, which **Add from GitHub** and **Sync** install from, and tags it `coco-desktop-v<version>`. Never commit to that branch by hand; the workflow overwrites it on the next release.
+
+- **Re-running is safe.** If the publish job fails, re-run it, or run the workflow by hand (`workflow_dispatch`) with the release tag, e.g. `v1.31.0`. A version that is already published with the same files is left alone.
+- **A pin tag never moves.** If `coco-desktop-v<version>` already exists with different files, the job fails. Bump the version instead of retagging.
+- **Releases only move forward.** The branch only moves to a newer version. Publishing an older tag adds its pin tag on a side commit and leaves the branch where it is.
+- **Check the build locally** with `python3 scripts/build_coco_desktop.py plugins/cortex-code <out-dir>`. It prints a JSON report of what it converted, and it fails rather than producing a copy Desktop would reject.
+
 ## Architecture
 
 For the reasoning behind the plugin structure, the unified toolkit model, and guidelines on how skills and plugins interact across editors, see the [Plugin Architecture Guide](docs/plugin-architecture-guide.md).
@@ -302,3 +312,12 @@ OpenCode is an exception — it ports hook logic to TypeScript since the `@openc
 If a harness exposes the session transcript in a format the line-based marker scanner can't read, add a reader to the shared lib rather than special-casing the adapter. **Cortex Code** is the worked example: its hook `transcript_path` is a metadata file with the messages in a sibling `<id>.history.jsonl`, so `plugins/shared/prevent/lib/protocol.py` provides `scan_history_jsonl_for_markers` (selected via `HookInput.transcript_format`) and the Cortex `pre_edit_hook.py` rewrites the path to that sibling. **Invariant:** prevent deny reasons must never contain a string the marker scanner would match — a harness that persists hook output back into the scanned transcript would otherwise let the impact-check gate unlock itself.
 
 **Cortex command bodies must not contain a `---` sequence** — Cortex truncates an injected slash-command body at the first `---`, silently dropping everything after it. A Markdown table's separator row (`|---|---|`) is the usual offender, so use bulleted lists instead of tables in `plugins/cortex-code/commands/*.md`. (Other harnesses tolerate tables; this constraint is Cortex-specific.)
+
+**Cortex hooks live in one file, `plugins/cortex-code/hooks/hooks.json`.** CoCo Desktop reads hooks only from that file and ignores a `hooks` field in the manifest, so don't add one. Desktop matches each matcher as a case-sensitive, unanchored regular expression against lowercase tool IDs (`bash`, `edit`, `write`, `multi_edit`, `skill`), so anchor lowercase IDs: `^bash$`, `^(edit|write|multi_edit)$`. A PascalCase matcher like `Bash` never fires in Desktop, and an unanchored `bash` also matches `bash_output`. The Cortex Code CLI ignores case, so the same file works there. Quote the plugin root in commands (`"${CORTEX_PLUGIN_ROOT}/hooks/…"`), because install paths can contain spaces. `plugins/cortex-code/tests/test_hooks_config.py` lists every expected handler; update it when you add one.
+
+**Cortex commands become skills in the CoCo Desktop build**, because Desktop has no commands. The builder:
+- drops a command whose name matches a skill's `name`, since the skill already covers it;
+- names it `<command>-cmd` when a skill folder already has the command's name;
+- fails the build on a command with an empty body, or on two commands with the same name.
+
+Check what your command turns into with the local build under [CoCo Desktop build](#coco-desktop-build).
