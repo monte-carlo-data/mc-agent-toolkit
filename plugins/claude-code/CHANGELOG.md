@@ -5,6 +5,15 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Claude Code will
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.30.0] - 2026-11-18
+
+### Added
+
+- reinforce-agent: starts from one issue handed over from Monte Carlo, an agent health issue link, or a prompt naming `agent_name`, `trace_table_mcon` and `issue_uuid`, and reads it with `get_reinforcement_loop_report(issue_uuid=...)`.
+- reinforce-agent: fixes a Snowflake Cortex agent by committing a new agent version instead of opening a pull request. `scripts/patch_agent_spec.py` builds the new specification from the current one and a merge patch, and reports every changed path, so the spec is never retyped. It checks first that the session's roles can change the agent; when they can't, it prints complete SQL for someone who can. Before writing it checks the agent hasn't changed, and before committing that the new version holds exactly the new spec. When the user wants to test before releasing, it pins the default version before any write, and it runs one statement at a time, so no commit can release the fix early. On an agent whose only committed version is `VERSION$1`, which Snowflake serves from the live version, it first commits the live version unchanged, so production never sees an edit before release. When a committed version is waiting to be released, it lists each with its comment and offers to release it, drop it, or stop. If a run stops after pinning the default, it says so and how to restore it. It reads the current spec from the default version in `SHOW VERSIONS`, since `DESCRIBE AGENT` can return an empty spec on an agent with no live version. It names the agent in full in every statement, checks the session can change the agent before offering any write, and, if a run stops while the live version holds an uncommitted fix, puts the current spec back. After a `COMMIT` error it checks `SHOW VERSIONS` for a new version before treating the commit as failed, and it checks the committed version holds the new spec before offering a release. If a run stops, it recovers first (puts the old spec back, or rolls back a fix that is already live but unchecked), then reports what the agent holds. Before offering to release or drop a version waiting to be released, it shows what that version would change, with the script's new `--compare` mode. The change report names each changed item inside an array, such as one tool's description, and marks a field that was added or removed.
+- reinforce-agent: after the user confirms the fix is released, marks the issue fixed with `update_reinforcement_loop_issue` (`MARK_FIXED`), passing the pull request when there is one. A fix not yet released can be marked in progress (`MARK_IN_PROGRESS`).
+- reinforce-agent: picks how to land a fix from the agent's `backend_class`, not its trace table MCON.
+
 ## [1.29.9] - 2026-11-18
 
 ### Changed
