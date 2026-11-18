@@ -38,7 +38,7 @@ The Prevent feature uses four hooks and a slash command to enforce the impact-as
 
 Hook availability and behavior varies by agent — see each agent's README for platform-specific details. The [Hook Format Comparison](#hook-format-comparison) table below shows the technical differences.
 
-**Editor compatibility:** Most agents run inside popular editors. **VS Code** users can use Copilot CLI or Claude Code. **JetBrains** users can use Copilot CLI. **Cursor** is a standalone editor with its own plugin. Claude Code, Copilot CLI, and OpenCode also run in any **terminal**. Codex runs on **GitHub**. **Cortex Code** is Snowflake's terminal CLI agent.
+**Editor compatibility:** Most agents run inside popular editors. **VS Code** users can use Copilot CLI or Claude Code. **JetBrains** users can use Copilot CLI. **Cursor** is a standalone editor with its own plugin. Claude Code, Copilot CLI, and OpenCode also run in any **terminal**. Codex runs on **GitHub**. **Cortex Code** is Snowflake's coding agent, available as the `cortex` terminal CLI and the CoCo Desktop app.
 
 ## Architecture
 
@@ -69,10 +69,10 @@ For detailed architecture decisions, see the [Plugin Architecture Guide](../docs
 | Aspect | Claude Code | Cursor | OpenCode | Copilot CLI | Cortex Code |
 |---|---|---|---|---|---|
 | Language | Python | Python | TypeScript | Python | Python |
-| Hook config | `hooks/<skill>/hooks.json` | `hooks/<skill>/hooks.json` | Event handlers in `src/` | `hooks.json` (v1 format) at plugin root | `hooks/<skill>/hooks.json` |
+| Hook config | `hooks/<skill>/hooks.json` | `hooks/<skill>/hooks.json` | Event handlers in `src/` | `hooks.json` (v1 format) at plugin root | One `hooks/hooks.json` for all skills |
 | Command field | `"command"` | `"command"` | SDK events | `"bash"` | `"command"` |
-| Tool names | `Write`, `Edit`, `Bash` | `Write`, `Edit` | `edit`, `write`, `apply_patch` | `edit`, `create`, `bash` | `Edit`/`Write`/`MultiEdit`/`Bash` (matchers; tool names arrive lowercased) |
+| Tool names | `Write`, `Edit`, `Bash` | `Write`, `Edit` | `edit`, `write`, `apply_patch` | `edit`, `create`, `bash` | `edit`, `write`, `multi_edit`, `bash`, `skill` (regex matchers; CoCo Desktop matches case-sensitively) |
 | Deny format | `hookSpecificOutput.permissionDecision` | `permission: "deny"` | Thrown `Error` | `permissionDecision: "deny"` | `hookSpecificOutput.permissionDecision` |
 | Session ID | `session_id` | `conversation_id` | SDK client | PID (not provided) | `session_id` |
 
-**Cortex Code** wraps Claude Code, so its hook config and hook I/O JSON match Claude Code, and `${CORTEX_PLUGIN_ROOT}` expands in hook commands (the analog of Claude Code's `${CLAUDE_PLUGIN_ROOT}`; the Cortex hooks use `${CORTEX_PLUGIN_ROOT}`). The one difference: the hook `transcript_path` points at a `<id>.json` metadata file, while the session messages live in a sibling `<id>.history.jsonl`; the prevent pre-edit hook reads that sibling and matches markers only in assistant-authored text.
+**Cortex Code** wraps Claude Code, so its hook I/O JSON matches Claude Code, and `${CORTEX_PLUGIN_ROOT}` is substituted into hook commands (the analog of Claude Code's `${CLAUDE_PLUGIN_ROOT}`). It is substituted into the command text, not exported, so quote it. Three differences in hook config: Cortex Code (CoCo Desktop in particular) loads hooks only from `hooks/hooks.json` at the plugin root, so the manifest declares no `hooks`; matchers are unanchored regexes, and CoCo Desktop tests them case-sensitively against its lowercase tool IDs (the CLI ignores case), so the plugin uses anchored lowercase matchers such as `^bash$` (PascalCase names like `Bash` never match in Desktop); and the hook `transcript_path` points at a `<id>.json` metadata file, while the session messages live in a sibling `<id>.history.jsonl`. For the last one, the hook `transcript_path` points at a `<id>.json` metadata file, while the session messages live in a sibling `<id>.history.jsonl`; the prevent pre-edit hook reads that sibling and matches markers only in assistant-authored text.

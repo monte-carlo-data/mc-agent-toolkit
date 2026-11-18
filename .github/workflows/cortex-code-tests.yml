@@ -1,0 +1,40 @@
+name: Cortex Code Plugin Tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'plugins/cortex-code/**'
+      - 'skills/**'
+      - 'LICENSE'
+      - 'scripts/build_coco_desktop.py'
+      - 'scripts/tests/test_build_coco_desktop.py'
+      - '.github/workflows/cortex-code-tests.yml'
+  pull_request:
+    paths:
+      - 'plugins/cortex-code/**'
+      - 'skills/**'
+      - 'LICENSE'
+      - 'scripts/build_coco_desktop.py'
+      - 'scripts/tests/test_build_coco_desktop.py'
+      - '.github/workflows/cortex-code-tests.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # Stdlib only — no pip install needed.
+      - name: Hook config matches how Cortex Code loads and matches hooks
+        run: python3 plugins/cortex-code/tests/test_hooks_config.py
+
+      - name: CoCo Desktop build
+        run: python3 scripts/tests/test_build_coco_desktop.py
