@@ -354,9 +354,9 @@ landed, whatever the error said: go on with that version. No new named version m
 land: stop. Anything else, including a `SHOW VERSIONS` that fails, means you don't know: stop,
 write nothing more, and say so.
 
-Under a `LAST` default with nothing pinned (**apply and release** on an agent whose default was
-never set), the fix is what callers get from the moment the `COMMIT` lands, before any check
-below. Check the new version holds `new.json`:
+Whatever the default, check the new version holds `new.json`. Under a `LAST` default with
+nothing pinned (**apply and release** on an agent whose default was never set), the fix is
+already what callers get, since the `COMMIT` landed:
 
 ```sql
 SHOW VERSIONS IN AGENT <db>.<schema>.<agent>;
