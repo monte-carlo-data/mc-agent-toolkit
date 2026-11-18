@@ -125,6 +125,7 @@ bucket: Monitoring
 ---
 ```
 
+- The frontmatter must be valid YAML. Hosts parse it with YAML parsers, and a strict one drops a skill (or a whole skill catalog) it can't parse. Quote a one-line value that contains `: ` or ` #`, or that starts with a quote, `[`, `{`, `>`, `|`, `*`, `&`, `!`, `%`, `@` or a backtick: `description: "Connect warehouses with API v2 tools: show what exists."`. Unquoted, the first `: ` is a parse error and ` #` silently cuts the value short. CI runs `scripts/check_skill_frontmatter.py`, which parses every `skills/*/SKILL.md` and `.claude/skills/*/SKILL.md` with PyYAML and requires `name` and `description`; run it locally with `python3 scripts/check_skill_frontmatter.py` (needs PyYAML).
 - `name` and `description` are required by Claude Code. `name` is the canonical prefixed form (see [Naming](#naming)).
 - `when_to_use` is strongly recommended — it's a Claude-specific convention today but likely to be adopted by other editors.
 - `bucket` tracks which capability bucket the skill belongs to for the public docs. Valid values: Trust / Incident Response / Monitoring / Prevent / Optimize / Setup. Ignored by Claude at runtime — it's a catalog/docs hint.

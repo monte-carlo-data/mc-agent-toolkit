@@ -153,7 +153,7 @@ only reads `peer_skills` and `cases`, so other top-level keys are free for ancho
 ### Testing the runner
 
 ```bash
-uv run python -m unittest test_live_eval_scoring test_claude_judge
+uv run python -m unittest test_live_eval_scoring test_claude_judge test_run_evals_metadata
 ```
 
 `make dry-run` validates the YAML without calling any API and needs no Monte Carlo credentials.

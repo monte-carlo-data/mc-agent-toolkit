@@ -1,6 +1,6 @@
 ---
 name: monte-carlo-onboarding
-description: Connect warehouses, BI tools (Tableau, Looker, Power BI) and custom connectors to Monte Carlo with API v2 tools: show what exists, reference credentials, create, validate and fix connections. Use to onboard platforms or generate Terraform or scripts.
+description: "Connect warehouses, BI tools (Tableau, Looker, Power BI) and custom connectors to Monte Carlo with API v2 tools: show what exists, reference credentials, create, validate and fix connections. Use to onboard platforms or generate Terraform or scripts."
 metadata:
   bucket: Setup
 ---

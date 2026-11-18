@@ -24,6 +24,16 @@ description: |
 
 Always count characters before committing. A quick check: `echo -n "your description" | wc -c`.
 
+## SKILL.md frontmatter must be valid YAML
+
+Hosts parse the frontmatter with YAML parsers; a strict one drops a skill it can't parse. Quote a one-line value that contains `: ` or ` #`, or starts with a YAML indicator (a quote, `[`, `{`, `>`, `|`, `*`, `&`, `!`, `%`, `@`, a backtick):
+
+```yaml
+description: "Connect warehouses with API v2 tools: show what exists, then create connections."
+```
+
+Unquoted, the first `: ` is a parse error and ` #` silently cuts the value short. CI runs `python3 scripts/check_skill_frontmatter.py` (PyYAML), which also requires `name` and `description`; run it before committing.
+
 ## MCP tool names in skill docs must use snake_case
 
 When referencing Monte Carlo MCP tools in skill files (SKILL.md, references/*.md, patterns), always use snake_case matching the actual tool names — not camelCase.
