@@ -7,25 +7,26 @@ them. Each section is one tool; its name is the tool to call.
 
 ## `list_integration_keys`: List integration keys
 
-List your account's ingestion and Airflow callbacks keys.
+List your account's ingestion, Airflow callbacks and OpenTelemetry keys.
 
 No secret is part of the list. Keys are sorted oldest first.
 
-The list is not paged. A warehouse or container holds a key or two in normal use.
+The list is not paged. A warehouse, container or deployment holds a key or two in normal
+use.
 
 - **Effect:** read-only.
-- **Pairs with:** `get_airflow_callbacks_key`, `get_ingestion_key`.
+- **Pairs with:** `get_airflow_callbacks_key`, `get_ingestion_key`, `get_open_telemetry_key`.
 
 ### Arguments
 
 | Argument | Type | Required | Description |
 |---|---|---|---|
-| `scope` | one of `INGESTION`, `AIRFLOW_CALLBACKS` | no | Only keys of this scope. |
-| `parent_id` | `str` | no | Only keys scoped to this warehouse, BI container or ETL container. |
+| `scope` | one of `INGESTION`, `AIRFLOW_CALLBACKS`, `OPEN_TELEMETRY` | no | Only keys of this scope. |
+| `parent_id` | `str` | no | Only keys scoped to this warehouse, BI container, ETL container or Agent Observability deployment. |
 
 ### Response
 
-Returns `items`. Response fields per item: id, description, created_time, scope, warehouse_id, bi_container_id, etl_container_id.
+Returns `items`. Response fields per item: id, description, created_time, scope, warehouse_id, bi_container_id, etl_container_id, deployment_id.
 
 | Field | Description |
 |---|---|
@@ -36,6 +37,7 @@ Returns `items`. Response fields per item: id, description, created_time, scope,
 | `warehouse_id` | The warehouse the key is scoped to, if it is scoped to one. |
 | `bi_container_id` | The BI container the key is scoped to, if it is scoped to one. |
 | `etl_container_id` | The ETL container the key is scoped to, if it is scoped to one. |
+| `deployment_id` | The Agent Observability deployment the key is scoped to, if it is scoped to one. |
 
 ### What can fail
 
@@ -143,6 +145,64 @@ Delete an ingestion key. Data pushed with it is refused from then on, so delete 
 
 - **Effect:** deletes; destructive and idempotent.
 - **Pairs with:** `get_ingestion_key`, `list_integration_keys`.
+
+### Arguments
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `key_id` | `str` | yes | Id of the integration key, as returned when it is created or listed. |
+
+### Response
+
+Returns `key_id` and `deleted: true` once the key is gone.
+
+### What can fail
+
+- Authentication credentials are missing or invalid.
+- The request was authenticated, but the caller is not allowed to perform this operation. Read `code` to tell the reasons apart: `account_frozen` means the account is paused, rather than that the caller lacks permission.
+- Monte Carlo is busy or temporarily unavailable; try again after a moment.
+- An unexpected error prevented the request from being processed.
+
+## `get_open_telemetry_key`: Get an OpenTelemetry key
+
+Get one OpenTelemetry key. The secret is not part of it.
+
+An id that names a key of another scope, or no key in your account, returns 404.
+
+- **Effect:** read-only.
+- **Pairs with:** `delete_open_telemetry_key`, `list_integration_keys`.
+
+### Arguments
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `key_id` | `str` | yes | Id of the integration key, as returned when it is created or listed. |
+
+### Response
+
+Response fields: id, description, created_time, deployment_id, mcd_id.
+
+| Field | Description |
+|---|---|
+| `id` | Unique identifier of the key. |
+| `description` | What this key is for. |
+| `created_time` | When the key was created. |
+| `deployment_id` | The `AGENT_OBSERVABILITY` deployment the key sends traces to. |
+| `mcd_id` | Key id to present, as the `x-mcd-id` header or a client's `mcd_id` setting. The same value as `id`. |
+
+### What can fail
+
+- Authentication credentials are missing or invalid.
+- The request was authenticated, but the caller is not allowed to perform this operation. Read `code` to tell the reasons apart: `account_frozen` means the account is paused, rather than that the caller lacks permission.
+- The key does not exist, or is not visible to the caller.
+- An unexpected error prevented the request from being processed.
+
+## `delete_open_telemetry_key`: Delete an OpenTelemetry key
+
+Delete an OpenTelemetry key. Traces sent with it are refused from then on, so delete it only once the agents sending with it have a new key.
+
+- **Effect:** deletes; destructive and idempotent.
+- **Pairs with:** `get_open_telemetry_key`, `list_integration_keys`.
 
 ### Arguments
 
