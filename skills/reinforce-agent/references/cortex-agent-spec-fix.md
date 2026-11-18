@@ -101,6 +101,19 @@ version, and whether there is a live version (the row without a name). From `DES
 `default_version_name`. `LAST` means no default was set, so callers get whichever version was
 committed last.
 
+The patch script trusts `current.json`, so check the file against Snowflake before going on. A
+slip in copying it, such as a lost escape in a long description, would otherwise reach the new
+spec unnoticed:
+
+```sql
+SHOW VERSIONS IN AGENT <db>.<schema>.<agent>;
+SELECT PARSE_JSON("agent_spec") = PARSE_JSON($$<contents of current.json>$$) AS matches
+FROM TABLE(RESULT_SCAN(LAST_QUERY_ID())) WHERE "is_default" = 'true';
+```
+
+If `matches` isn't TRUE, write `current.json` again from that row and recheck.
+NEVER patch an unchecked file.
+
 Check that this session can change the agent, so a missing grant shows up now, not after the
 user has picked what to do:
 
@@ -123,7 +136,15 @@ released, perhaps a fix held back for testing. Step 5 replaces the whole spec wi
 from the default's, so the new version would silently leave that change out. Write nothing yet.
 List each committed version newer than the default with its comment from `SHOW VERSIONS`, and
 show what it changes. For each one, save its `agent_spec` from `SHOW VERSIONS` to `waiting.json`
-exactly as returned, then:
+exactly as returned, and check it as `current.json` was checked:
+
+```sql
+SHOW VERSIONS IN AGENT <db>.<schema>.<agent>;
+SELECT PARSE_JSON("agent_spec") = PARSE_JSON($$<contents of waiting.json>$$) AS matches
+FROM TABLE(RESULT_SCAN(LAST_QUERY_ID())) WHERE "name" = '<version>';
+```
+
+If `matches` isn't TRUE, write `waiting.json` again from that row and recheck. Then:
 
 ```bash
 python3 <skill dir>/scripts/patch_agent_spec.py --spec current.json --compare waiting.json
@@ -159,19 +180,6 @@ WHERE c."name" = '<that version>' AND v."name" = 'VERSION$1';
 
 If it is TRUE, releasing it changes nothing callers get, so suggest releasing it. Don't call a
 drop harmless: see the Drop choice above.
-
-The patch script trusts `current.json`, so check the file against Snowflake before going on. A
-slip in copying it, such as a lost escape in a long description, would otherwise reach the new
-spec unnoticed:
-
-```sql
-SHOW VERSIONS IN AGENT <db>.<schema>.<agent>;
-SELECT PARSE_JSON("agent_spec") = PARSE_JSON($$<contents of current.json>$$) AS matches
-FROM TABLE(RESULT_SCAN(LAST_QUERY_ID())) WHERE "is_default" = 'true';
-```
-
-If `matches` isn't TRUE, write `current.json` again from that row and recheck.
-NEVER patch an unchecked file.
 
 Check the issue's diagnosis against the spec (for example, "instructions holds only
 `sample_questions`"). If the spec has moved on since the diagnosis, say so before proposing
@@ -414,7 +422,10 @@ after a stop.
   `SHOW VERSIONS`. If the default is the new version and the release check hasn't returned TRUE,
   run the rollback from "Tell the user", then check the default holds `current.json`, as in the
   recheck. If the release check returned TRUE, the fix is released: nothing to recover.
-- **You don't know whether the fix's `COMMIT` landed:** write nothing more.
+- **You don't know whether the fix's `COMMIT` landed:** read `SHOW VERSIONS` again now and compare
+  it with the list you kept before the commit. A new named version with the fix's comment means
+  it landed, and no new named version means it didn't: recover as in the branch above that
+  applies. Only if `SHOW VERSIONS` still fails, write nothing more.
 
 **2. Report** what the agent holds after recovery, from `DESCRIBE AGENT` and `SHOW VERSIONS` read
 now, not from what you meant to do:
@@ -440,8 +451,9 @@ holding the current spec. Quote `LAST`: unquoted, it is a syntax error. Afterwar
 ALTER AGENT <db>.<schema>.<agent> SET DEFAULT_VERSION = 'LAST';
 ```
 
-If the fix's `COMMIT` landed, or may have, NEVER offer that statement: say the default stays
-pinned, and that setting it back to `'LAST'` would release the fix.
+If the fix's `COMMIT` landed, or may have, NEVER offer that statement: setting the default to
+`'LAST'` would release the fix. Report the default as `DESCRIBE AGENT` shows it now, or as
+unknown if it can't be read.
 
 **4. End the run:** skip step 6, "Check it worked", and don't mark the issue fixed.
 

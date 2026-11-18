@@ -104,7 +104,7 @@ class PatchAgentSpecTest(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(
             report["changed"],
-            [{"path": "instructions.orchestration", "before": None, "after": RULE}],
+            [{"path": "instructions.orchestration", "change": "added", "before": None, "after": RULE}],
         )
         expected = json.loads(json.dumps(SPEC))
         expected["instructions"]["orchestration"] = RULE
@@ -180,7 +180,12 @@ class PatchAgentSpecTest(unittest.TestCase):
                     "before": LONG_DESCRIPTION,
                     "after": "New description.",
                 },
-                {"path": "tools[1].tool_spec.description", "before": None, "after": "Added by mistake."},
+                {
+                    "path": "tools[1].tool_spec.description",
+                    "change": "added",
+                    "before": None,
+                    "after": "Added by mistake.",
+                },
             ],
         )
 
@@ -205,8 +210,13 @@ class PatchAgentSpecTest(unittest.TestCase):
             report,
             {
                 "changed": [
-                    {"path": "instructions.orchestration", "before": None, "after": RULE},
-                    {"path": "skills", "before": [], "after": None},
+                    {
+                        "path": "instructions.orchestration",
+                        "change": "added",
+                        "before": None,
+                        "after": RULE,
+                    },
+                    {"path": "skills", "change": "removed", "before": [], "after": None},
                     {
                         "path": "tools[1].tool_spec.name",
                         "before": "client_search_tool",
@@ -216,6 +226,22 @@ class PatchAgentSpecTest(unittest.TestCase):
             },
         )
         self.assertEqual(files, ["other.json", "spec.json"])
+
+    def test_compare_tells_a_missing_key_from_an_explicit_null(self) -> None:
+        with_null = {"models": {"orchestration": None}}
+        without = {"models": {}}
+
+        _, added, _, _ = compare(without, with_null)
+        _, removed, _, _ = compare(with_null, without)
+
+        self.assertEqual(
+            added,
+            {"changed": [{"path": "models.orchestration", "change": "added", "before": None, "after": None}]},
+        )
+        self.assertEqual(
+            removed,
+            {"changed": [{"path": "models.orchestration", "change": "removed", "before": None, "after": None}]},
+        )
 
     def test_compare_of_equal_specs_reports_no_changes(self) -> None:
         code, report, _, _ = compare(SPEC, json.loads(json.dumps(SPEC)))

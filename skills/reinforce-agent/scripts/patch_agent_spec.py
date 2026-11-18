@@ -19,8 +19,12 @@ With --compare it writes nothing and reports every path that differs from the sp
 file, such as a committed version waiting to be released.
 
 Prints a JSON report to stdout:
-    {"changed": [{"path": "instructions.orchestration", "before": null, "after": "..."}],
+    {"changed": [{"path": "instructions.orchestration", "change": "added", "before": null,
+                  "after": "..."}],
      "out": "new.json"}
+
+A path that exists on only one side has "change": "added" or "removed"; a value that changed
+has no "change" field.
 
 Exits 1 when the inputs aren't JSON objects, 3 when the patch changes nothing (argparse
 uses 2 for usage errors).
@@ -73,9 +77,11 @@ def changed_paths(before: Any, after: Any, prefix: str = "") -> list[dict[str, A
             old = before.get(key, _MISSING)
             new = after.get(key, _MISSING)
             if old is _MISSING or new is _MISSING:
+                # "change" tells a missing key from one set to null, which both print as null.
                 changes.append(
                     {
                         "path": path,
+                        "change": "added" if old is _MISSING else "removed",
                         "before": None if old is _MISSING else old,
                         "after": None if new is _MISSING else new,
                     }
