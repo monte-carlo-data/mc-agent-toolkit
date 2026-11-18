@@ -49,7 +49,7 @@ search service is a change to that object: propose it and its SQL, and let the u
   did, and a `COMMIT` that lands before its `SET DEFAULT_VERSION` releases the fix.
 - **A check reads only its own `SHOW`.** `RESULT_SCAN(LAST_QUERY_ID())` reads the statement just
   before it in the same session. If a check returns no rows or an error, run its `SHOW` and the
-  check again. NEVER take no rows as TRUE.
+  check again, once. If it still does, treat the check as not TRUE. NEVER take no rows as TRUE.
 - **Nothing stops a concurrent edit.** Snowflake has no conditional update, and `SET
   SPECIFICATION` overwrites whatever is there. Step 5 checks again right before writing, which
   narrows the gap but can't close it.
@@ -199,20 +199,21 @@ Whoever runs that SQL doesn't have your files or step 1's results, so it must ru
   one-line print of its file, never a placeholder. Leave `<new version>` for them to fill from
   `SHOW VERSIONS`; don't guess the number.
 - If step 1 found a live version on an agent with a committed version after `VERSION$1`, run
-  the comparison in "One live version at a time" now. If it is TRUE, print `MODIFY LIVE VERSION`
-  on that live version without the `ADD LIVE VERSION`, and say callers that ask for the live
-  version see the change at once. If it isn't TRUE, print no writes: say the live version holds
-  edits, and stop.
+  the comparison in "One live version at a time" now. If it isn't TRUE, print no writes: say the
+  live version holds edits, and stop. If it is TRUE, print that comparison again right before
+  `MODIFY LIVE VERSION`, in place of the `ADD LIVE VERSION`: they go on only if it returns TRUE,
+  and callers that ask for the live version see the change at once.
 - Tell them to stop at the first error or the first `matches` that isn't TRUE, and to ask for
   new SQL if `ADD LIVE VERSION` fails or the agent differs from the snapshot.
 - Tell them a `COMMIT` error may still have landed: if `SHOW VERSIONS` then lists a named version
   with the fix's comment that wasn't in the `SHOW VERSIONS` just before the fix's `COMMIT`, it
   landed, so they go on with the checks.
-- After the rest, print the put-back from "When the run stops", as what to run if they stop after
-  the `MODIFY` that sets `new.json`, before the fix's `COMMIT` lands, and only if the check before
-  the commit returned TRUE.
-- End with the rollback, naming the default version from step 1. Tell them to run it if they stop
-  for any reason after the fix's `COMMIT` lands and before the release check returns TRUE.
+- After the rest, print what to run if they stop after the `MODIFY` that sets `new.json` and
+  before the fix's `COMMIT` lands: the check that the live version holds `new.json`, then the
+  put-back from "When the run stops", only if that check returns TRUE.
+- End with the rollback, naming the default version from step 1. If they stop after the fix's
+  `COMMIT` lands and before the release check returns TRUE, they check in `SHOW VERSIONS` which
+  version is the default, and run the rollback only if it is the fix's version.
 
 If `VERSION$1` is the only committed version, put this in the question itself, the text shown
 with the choices, since your reasoning isn't shown to the user: applying starts by committing
@@ -381,17 +382,15 @@ Then go on to step 6.
 
 #### When the run stops
 
-Tell the user what the agent holds now, from what you observed, not from what you meant to do:
-whether the pin landed, which versions were committed (the unchanged copy counts), whether the
-fix was committed, what the live version holds, and which version callers that don't name one
-get. Then end the run: skip step 6, "Check it worked", and don't mark the issue fixed. What
-else to do depends on how far the run got:
+Recover first, then report, then end the run. Writes in this part are the only ones allowed
+after a stop.
 
-- **Before the `MODIFY` that sets `new.json`:** write nothing more.
-- **After that `MODIFY`, and the fix's `COMMIT` didn't land:** run the check before the commit
-  first if it hasn't run. If it returned TRUE, the live version holds this run's spec: put the
-  current spec back, and check it. If it didn't, someone else may be editing the live version:
-  write nothing, and tell the user what it holds.
+**1. Recover**, as far as the run got:
+
+- **Before the `MODIFY` that sets `new.json`:** nothing to recover.
+- **After that `MODIFY`, and the fix's `COMMIT` didn't land:** run the check that the live version
+  holds `new.json` again now, even if it ran before. Only if it is TRUE does the live version
+  still hold this run's spec: put the current spec back, and check it.
 
   ```sql
   ALTER AGENT <db>.<schema>.<agent> MODIFY LIVE VERSION SET SPECIFICATION = $$<contents of current.json>$$;
@@ -400,29 +399,41 @@ else to do depends on how far the run got:
   FROM TABLE(RESULT_SCAN(LAST_QUERY_ID())) WHERE "name" IS NULL OR "name" = '';
   ```
 
-  If the put-back's check isn't TRUE, write nothing more, and tell the user what the live version
-  holds.
-- **After the fix's `COMMIT` lands:** check in `SHOW VERSIONS` which version is the default. If it
-  is the new version and the release check hasn't returned TRUE, run the rollback at once, then
-  check the default holds `current.json` as in the recheck. Tell the user the new version stays
-  committed, so a later run lists it as waiting to be released, and that they can drop it.
-- **You don't know whether the fix's `COMMIT` landed:** write nothing more. Tell the user to look
-  in `SHOW VERSIONS` for a version with the fix's comment, and give them the rollback for if it
-  is there and is the default.
+  If either check isn't TRUE, write nothing more: someone else may be editing the live version.
+- **After the fix's `COMMIT` landed:** read the default now, with `DESCRIBE AGENT` and
+  `SHOW VERSIONS`. If the default is the new version and the release check hasn't returned TRUE,
+  run the rollback from "Tell the user", then check the default holds `current.json`, as in the
+  recheck. If the release check returned TRUE, the fix is released: nothing to recover.
+- **You don't know whether the fix's `COMMIT` landed:** write nothing more.
 
-If the pin landed and you know the fix's `COMMIT` didn't land, tell the user the default is
-pinned. If step 1's
-`default_version_name` was `LAST`, also give them the statement that restores it. The latest
-commit then is the step 1 default or the unchanged copy, both holding the current spec. Quote
-`LAST`: unquoted, it is a syntax error. Afterwards `DESCRIBE AGENT` shows `default_version_name`
-as `LAST` again:
+**2. Report** what the agent holds after recovery, from `DESCRIBE AGENT` and `SHOW VERSIONS` read
+now, not from what you meant to do:
+
+- which version callers that don't name one get, and whether the default is pinned or `LAST`;
+- which versions this run committed (the unchanged copy counts), and whether the fix is one;
+- if the fix's version failed its check, how its spec differs from `new.json`, or that it
+  couldn't be read;
+- what the live version holds, if there is one.
+
+If the fix's version is committed but isn't the default, say a later run will list it as waiting
+to be released, and that they can drop it. If you don't know whether the fix's `COMMIT` landed,
+give them the version list from just before it: a new version there with the fix's comment means
+it landed. Give them the rollback for if that version is the default.
+
+**3. Restoring `LAST`.** Only if the pin landed, step 1's `default_version_name` was `LAST`, and
+the fix's `COMMIT` didn't land, tell the user the default is pinned and give them the statement
+that restores it. The latest commit is then the step 1 default or the unchanged copy, both
+holding the current spec. Quote `LAST`: unquoted, it is a syntax error. Afterwards
+`DESCRIBE AGENT` shows `default_version_name` as `LAST` again:
 
 ```sql
 ALTER AGENT <db>.<schema>.<agent> SET DEFAULT_VERSION = 'LAST';
 ```
 
-Once the fix's `COMMIT` has landed, NEVER offer that statement: say the default stays pinned, and
-that setting it back to `'LAST'` would release the fix.
+If the fix's `COMMIT` landed, or may have, NEVER offer that statement: say the default stays
+pinned, and that setting it back to `'LAST'` would release the fix.
+
+**4. End the run:** skip step 6, "Check it worked", and don't mark the issue fixed.
 
 ### 6. Check it worked
 
