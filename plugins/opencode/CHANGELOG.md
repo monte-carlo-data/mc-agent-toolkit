@@ -5,6 +5,13 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for OpenCode will be
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.30.1] - 2026-11-18
+
+### Fixed
+
+- reinforce-agent: when a run stops after setting the fix on a Cortex agent's live version, and the live version doesn't hold the fix as written (a lost escape, say), the report now gives the user the statement that puts the current spec back, with its check, and says it overwrites whatever the live version holds, so the user decides. Before, the run left the live version holding neither spec and gave no way back. The SQL printed for someone else to run says the same.
+- reinforce-agent: when it isn't known whether the fix's `COMMIT` landed, the run no longer says to write nothing more; it stops and lets "When the run stops" read the versions again and recover, as that section already described.
+
 ## [1.30.0] - 2026-11-18
 
 ### Added
