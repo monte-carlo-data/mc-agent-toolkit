@@ -119,7 +119,9 @@ the user what it is, and offer three choices:
 
 - **Release it**: `ALTER AGENT <db>.<schema>.<agent> SET DEFAULT_VERSION = '<version>';`
 - **Drop it**: `ALTER AGENT <db>.<schema>.<agent> DROP VERSION <version>;` for each waiting
-  version, newest first, with the name unquoted. A dropped version can't be restored.
+  version, newest first, with the name unquoted. A dropped version can't be restored. If the
+  drop leaves `VERSION$1` as the only committed version, callers that don't name a version go
+  back to the live version, which may hold a spec nobody checked.
 - **Stop** while they keep testing it.
 
 Run the chosen statement only if the session can change the agent, otherwise give the user the
@@ -137,8 +139,7 @@ WHERE c."name" = '<that version>' AND v."name" = 'VERSION$1';
 ```
 
 If it is TRUE, releasing it changes nothing callers get, so suggest releasing it. Don't call a
-drop harmless: if it is the only version committed after `VERSION$1`, dropping it puts callers
-that don't name a version back on the live version, which may hold a spec nobody checked.
+drop harmless: see the Drop choice above.
 
 The patch script trusts `current.json`, so check the file against Snowflake before going on. A
 slip in copying it, such as a lost escape in a long description, would otherwise reach the new
@@ -183,9 +184,11 @@ switch to a role the user hasn't said they have, and never grant privileges unle
 
 Whoever runs that SQL doesn't have your files, so it must run as printed: the step 5 statements
 for **apply and release**, in order, with every spec as the one-line print of its file, never a
-placeholder. Leave out the block that puts `current.json` back on the live version; print it
-apart, after the rest, as what to run if they stop after the `MODIFY LIVE VERSION` that sets
-`new.json` and before the fix's `COMMIT` succeeds. Leave `<new version>` for them to fill from
+placeholder. Leave out "Put the spec back"; print it apart, after the rest, as what to run if
+they stop after the `MODIFY LIVE VERSION` that sets `new.json` and before the fix's `COMMIT`
+lands. Tell them a `COMMIT` error may still have landed: if `SHOW VERSIONS` then lists a new
+named version, the commit landed, so they go on with the checks and must not put the spec back.
+Leave `<new version>` for them to fill from
 `SHOW VERSIONS`; don't guess the number. Tell them to stop at the first error or the first
 `matches` that isn't TRUE, and to ask for new SQL if `ADD LIVE VERSION` fails or the agent
 changed. End with the rollback, naming the default version from step 1.
@@ -243,7 +246,7 @@ SHOW VERSIONS IN AGENT <db>.<schema>.<agent>;
 ```
 
 Go on only if `SHOW VERSIONS` shows that version as the default. If the run stops before the
-fix's own `COMMIT` below succeeds, tell the user the default is now pinned to that version. If
+fix's own `COMMIT` below lands, tell the user the default is now pinned to that version. If
 step 1's `default_version_name` was `LAST`, also give them the statement that restores it. Quote
 `LAST`: unquoted, it is a syntax error. Afterwards `DESCRIBE AGENT` shows `default_version_name`
 as `LAST` again, as on an agent whose default was never set:
@@ -291,25 +294,34 @@ FROM TABLE(RESULT_SCAN(LAST_QUERY_ID())) WHERE "name" IS NULL OR "name" = '';
 
 If it isn't TRUE, don't commit: tell the user what differs.
 
-From the `MODIFY LIVE VERSION` above until the fix's `COMMIT` succeeds, the live version holds an
+From the `MODIFY LIVE VERSION` above until the fix's `COMMIT` lands, the live version holds an
 uncommitted spec, which callers that ask for the live version get, and which blocks the next
-run's `ADD LIVE VERSION`.
-If the run stops in that span (a failed check, a failed `COMMIT`, or the user stopping), tell
-the user, put the current spec back, and check it:
+run's `ADD LIVE VERSION`. If the run stops in that span (a failed check, the user stopping, or a
+`COMMIT` that didn't land), go to "Put the spec back" at the end of this step.
 
-```sql
-ALTER AGENT <db>.<schema>.<agent> MODIFY LIVE VERSION SET SPECIFICATION = $$<contents of current.json>$$;
-SHOW VERSIONS IN AGENT <db>.<schema>.<agent>;
-SELECT PARSE_JSON("agent_spec") = PARSE_JSON($$<contents of current.json>$$) AS matches
-FROM TABLE(RESULT_SCAN(LAST_QUERY_ID())) WHERE "name" IS NULL OR "name" = '';
-```
-
-Then commit and read back the new version's name. Don't assume the next number:
+Keep the version list from the `SHOW VERSIONS` just above. Then commit and read back the new
+version's name. Don't assume the next number:
 
 ```sql
 ALTER AGENT <db>.<schema>.<agent> COMMIT COMMENT = 'Monte Carlo issue <issue uuid>: <your summary of the fix>';
 SHOW VERSIONS IN AGENT <db>.<schema>.<agent>;
 ```
+
+A `COMMIT` that returns an error, such as a timeout, may still have landed. Compare this
+`SHOW VERSIONS` with the list you kept: a new named version means the commit landed, whatever
+the error said, so go on below with that version. If there is no new named version, it didn't
+land: put the spec back.
+
+Check the new version holds `new.json`:
+
+```sql
+SHOW VERSIONS IN AGENT <db>.<schema>.<agent>;
+SELECT PARSE_JSON("agent_spec") = PARSE_JSON($$<contents of new.json>$$) AS matches
+FROM TABLE(RESULT_SCAN(LAST_QUERY_ID())) WHERE "name" = '<new version>';
+```
+
+If it isn't TRUE, don't release it and don't give the user a release statement: tell them what
+the new version holds, and that callers still get the default.
 
 For **apply and release**, set the default to the new version, then confirm the agent now runs
 exactly `new.json`. If step 1's `default_version_name` was `LAST`, use `'LAST'` in place of
@@ -332,6 +344,20 @@ and that it pins the default: a later commit won't reach callers until the defau
 For **keep the current default**, tell them how to release once they've tested:
 `ALTER AGENT <db>.<schema>.<agent> SET DEFAULT_VERSION = '<new version>';`, or `= 'LAST'` if step 1's
 `default_version_name` was `LAST` and nothing was committed since, which also unpins it.
+
+#### Put the spec back
+
+Only for a run that stops after the `MODIFY LIVE VERSION` that sets `new.json` and before the
+fix's `COMMIT` lands. NEVER run this as a step on the way to the commit: committing afterwards
+would commit the old spec under the fix's comment. Tell the user the run stopped, put the
+current spec back, and check it:
+
+```sql
+ALTER AGENT <db>.<schema>.<agent> MODIFY LIVE VERSION SET SPECIFICATION = $$<contents of current.json>$$;
+SHOW VERSIONS IN AGENT <db>.<schema>.<agent>;
+SELECT PARSE_JSON("agent_spec") = PARSE_JSON($$<contents of current.json>$$) AS matches
+FROM TABLE(RESULT_SCAN(LAST_QUERY_ID())) WHERE "name" IS NULL OR "name" = '';
+```
 
 ### 6. Check it worked
 
