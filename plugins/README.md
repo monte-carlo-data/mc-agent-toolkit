@@ -8,12 +8,12 @@ For the user-facing feature list and installation instructions, see the [main RE
 
 | Agent | Status | Skills | MCP | Installation |
 |---|---|---|---|---|
-| **Claude Code** | Full | All 17 | OAuth | [Setup guide](claude-code/README.md) |
-| **Cursor** | Full | All 17 | OAuth | [Setup guide](cursor/README.md) |
-| **OpenCode** | Full | All 17 | OAuth | [Setup guide](opencode/README.md) |
-| **Cortex Code** | Full | All 17 | OAuth | [Setup guide](cortex-code/README.md) |
-| **Copilot CLI** | Preliminary | All 17 | OAuth | [Setup guide](copilot/README.md) |
-| **Codex** | Preliminary | All 17 | OAuth | [Setup guide](codex/README.md) |
+| **Claude Code** | Full | All 21 | OAuth | [Setup guide](claude-code/README.md) |
+| **Cursor** | Full | All 21 | OAuth | [Setup guide](cursor/README.md) |
+| **OpenCode** | Full | All 21 | OAuth | [Setup guide](opencode/README.md) |
+| **Cortex Code** | Full | All 21 | OAuth | [Setup guide](cortex-code/README.md) |
+| **Copilot CLI** | Preliminary | All 21 | OAuth | [Setup guide](copilot/README.md) |
+| **Codex** | Preliminary | All 21 | OAuth | [Setup guide](codex/README.md) |
 
 Currently, only the **Prevent** skill leverages hooks for *enforcement*; the other skills are instruction-only. (Telemetry also uses a lightweight `SessionStart` hook to fire an anonymous install beacon — see each plugin's README and the Telemetry section in the root README.)
 

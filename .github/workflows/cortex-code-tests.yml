@@ -9,6 +9,9 @@ on:
       - 'LICENSE'
       - 'scripts/build_coco_desktop.py'
       - 'scripts/tests/test_build_coco_desktop.py'
+      - 'scripts/publish_coco_desktop.py'
+      - 'scripts/tests/test_publish_coco_desktop.py'
+      - '.github/workflows/release-on-tag.yml'
       - '.github/workflows/cortex-code-tests.yml'
   pull_request:
     paths:
@@ -17,6 +20,9 @@ on:
       - 'LICENSE'
       - 'scripts/build_coco_desktop.py'
       - 'scripts/tests/test_build_coco_desktop.py'
+      - 'scripts/publish_coco_desktop.py'
+      - 'scripts/tests/test_publish_coco_desktop.py'
+      - '.github/workflows/release-on-tag.yml'
       - '.github/workflows/cortex-code-tests.yml'
 
 permissions:
@@ -38,3 +44,6 @@ jobs:
 
       - name: CoCo Desktop build
         run: python3 scripts/tests/test_build_coco_desktop.py
+
+      - name: CoCo Desktop publish
+        run: python3 scripts/tests/test_publish_coco_desktop.py

@@ -27,16 +27,20 @@ EDIT_TOOLS = ["edit", "write", "multi_edit"]
 NEVER = [
     "bash_output", "notebook_edit_cell", "notebook_edit", "apply_patch", "read", "grep",
     "Bash", "Edit", "Write", "MultiEdit", "Skill", "skill_search", "",
+    # Made-up IDs around each matched name, so an anchor dropped at either end shows up.
+    "edit_preview", "pre_edit", "write_file", "rewrite", "multi_edit_v2", "my_bash", "bash2",
+    "skills", "load_skill",
 ]
 
-# (event, script relative to plugin root, tool IDs that must match or None for no matcher)
+# (event, script relative to plugin root, interpreter or None when the script runs directly,
+#  tool IDs that must match or None for no matcher)
 EXPECTED = [
-    ("SessionStart", "hooks/telemetry/scripts/ensure-toolkit-ids.sh", None),
-    ("PreToolUse", "hooks/prevent/pre_edit_hook.py", EDIT_TOOLS),
-    ("PreToolUse", "hooks/prevent/pre_commit_hook.py", ["bash"]),
-    ("PreToolUse", "hooks/telemetry/scripts/skill-beacon.sh", ["skill"]),
-    ("PostToolUse", "hooks/prevent/post_edit_hook.py", EDIT_TOOLS),
-    ("Stop", "hooks/prevent/turn_end_hook.py", None),
+    ("SessionStart", "hooks/telemetry/scripts/ensure-toolkit-ids.sh", None, None),
+    ("PreToolUse", "hooks/prevent/pre_edit_hook.py", "python3", EDIT_TOOLS),
+    ("PreToolUse", "hooks/prevent/pre_commit_hook.py", "python3", ["bash"]),
+    ("PreToolUse", "hooks/telemetry/scripts/skill-beacon.sh", None, ["skill"]),
+    ("PostToolUse", "hooks/prevent/post_edit_hook.py", "python3", EDIT_TOOLS),
+    ("Stop", "hooks/prevent/turn_end_hook.py", "python3", None),
 ]
 
 ROOT_VAR = "${CORTEX_PLUGIN_ROOT}"
@@ -53,20 +57,28 @@ def cortex_matches(matcher, tool_name):
 
 
 def load_handlers():
-    """Flatten hooks.json into (event, matcher, command) tuples."""
+    """Flatten hooks.json into (event, matcher, command, type) tuples."""
     config = json.loads(HOOKS_FILE.read_text())
     handlers = []
     for event, groups in config["hooks"].items():
         for group in groups:
             for hook in group["hooks"]:
-                handlers.append((event, group.get("matcher"), hook["command"]))
+                handlers.append((event, group.get("matcher"), hook.get("command"), hook.get("type")))
     return handlers
+
+
+FAKE_ROOT = "/tmp/cortex plugin root"
+
+
+def argv_of(command):
+    """The argument vector a command runs, with the root substituted as Cortex does."""
+    return shlex.split(command.replace(ROOT_VAR, FAKE_ROOT))
 
 
 def script_of(command):
     """The plugin-relative script a command runs, after quoting is applied."""
-    fake_root = "/tmp/cortex plugin root"
-    for token in shlex.split(command.replace(ROOT_VAR, fake_root)):
+    fake_root = FAKE_ROOT
+    for token in argv_of(command):
         if token.startswith(fake_root + "/"):
             return token[len(fake_root) + 1:]
     return None
@@ -83,18 +95,27 @@ class HookConfigTest(unittest.TestCase):
         self.assertEqual(nested, [], "per-feature hooks.json files are not loaded by Cortex Code")
 
     def test_every_command_quotes_the_plugin_root(self):
-        for event, _, command in load_handlers():
+        for event, _, command, _ in load_handlers():
             with self.subTest(event=event, command=command):
                 self.assertIsNotNone(script_of(command), "the root must be quoted with the script path")
 
     def test_handlers_are_exactly_the_expected_set(self):
-        actual = sorted((event, script_of(command)) for event, _, command in load_handlers())
-        expected = sorted((event, script) for event, script, _ in EXPECTED)
+        actual = sorted((event, script_of(command)) for event, _, command, _ in load_handlers())
+        expected = sorted((event, script) for event, script, _, _ in EXPECTED)
         self.assertEqual(actual, expected)
 
+    def test_each_handler_runs_exactly_its_script(self):
+        by_key = {(event, script_of(command)): (command, kind) for event, _, command, kind in load_handlers()}
+        for event, script, interpreter, _ in EXPECTED:
+            command, kind = by_key[(event, script)]
+            with self.subTest(event=event, script=script):
+                self.assertEqual(kind, "command")
+                expected = ([interpreter] if interpreter else []) + [f"{FAKE_ROOT}/{script}"]
+                self.assertEqual(argv_of(command), expected)
+
     def test_matchers_hit_only_their_tools(self):
-        by_key = {(event, script_of(command)): matcher for event, matcher, command in load_handlers()}
-        for event, script, tools in EXPECTED:
+        by_key = {(event, script_of(command)): matcher for event, matcher, command, _ in load_handlers()}
+        for event, script, _, tools in EXPECTED:
             matcher = by_key.get((event, script))
             with self.subTest(event=event, script=script, matcher=matcher):
                 if tools is None:
@@ -107,7 +128,7 @@ class HookConfigTest(unittest.TestCase):
                     self.assertFalse(cortex_matches(matcher, tool), f"{matcher!r} must not match {tool!r}")
 
     def test_scripts_exist_and_direct_ones_are_executable(self):
-        for event, _, command in load_handlers():
+        for event, _, command, _ in load_handlers():
             script = script_of(command)
             path = PLUGIN_ROOT / script
             with self.subTest(event=event, script=script):

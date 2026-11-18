@@ -70,11 +70,11 @@ def remote_ref(repo: Path, remote: str, ref: str) -> str | None:
     return git(repo, "rev-parse", "FETCH_HEAD^{commit}")
 
 
-def build_tree(repo: Path, tag: str, work: Path) -> str:
-    """Build the tag's plugin and return the git tree id of the output."""
+def build_tree(repo: Path, tag: str, commit: str, work: Path) -> str:
+    """Build the plugin at the tag's commit and return the git tree id of the output."""
     archive = work / "source.tar"
     with archive.open("wb") as fh:
-        subprocess.run(["git", "archive", "--format=tar", tag, *BUILD_INPUTS], cwd=repo, stdout=fh, check=True)
+        subprocess.run(["git", "archive", "--format=tar", commit, *BUILD_INPUTS], cwd=repo, stdout=fh, check=True)
     source = work / "source"
     with tarfile.open(archive) as tar:
         tar.extractall(source, filter="tar") if hasattr(tarfile, "data_filter") else tar.extractall(source)
@@ -97,24 +97,33 @@ def publish(tag: str, repo: Path = Path("."), remote: str = "origin", expect_sha
     version = tag[1:]
     repo = Path(repo).resolve()
 
-    source_sha = git(repo, "rev-parse", f"{tag}^{{commit}}")
+    # Only a tag counts: a branch named like one must never be published as a release.
+    source_sha = git(repo, "rev-parse", "-q", "--verify", f"refs/tags/{tag}^{{commit}}", check=False)
+    if not source_sha:
+        raise PublishError(f"no tag {tag} in {repo}")
     if expect_sha and source_sha != expect_sha:
         raise PublishError(f"{tag} is {source_sha}, expected {expect_sha}")
-    manifest = json.loads(git(repo, "show", f"{tag}:{PLUGIN}/.cortex-plugin/plugin.json"))
+    manifest = json.loads(git(repo, "show", f"{source_sha}:{PLUGIN}/.cortex-plugin/plugin.json"))
     if manifest.get("version") != version:
         raise PublishError(f"{tag} has plugin version {manifest.get('version')}, not {version}")
 
     pin = f"{TAG_PREFIX}{version}"
     with tempfile.TemporaryDirectory() as tmp:
-        tree = build_tree(repo, tag, Path(tmp))
+        tree = build_tree(repo, tag, source_sha, Path(tmp))
 
     existing_pin = remote_ref(repo, remote, f"refs/tags/{pin}")
-    if existing_pin:
-        if git(repo, "rev-parse", f"{existing_pin}^{{tree}}") == tree:
-            return {"action": "unchanged", "tag": pin, "commit": existing_pin}
-        raise PublishError(f"{pin} already exists with different files; bump the version instead of retagging")
-
     head = remote_ref(repo, remote, f"refs/heads/{BRANCH}")
+    if existing_pin:
+        if git(repo, "rev-parse", f"{existing_pin}^{{tree}}") != tree:
+            raise PublishError(f"{pin} already exists with different files; bump the version instead of retagging")
+        if head is None:
+            # Recreating the branch from this pin could move it back to an old version.
+            raise PublishError(
+                f"{pin} exists but the {BRANCH} branch is missing; push the newest "
+                f"{TAG_PREFIX}* tag's commit to refs/heads/{BRANCH} by hand"
+            )
+        return {"action": "unchanged", "tag": pin, "commit": existing_pin}
+
     head_version = None
     if head:
         head_manifest = json.loads(git(repo, "show", f"{head}:.cortex-plugin/plugin.json"))

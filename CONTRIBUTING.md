@@ -284,7 +284,7 @@ When a version bump merges to `main`, the GitHub Actions workflow (`.github/work
 
 The same workflow then publishes the Cortex Code plugin in CoCo Desktop's format. `scripts/publish_coco_desktop.py` builds `plugins/cortex-code` at the release tag with `scripts/build_coco_desktop.py`. It commits the result to the `coco-desktop` branch, which **Add from GitHub** and **Sync** install from, and tags it `coco-desktop-v<version>`. Never commit to that branch by hand; the workflow overwrites it on the next release.
 
-- **Re-running is safe.** If the publish job fails, re-run it, or run the workflow by hand (`workflow_dispatch`) with the release tag, e.g. `v1.31.0`. A version that is already published with the same files is left alone.
+- **Re-running is safe.** If the publish job fails, re-run it, or run the workflow by hand (`workflow_dispatch`) with the release tag, e.g. `v1.31.0`. A version that is already published with the same files is left alone. Publishes run one at a time, and GitHub keeps only the newest waiting one, so if three version bumps merge within one publish, the middle one is cancelled: its Actions run shows as cancelled, and running the workflow by hand with its tag adds its pin.
 - **A pin tag never moves.** If `coco-desktop-v<version>` already exists with different files, the job fails. Bump the version instead of retagging.
 - **Releases only move forward.** The branch only moves to a newer version. Publishing an older tag adds its pin tag on a side commit and leaves the branch where it is.
 - **Check the build locally** with `python3 scripts/build_coco_desktop.py plugins/cortex-code <out-dir>`. It prints a JSON report of what it converted, and it fails rather than producing a copy Desktop would reject.
@@ -316,6 +316,7 @@ If a harness exposes the session transcript in a format the line-based marker sc
 **Cortex hooks live in one file, `plugins/cortex-code/hooks/hooks.json`.** CoCo Desktop reads hooks only from that file and ignores a `hooks` field in the manifest, so don't add one. Desktop matches each matcher as a case-sensitive, unanchored regular expression against lowercase tool IDs (`bash`, `edit`, `write`, `multi_edit`, `skill`), so anchor lowercase IDs: `^bash$`, `^(edit|write|multi_edit)$`. A PascalCase matcher like `Bash` never fires in Desktop, and an unanchored `bash` also matches `bash_output`. The Cortex Code CLI ignores case, so the same file works there. Quote the plugin root in commands (`"${CORTEX_PLUGIN_ROOT}/hooks/…"`), because install paths can contain spaces. `plugins/cortex-code/tests/test_hooks_config.py` lists every expected handler; update it when you add one.
 
 **Cortex commands become skills in the CoCo Desktop build**, because Desktop has no commands. The builder:
+- converts only the command paths the manifest's `commands` lists, and names each skill after the command's `name` frontmatter, or its filename when there is none;
 - drops a command whose name matches a skill's `name`, since the skill already covers it;
 - names it `<command>-cmd` when a skill folder already has the command's name;
 - fails the build on a command with an empty body, or on two commands with the same name.

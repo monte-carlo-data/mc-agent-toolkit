@@ -107,6 +107,28 @@ class PublishTest(unittest.TestCase):
         self.assertEqual(result["action"], "unchanged")
         self.assertEqual(self.dist_head(), head)
 
+    def test_branch_named_like_a_tag_is_rejected(self):
+        self.git("tag", "-d", "v9.9.9")
+        self.git("branch", "v9.9.9")
+        with self.assertRaisesRegex(publish_mod.PublishError, "no tag v9.9.9"):
+            self.publish("v9.9.9", dry_run=True)
+
+    def test_tag_wins_over_a_branch_of_the_same_name(self):
+        tagged = self.git("rev-parse", "HEAD")
+        self.set_version("9.9.10")
+        self.git("commit", "-qam", "unreleased")
+        self.git("branch", "v9.9.9")
+        result = self.publish("v9.9.9", expect_sha=tagged)
+        self.assertEqual(result["action"], "published")
+        manifest = json.loads(self.remote_file(self.dist_head(), ".cortex-plugin/plugin.json"))
+        self.assertEqual(manifest["version"], "9.9.9")
+
+    def test_rerun_fails_when_the_branch_is_missing(self):
+        self.publish("v9.9.9")
+        self.remote_git("update-ref", "-d", "refs/heads/coco-desktop")
+        with self.assertRaisesRegex(publish_mod.PublishError, "coco-desktop branch is missing"):
+            self.publish("v9.9.9")
+
     def test_second_release_fast_forwards_and_drops_removed_files(self):
         self.publish("v9.9.9")
         first = self.dist_head()

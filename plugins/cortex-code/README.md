@@ -73,7 +73,7 @@ The data is stored in Mixpanel and Datadog and is used only for product-developm
 | **Onboarding** | Connects a warehouse to Monte Carlo through the REST API v2 tools: deployment choice, credential references, warehouse and connection; Terraform or SDK/CLI script output on request. `/monte-carlo-onboarding`. | [Skill README](../../skills/onboarding/README.md) |
 | **Automated Triage** | Guides you through automated alert triage — scoring, deep troubleshooting, classification, and actions. Requires extended MCP toolset. | [SKILL](../../skills/automated-triage/SKILL.md) |
 
-All 21 skills are bundled — see the [skills directory](../../skills/) for the full list. CoCo Desktop turns slash commands into skills, so its plugin page lists 35 entries.
+All 21 skills are bundled — see the [skills directory](../../skills/) for the full list. CoCo Desktop has no slash commands, so the Desktop build turns them into skills: it has 35 in all.
 
 The Prevent feature includes **PreToolUse hooks that block edits to dbt SQL files** until an impact assessment runs. The hooks only fire on `.sql` files inside dbt model, macro, or snapshot directories — they do not affect non-dbt files.
 

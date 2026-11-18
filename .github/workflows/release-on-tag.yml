@@ -54,7 +54,8 @@ jobs:
             echo "::error::$TAG already exists at $EXISTING, not $GITHUB_SHA"
             exit 1
           fi
-          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --generate-notes --latest
+          # No --latest: GitHub picks Latest by version, so a retried older release can't take it.
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --generate-notes
         env:
           TAG: ${{ steps.version.outputs.tag }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -152,6 +152,22 @@ class FixtureBuildTest(unittest.TestCase):
         self.assertEqual(fields["description"], "Do the thing. Triggers: /nofront, nofront.")
         self.assertEqual(body, "\n# /nofront\n\nDo the thing.\n\nMore detail: `x`.\n")
 
+    def test_only_manifest_command_paths_convert(self):
+        out = self.tmp / "dist2"
+        write(self.plugin / "commands/draft/unlisted.md", "---\ndescription: Draft.\n---\n\nNot shipped.\n")
+        report = build_mod.build(self.plugin, out, ref="main")
+        self.assertNotIn("unlisted", report["converted"])
+        self.assertFalse((out / "skills/unlisted").exists())
+
+    def test_command_frontmatter_name_wins_over_filename(self):
+        out = self.tmp / "dist2"
+        write(self.plugin / "commands/y/shortcut.md", "---\nname: published-name\ndescription: P.\n---\n\nBody.\n")
+        report = build_mod.build(self.plugin, out, ref="main")
+        self.assertIn("published-name", report["converted"])
+        fields, _ = frontmatter(out / "skills/published-name/SKILL.md")
+        self.assertEqual(fields["name"], "published-name")
+        self.assertIn("/published-name", fields["description"])
+
     def test_folder_clash_keeps_command_name(self):
         fields, body = frontmatter(self.out / "skills/alpha-cmd/SKILL.md")
         self.assertEqual(fields["name"], "alpha")
@@ -211,7 +227,7 @@ class FixtureFailureTest(unittest.TestCase):
         with self.assertRaisesRegex(build_mod.BuildError, pattern):
             build_mod.build(self.plugin, self.out, ref="main")
         self.assertFalse(self.out.exists(), "a failed build must leave no output")
-        leftovers = [p.name for p in self.tmp.iterdir() if p.name not in ("repo",)]
+        leftovers = [p.name for p in self.tmp.iterdir() if p.name not in ("repo", "outside")]
         self.assertEqual(leftovers, [], "a failed build must leave no staging dir")
 
     def test_existing_output(self):
@@ -226,6 +242,22 @@ class FixtureFailureTest(unittest.TestCase):
     def test_dangling_symlink(self):
         os.symlink("../../../skills/missing", self.plugin / "skills/missing")
         self.assert_build_fails("missing")
+
+    def test_link_outside_the_repo(self):
+        write(self.tmp / "outside/secret.txt", "not for publishing\n")
+        os.symlink("../../../outside/secret.txt", self.plugin / "secret.txt")
+        self.assert_build_fails("outside")
+
+    def test_absolute_link_outside_the_repo(self):
+        write(self.tmp / "outside/secret.txt", "not for publishing\n")
+        os.symlink(str(self.tmp / "outside/secret.txt"), self.plugin / "secret.txt")
+        self.assert_build_fails("outside")
+
+    def test_nested_link_outside_the_repo(self):
+        # Inside a skill the plugin reaches through its own (allowed) link.
+        write(self.tmp / "outside/secret.txt", "not for publishing\n")
+        os.symlink("../../../outside/secret.txt", self.tmp / "repo/skills/alpha/secret.txt")
+        self.assert_build_fails("outside")
 
     def test_duplicate_command_names(self):
         write(self.plugin / "commands/y/nofront-dup.md", "Dup.\n")

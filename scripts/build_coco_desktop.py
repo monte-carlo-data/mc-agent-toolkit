@@ -81,6 +81,25 @@ def parse_frontmatter(text: str) -> tuple[dict | None, str]:
     return fields, match.group(2)
 
 
+def check_links(plugin: Path, repo_root: Path) -> None:
+    """Fail on any link, at any depth reachable from the plugin, that resolves outside the repo."""
+    root = Path(os.path.realpath(repo_root))
+    seen = set()
+    for directory, dirs, files in os.walk(plugin, followlinks=True):
+        real_dir = os.path.realpath(directory)
+        if real_dir in seen:
+            dirs[:] = []
+            continue
+        seen.add(real_dir)
+        for name in dirs + files:
+            path = Path(directory, name)
+            if not path.is_symlink():
+                continue
+            target = Path(os.path.realpath(path))
+            if target != root and root not in target.parents:
+                raise BuildError(f"{path} links outside the repo, to {target}")
+
+
 def copy_plugin(plugin: Path, staging: Path) -> None:
     def ignore(directory: str, names: list[str]) -> set[str]:
         rel_dir = os.path.relpath(directory, plugin)
@@ -101,11 +120,24 @@ def convert_commands(plugin: Path, staging: Path) -> dict:
         fields, _ = parse_frontmatter(skill_md.read_text())
         skill_names.add((fields or {}).get("name") or skill_md.parent.name)
 
+    # Only what the manifest declares, as CoCo's installer does; a command's own `name` wins.
+    declared = json.loads((plugin / MANIFEST).read_text()).get("commands") or []
+    sources = []
+    for entry in [declared] if isinstance(declared, str) else declared:
+        path = (plugin / entry).resolve()
+        if path.is_dir():
+            sources += sorted(path.rglob("*.md"))
+        elif path.is_file():
+            sources.append(path)
+        else:
+            raise BuildError(f"manifest command path {entry} does not exist")
     commands = {}
-    for path in sorted((plugin / "commands").rglob("*.md")):
-        if path.stem in commands:
-            raise BuildError(f"two commands are named {path.stem}: {commands[path.stem]} and {path}")
-        commands[path.stem] = path
+    for path in sorted(set(sources)):
+        fields, _ = parse_frontmatter(path.read_text())
+        name = (fields or {}).get("name") or path.stem
+        if name in commands:
+            raise BuildError(f"two commands are named {name}: {commands[name]} and {path}")
+        commands[name] = path
 
     report = {"converted": [], "dropped": [], "renamed": []}
     for name, path in sorted(commands.items()):
@@ -262,6 +294,7 @@ def build(plugin_dir: Path, out_dir: Path, ref: str = "main", repo_root: Path | 
     out.parent.mkdir(parents=True, exist_ok=True)
     staging = Path(tempfile.mkdtemp(prefix=f".{out.name}.", dir=out.parent))
     try:
+        check_links(plugin, repo_root)
         copy_plugin(plugin, staging)
         report = convert_commands(plugin, staging)
         manifest = rewrite_manifest(staging)
