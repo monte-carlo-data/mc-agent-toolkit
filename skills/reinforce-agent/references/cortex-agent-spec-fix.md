@@ -82,11 +82,14 @@ SHOW VERSIONS IN AGENT <db>.<schema>.<agent>;
 Save the `agent_spec` of the default version's row in `SHOW VERSIONS` (`is_default` is true) to
 `current.json` exactly as returned. Don't take it from `DESCRIBE AGENT`: on an agent with no live
 version, `DESCRIBE` can return an empty `agent_spec`. If `SHOW VERSIONS` doesn't return
-`agent_spec` (that depends on account settings), the checks below can't run: stop, say so, give
-the user the merge patch from step 2, then go to the skill's "Mark the issue fixed" step. If the
-spec is NULL or empty, stop: the agent may be secure, which hides its spec from roles other than
-its owner. Say so, and name the owner from `DESCRIBE AGENT`. From `SHOW VERSIONS`, note the
-versions, which one is the default, whether `VERSION$1` is the only committed version, and
+`agent_spec` (that depends on account settings), the checks below can't run: stop and say so.
+Show the user the change to make in words, never a merge patch: a patch that adds to a string or
+an array has to repeat its existing value, and there is no checked copy of it. Then go to the
+skill's "Mark the issue fixed" step. If the spec is NULL or empty, stop: the agent may be secure,
+which hides its spec from roles other than its owner. Say so, and name the owner from
+`DESCRIBE AGENT`. From `SHOW VERSIONS`, note the
+versions, which one is the default (the name of the `is_default` row, never `LAST`: this is "the
+default version from step 1" below), whether `VERSION$1` is the only committed version, and
 whether there is a live version (the row without a name). From `DESCRIBE AGENT`, note
 `default_version_name`: `LAST` means no default was set, so callers get whichever version was
 committed last.
@@ -180,9 +183,12 @@ switch to a role the user hasn't said they have, and never grant privileges unle
 
 Whoever runs that SQL doesn't have your files, so it must run as printed: the step 5 statements
 for **apply and release**, in order, with every spec as the one-line print of its file, never a
-placeholder. Leave `<new version>` for them to fill from `SHOW VERSIONS`; don't guess the
-number. Tell them to stop at the first error or the first `matches` that isn't TRUE, and to ask
-for new SQL if `ADD LIVE VERSION` fails or the agent changed. End with the rollback.
+placeholder. Leave out the block that puts `current.json` back on the live version; print it
+apart, after the rest, as what to run if they stop after the `MODIFY LIVE VERSION` that sets
+`new.json` and before the fix's `COMMIT` succeeds. Leave `<new version>` for them to fill from
+`SHOW VERSIONS`; don't guess the number. Tell them to stop at the first error or the first
+`matches` that isn't TRUE, and to ask for new SQL if `ADD LIVE VERSION` fails or the agent
+changed. End with the rollback, naming the default version from step 1.
 
 If `VERSION$1` is the only committed version, put this in the question itself, the text shown
 with the choices, since your reasoning isn't shown to the user: applying starts by committing
@@ -285,8 +291,9 @@ FROM TABLE(RESULT_SCAN(LAST_QUERY_ID())) WHERE "name" IS NULL OR "name" = '';
 
 If it isn't TRUE, don't commit: tell the user what differs.
 
-From here until the fix's `COMMIT` succeeds, the live version holds an uncommitted spec, which
-callers that ask for the live version get, and which blocks the next run's `ADD LIVE VERSION`.
+From the `MODIFY LIVE VERSION` above until the fix's `COMMIT` succeeds, the live version holds an
+uncommitted spec, which callers that ask for the live version get, and which blocks the next
+run's `ADD LIVE VERSION`.
 If the run stops in that span (a failed check, a failed `COMMIT`, or the user stopping), tell
 the user, put the current spec back, and check it:
 
@@ -318,7 +325,9 @@ FROM TABLE(RESULT_SCAN(LAST_QUERY_ID())) WHERE "is_default" = 'true';
 
 If `matches` isn't TRUE, roll back and tell the user.
 
-Tell the user the rollback, `ALTER AGENT <db>.<schema>.<agent> SET DEFAULT_VERSION = '<previous default>';`,
+The rollback names the default version from step 1, never `LAST`: once the fix is committed,
+`LAST` is the fix. Tell the user the rollback,
+`ALTER AGENT <db>.<schema>.<agent> SET DEFAULT_VERSION = '<default version from step 1>';`,
 and that it pins the default: a later commit won't reach callers until the default is set again.
 For **keep the current default**, tell them how to release once they've tested:
 `ALTER AGENT <db>.<schema>.<agent> SET DEFAULT_VERSION = '<new version>';`, or `= 'LAST'` if step 1's
