@@ -186,12 +186,13 @@ Whoever runs that SQL doesn't have your files, so it must run as printed: the st
 for **apply and release**, in order, with every spec as the one-line print of its file, never a
 placeholder. Leave out "Put the spec back"; print it apart, after the rest, as what to run if
 they stop after the `MODIFY LIVE VERSION` that sets `new.json` and before the fix's `COMMIT`
-lands. Tell them a `COMMIT` error may still have landed: if `SHOW VERSIONS` then lists a new
-named version, the commit landed, so they go on with the checks and must not put the spec back.
-Leave `<new version>` for them to fill from
-`SHOW VERSIONS`; don't guess the number. Tell them to stop at the first error or the first
-`matches` that isn't TRUE, and to ask for new SQL if `ADD LIVE VERSION` fails or the agent
-changed. End with the rollback, naming the default version from step 1.
+lands. Tell them a `COMMIT` error may still have landed: if `SHOW VERSIONS` then lists a named
+version that wasn't in the `SHOW VERSIONS` just before the fix's `COMMIT`, the commit landed, so
+they go on with the checks and must not put the spec back. Leave `<new version>` for them to
+fill from `SHOW VERSIONS`; don't guess the number. Tell them to stop at the first error or the
+first `matches` that isn't TRUE, and to ask for new SQL if `ADD LIVE VERSION` fails or the agent
+changed. End with the rollback, naming the default version from step 1, and tell them to run it
+if any `matches` after the fix's `COMMIT` isn't TRUE.
 
 If `VERSION$1` is the only committed version, put this in the question itself, the text shown
 with the choices, since your reasoning isn't shown to the user: applying starts by committing
@@ -320,8 +321,12 @@ SELECT PARSE_JSON("agent_spec") = PARSE_JSON($$<contents of new.json>$$) AS matc
 FROM TABLE(RESULT_SCAN(LAST_QUERY_ID())) WHERE "name" = '<new version>';
 ```
 
-If it isn't TRUE, don't release it and don't give the user a release statement: tell them what
-the new version holds, and that callers still get the default.
+If it isn't TRUE, stop, and give the user no release statement. Check which version is the
+default in that `SHOW VERSIONS`. If it is the new version (step 1's `default_version_name` was
+`LAST` and nothing pinned it, as on **apply and release**), the commit already released it, so
+callers get it now: run the rollback below at once and check the default holds `current.json`,
+as in step 5's first check. Tell the user what the new version holds and which version callers
+get. Then end the run: skip "Check it worked", and don't mark the issue fixed.
 
 For **apply and release**, set the default to the new version, then confirm the agent now runs
 exactly `new.json`. If step 1's `default_version_name` was `LAST`, use `'LAST'` in place of
@@ -335,7 +340,8 @@ SELECT PARSE_JSON("agent_spec") = PARSE_JSON($$<contents of new.json>$$) AS matc
 FROM TABLE(RESULT_SCAN(LAST_QUERY_ID())) WHERE "is_default" = 'true';
 ```
 
-If `matches` isn't TRUE, roll back and tell the user.
+If `matches` isn't TRUE, run the rollback below, tell the user, and end the run: skip "Check it
+worked", and don't mark the issue fixed.
 
 The rollback names the default version from step 1, never `LAST`: once the fix is committed,
 `LAST` is the fix. Tell the user the rollback,
@@ -358,6 +364,9 @@ SHOW VERSIONS IN AGENT <db>.<schema>.<agent>;
 SELECT PARSE_JSON("agent_spec") = PARSE_JSON($$<contents of current.json>$$) AS matches
 FROM TABLE(RESULT_SCAN(LAST_QUERY_ID())) WHERE "name" IS NULL OR "name" = '';
 ```
+
+Then end the run: nothing was committed, so skip "Check it worked", and don't mark the issue
+fixed.
 
 ### 6. Check it worked
 
