@@ -4,22 +4,13 @@ This reference explains how to discover what remediation tools are available to 
 
 ## Category 1: MCP servers
 
-In Claude Code and other MCP-capable editors, MCP tools follow the naming convention:
+Each MCP-capable client lists the tools of every connected MCP server, and each client spells their IDs its own way: the server's name plus the operation, joined with a client-specific prefix or separator. Identify a server by its name and by what its tools describe, not by the spelling of the IDs. For example:
 
-```
-mcp__<server_name>__<tool_name>
-```
+- an Airflow server with a `trigger_dag_run` operation
+- a dbt Cloud server with a `trigger_run` operation
+- a GitHub server with a `create_pull_request` operation
 
-For example:
-- `mcp__airflow__trigger_dag_run` — an Airflow MCP tool
-- `mcp__dbt_cloud__trigger_run` — a dbt Cloud MCP tool
-- `mcp__github__create_pull_request` — a GitHub MCP tool
-
-Monte Carlo's own tools are bundled by this plugin and namespaced under the plugin server — see the **Monte Carlo tool routing** block at the top of the skill. Examples:
-- `mcp__plugin_mc-agent-toolkit_monte-carlo-mcp__get_alerts`
-- `mcp__plugin_mc-agent-toolkit_monte-carlo-mcp__search`
-
-Scan your tool list for any `mcp__*__*` patterns and group by server name.
+Go through your available tools, group them by the server they belong to, and call each with the tool ID your client exposes. Monte Carlo's own operations (`get_alerts`, `search`, …) come from your Monte Carlo connection; the routing note at the top of the skill says which connection to use.
 
 ## Category 2: CLI tools
 
@@ -62,7 +53,7 @@ curl -X POST "https://cloud.getdbt.com/api/v2/accounts/<account_id>/jobs/<job_id
 
 ### Step 1: Check MCP servers
 
-Scan your tool list for `mcp__*__*` patterns. Common MCP servers relevant to remediation:
+Group your available tools by MCP server, as described above. Common MCP servers relevant to remediation:
 
 | Server Name Pattern | Capability |
 | ------------------- | ---------- |

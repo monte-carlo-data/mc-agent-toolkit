@@ -155,7 +155,7 @@ Example: if adding a skill that acts on alerts, explicitly call out how it diffe
 
 ### Portability markers for plugin-only sections
 
-A `SKILL.md` is the single source for every surface that renders the skill: the editor plugins read the file as-is, and the Monte Carlo MCP server renders its prompts from the same file for clients that have no plugin (the claude.ai connector, Cursor without the toolkit). Anything that only makes sense inside a plugin — slash commands, hook behaviour, instructions to `Read` a sibling file — has to be droppable by that renderer.
+A `SKILL.md` is the single source for every surface that reads the skill: the editor plugins and standalone installs read the file as-is, and a prompt renderer can turn it into an MCP prompt for clients that have no plugin (the claude.ai connector, Cursor without the toolkit). Anything that only makes sense inside a plugin — slash commands, hook behaviour, instructions to `Read` a sibling file — has to be droppable by that renderer. Raw readers still see marked text, so word it to be harmless without the plugin.
 
 Wrap such sections in an HTML comment pair, on their own lines:
 
@@ -169,11 +169,11 @@ Invoke explicitly with `/monte-carlo-example`.
 Rules:
 
 - Markers are line-anchored and never nest. A renderer drops everything between a `start` and the next `end`, inclusive.
-- Everything outside the markers must stand alone without the plugin: name MCP tools by their bare names, not slash commands.
+- Everything outside the markers must stand alone without the plugin: name MCP tools by their bare operation names, never a client's prefixed tool ID, and use no slash commands.
 - Mention reference files by relative path, as a Markdown link or a code span; a `<placeholder>` segment, as in `reference/api/<tag>.md`, matches every file there. A prompt cannot read files, so the renderer inlines each file mentioned outside the markers, and the files those mention. To keep a file out of the prompt, mention it only inside a marked block — for example a reference that restates the MCP tools' own schemas.
 - Keep the marked block short. If most of a skill is plugin-only, the skill is a plugin feature, not a portable skill.
 
-New fully portable skills should keep host conventions in adapters outside the skill directory and use standard `name`, `description` and optional `metadata` frontmatter. Put catalog hints under `metadata` (for example, `metadata.bucket`), and activation guidance in `description` and the body. `skills/onboarding/SKILL.md` is the portable example: its one marked block keeps the per-tag API reference, which restates the tool schemas, out of the MCP prompt. The renderer is `mcp-server/mcp_server/prompt_renderer.py` in [ai-agent](https://github.com/monte-carlo-data/ai-agent); this repo only defines the contract.
+New fully portable skills should keep host conventions in adapters outside the skill directory and use standard `name`, `description` and optional `metadata` frontmatter. Put catalog hints under `metadata` (for example, `metadata.bucket`), and activation guidance in `description` and the body. `skills/onboarding/SKILL.md` is the portable example: its one marked block keeps the per-tag API reference, which restates the tool schemas, out of the MCP prompt. This repo defines the contract. The renderer that implements it, `mcp-server/mcp_server/prompt_renderer.py`, lives on an unmerged [ai-agent](https://github.com/monte-carlo-data/ai-agent) branch (monte-carlo-data/ai-agent#2659); the MCP server's prompts are currently copied from the skills by hand. Skills that call Monte Carlo MCP tools also carry a routing note whose wording is fixed in `.claude/rules/skills.md` § Route Monte Carlo MCP calls.
 
 ### Naming
 

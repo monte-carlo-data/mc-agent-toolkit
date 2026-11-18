@@ -493,8 +493,10 @@ from. Skip automatically for YAML/docs-only diffs.
 0. **Pre-flight check (prerequisites).** Before any other step, verify:
    - `dbt` is installed and a `dbt_project.yml` is discoverable from the
      changed model.
-   - The Snowflake MCP server is available in this session — look for any
-     tool whose name starts with `mcp__snowflake__`. If absent, abort with:
+   - A Snowflake MCP server is available in this session with a tool that
+     runs a SQL query: look for a Snowflake server among your available
+     tools by its name and tool descriptions, not by the spelling of tool
+     IDs, which differs between clients. If absent, abort with:
      "Snowflake MCP is not registered in this session. `/mc-validate run`
      requires the Snowflake MCP server — see the prevent skill README's
      prerequisites. Aborting before the build so no work is lost."
@@ -684,8 +686,8 @@ Snowflake MCP, and present per-query verdicts plus a consolidated summary.
    cancel. Having seen the ✓ from step 4 plus the exact SQL here, the
    engineer has everything they need to press proceed with confidence.
 
-6. **Execute each query via Snowflake MCP** (e.g. the `mcp__snowflake__query`
-   tool — confirm the exact tool name available in the session). Apply a 60s
+6. **Execute each query via Snowflake MCP**, using the query tool found in
+   step 0 under the tool ID your client exposes for it. Apply a 60s
    per-query timeout by default. On error (including timeout), continue with
    remaining queries but mark the failed one.
 

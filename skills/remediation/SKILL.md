@@ -13,13 +13,20 @@ version: 1.0.0
 
 This skill teaches you to investigate and remediate data quality issues detected by Monte Carlo. You use MC MCP tools to understand the alert context, run root cause analysis, assess blast radius, and then execute the appropriate remediation action using whatever external tools the user has connected.
 
-> **Monte Carlo tool routing (required):** Always call Monte Carlo MCP tools through this plugin's
-> bundled server, whose fully-qualified tool names are
-> `mcp__plugin_mc-agent-toolkit_monte-carlo-mcp__<tool>` (e.g.
-> `mcp__plugin_mc-agent-toolkit_monte-carlo-mcp__get_alerts`). Bare tool names used in this skill
-> (`get_alerts`, `search`, `get_asset`, …) refer to that bundled server. If the session also has a
-> separately-configured `monte-carlo-mcp` server, do **not** route to it — it may point at a
-> different endpoint or credentials.
+> **Monte Carlo tool routing (required):** For Monte Carlo operations such as `get_alerts`,
+> `get_asset` and `create_or_update_alert_comment`, use the tool ID your client exposes on the
+> connection for the intended account. Proceed when there is one suitable connection and no evidence
+> of an account or source mismatch. If the choice is ambiguous, ask which connection to use before
+> making a Monte Carlo call; if you can't get an answer, leave the call pending. Use the selected
+> connection throughout. If it is unavailable or lacks the operation, follow this skill's fallback
+> where it has one, or report what is missing.
+
+<!-- plugin-only:start -->
+> **With the Agent Toolkit plugin:** When using the toolkit plugin or its installer, prefer the
+> connection it provides or configures (normally named `monte-carlo-mcp`) when it is suitable for the
+> intended account. If you know that connection is missing, confirm the intended alternative before
+> using another one.
+<!-- plugin-only:end -->
 
 Reference files live next to this skill file. **Use the Read tool** (not MCP resources) to access them:
 
@@ -273,7 +280,7 @@ Present this summary to the user before proceeding to remediation.
 
 Before attempting any remediation action, you must know what tools you can use. You have three categories to check:
 
-1. **MCP servers** — scan your tool list for `mcp__*__*` patterns (e.g., `mcp__airflow__trigger_dag_run`)
+1. **MCP servers** — group your available tools by the MCP server they belong to (e.g., an Airflow server's `trigger_dag_run`)
 2. **CLI tools** — you have shell access; check for tools like `gh`, `dbt`, `airflow`, `curl` via `which <tool>`
 3. **APIs** — any service with a REST API is reachable via `curl` if you have the right credentials
 
