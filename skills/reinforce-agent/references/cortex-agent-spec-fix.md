@@ -121,8 +121,18 @@ choices below and in step 4 hand the user SQL instead.
 If the default isn't the most recently committed version, a committed version is waiting to be
 released, perhaps a fix held back for testing. Step 5 replaces the whole spec with one built
 from the default's, so the new version would silently leave that change out. Write nothing yet.
-List each committed version newer than the default with its comment from `SHOW VERSIONS`, ask
-the user what it is, and offer three choices:
+List each committed version newer than the default with its comment from `SHOW VERSIONS`, and
+show what it changes. For each one, save its `agent_spec` from `SHOW VERSIONS` to `waiting.json`
+exactly as returned, then:
+
+```bash
+python3 <skill dir>/scripts/patch_agent_spec.py --spec current.json --compare waiting.json
+```
+
+Show the user that report. Without the script, say you couldn't show the difference. A version
+this skill committed may be one a run rolled back because its check failed, not a fix held back
+for testing: the report shows what it would release. Ask the user what it is, and offer three
+choices:
 
 - **Release it**: `ALTER AGENT <db>.<schema>.<agent> SET DEFAULT_VERSION = '<version>';`
 - **Drop it**: `ALTER AGENT <db>.<schema>.<agent> DROP VERSION <version>;` for each waiting

@@ -13,6 +13,10 @@ Merge patch rules: an object merges key by key, `null` deletes a key, and any ot
 
 Usage:
     python3 patch_agent_spec.py --spec current.json --patch fix.json --out new.json
+    python3 patch_agent_spec.py --spec current.json --compare other.json
+
+With --compare it writes nothing and reports every path that differs from the spec to the other
+file, such as a committed version waiting to be released.
 
 Prints a JSON report to stdout:
     {"changed": [{"path": "instructions.orchestration", "before": null, "after": "..."}],
@@ -97,16 +101,29 @@ def load_object(path: Path, label: str) -> dict[str, Any]:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--spec", required=True, type=Path, help="current spec, JSON")
-    parser.add_argument("--patch", required=True, type=Path, help="JSON Merge Patch")
-    parser.add_argument("--out", required=True, type=Path, help="where to write the new spec")
+    parser.add_argument("--patch", type=Path, help="JSON Merge Patch")
+    parser.add_argument("--out", type=Path, help="where to write the new spec")
+    parser.add_argument("--compare", type=Path, help="another spec to compare with; writes nothing")
     args = parser.parse_args(argv)
+    if args.compare is not None and (args.patch is not None or args.out is not None):
+        parser.error("use --compare, or --patch with --out, not both")
+    if args.compare is None and (args.patch is None or args.out is None):
+        parser.error("--patch and --out are required unless --compare is given")
 
     try:
         spec = load_object(args.spec, "spec")
-        patch = load_object(args.patch, "patch")
+        if args.compare is not None:
+            other = load_object(args.compare, "spec to compare")
+        else:
+            patch = load_object(args.patch, "patch")
     except SystemExit as error:
         print(error, file=sys.stderr)
         return 1
+
+    if args.compare is not None:
+        report = {"changed": changed_paths(spec, other)}
+        print(json.dumps(report, indent=2, ensure_ascii=False))
+        return 0
 
     new_spec = merge_patch(spec, patch)
     changes = changed_paths(spec, new_spec)

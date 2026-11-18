@@ -75,6 +75,28 @@ def run(spec: object, patch: object) -> tuple[int, dict | None, dict | None, str
         return proc.returncode, report, new_spec, proc.stderr
 
 
+def compare(spec: object, other: object, *extra: str) -> tuple[int, dict | None, list[str], str]:
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        (tmp_path / "spec.json").write_text(json.dumps(spec, ensure_ascii=False))
+        (tmp_path / "other.json").write_text(json.dumps(other, ensure_ascii=False))
+        proc = subprocess.run(
+            [
+                sys.executable,
+                str(SCRIPT),
+                "--spec",
+                str(tmp_path / "spec.json"),
+                "--compare",
+                str(tmp_path / "other.json"),
+                *extra,
+            ],
+            capture_output=True,
+            text=True,
+        )
+        report = json.loads(proc.stdout) if proc.returncode == 0 else None
+        return proc.returncode, report, sorted(p.name for p in tmp_path.iterdir()), proc.stderr
+
+
 class PatchAgentSpecTest(unittest.TestCase):
     def test_adds_a_nested_key_and_keeps_everything_else(self) -> None:
         code, report, new_spec, _ = run(SPEC, {"instructions": {"orchestration": RULE}})
@@ -169,6 +191,43 @@ class PatchAgentSpecTest(unittest.TestCase):
         self.assertEqual(
             report["changed"], [{"path": "skills", "before": [], "after": [{"name": "s"}]}]
         )
+
+    def test_compare_reports_each_difference_and_writes_nothing(self) -> None:
+        other = json.loads(json.dumps(SPEC))
+        other["instructions"]["orchestration"] = RULE
+        other["tools"][1]["tool_spec"]["name"] = "renamed_search_tool"
+        del other["skills"]
+
+        code, report, files, _ = compare(SPEC, other)
+
+        self.assertEqual(code, 0)
+        self.assertEqual(
+            report,
+            {
+                "changed": [
+                    {"path": "instructions.orchestration", "before": None, "after": RULE},
+                    {"path": "skills", "before": [], "after": None},
+                    {
+                        "path": "tools[1].tool_spec.name",
+                        "before": "client_search_tool",
+                        "after": "renamed_search_tool",
+                    },
+                ]
+            },
+        )
+        self.assertEqual(files, ["other.json", "spec.json"])
+
+    def test_compare_of_equal_specs_reports_no_changes(self) -> None:
+        code, report, _, _ = compare(SPEC, json.loads(json.dumps(SPEC)))
+
+        self.assertEqual(code, 0)
+        self.assertEqual(report, {"changed": []})
+
+    def test_compare_cannot_be_combined_with_a_patch(self) -> None:
+        code, _, _, stderr = compare(SPEC, SPEC, "--patch", "x.json", "--out", "y.json")
+
+        self.assertEqual(code, 2)
+        self.assertIn("not both", stderr)
 
     def test_a_patch_that_changes_nothing_fails(self) -> None:
         code, _, new_spec, stderr = run(SPEC, {"models": {"orchestration": "claude-opus-4-6"}})
