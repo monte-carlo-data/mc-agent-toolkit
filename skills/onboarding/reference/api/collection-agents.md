@@ -15,7 +15,7 @@ Agents on the older platform are managed separately and do not appear here.
 Agents are sorted by name, ignoring case. Agents with no name come last.
 
 - **Effect:** read-only.
-- **Pairs with:** `register_aws_collection_agent`, `get_aws_collection_agent`, `get_azure_collection_agent`, `get_gcp_collection_agent`, `register_generic_collection_agent`, `get_generic_collection_agent_oauth_client`, `get_generic_collection_agent_token`, `get_generic_collection_agent`.
+- **Pairs with:** `register_aws_collection_agent`, `register_generic_collection_agent`, `get_generic_collection_agent_oauth_client`, `get_generic_collection_agent_token`, `get_collection_agent`.
 
 ### Arguments
 
@@ -51,7 +51,7 @@ Returns `items`. Response fields per item: id, name, deployment_id, authenticati
 Register a collection agent you have deployed on AWS, completing the deployment it was provisioned for. Provision the deployment with create_deployment first, then deploy the agent in your AWS account. Needs the deployment's id, the agent's Lambda function ARN, and the ARN of the role Monte Carlo assumes to invoke it. The deployment's external id must already be in that role's trust policy.
 
 - **Effect:** creates; repeating it creates again.
-- **Pairs with:** `get_aws_collection_agent`, `update_aws_collection_agent`, `delete_aws_collection_agent`, `list_collection_agents`, `list_deployments`.
+- **Pairs with:** `update_aws_collection_agent`, `list_collection_agents`, `list_deployments`.
 
 ### Arguments
 
@@ -91,53 +91,12 @@ Returns the new collection agent. Response fields: id, name, deployment_id, auth
 - Monte Carlo is busy or temporarily unavailable; the tool retries once after the wait Monte Carlo asks for.
 - An unexpected error prevented the request from being processed.
 
-## `get_aws_collection_agent`: Get an AWS collection agent
-
-Get one collection agent running on AWS, including its external id.
-
-An id that names an agent on another platform, or no agent in your account, returns 404.
-
-- **Effect:** read-only.
-- **Pairs with:** `register_aws_collection_agent`, `update_aws_collection_agent`, `delete_aws_collection_agent`, `list_collection_agents`.
-
-### Arguments
-
-| Argument | Type | Required | Description |
-|---|---|---|---|
-| `collection_agent_id` | `str` | yes | Id of the collection agent, as returned when it is registered or listed. |
-
-### Response
-
-Response fields: id, name, deployment_id, authentication_type, enabled, created_time, last_updated_time, image_build, image_version, is_remote_upgradeable, lambda_function_arn, external_id.
-
-| Field | Description |
-|---|---|
-| `id` | Unique identifier of the collection agent. |
-| `name` | Display name of the collection agent. Null when it has no name. |
-| `deployment_id` | Identifier of the deployment this collection agent runs on. |
-| `authentication_type` | How Monte Carlo authenticates when it calls the collection agent. Null for an agent that connects out instead, such as a generic one. |
-| `enabled` | Whether Monte Carlo is using this collection agent. An agent Monte Carlo has not validated is not enabled, either because it has not been registered yet or because validation failed. |
-| `created_time` | When the collection agent was created. That is when its deployment was provisioned, which is before you register the agent. |
-| `last_updated_time` | When the collection agent was last changed. Registering it, renaming it, changing how Monte Carlo reaches it, and Monte Carlo picking up a new image version all update this. Null until any of those has happened. |
-| `image_build` | Build of the image the collection agent is running. Null until Monte Carlo has contacted the agent. |
-| `image_version` | Version of the image the collection agent is running. Null until Monte Carlo has contacted the agent. |
-| `is_remote_upgradeable` | Whether Monte Carlo can update the collection agent's image for you. |
-| `lambda_function_arn` | ARN of the Lambda function Monte Carlo invokes. Empty until the agent has been registered. |
-| `external_id` | Value to supply in the trust policy of the role Monte Carlo assumes to invoke the function. Null until Monte Carlo has generated one, for a caller who is not permitted to register an agent, and if the value could not be read just now. Retry the request in that last case. |
-
-### What can fail
-
-- Authentication credentials are missing or invalid.
-- The request was authenticated, but the caller is not allowed to perform this operation. Read `code` to tell the reasons apart: `account_frozen` means the account is paused, rather than that the caller lacks permission.
-- The collection agent does not exist, or is not visible to the caller.
-- An unexpected error prevented the request from being processed.
-
 ## `update_aws_collection_agent`: Update an AWS collection agent
 
 Change the Lambda function, role or name of an AWS collection agent. Monte Carlo revalidates it and re-enables it if it was disabled. Changing only the name skips revalidation.
 
 - **Effect:** updates in place; idempotent.
-- **Pairs with:** `register_aws_collection_agent`, `get_aws_collection_agent`, `delete_aws_collection_agent`, `list_collection_agents`.
+- **Pairs with:** `register_aws_collection_agent`, `list_collection_agents`.
 
 ### Arguments
 
@@ -177,170 +136,12 @@ Returns the collection agent after the change. Response fields: id, name, deploy
 - Monte Carlo is busy or temporarily unavailable; the tool retries once after the wait Monte Carlo asks for.
 - An unexpected error prevented the request from being processed.
 
-## `delete_aws_collection_agent`: Delete an AWS collection agent
-
-Deregister an AWS collection agent. The deployment is left without an agent and cannot take another one from here; to register a replacement, delete the deployment with delete_deployment and provision a new one with create_deployment.
-
-- **Effect:** deletes; destructive and idempotent.
-- **Pairs with:** `register_aws_collection_agent`, `get_aws_collection_agent`, `update_aws_collection_agent`, `list_collection_agents`.
-
-### Arguments
-
-| Argument | Type | Required | Description |
-|---|---|---|---|
-| `collection_agent_id` | `str` | yes | Id of the collection agent, as returned when it is registered or listed. |
-
-### Response
-
-Returns `collection_agent_id` and `deleted: true` once the collection agent is gone.
-
-### What can fail
-
-- Authentication credentials are missing or invalid.
-- The request was authenticated, but the caller is not allowed to perform this operation. Read `code` to tell the reasons apart: `account_frozen` means the account is paused, rather than that the caller lacks permission.
-- The collection agent does not exist, or is not visible to the caller.
-- The change conflicts with the current state of the collection agent.
-- Monte Carlo is busy or temporarily unavailable; try again after a moment.
-- An unexpected error prevented the request from being processed.
-
-## `get_azure_collection_agent`: Get an Azure collection agent
-
-Get one collection agent running on Azure.
-
-An id that names an agent on another platform, or no agent in your account, returns 404.
-
-- **Effect:** read-only.
-- **Pairs with:** `delete_azure_collection_agent`, `list_collection_agents`.
-
-### Arguments
-
-| Argument | Type | Required | Description |
-|---|---|---|---|
-| `collection_agent_id` | `str` | yes | Id of the collection agent, as returned when it is registered or listed. |
-
-### Response
-
-Response fields: id, name, deployment_id, authentication_type, enabled, created_time, last_updated_time, image_build, image_version, is_remote_upgradeable, function_app_url.
-
-| Field | Description |
-|---|---|
-| `id` | Unique identifier of the collection agent. |
-| `name` | Display name of the collection agent. Null when it has no name. |
-| `deployment_id` | Identifier of the deployment this collection agent runs on. |
-| `authentication_type` | How Monte Carlo authenticates when it calls the collection agent. Null for an agent that connects out instead, such as a generic one. |
-| `enabled` | Whether Monte Carlo is using this collection agent. An agent Monte Carlo has not validated is not enabled, either because it has not been registered yet or because validation failed. |
-| `created_time` | When the collection agent was created. That is when its deployment was provisioned, which is before you register the agent. |
-| `last_updated_time` | When the collection agent was last changed. Registering it, renaming it, changing how Monte Carlo reaches it, and Monte Carlo picking up a new image version all update this. Null until any of those has happened. |
-| `image_build` | Build of the image the collection agent is running. Null until Monte Carlo has contacted the agent. |
-| `image_version` | Version of the image the collection agent is running. Null until Monte Carlo has contacted the agent. |
-| `is_remote_upgradeable` | Whether Monte Carlo can update the collection agent's image for you. |
-| `function_app_url` | URL of the function app Monte Carlo calls. Empty until the agent has been registered. |
-
-### What can fail
-
-- Authentication credentials are missing or invalid.
-- The request was authenticated, but the caller is not allowed to perform this operation. Read `code` to tell the reasons apart: `account_frozen` means the account is paused, rather than that the caller lacks permission.
-- The collection agent does not exist, or is not visible to the caller.
-- An unexpected error prevented the request from being processed.
-
-## `delete_azure_collection_agent`: Delete an Azure collection agent
-
-Deregister an Azure collection agent. The deployment is left without an agent and cannot take another one from here; to register a replacement, delete the deployment with delete_deployment and provision a new one with create_deployment.
-
-- **Effect:** deletes; destructive and idempotent.
-- **Pairs with:** `get_azure_collection_agent`, `list_collection_agents`.
-
-### Arguments
-
-| Argument | Type | Required | Description |
-|---|---|---|---|
-| `collection_agent_id` | `str` | yes | Id of the collection agent, as returned when it is registered or listed. |
-
-### Response
-
-Returns `collection_agent_id` and `deleted: true` once the collection agent is gone.
-
-### What can fail
-
-- Authentication credentials are missing or invalid.
-- The request was authenticated, but the caller is not allowed to perform this operation. Read `code` to tell the reasons apart: `account_frozen` means the account is paused, rather than that the caller lacks permission.
-- The collection agent does not exist, or is not visible to the caller.
-- The change conflicts with the current state of the collection agent.
-- Monte Carlo is busy or temporarily unavailable; try again after a moment.
-- An unexpected error prevented the request from being processed.
-
-## `get_gcp_collection_agent`: Get a GCP collection agent
-
-Get one collection agent running on GCP.
-
-An id that names an agent on another platform, or no agent in your account, returns 404.
-
-- **Effect:** read-only.
-- **Pairs with:** `delete_gcp_collection_agent`, `list_collection_agents`.
-
-### Arguments
-
-| Argument | Type | Required | Description |
-|---|---|---|---|
-| `collection_agent_id` | `str` | yes | Id of the collection agent, as returned when it is registered or listed. |
-
-### Response
-
-Response fields: id, name, deployment_id, authentication_type, enabled, created_time, last_updated_time, image_build, image_version, is_remote_upgradeable, cloud_run_url.
-
-| Field | Description |
-|---|---|
-| `id` | Unique identifier of the collection agent. |
-| `name` | Display name of the collection agent. Null when it has no name. |
-| `deployment_id` | Identifier of the deployment this collection agent runs on. |
-| `authentication_type` | How Monte Carlo authenticates when it calls the collection agent. Null for an agent that connects out instead, such as a generic one. |
-| `enabled` | Whether Monte Carlo is using this collection agent. An agent Monte Carlo has not validated is not enabled, either because it has not been registered yet or because validation failed. |
-| `created_time` | When the collection agent was created. That is when its deployment was provisioned, which is before you register the agent. |
-| `last_updated_time` | When the collection agent was last changed. Registering it, renaming it, changing how Monte Carlo reaches it, and Monte Carlo picking up a new image version all update this. Null until any of those has happened. |
-| `image_build` | Build of the image the collection agent is running. Null until Monte Carlo has contacted the agent. |
-| `image_version` | Version of the image the collection agent is running. Null until Monte Carlo has contacted the agent. |
-| `is_remote_upgradeable` | Whether Monte Carlo can update the collection agent's image for you. |
-| `cloud_run_url` | URL of the Cloud Run service Monte Carlo calls. Empty until the agent has been registered. |
-
-### What can fail
-
-- Authentication credentials are missing or invalid.
-- The request was authenticated, but the caller is not allowed to perform this operation. Read `code` to tell the reasons apart: `account_frozen` means the account is paused, rather than that the caller lacks permission.
-- The collection agent does not exist, or is not visible to the caller.
-- An unexpected error prevented the request from being processed.
-
-## `delete_gcp_collection_agent`: Delete a GCP collection agent
-
-Deregister a GCP collection agent. The deployment is left without an agent and cannot take another one from here; to register a replacement, delete the deployment with delete_deployment and provision a new one with create_deployment.
-
-- **Effect:** deletes; destructive and idempotent.
-- **Pairs with:** `get_gcp_collection_agent`, `list_collection_agents`.
-
-### Arguments
-
-| Argument | Type | Required | Description |
-|---|---|---|---|
-| `collection_agent_id` | `str` | yes | Id of the collection agent, as returned when it is registered or listed. |
-
-### Response
-
-Returns `collection_agent_id` and `deleted: true` once the collection agent is gone.
-
-### What can fail
-
-- Authentication credentials are missing or invalid.
-- The request was authenticated, but the caller is not allowed to perform this operation. Read `code` to tell the reasons apart: `account_frozen` means the account is paused, rather than that the caller lacks permission.
-- The collection agent does not exist, or is not visible to the caller.
-- The change conflicts with the current state of the collection agent.
-- Monte Carlo is busy or temporarily unavailable; try again after a moment.
-- An unexpected error prevented the request from being processed.
-
 ## `register_generic_collection_agent`: Register a generic collection agent
 
 Enable the generic collection agent a deployment was provisioned for, once the agent is running and connected to Monte Carlo. Needs the deployment's id. Provision the deployment with create_deployment first. The token or OAuth client the agent starts with is created with the CLI or the API, not from here, because the response carries the secret; delete_generic_collection_agent_token and delete_generic_collection_agent_oauth_client remove one.
 
 - **Effect:** creates; repeating it creates again.
-- **Pairs with:** `get_generic_collection_agent`, `update_generic_collection_agent`, `delete_generic_collection_agent`, `list_collection_agents`, `list_deployments`.
+- **Pairs with:** `update_generic_collection_agent`, `list_collection_agents`, `list_deployments`.
 
 ### Arguments
 
@@ -536,51 +337,12 @@ Returns `credential_id` and `deleted: true` once the credential is gone.
 - Monte Carlo is busy or temporarily unavailable; try again after a moment.
 - An unexpected error prevented the request from being processed.
 
-## `get_generic_collection_agent`: Get a generic collection agent
-
-Get one generic collection agent.
-
-An id that names an agent on another platform, or no agent in your account, returns 404.
-
-- **Effect:** read-only.
-- **Pairs with:** `register_generic_collection_agent`, `update_generic_collection_agent`, `delete_generic_collection_agent`, `list_collection_agents`.
-
-### Arguments
-
-| Argument | Type | Required | Description |
-|---|---|---|---|
-| `collection_agent_id` | `str` | yes | Id of the collection agent, as returned when it is registered or listed. |
-
-### Response
-
-Response fields: id, name, deployment_id, authentication_type, enabled, created_time, last_updated_time, image_build, image_version, is_remote_upgradeable.
-
-| Field | Description |
-|---|---|
-| `id` | Unique identifier of the collection agent. |
-| `name` | Display name of the collection agent. Null when it has no name. |
-| `deployment_id` | Identifier of the deployment this collection agent runs on. |
-| `authentication_type` | How Monte Carlo authenticates when it calls the collection agent. Null for an agent that connects out instead, such as a generic one. |
-| `enabled` | Whether Monte Carlo is using this collection agent. An agent Monte Carlo has not validated is not enabled, either because it has not been registered yet or because validation failed. |
-| `created_time` | When the collection agent was created. That is when its deployment was provisioned, which is before you register the agent. |
-| `last_updated_time` | When the collection agent was last changed. Registering it, renaming it, changing how Monte Carlo reaches it, and Monte Carlo picking up a new image version all update this. Null until any of those has happened. |
-| `image_build` | Build of the image the collection agent is running. Null until Monte Carlo has contacted the agent. |
-| `image_version` | Version of the image the collection agent is running. Null until Monte Carlo has contacted the agent. |
-| `is_remote_upgradeable` | Whether Monte Carlo can update the collection agent's image for you. |
-
-### What can fail
-
-- Authentication credentials are missing or invalid.
-- The request was authenticated, but the caller is not allowed to perform this operation. Read `code` to tell the reasons apart: `account_frozen` means the account is paused, rather than that the caller lacks permission.
-- The collection agent does not exist, or is not visible to the caller.
-- An unexpected error prevented the request from being processed.
-
 ## `update_generic_collection_agent`: Update a generic collection agent
 
 Rename a generic collection agent. The name is the only field this takes.
 
 - **Effect:** updates in place; idempotent.
-- **Pairs with:** `register_generic_collection_agent`, `get_generic_collection_agent`, `delete_generic_collection_agent`, `list_collection_agents`.
+- **Pairs with:** `register_generic_collection_agent`, `list_collection_agents`.
 
 ### Arguments
 
@@ -615,12 +377,58 @@ Returns the collection agent after the change. Response fields: id, name, deploy
 - Monte Carlo is busy or temporarily unavailable; the tool retries once after the wait Monte Carlo asks for.
 - An unexpected error prevented the request from being processed.
 
-## `delete_generic_collection_agent`: Delete a generic collection agent
+## `get_collection_agent`: Get a collection agent
 
-Deregister a generic collection agent, deleting the credentials created for its deployment. The deployment is left without an agent and cannot take another one from here; to register a replacement, delete the deployment with delete_deployment and provision a new one with create_deployment.
+Get one collection agent, on any platform.
+
+Takes the id the list returns. `details` holds the fields of that platform's own read, such
+as the external id of an AWS agent. A secret is never returned.
+
+An id that names no agent in your account returns 404. So does an agent on a platform with
+no path of its own here, such as a Snowflake agent.
+
+- **Effect:** read-only.
+- **Pairs with:** `list_collection_agents`, `delete_collection_agent`.
+
+### Arguments
+
+| Argument | Type | Required | Description |
+|---|---|---|---|
+| `collection_agent_id` | `str` | yes | Id of the collection agent, as returned when it is registered or listed. |
+
+### Response
+
+Response fields: id, name, deployment_id, authentication_type, enabled, created_time, last_updated_time, image_build, image_version, is_remote_upgradeable, platform, endpoint, details.
+
+| Field | Description |
+|---|---|
+| `id` | Unique identifier of the collection agent. |
+| `name` | Display name of the collection agent. Null when it has no name. |
+| `deployment_id` | Identifier of the deployment this collection agent runs on. |
+| `authentication_type` | How Monte Carlo authenticates when it calls the collection agent. Null for an agent that connects out instead, such as a generic one. |
+| `enabled` | Whether Monte Carlo is using this collection agent. An agent Monte Carlo has not validated is not enabled, either because it has not been registered yet or because validation failed. |
+| `created_time` | When the collection agent was created. That is when its deployment was provisioned, which is before you register the agent. |
+| `last_updated_time` | When the collection agent was last changed. Registering it, renaming it, changing how Monte Carlo reaches it, and Monte Carlo picking up a new image version all update this. Null until any of those has happened. |
+| `image_build` | Build of the image the collection agent is running. Null until Monte Carlo has contacted the agent. |
+| `image_version` | Version of the image the collection agent is running. Null until Monte Carlo has contacted the agent. |
+| `is_remote_upgradeable` | Whether Monte Carlo can update the collection agent's image for you. |
+| `platform` | Where the collection agent runs. |
+| `endpoint` | Address Monte Carlo reaches the collection agent at, in whatever form its platform uses. On AWS that is the ARN of a Lambda function, on Azure the URL of a function app, and on GCP the URL of a Cloud Run service. Empty until the agent has been registered. Null for a generic or Snowflake agent, which connect to Monte Carlo rather than being reached. |
+| `details` | The fields the platform-specific read of this agent returns beyond the ones above, such as `lambda_function_arn` and `external_id` on AWS. Empty for a generic agent. Never a secret. |
+
+### What can fail
+
+- Authentication credentials are missing or invalid.
+- The request was authenticated, but the caller is not allowed to perform this operation. Read `code` to tell the reasons apart: `account_frozen` means the account is paused, rather than that the caller lacks permission.
+- The collection agent does not exist, or is not visible to the caller.
+- An unexpected error prevented the request from being processed.
+
+## `delete_collection_agent`: Delete a collection agent
+
+Deregister a collection agent on any platform, by the id list_collection_agents returns. A generic agent's tokens are deleted with it. Its OAuth clients are deleted on a best-effort basis, and one that fails to delete is not reported. Refused while the agent's deployment still has a connection; delete or move those connections first. The deployment is left without an agent and cannot take another one from here; to register a replacement, the user reprovisions the deployment with the Monte Carlo CLI or the REST API. A listed agent on a platform with no path of its own here, such as a Snowflake agent, cannot be deleted here and returns 404; that 404 does not mean it is already gone.
 
 - **Effect:** deletes; destructive and idempotent.
-- **Pairs with:** `register_generic_collection_agent`, `get_generic_collection_agent`, `update_generic_collection_agent`, `list_collection_agents`.
+- **Pairs with:** `list_collection_agents`, `get_collection_agent`.
 
 ### Arguments
 
