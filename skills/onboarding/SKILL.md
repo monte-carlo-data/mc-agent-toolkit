@@ -133,8 +133,8 @@ instrument-agent; for an already-connected warehouse's monitoring use monitoring
 | Step | Tools |
 |---|---|
 | Deployment | `list_deployments`, `get_deployment`, `create_deployment`, `update_deployment`, `delete_deployment` |
-| Agent | `list_collection_agents`, `register_aws_collection_agent`, `register_generic_collection_agent`, `get_aws_collection_agent`, `get_gcp_collection_agent`, `get_azure_collection_agent`, `get_generic_collection_agent`, `update_aws_collection_agent`, `update_generic_collection_agent`, `delete_aws_collection_agent`, `delete_gcp_collection_agent`, `delete_azure_collection_agent`, `delete_generic_collection_agent`, `delete_generic_collection_agent_token`, `delete_generic_collection_agent_oauth_client` |
-| Data store | `list_collection_data_stores`, `register_aws_collection_data_store`, `get_aws_collection_data_store`, `get_gcp_collection_data_store`, `get_azure_collection_data_store`, `update_aws_collection_data_store`, `delete_aws_collection_data_store`, `delete_gcp_collection_data_store`, `delete_azure_collection_data_store` |
+| Agent | `list_collection_agents`, `register_aws_collection_agent`, `register_generic_collection_agent`, `get_collection_agent` and `delete_collection_agent` (any platform, by id), `update_aws_collection_agent`, `update_generic_collection_agent`, `delete_generic_collection_agent_token`, `delete_generic_collection_agent_oauth_client` |
+| Data store | `list_collection_data_stores`, `register_aws_collection_data_store`, `get_collection_data_store` and `delete_collection_data_store` (any platform, by id), `update_aws_collection_data_store` |
 | Credentials | `list_credentials`, `get_credentials` and `delete_credentials` (any kind, by id), `create_aws_secrets_manager_credentials`, `create_gcp_secret_manager_credentials`, `create_azure_key_vault_credentials`, `create_env_var_credentials`, `create_file_credentials`, the `mc_managed_credentials_operation` of a type whose `mc_managed_credentials_secret` is false (for example `create_glue_credentials`), `update_aws_secrets_manager_credentials`, `update_gcp_secret_manager_credentials`, `update_azure_key_vault_credentials`, `update_env_var_credentials`, `update_file_credentials`, `validate_aws_secrets_manager_credentials`, `validate_gcp_secret_manager_credentials`, `validate_azure_key_vault_credentials`, `validate_env_var_credentials`, `validate_file_credentials` |
 | Warehouse | `list_warehouses`, `get_warehouse`, `create_warehouse`, `update_warehouse`, `delete_warehouse` |
 | BI container | `list_bi_containers`, `get_bi_container`, `create_bi_container`, `update_bi_container`, `delete_bi_container` |
@@ -676,7 +676,7 @@ Pending on your side
   - Push-only custom connector: the ingestion key step (CLI or Terraform), then the push itself (push-ingestion)
 
 Cleanup if you abandon this: delete_ingestion_key → delete_connection → delete_warehouse|delete_bi_container|delete_etl_container → delete_credentials →
-delete_<platform>_collection_agent|data_store → delete_deployment, in that order. On the generic
+delete_collection_agent|delete_collection_data_store → delete_deployment, in that order. On the generic
 agent path, also delete the token or OAuth client this run minted (delete_generic_collection_agent_token /
 delete_generic_collection_agent_oauth_client).
 ```

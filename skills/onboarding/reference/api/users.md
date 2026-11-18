@@ -10,7 +10,8 @@ them. Each section is one tool; its name is the tool to call.
 Return the identity this request was authenticated as, along with its account.
 
 Use it to confirm that a set of credentials works, to find out which account they belong
-to, and to read the authorization groups that decide what the caller may do.
+to, and to read the authorization groups and permissions that decide what the caller may
+do.
 
 Any authenticated caller may call this operation, and it keeps answering while an account
 is paused. A client can therefore learn that the account is paused, rather than only
@@ -24,7 +25,7 @@ None.
 
 ### Response
 
-Response fields: user_id, email, first_name, last_name, identity_type, account_id, account_name, account_frozen, auth_groups, features.
+Response fields: user_id, email, first_name, last_name, identity_type, account_id, account_name, account_frozen, auth_groups, permissions, features.
 
 | Field | Description |
 |---|---|
@@ -37,6 +38,7 @@ Response fields: user_id, email, first_name, last_name, identity_type, account_i
 | `account_name` | Display name of the account. Null when the account has no name. |
 | `account_frozen` | Whether the account is paused. While it is, this endpoint still answers but every other one returns 403 with the code `account_frozen`. |
 | `auth_groups` | Names of the authorization groups this user belongs to. They determine what the user is permitted to do. |
+| `permissions` | The permissions this user holds, sorted. A permission held only on some domains is listed too. An operation's `x-mc-required-permissions` names the permissions that let a caller through, any one of them; an empty list means any caller. |
 | `features` | Features in early access that are on for the account. Every operation of a resource in early access answers 404 until its feature is on. |
 
 ### What can fail

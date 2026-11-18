@@ -10,7 +10,8 @@ them. Each section is one tool; its name is the tool to call.
 List the deployments in your account.
 
 A deployment is the infrastructure that connects Monte Carlo to your environment. Each
-one hosts a collection agent or a data store, or is hosted by Monte Carlo itself.
+one hosts a collection agent or a data store, or is hosted by Monte Carlo itself. An
+`AGENT_OBSERVABILITY` deployment is hosted by Monte Carlo and stores your agents' traces.
 
 Only deployments on Monte Carlo's current collection platform are listed. Deployments on
 the older platform are managed separately and do not appear here.
@@ -28,17 +29,20 @@ None.
 
 ### Response
 
-Returns `items`. Response fields per item: id, name, type, runtime_platform, enabled, created_time, last_updated_time.
+Returns `items`. Response fields per item: id, name, type, runtime_platform, enabled, created_time, last_updated_time, status, status_detail, deletion_protection.
 
 | Field | Description |
 |---|---|
 | `id` | Unique identifier of the deployment. |
 | `name` | Display name of the deployment. |
 | `type` | What the deployment hosts. Null when nothing is provisioned on it, in which case it has to be provisioned before it can be used. |
-| `runtime_platform` | Where the deployment's collection agent or data store runs. Null for a Monte Carlo hosted deployment, which runs neither, for one with nothing provisioned on it, and for one whose platform Monte Carlo has not recorded. |
-| `enabled` | Whether the deployment can serve connections. A deployment still waiting for its collection agent or data store to be registered, or with nothing provisioned on it, is not enabled. |
-| `created_time` | When the deployment was assigned to your account. Null when Monte Carlo has no record of that. |
+| `runtime_platform` | Where the deployment's collection agent or data store runs. Null for a Monte Carlo hosted deployment, `AGENT_OBSERVABILITY` included, which runs neither. Also null for one with nothing provisioned on it, and for one whose platform Monte Carlo has not recorded. |
+| `enabled` | Whether the deployment can serve connections. A deployment still waiting for its collection agent or data store to be registered, or with nothing provisioned on it, is not enabled. An `AGENT_OBSERVABILITY` deployment is enabled only while its `status` is `READY`. |
+| `created_time` | When the deployment was assigned to your account, or for an `AGENT_OBSERVABILITY` deployment, when it was created. Null when Monte Carlo has no record of that. |
 | `last_updated_time` | When Monte Carlo last updated the infrastructure behind the deployment. Null when Monte Carlo has no record of an update. |
+| `status` | How far Monte Carlo has got with setting the deployment up. An `AGENT_OBSERVABILITY` deployment is `PROVISIONING` while Monte Carlo sets it up, then `READY` or `FAILED`. Every other deployment is `READY`. `enabled` says whether the deployment can serve connections. |
+| `status_detail` | More about the status, such as why setting up the deployment failed. Null when there is nothing to add. |
+| `deletion_protection` | Whether deleting the deployment is refused once it has been `READY`. Only an `AGENT_OBSERVABILITY` deployment can be protected. Every other deployment is `false`. Turn it off with an update before deleting a protected deployment. |
 
 ### What can fail
 
@@ -48,7 +52,7 @@ Returns `items`. Response fields per item: id, name, type, runtime_platform, ena
 
 ## `create_deployment`: Create a deployment
 
-Provision a deployment for a collection agent or a data store you will run in your own cloud. Call list_deployments first: it includes the cloud deployment Monte Carlo hosts for the account when it runs on the current collection platform, and this cannot create another one. Create a deployment only when a warehouse has to be reached from inside your network (a collection agent) or sampled rows have to stay in your storage (a data store). A deployment with nothing registered on it serves no connections, so never create one without an agent or data store to put on it. Takes the deployment type and the platform it will run on, and returns the external id when that platform needs one. Registering the agent or data store is a second call.
+Provision a deployment for a collection agent or a data store you will run in your own cloud, or create an AGENT_OBSERVABILITY deployment Monte Carlo hosts to store agent traces. Call list_deployments first: it includes the cloud deployment Monte Carlo hosts for the account when it runs on the current collection platform, and this cannot create another one. Create a collector deployment only when a warehouse has to be reached from inside your network (a collection agent) or sampled rows have to stay in your storage (a data store). A deployment with nothing registered on it serves no connections, so never create one without an agent or data store to put on it. For a collector, takes the deployment type and the platform it will run on, and returns the external id when that platform needs one. Registering the agent or data store is a second call. For AGENT_OBSERVABILITY, send no platform. The deployment comes back with status PROVISIONING: poll get_deployment until it is READY or FAILED. It is protected from deletion once ready unless deletion_protection is false. Refused when the account cannot have Monte Carlo hosted Agent Observability, already holds as many as it may, or has created as many as a day allows.
 
 - **Effect:** creates; repeating it creates again.
 - **Pairs with:** `list_deployments`, `get_deployment`, `update_deployment`, `delete_deployment`.
@@ -57,23 +61,27 @@ Provision a deployment for a collection agent or a data store you will run in yo
 
 | Argument | Type | Required | Description |
 |---|---|---|---|
-| `type` | one of `COLLECTION_AGENT`, `COLLECTION_DATA_STORE`, `CLOUD` | yes | What the deployment will host. Only `COLLECTION_AGENT` and `COLLECTION_DATA_STORE` can be provisioned today. Any other value is rejected. |
-| `runtime_platform` | one of `AWS`, `AWS_PROXIED`, `AZURE`, `GCP`, `GCP_PROXIED`, `SNOWFLAKE`, `GENERIC` | yes | Where the deployment's collection agent or data store will run. Either can be provisioned on `AWS`, `AZURE` or `GCP`, and a collection agent also on `GENERIC`. Any other combination is rejected. |
+| `type` | one of `COLLECTION_AGENT`, `COLLECTION_DATA_STORE`, `CLOUD`, `AGENT_OBSERVABILITY` | yes | What the deployment will host. `COLLECTION_AGENT` and `COLLECTION_DATA_STORE` can be provisioned, and an `AGENT_OBSERVABILITY` deployment can be created when your account has Monte Carlo hosted Agent Observability. Any other value is rejected. |
+| `runtime_platform` | one of `AWS`, `AWS_PROXIED`, `AZURE`, `GCP`, `GCP_PROXIED`, `SNOWFLAKE`, `GENERIC` | no | Where the deployment's collection agent or data store will run. Either can be provisioned on `AWS`, `AZURE` or `GCP`, and a collection agent also on `GENERIC`. Any other combination is rejected. Required for a collection agent or data store. Leave it out for `AGENT_OBSERVABILITY`, which Monte Carlo hosts. |
 | `name` | `str` | no | Display name for the deployment. Monte Carlo generates one if you leave it out. Up to 200 characters. |
+| `deletion_protection` | `bool` | no | Whether deleting the deployment is refused once it has been ready. Only an `AGENT_OBSERVABILITY` deployment can be protected, and it is protected unless you send `false`. Any other type accepts only `false`. |
 
 ### Response
 
-Returns the new deployment. Response fields: id, name, type, runtime_platform, enabled, created_time, last_updated_time, aws_external_id.
+Returns the new deployment. Response fields: id, name, type, runtime_platform, enabled, created_time, last_updated_time, status, status_detail, deletion_protection, aws_external_id.
 
 | Field | Description |
 |---|---|
 | `id` | Unique identifier of the deployment. |
 | `name` | Display name of the deployment. |
 | `type` | What the deployment hosts. Null when nothing is provisioned on it, in which case it has to be provisioned before it can be used. |
-| `runtime_platform` | Where the deployment's collection agent or data store runs. Null for a Monte Carlo hosted deployment, which runs neither, for one with nothing provisioned on it, and for one whose platform Monte Carlo has not recorded. |
-| `enabled` | Whether the deployment can serve connections. A deployment still waiting for its collection agent or data store to be registered, or with nothing provisioned on it, is not enabled. |
-| `created_time` | When the deployment was assigned to your account. Null when Monte Carlo has no record of that. |
+| `runtime_platform` | Where the deployment's collection agent or data store runs. Null for a Monte Carlo hosted deployment, `AGENT_OBSERVABILITY` included, which runs neither. Also null for one with nothing provisioned on it, and for one whose platform Monte Carlo has not recorded. |
+| `enabled` | Whether the deployment can serve connections. A deployment still waiting for its collection agent or data store to be registered, or with nothing provisioned on it, is not enabled. An `AGENT_OBSERVABILITY` deployment is enabled only while its `status` is `READY`. |
+| `created_time` | When the deployment was assigned to your account, or for an `AGENT_OBSERVABILITY` deployment, when it was created. Null when Monte Carlo has no record of that. |
 | `last_updated_time` | When Monte Carlo last updated the infrastructure behind the deployment. Null when Monte Carlo has no record of an update. |
+| `status` | How far Monte Carlo has got with setting the deployment up. An `AGENT_OBSERVABILITY` deployment is `PROVISIONING` while Monte Carlo sets it up, then `READY` or `FAILED`. Every other deployment is `READY`. `enabled` says whether the deployment can serve connections. |
+| `status_detail` | More about the status, such as why setting up the deployment failed. Null when there is nothing to add. |
+| `deletion_protection` | Whether deleting the deployment is refused once it has been `READY`. Only an `AGENT_OBSERVABILITY` deployment can be protected. Every other deployment is `false`. Turn it off with an update before deleting a protected deployment. |
 | `aws_external_id` | Value to supply when you register an AWS collection agent or data store on this deployment. It goes in the trust policy of the role Monte Carlo assumes. Null until Monte Carlo has generated one, for a deployment on another platform, for a caller who is not permitted to register one, and if the value could not be read just now. Retry the request in that last case. |
 
 ### What can fail
@@ -103,17 +111,20 @@ Carlo's older collection platform all return 404.
 
 ### Response
 
-Response fields: id, name, type, runtime_platform, enabled, created_time, last_updated_time, aws_external_id.
+Response fields: id, name, type, runtime_platform, enabled, created_time, last_updated_time, status, status_detail, deletion_protection, aws_external_id.
 
 | Field | Description |
 |---|---|
 | `id` | Unique identifier of the deployment. |
 | `name` | Display name of the deployment. |
 | `type` | What the deployment hosts. Null when nothing is provisioned on it, in which case it has to be provisioned before it can be used. |
-| `runtime_platform` | Where the deployment's collection agent or data store runs. Null for a Monte Carlo hosted deployment, which runs neither, for one with nothing provisioned on it, and for one whose platform Monte Carlo has not recorded. |
-| `enabled` | Whether the deployment can serve connections. A deployment still waiting for its collection agent or data store to be registered, or with nothing provisioned on it, is not enabled. |
-| `created_time` | When the deployment was assigned to your account. Null when Monte Carlo has no record of that. |
+| `runtime_platform` | Where the deployment's collection agent or data store runs. Null for a Monte Carlo hosted deployment, `AGENT_OBSERVABILITY` included, which runs neither. Also null for one with nothing provisioned on it, and for one whose platform Monte Carlo has not recorded. |
+| `enabled` | Whether the deployment can serve connections. A deployment still waiting for its collection agent or data store to be registered, or with nothing provisioned on it, is not enabled. An `AGENT_OBSERVABILITY` deployment is enabled only while its `status` is `READY`. |
+| `created_time` | When the deployment was assigned to your account, or for an `AGENT_OBSERVABILITY` deployment, when it was created. Null when Monte Carlo has no record of that. |
 | `last_updated_time` | When Monte Carlo last updated the infrastructure behind the deployment. Null when Monte Carlo has no record of an update. |
+| `status` | How far Monte Carlo has got with setting the deployment up. An `AGENT_OBSERVABILITY` deployment is `PROVISIONING` while Monte Carlo sets it up, then `READY` or `FAILED`. Every other deployment is `READY`. `enabled` says whether the deployment can serve connections. |
+| `status_detail` | More about the status, such as why setting up the deployment failed. Null when there is nothing to add. |
+| `deletion_protection` | Whether deleting the deployment is refused once it has been `READY`. Only an `AGENT_OBSERVABILITY` deployment can be protected. Every other deployment is `false`. Turn it off with an update before deleting a protected deployment. |
 | `aws_external_id` | Value to supply when you register an AWS collection agent or data store on this deployment. It goes in the trust policy of the role Monte Carlo assumes. Null until Monte Carlo has generated one, for a deployment on another platform, for a caller who is not permitted to register one, and if the value could not be read just now. Retry the request in that last case. |
 
 ### What can fail
@@ -125,7 +136,7 @@ Response fields: id, name, type, runtime_platform, enabled, created_time, last_u
 
 ## `update_deployment`: Update a deployment
 
-Rename a deployment. The name is the only field this takes. Nothing about the infrastructure behind the deployment changes.
+Rename a deployment, or turn an AGENT_OBSERVABILITY deployment's deletion protection on or off. Takes name and deletion_protection, both optional. Turning protection off is the step before delete_deployment on a protected deployment. Nothing about the infrastructure behind the deployment changes.
 
 - **Effect:** updates in place; idempotent.
 - **Pairs with:** `list_deployments`, `create_deployment`, `get_deployment`, `delete_deployment`.
@@ -136,20 +147,24 @@ Rename a deployment. The name is the only field this takes. Nothing about the in
 |---|---|---|---|
 | `deployment_id` | `str` | yes | Id of the deployment, as returned when it is created or listed. |
 | `name` | `str` | no | New display name for the deployment. Left out, the name is unchanged. Between 1 and 200 characters. |
+| `deletion_protection` | `bool` | no | Whether deleting the deployment is refused once it has been `READY`. Left out, it is unchanged. Only an `AGENT_OBSERVABILITY` deployment can be protected. Any other type accepts only `false`. |
 
 ### Response
 
-Returns the deployment after the change. Response fields: id, name, type, runtime_platform, enabled, created_time, last_updated_time, aws_external_id.
+Returns the deployment after the change. Response fields: id, name, type, runtime_platform, enabled, created_time, last_updated_time, status, status_detail, deletion_protection, aws_external_id.
 
 | Field | Description |
 |---|---|
 | `id` | Unique identifier of the deployment. |
 | `name` | Display name of the deployment. |
 | `type` | What the deployment hosts. Null when nothing is provisioned on it, in which case it has to be provisioned before it can be used. |
-| `runtime_platform` | Where the deployment's collection agent or data store runs. Null for a Monte Carlo hosted deployment, which runs neither, for one with nothing provisioned on it, and for one whose platform Monte Carlo has not recorded. |
-| `enabled` | Whether the deployment can serve connections. A deployment still waiting for its collection agent or data store to be registered, or with nothing provisioned on it, is not enabled. |
-| `created_time` | When the deployment was assigned to your account. Null when Monte Carlo has no record of that. |
+| `runtime_platform` | Where the deployment's collection agent or data store runs. Null for a Monte Carlo hosted deployment, `AGENT_OBSERVABILITY` included, which runs neither. Also null for one with nothing provisioned on it, and for one whose platform Monte Carlo has not recorded. |
+| `enabled` | Whether the deployment can serve connections. A deployment still waiting for its collection agent or data store to be registered, or with nothing provisioned on it, is not enabled. An `AGENT_OBSERVABILITY` deployment is enabled only while its `status` is `READY`. |
+| `created_time` | When the deployment was assigned to your account, or for an `AGENT_OBSERVABILITY` deployment, when it was created. Null when Monte Carlo has no record of that. |
 | `last_updated_time` | When Monte Carlo last updated the infrastructure behind the deployment. Null when Monte Carlo has no record of an update. |
+| `status` | How far Monte Carlo has got with setting the deployment up. An `AGENT_OBSERVABILITY` deployment is `PROVISIONING` while Monte Carlo sets it up, then `READY` or `FAILED`. Every other deployment is `READY`. `enabled` says whether the deployment can serve connections. |
+| `status_detail` | More about the status, such as why setting up the deployment failed. Null when there is nothing to add. |
+| `deletion_protection` | Whether deleting the deployment is refused once it has been `READY`. Only an `AGENT_OBSERVABILITY` deployment can be protected. Every other deployment is `false`. Turn it off with an update before deleting a protected deployment. |
 | `aws_external_id` | Value to supply when you register an AWS collection agent or data store on this deployment. It goes in the trust policy of the role Monte Carlo assumes. Null until Monte Carlo has generated one, for a deployment on another platform, for a caller who is not permitted to register one, and if the value could not be read just now. Retry the request in that last case. |
 
 ### What can fail
@@ -163,7 +178,7 @@ Returns the deployment after the change. Response fields: id, name, type, runtim
 
 ## `delete_deployment`: Delete a deployment
 
-Delete a deployment and release the infrastructure Monte Carlo runs for it. Refused while it has an enabled collection agent or data store, connections running through it, ETL containers on it, or objects in its storage. The cloud deployment hosted by Monte Carlo cannot be deleted.
+Delete a deployment and release the infrastructure Monte Carlo runs for it. Refused while it has an enabled collection agent or data store, connections running through it, ETL containers on it, or objects in its storage. The cloud deployment hosted by Monte Carlo cannot be deleted. An AGENT_OBSERVABILITY deployment that has been READY is refused while its deletion_protection is on: turn it off with update_deployment first, and only when the user asks to delete the deployment and the agent traces it stores.
 
 - **Effect:** deletes; destructive and idempotent.
 - **Pairs with:** `list_deployments`, `create_deployment`, `get_deployment`, `update_deployment`.

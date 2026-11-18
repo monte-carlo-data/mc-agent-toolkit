@@ -5,6 +5,12 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Codex will be do
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.29.9] - 2026-11-18
+
+### Changed
+
+- onboarding: name the any-platform `get_collection_agent`, `delete_collection_agent`, `get_collection_data_store` and `delete_collection_data_store` tools in place of the per-platform ones the MCP server no longer has, and regenerate the API reference (adds Hive credentials)
+
 ## [1.29.8] - 2026-11-11
 
 ### Changed
