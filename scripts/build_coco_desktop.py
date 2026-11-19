@@ -113,6 +113,23 @@ def copy_plugin(plugin: Path, staging: Path) -> None:
         raise BuildError(f"could not copy (dangling or unreadable link?): {problems}") from exc
 
 
+def first_paragraph(body: str) -> str:
+    """The body's first paragraph of text, skipping headings, with wrapped lines joined."""
+    lines = []
+    for line in body.splitlines():
+        text = line.strip()
+        if not text:
+            if lines:
+                break
+            continue
+        if text.startswith("#"):
+            if lines:
+                break
+            continue
+        lines.append(text)
+    return " ".join(lines)
+
+
 def convert_commands(plugin: Path, staging: Path) -> dict:
     skills_dir = staging / "skills"
     skill_names = set()
@@ -150,10 +167,7 @@ def convert_commands(plugin: Path, staging: Path) -> dict:
             fields, body = {}, "\n" + text
         if not body.strip():
             raise BuildError(f"command {name} ({path}) has an empty body")
-        description = fields.get("description") or next(
-            (line.strip() for line in body.splitlines() if line.strip() and not line.lstrip().startswith("#")),
-            "",
-        )
+        description = fields.get("description") or first_paragraph(body)
         if not description:
             raise BuildError(f"command {name} ({path}) has no description and no text line")
         description = f"{description.rstrip('.')}. Triggers: /{name}, {name.replace('-', ' ')}."

@@ -17,7 +17,7 @@ If you added the toolkit to CoCo Desktop another way before (for example with **
 
 CoCo should report the plugin as already CoCo-ready and install it without changes. The plugin page then shows the GitHub source, a **Sync** button, and the skills.
 
-To pin a version instead of following the latest release, use the release's tag: `https://github.com/monte-carlo-data/mc-agent-toolkit/tree/coco-desktop-v<version>` (for example `coco-desktop-v1.31.0`). Each tag holds one release and never changes.
+To pin a version instead of following the latest release, use the release's tag: `https://github.com/monte-carlo-data/mc-agent-toolkit/tree/coco-desktop-v<version>` (for example `coco-desktop-v1.32.0`). Each tag holds one release and never changes.
 
 ### Cortex Code CLI
 
@@ -110,7 +110,7 @@ cortex plugin uninstall mc-agent-toolkit
 
 ## Architecture
 
-Cortex Code wraps Claude Code, so this plugin reuses the same SKILL.md skills, the same prevent hook lifecycle (PreToolUse/PostToolUse/Stop), and the same MCP configuration. Hooks live in a single `hooks/hooks.json` at the plugin root, the only place CoCo Desktop reads them, and their matchers use Cortex's lowercase tool IDs (`^bash$`, `^(edit|write|multi_edit)$`, `^skill$`) because Desktop matches case-sensitively. The CoCo Desktop copy is built by `scripts/build_coco_desktop.py` and published by `scripts/publish_coco_desktop.py` from the release workflow. The other Cortex-specific adaptation is the prevent transcript reader: Cortex stores session messages in a sibling `<id>.history.jsonl` and persists hook output back into the transcript, so the gate scans only assistant-authored text to find its completion marker. See the [plugins README](../README.md) for the editor-support comparison and hook-format details, and the [Plugin Architecture Guide](../../docs/plugin-architecture-guide.md) for the shared-core/adapter design.
+Cortex Code wraps Claude Code, so this plugin reuses the same SKILL.md skills, the same prevent hook lifecycle (PreToolUse/PostToolUse/Stop), and the same MCP configuration. Hooks live in a single `hooks/hooks.json` at the plugin root, which CoCo Desktop loads (it ignored the manifest's list of hook files), and their matchers use Cortex's lowercase tool IDs (`^bash$`, `^(edit|write|multi_edit)$`, `^skill$`) because matching is case-sensitive. The CoCo Desktop copy is built by `scripts/build_coco_desktop.py` and published by `scripts/publish_coco_desktop.py` from the release workflow. The other Cortex-specific adaptation is the prevent transcript reader: Cortex stores session messages in a sibling `<id>.history.jsonl` and persists hook output back into the transcript, so the gate scans only assistant-authored text to find its completion marker. See the [plugins README](../README.md) for the editor-support comparison and hook-format details, and the [Plugin Architecture Guide](../../docs/plugin-architecture-guide.md) for the shared-core/adapter design.
 
 ## Changelog
 

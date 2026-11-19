@@ -154,6 +154,70 @@ class PublishTest(unittest.TestCase):
         pin = self.dist_tag("9.9.10")
         manifest = json.loads(self.remote_file(pin, ".cortex-plugin/plugin.json"))
         self.assertEqual(manifest["version"], "9.9.10")
+        # A side commit with no parents, so the branch's history never shows the older build.
+        self.assertEqual(self.remote_git("rev-list", "--count", pin), "1")
+
+    def test_missing_branch_is_not_recreated_at_an_older_version(self):
+        self.git("checkout", "-q", "-b", "hotfix", "v9.9.9")
+        self.release("9.9.10")
+        self.git("checkout", "-q", "main")
+        self.release("9.10.0")
+        self.publish("v9.10.0")
+        self.remote_git("update-ref", "-d", "refs/heads/coco-desktop")
+        with self.assertRaisesRegex(publish_mod.PublishError, "coco-desktop branch is missing"):
+            self.publish("v9.9.10")
+        self.assertNotIn("coco-desktop-v9.9.10", self.remote_git("tag"))
+
+    def test_branch_holding_this_version_with_different_files_fails(self):
+        self.publish("v9.9.9")
+        self.remote_git("tag", "-d", "coco-desktop-v9.9.9")
+        (self.plugin / "settings.json").write_text('{"changed": true}\n')
+        self.git("commit", "-qam", "same version, different files")
+        self.git("tag", "-f", "v9.9.9")
+        with self.assertRaisesRegex(publish_mod.PublishError, "already holds 9.9.9 with different files"):
+            self.publish("v9.9.9")
+
+    def test_branch_holding_this_version_restores_a_missing_pin(self):
+        self.publish("v9.9.9")
+        head = self.dist_head()
+        self.remote_git("tag", "-d", "coco-desktop-v9.9.9")
+        result = self.publish("v9.9.9")
+        self.assertEqual(result["action"], "pinned")
+        self.assertEqual(self.dist_tag("9.9.9"), head)
+
+    def test_release_off_the_required_branch_is_refused(self):
+        self.git("checkout", "-q", "-b", "hotfix", "v9.9.9")
+        self.release("9.9.10")
+        with self.assertRaisesRegex(publish_mod.PublishError, "not on main"):
+            self.publish("v9.9.10", require_ancestor="main", dry_run=True)
+        self.git("checkout", "-q", "main")
+        self.assertEqual(self.publish("v9.9.9", require_ancestor="main", dry_run=True)["action"], "published")
+
+    def run_cli(self, *args):
+        import contextlib
+        import io
+        out, err = io.StringIO(), io.StringIO()
+        cwd = os.getcwd()
+        os.chdir(self.repo)
+        try:
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+                code = publish_mod.main(list(args))
+        finally:
+            os.chdir(cwd)
+        return code, out.getvalue(), err.getvalue()
+
+    def test_cli_flags_the_workflow_uses(self):
+        sha = self.git("rev-parse", "v9.9.9^{commit}")
+        code, _, err = self.run_cli("v9.9.9", "--remote", "origin", "--expect-sha", "0" * 40, "--dry-run")
+        self.assertEqual(code, 1)
+        self.assertIn("expected", err)
+        code, _, err = self.run_cli("v9.9.9", "--require-ancestor", "refs/heads/nope", "--dry-run")
+        self.assertEqual(code, 1)
+        code, out, _ = self.run_cli(
+            "v9.9.9", "--remote", "origin", "--expect-sha", sha, "--require-ancestor", "main", "--dry-run"
+        )
+        self.assertEqual(code, 0)
+        self.assertEqual(json.loads(out)["action"], "published")
 
     def test_conflicting_existing_tag_fails(self):
         self.publish("v9.9.9")

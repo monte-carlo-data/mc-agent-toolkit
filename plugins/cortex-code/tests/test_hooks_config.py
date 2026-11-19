@@ -1,7 +1,7 @@
 """Checks the Cortex Code hook config against how Cortex Code loads and matches hooks.
 
 Cortex Code reads a plugin's hooks from ``hooks/hooks.json`` at the plugin root. CoCo
-Desktop ignores a manifest ``hooks`` array, so the manifest must not declare one.
+Desktop 2.0.0 ignored a manifest ``hooks`` array, so the manifest must not declare one.
 Matchers are unanchored, case-sensitive regexes tested against Cortex's lowercase tool
 IDs (``bash``, ``edit``, ``write``, ``multi_edit``, ``skill``); PascalCase names never
 match. ``${CORTEX_PLUGIN_ROOT}`` is substituted into the command text, not exported, so

@@ -71,7 +71,8 @@ def make_fixture(root: Path) -> Path:
         plugin / "README.md",
         "# Fixture\n\n"
         "[alpha](../../skills/alpha/SKILL.md) [skills dir](../../skills/) [plugins](../README.md)\n"
-        "[web](https://example.com/x) [anchor](#usage) [log](CHANGELOG.md) [settings](settings.json)\n",
+        "[web](https://example.com/x) [anchor](#usage) [log](CHANGELOG.md) [settings](settings.json)\n"
+        "[alpha usage](../../skills/alpha/SKILL.md#usage) [log entry](CHANGELOG.md#999)\n",
     )
     (plugin / "skills").mkdir()
     os.symlink("../../../skills/alpha", plugin / "skills/alpha")
@@ -152,6 +153,26 @@ class FixtureBuildTest(unittest.TestCase):
         self.assertEqual(fields["description"], "Do the thing. Triggers: /nofront, nofront.")
         self.assertEqual(body, "\n# /nofront\n\nDo the thing.\n\nMore detail: `x`.\n")
 
+    def test_description_joins_a_wrapped_first_paragraph(self):
+        out = self.tmp / "dist2"
+        write(
+            self.plugin / "commands/y/wrapped.md",
+            "# /wrapped\n\nGenerate a script that collects metadata\nand pushes it to Monte Carlo.\n\nMore.\n",
+        )
+        build_mod.build(self.plugin, out, ref="main")
+        fields, _ = frontmatter(out / "skills/wrapped/SKILL.md")
+        self.assertEqual(
+            fields["description"],
+            "Generate a script that collects metadata and pushes it to Monte Carlo. Triggers: /wrapped, wrapped.",
+        )
+
+    def test_parse_frontmatter_quoted_and_block_values(self):
+        fields, body = build_mod.parse_frontmatter(
+            "---\nname: 'quoted-name'\ndescription: >-\n  Folded line one\n  and line two.\nother: \"x: y\"\n---\nBody.\n"
+        )
+        self.assertEqual(fields, {"name": "quoted-name", "description": "Folded line one and line two.", "other": "x: y"})
+        self.assertEqual(body, "Body.\n")
+
     def test_only_manifest_command_paths_convert(self):
         out = self.tmp / "dist2"
         write(self.plugin / "commands/draft/unlisted.md", "---\ndescription: Draft.\n---\n\nNot shipped.\n")
@@ -198,6 +219,8 @@ class FixtureBuildTest(unittest.TestCase):
         self.assertIn("[anchor](#usage)", text)
         self.assertIn("[log](docs/CHANGELOG.md)", text)
         self.assertIn("[settings](settings.json)", text)
+        self.assertIn(f"[alpha usage]({base}/blob/v9.9.9/skills/alpha/SKILL.md#usage)", text)
+        self.assertIn("[log entry](docs/CHANGELOG.md#999)", text)
 
     def test_deterministic(self):
         again = self.tmp / "dist2"
@@ -258,6 +281,22 @@ class FixtureFailureTest(unittest.TestCase):
         write(self.tmp / "outside/secret.txt", "not for publishing\n")
         os.symlink("../../../outside/secret.txt", self.tmp / "repo/skills/alpha/secret.txt")
         self.assert_build_fails("outside")
+
+    def test_missing_hooks_file(self):
+        (self.plugin / "hooks/hooks.json").unlink()
+        self.assert_build_fails("hooks/hooks.json is missing")
+
+    def test_duplicate_skill_names(self):
+        write(self.tmp / "repo/skills/gamma/SKILL.md", "---\nname: beta\ndescription: G.\n---\n\nG.\n")
+        os.symlink("../../../skills/gamma", self.plugin / "skills/gamma")
+        self.assert_build_fails("skill name beta")
+
+    def test_missing_manifest_command_path(self):
+        manifest_path = self.plugin / ".cortex-plugin/plugin.json"
+        manifest = json.loads(manifest_path.read_text())
+        manifest["commands"].append("./commands/missing/")
+        manifest_path.write_text(json.dumps(manifest))
+        self.assert_build_fails("manifest command path ./commands/missing/")
 
     def test_duplicate_command_names(self):
         write(self.plugin / "commands/y/nofront-dup.md", "Dup.\n")

@@ -14,7 +14,7 @@ holds different files, the run fails rather than retagging. A release older than
 branch head gets its pin tag on a side commit and leaves the branch alone. Branch and
 tag are pushed atomically.
 
-Usage: publish_coco_desktop.py <source tag> [--remote origin] [--expect-sha SHA] [--dry-run]
+Usage: publish_coco_desktop.py <source tag> [--remote origin] [--expect-sha SHA] [--require-ancestor REF] [--dry-run]
 """
 
 import argparse
@@ -90,7 +90,7 @@ def build_tree(repo: Path, tag: str, commit: str, work: Path) -> str:
 
 
 def publish(tag: str, repo: Path = Path("."), remote: str = "origin", expect_sha: str | None = None,
-            dry_run: bool = False) -> dict:
+            require_ancestor: str | None = None, dry_run: bool = False) -> dict:
     match = SOURCE_TAG.match(tag)
     if not match:
         raise PublishError(f"source tag {tag!r} is not v<major>.<minor>.<patch>")
@@ -103,6 +103,11 @@ def publish(tag: str, repo: Path = Path("."), remote: str = "origin", expect_sha
         raise PublishError(f"no tag {tag} in {repo}")
     if expect_sha and source_sha != expect_sha:
         raise PublishError(f"{tag} is {source_sha}, expected {expect_sha}")
+    if require_ancestor:
+        if not git(repo, "rev-parse", "-q", "--verify", f"{require_ancestor}^{{commit}}", check=False):
+            raise PublishError(f"no {require_ancestor} in {repo}")
+        if subprocess.run(["git", "merge-base", "--is-ancestor", source_sha, require_ancestor], cwd=repo).returncode:
+            raise PublishError(f"{tag} is not on {require_ancestor}")
     manifest = json.loads(git(repo, "show", f"{source_sha}:{PLUGIN}/.cortex-plugin/plugin.json"))
     if manifest.get("version") != version:
         raise PublishError(f"{tag} has plugin version {manifest.get('version')}, not {version}")
@@ -111,17 +116,18 @@ def publish(tag: str, repo: Path = Path("."), remote: str = "origin", expect_sha
     with tempfile.TemporaryDirectory() as tmp:
         tree = build_tree(repo, tag, source_sha, Path(tmp))
 
-    existing_pin = remote_ref(repo, remote, f"refs/tags/{pin}")
     head = remote_ref(repo, remote, f"refs/heads/{BRANCH}")
+    if head is None and git(repo, "ls-remote", "--tags", remote, f"refs/tags/{TAG_PREFIX}*"):
+        # Published before, so the branch was deleted. Recreating it from this release could
+        # move it back to an older version than a pin that already exists.
+        raise PublishError(
+            f"the {BRANCH} branch is missing but {TAG_PREFIX}* tags exist; push the newest "
+            f"{TAG_PREFIX}* tag's commit to refs/heads/{BRANCH} by hand, then re-run"
+        )
+    existing_pin = remote_ref(repo, remote, f"refs/tags/{pin}")
     if existing_pin:
         if git(repo, "rev-parse", f"{existing_pin}^{{tree}}") != tree:
             raise PublishError(f"{pin} already exists with different files; bump the version instead of retagging")
-        if head is None:
-            # Recreating the branch from this pin could move it back to an old version.
-            raise PublishError(
-                f"{pin} exists but the {BRANCH} branch is missing; push the newest "
-                f"{TAG_PREFIX}* tag's commit to refs/heads/{BRANCH} by hand"
-            )
         return {"action": "unchanged", "tag": pin, "commit": existing_pin}
 
     head_version = None
@@ -155,13 +161,15 @@ def publish(tag: str, repo: Path = Path("."), remote: str = "origin", expect_sha
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("tag", help="source release tag, e.g. v1.31.0")
+    parser.add_argument("tag", help="source release tag, e.g. v1.32.0")
     parser.add_argument("--remote", default="origin")
     parser.add_argument("--expect-sha", help="fail unless the tag points at this commit")
+    parser.add_argument("--require-ancestor", metavar="REF", help="fail unless the tag's commit is on REF")
     parser.add_argument("--dry-run", action="store_true", help="build and plan, push nothing")
     args = parser.parse_args(argv)
     try:
-        result = publish(args.tag, remote=args.remote, expect_sha=args.expect_sha, dry_run=args.dry_run)
+        result = publish(args.tag, remote=args.remote, expect_sha=args.expect_sha,
+                         require_ancestor=args.require_ancestor, dry_run=args.dry_run)
     except PublishError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1

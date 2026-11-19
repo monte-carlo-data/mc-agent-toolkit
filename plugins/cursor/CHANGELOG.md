@@ -5,6 +5,18 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Cursor will be d
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.32.0] - 2026-11-19
+
+### Added
+
+- Cortex Code: CoCo Desktop install. Each release publishes a copy of the plugin that is already in CoCo Desktop's format to the `coco-desktop` branch and tags it `coco-desktop-v<version>`. Install it with **Add from GitHub** and update it with **Sync**; CoCo installs it without rewriting it. `scripts/build_coco_desktop.py` builds the copy and `scripts/publish_coco_desktop.py` publishes it from the release workflow.
+
+### Fixed
+
+- Cortex Code: hooks load and fire in CoCo Desktop. They now live in one `hooks/hooks.json` at the plugin root, because Desktop 2.0.0 ignored the manifest's list of hook files, and their matchers use Cortex's lowercase tool IDs (`^bash$`, `^(edit|write|multi_edit)$`, `^skill$`), because matching is case-sensitive and the PascalCase matchers never fired in Desktop. Hook commands now quote the plugin root, so install paths with spaces work.
+- reinforce-agent: when a run stops after setting the fix on a Cortex agent's live version, and the live version holds neither the fix as written (a lost escape, say) nor the current spec, or can't be read, the report now gives the user the statement that puts the current spec back, with its check, and says it overwrites whatever the live version holds, so the user decides. Before, the run left the live version holding neither spec and gave no way back. The SQL printed for someone else to run says the same.
+- reinforce-agent: when it isn't known whether the fix's `COMMIT` landed, the run no longer says to write nothing more; it stops and lets "When the run stops" read the versions again and recover, as that section already described. If they still don't show whether it landed, it writes nothing and reports them.
+
 ## [1.31.0] - 2026-11-19
 
 ### Changed
