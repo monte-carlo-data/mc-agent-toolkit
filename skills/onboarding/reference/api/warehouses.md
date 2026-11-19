@@ -45,7 +45,7 @@ Returns `items` (response fields per item: id, name, type, deployment_id, create
 
 ## `create_warehouse`: Create a warehouse
 
-Create an empty warehouse on a deployment, to add connections to. Call list_deployments first and pick the deployment its connections will run through: the cloud deployment Monte Carlo hosts for the account, when the list shows one, or one with a collection agent or data store already registered. Create a new deployment with create_deployment only when the warehouse needs a collection agent inside your network or a data store on your side, never one with nothing behind it. Takes the name, the deployment id, and either the warehouse type or a connection type to derive it from. Databricks connections go on a data-lake warehouse. Send connection_type databricks-metastore-sql-warehouse, the connection to add first.
+Create an empty warehouse on a deployment, to add connections to. Call list_deployments first and pick the deployment its connections will run through: the cloud deployment Monte Carlo hosts for the account, when the list shows one, or one with a collection agent or data store already registered. Skip a deployment of type AGENT_OBSERVABILITY. It stores agent traces and cannot host a warehouse. Create a new deployment with create_deployment only when the warehouse needs a collection agent inside your network or a data store on your side, never one with nothing behind it. Takes the name, the deployment id, and either the warehouse type or a connection type to derive it from. Databricks connections go on a data-lake warehouse. Send connection_type databricks-metastore-sql-warehouse, the connection to add first.
 
 - **Effect:** creates; repeating it creates again.
 - **Pairs with:** `list_warehouses`, `get_warehouse`, `update_warehouse`, `delete_warehouse`, `list_deployments`.
@@ -55,7 +55,7 @@ Create an empty warehouse on a deployment, to add connections to. Call list_depl
 | Argument | Type | Required | Description |
 |---|---|---|---|
 | `name` | `str` | yes | Display name for the warehouse. Unique among your warehouses of the same type. Between 1 and 200 characters. |
-| `deployment_id` | `str` | yes | The deployment the warehouse's connections will run through. Pick one from the deployments list. Only a deployment on Monte Carlo's current collection platform is accepted. |
+| `deployment_id` | `str` | yes | The deployment the warehouse's connections will run through. Pick one from the deployments list. Only a deployment on Monte Carlo's current collection platform is accepted. An `AGENT_OBSERVABILITY` deployment is not. |
 | `type` | one of `bigquery`, `clickhouse`, `custom-connector`, `custom-integration`, `data-lake`, `db2`, `dremio`, `etl`, `microsoft-fabric`, `mysql`, `oracle`, `pinecone`, `redshift`, `s3-metadata-events`, `salesforce-crm`, `salesforce-data-cloud`, `snowflake`, `starburst-enterprise`, `starburst-galaxy`, `teradata`, `transactional-db` | no | The kind of data platform the warehouse represents. Every connection added to it has to fit. Cannot be changed after the warehouse is created. Send this or `connection_type`, not both. |
 | `connection_type` | `str` | no | The type of the first connection you plan to add. The warehouse type is taken from it and returned as `type`. Send this or `type`, not both. A connection type no warehouse type can be taken from is refused, custom connectors included. So is one this account does not have. Between 1 and 200 characters. |
 

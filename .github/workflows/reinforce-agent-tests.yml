@@ -1,0 +1,29 @@
+name: Reinforce Agent Spec Patch Tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'skills/reinforce-agent/**'
+      - '.github/workflows/reinforce-agent-tests.yml'
+  pull_request:
+    paths:
+      - 'skills/reinforce-agent/**'
+      - '.github/workflows/reinforce-agent-tests.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # patch_agent_spec.py uses only the Python stdlib — no pip install needed.
+      - name: Run patch_agent_spec tests
+        run: python3 skills/reinforce-agent/tests/test_patch_agent_spec.py

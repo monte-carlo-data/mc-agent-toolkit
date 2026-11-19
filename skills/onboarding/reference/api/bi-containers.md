@@ -37,7 +37,7 @@ Returns `items`. Response fields per item: id, type, name, deployment_id, deploy
 
 ## `create_bi_container`: Create a BI container
 
-Create an empty BI container, to add Looker, Tableau, Power BI or custom BI connector connections to. Call list_deployments first and pick the deployment its connections will run through: the cloud deployment Monte Carlo hosts for the account, when the list shows one, or one with a collection agent already registered. Takes the BI tool as type, a name, and the deployment id. One looker container holds both the Looker API connection and the LookML git connection. A custom-bi-connector container goes on the deployment of the agent that registered the connector, or on none for a push-only connector, whose BI assets the customer pushes. Pushing needs an ingestion key scoped to the container. Its create returns a secret, so the customer creates it with the CLI or Terraform, not this tool.
+Create an empty BI container, to add Looker, Tableau, Power BI or custom BI connector connections to. Call list_deployments first and pick the deployment its connections will run through: the cloud deployment Monte Carlo hosts for the account, when the list shows one, or one with a collection agent already registered. Skip a deployment of type AGENT_OBSERVABILITY. It stores agent traces and cannot host a BI container. Takes the BI tool as type, a name, and the deployment id. One looker container holds both the Looker API connection and the LookML git connection. A custom-bi-connector container goes on the deployment of the agent that registered the connector, or on none for a push-only connector, whose BI assets the customer pushes. Pushing needs an ingestion key scoped to the container. Its create returns a secret, so the customer creates it with the CLI or Terraform, not this tool.
 
 - **Effect:** creates; repeating it creates again.
 - **Pairs with:** `list_bi_containers`, `get_bi_container`, `update_bi_container`, `delete_bi_container`, `list_deployments`.
@@ -48,7 +48,7 @@ Create an empty BI container, to add Looker, Tableau, Power BI or custom BI conn
 |---|---|---|---|
 | `type` | one of `looker`, `tableau`, `power-bi`, `custom-bi-connector` | yes | The BI tool the container represents. Every connection added to it has to be for this tool. Cannot be changed after the container is created. |
 | `name` | `str` | yes | Display name for the BI container. Between 1 and 200 characters. |
-| `deployment_id` | `str` | no | The deployment the container's connections will run through. Pick one from the deployments list. Only a deployment on Monte Carlo's current collection platform is accepted. `custom-bi-connector` takes the deployment of the agent that registered the connector, or none for a push-only connector. Every other type requires one. |
+| `deployment_id` | `str` | no | The deployment the container's connections will run through. Pick one from the deployments list. Only a deployment on Monte Carlo's current collection platform is accepted. An `AGENT_OBSERVABILITY` deployment is not. `custom-bi-connector` takes the deployment of the agent that registered the connector, or none for a push-only connector. Every other type requires one. |
 
 ### Response
 
