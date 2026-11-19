@@ -228,7 +228,11 @@ Whoever runs that SQL doesn't have your files or step 1's results, so it must ru
   landed, so they go on with the checks.
 - After the rest, print what to run if they stop after the `MODIFY` that sets `new.json` and
   before the fix's `COMMIT` lands: the check that the live version holds `new.json`, then the
-  put-back from "When the run stops", only if that check returns TRUE.
+  put-back from "When the run stops". If that check returns TRUE, they run the put-back. If it
+  doesn't, they run only the put-back's check (its `SHOW VERSIONS` and `SELECT`): TRUE means the
+  live version already holds the current spec, so there is nothing to put back. Otherwise the
+  live version holds some other spec, or the checks couldn't read it, and the put-back overwrites
+  whatever it holds now, which may be someone else's edits: they decide whether to run it.
 - End with the rollback, naming the default version from step 1. If they stop after the fix's
   `COMMIT` lands and before the release check returns TRUE, they check in `SHOW VERSIONS` which
   version is the default, and run the rollback only if it is the fix's version.
@@ -352,7 +356,7 @@ A `COMMIT` that returns an error, such as a timeout, may still have landed. Comp
 `SHOW VERSIONS` with the list you kept. A new named version with this commit's comment means it
 landed, whatever the error said: go on with that version. No new named version means it didn't
 land: stop. Anything else, including a `SHOW VERSIONS` that fails, means you don't know: stop,
-write nothing more, and say so.
+and say so. "When the run stops" reads `SHOW VERSIONS` again before writing anything.
 
 Whatever the default, check the new version holds `new.json`. Under a `LAST` default with
 nothing pinned (**apply and release** on an agent whose default was never set), the fix is
@@ -417,7 +421,13 @@ after a stop.
   FROM TABLE(RESULT_SCAN(LAST_QUERY_ID())) WHERE "name" IS NULL OR "name" = '';
   ```
 
-  If either check isn't TRUE, write nothing more: someone else may be editing the live version.
+  If the first check isn't TRUE, run only the put-back's check (its `SHOW VERSIONS` and
+  `SELECT`). If that is TRUE, the live version already holds the current spec: nothing to
+  recover. Otherwise don't put anything back. Either the live version holds a spec that is
+  neither, because the `MODIFY` stored something else (a lost escape, say) or someone else is
+  editing it, or the checks couldn't read it. You can't tell which, so it's the user's call:
+  give them the put-back and its check in the report. If the put-back ran and its check isn't
+  TRUE, write nothing more.
 - **After the fix's `COMMIT` landed:** read the default now, with `DESCRIBE AGENT` and
   `SHOW VERSIONS`. If the default is the new version and the release check hasn't returned TRUE,
   run the rollback from "Tell the user", then check the default holds `current.json`, as in the
@@ -425,7 +435,9 @@ after a stop.
 - **You don't know whether the fix's `COMMIT` landed:** read `SHOW VERSIONS` again now and compare
   it with the list you kept before the commit. A new named version with the fix's comment means
   it landed, and no new named version means it didn't: recover as in the branch above that
-  applies. Only if `SHOW VERSIONS` still fails, write nothing more.
+  applies. Anything else, such as a new version with a different comment or a `SHOW VERSIONS`
+  that still fails, means you still don't know: write nothing more, and put the versions you
+  read in the report so the user decides.
 
 **2. Report** what the agent holds after recovery, from `DESCRIBE AGENT` and `SHOW VERSIONS` read
 now, not from what you meant to do:
@@ -434,7 +446,14 @@ now, not from what you meant to do:
 - which versions this run committed (the unchanged copy counts), and whether the fix is one;
 - if the fix's version failed its check, how its spec differs from `new.json`, or that it
   couldn't be read;
-- what the live version holds, if there is one.
+- what the live version holds, if there is one;
+- if you didn't put the current spec back because the live version held neither `new.json` nor
+  the current spec, or the checks couldn't read it: which of the two it was, then the put-back
+  and its check from "Recover", with every spec as the one-line print of its file. Say
+  that callers that ask for the live version get its spec now, and that the next run stops at
+  the live version check until it holds the current spec again. Say the put-back overwrites
+  whatever the live version holds, including anyone else's edits, so they should run it only
+  if they know no one else is editing the agent.
 
 If the fix's version is committed but isn't the default, say a later run will list it as waiting
 to be released, and that they can drop it. If you don't know whether the fix's `COMMIT` landed,

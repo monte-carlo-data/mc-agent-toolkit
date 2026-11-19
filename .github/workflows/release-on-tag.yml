@@ -5,13 +5,23 @@ on:
     branches: [main]
     paths:
       - 'plugins/claude-code/.claude-plugin/plugin.json'
+  # Re-publish the CoCo Desktop build of an existing release tag (retry after a failure).
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing release tag to publish to the coco-desktop branch, e.g. v1.32.0'
+        required: true
 
 permissions:
   contents: write
 
 jobs:
   release:
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.version.outputs.changed }}
+      tag: ${{ steps.version.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -31,12 +41,68 @@ jobs:
             echo "No version change detected"
           fi
 
+      # Safe to re-run: an existing tag at this commit is kept, a GitHub Release is only
+      # created if missing. A tag at a different commit fails the run.
       - name: Create tag and GitHub Release
         if: steps.version.outputs.changed == 'true'
         run: |
-          git tag "$TAG"
-          git push origin "$TAG"
-          gh release create "$TAG" --generate-notes --latest
+          EXISTING=$(git ls-remote origin "refs/tags/$TAG^{}" "refs/tags/$TAG" | awk '{print $1}' | tail -1)
+          if [[ -z "$EXISTING" ]]; then
+            git tag "$TAG"
+            git push origin "$TAG"
+          elif [[ "$EXISTING" != "$GITHUB_SHA" ]]; then
+            echo "::error::$TAG already exists at $EXISTING, not $GITHUB_SHA"
+            exit 1
+          fi
+          # GitHub marks a new release Latest unless told otherwise, so a retried older
+          # release would take Latest from a newer one. Mark it Latest only if its version is
+          # the highest released. If the list can't be read, the step fails rather than guess.
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            RELEASED=$(gh release list --limit 1000 --exclude-drafts --exclude-pre-releases --json tagName -q '.[].tagName')
+            HIGHEST=$(printf '%s\n' "$RELEASED" "$TAG" | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)
+            MAKE_LATEST=false
+            if [[ "$HIGHEST" == "$TAG" ]]; then
+              MAKE_LATEST=true
+            fi
+            gh release create "$TAG" --generate-notes --latest="$MAKE_LATEST"
+          fi
         env:
           TAG: ${{ steps.version.outputs.tag }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Publishes plugins/cortex-code in CoCo Desktop's format to the coco-desktop branch and
+  # tags it coco-desktop-v<version>. This must be a job here: the tag pushed above uses
+  # GITHUB_TOKEN, which does not trigger other workflows.
+  publish-coco-desktop:
+    needs: release
+    if: >-
+      !cancelled() &&
+      (github.event_name == 'workflow_dispatch' ||
+       (needs.release.result == 'success' && needs.release.outputs.changed == 'true'))
+    runs-on: ubuntu-latest
+    concurrency:
+      group: coco-desktop-publish
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Publish CoCo Desktop build
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch --tags --force origin
+          if [[ "$EVENT" == "push" ]]; then
+            python3 scripts/publish_coco_desktop.py "$TAG" --expect-sha "$GITHUB_SHA"
+          else
+            # A manual run publishes any tag it's given; only tags already on main qualify.
+            python3 scripts/publish_coco_desktop.py "$TAG" --require-ancestor origin/main
+          fi
+        env:
+          EVENT: ${{ github.event_name }}
+          TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || needs.release.outputs.tag }}

@@ -121,6 +121,7 @@ jobs:
               "plugins/*/package.json",
               "plugins/*/.mcp.json",
               "plugins/*/mcp.json",
+              "plugins/*/hooks/hooks.json",
               "plugins/*/hooks/*/hooks.json",
               "plugins/claude-code/evals/*/trigger-evals.json",
               "plugins/claude-code/evals/*/*.json",
