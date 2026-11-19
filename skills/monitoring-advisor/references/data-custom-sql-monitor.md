@@ -1,0 +1,231 @@
+# Custom SQL Monitor Reference
+
+Detailed reference for building `create_or_update_sql_monitor` tool calls. The tool follows the **two-call preview-then-confirm pattern** — see `data-monitor-creation.md` for the full flow.
+
+## Critical Constraints
+
+- **NEVER guess column names.** Always verify column names from `get_asset` before referencing them in SQL queries. A typo or assumed column name causes the monitor to fail on every scheduled run.
+
+---
+
+## When to Use
+
+Use a custom SQL monitor when the user wants to:
+
+- Run a specific SQL query and alert on its result
+- Implement cross-table logic (joins, subqueries, CTEs)
+- Apply business-specific aggregations or calculations that don't map to a single metric
+- Monitor a condition that spans multiple columns or tables
+- Use a SQL query they already have in mind
+
+---
+
+## The Universal Fallback
+
+Custom SQL is the fallback monitor type. Reach for it whenever another monitor type cannot express what the user needs:
+
+- **Validation monitor won't work** because the column doesn't exist yet, or the logic requires joins across tables.
+- **Metric monitor can't express the business logic** -- for example, a ratio between two columns, a conditional aggregation, or a calculation that spans multiple tables.
+- **Cross-table joins are needed** -- metric and validation monitors operate on a single table. If the check requires data from two or more tables, custom SQL is the only option.
+- **The user already has a SQL query** -- don't force it into another monitor type. Wrap it in a custom SQL monitor.
+
+If you find yourself contorting another monitor type to fit the user's intent, stop and use custom SQL instead.
+
+---
+
+## Required Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `name` | string | Unique identifier for the monitor. Use a descriptive slug (e.g., `orphan_orders_check`). |
+| `description` | string | Human-readable description of what the monitor checks. |
+| `warehouse` | string | Warehouse name or UUID where the SQL query will be executed. |
+| `sql` | string | SQL query that returns a **single numeric value** (one row, one column). |
+| `alert_condition` | object | When the monitor should fire (see Alert Conditions below). Singular — the tool takes exactly one condition object, not an array. |
+
+## Optional Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `domain_uuids` | array of string (uuid) | Domain UUIDs (use `get_domains` to list). Data monitors accept exactly one UUID in the list. |
+| `query_result_type` | string | What the SQL query returns — see the tool's enum for accepted values (single numeric is the most common). |
+| `custom_sampling_sql` | string | Optional SQL used to sample rows that contributed to the result (shown in alert detail). |
+| `variable_definitions` | object | Named variables that can be referenced in `sql` / `custom_sampling_sql`. |
+| `schedule_type` | string | Schedule type: `"fixed"` (default), `"dynamic"`, `"manual"`. |
+| `interval_minutes` | int | Schedule interval in minutes (only for `schedule_type="fixed"`). |
+| `audiences` | array of string | Notification audience **names** (not UUIDs) to alert when the monitor triggers. |
+| `failure_audiences` | array of string | Notification audience names to alert on query execution failures. |
+| `notes` | string | Free-text notes shown in the UI (separate from `description`). |
+| `priority` | string | Monitor priority (e.g. `"P1"`, `"P2"`). |
+| `tags` | array of `{name, value}` | Key-value tags to attach. |
+| `is_draft` | bool | When `True`, saves the monitor as a draft (not active). Default `False`. |
+| `monitor_uuid` | string (uuid) | UUID of an existing monitor to update in place. Omit to create a new monitor. **PUT semantics:** the call fully replaces the monitor's configuration — fields you omit revert to tool defaults, they are NOT left untouched. Before editing, read the current config with `get_monitors(monitor_ids=[<uuid>], include_fields=["config"])` and re-pass every field you want to keep. See `data-monitor-creation.md` (Step 7) for the safe-edit workflow. |
+| `dry_run` | bool | Default `True`. Preview mode. When omitted or `True`, returns YAML preview in `result.yaml`. When `False`, actually creates/updates the monitor and returns `result.monitor_uuid` + a deep link in `result.instructions`. See `data-monitor-creation.md`. |
+
+---
+
+## Alert Conditions
+
+Field names inside `alert_condition` are snake_case (`threshold_value`, `threshold_sensitivity`, `baseline_agg_function`, ...).
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `operator` | string | Yes | One of: `EQ`, `NEQ`, `LT`, `LTE`, `GT`, `GTE`, `OUTSIDE_RANGE`, `INSIDE_RANGE`, `AUTO`, `AUTO_HIGH`, `AUTO_LOW`, `NOOP`. Note: the inequality operator is `NEQ` (not `NE`). |
+| `threshold_value` | number | For explicit operators | Numeric threshold to compare the query result against. Pair with `GT`, `GTE`, `LT`, `LTE`, `EQ`, `NEQ`. |
+| `type` | string | No | Comparison semantics — see Threshold types below. Default: `threshold`. |
+
+### Threshold types
+
+| `type` | Behavior | Fields (in addition to `operator`) |
+|---|---|---|
+| `threshold` (default) | Compare the query result directly against a fixed value. | `threshold_value` |
+| `dynamic_threshold` | ML anomaly detection on the query result. | `operator` = `AUTO` / `AUTO_HIGH` / `AUTO_LOW`; optional `threshold_sensitivity` (`low` / `medium` / `high`, default `medium`) |
+| `change` | Compare the query result against a recent baseline (e.g. 2-day rolling MAX). | `threshold_value`, `baseline_agg_function`, `baseline_interval_minutes`, `is_threshold_relative` |
+| `noop` | Collect data without alerting. | `operator` = `NOOP`, no threshold |
+
+**`change`-type fields:**
+
+- `baseline_agg_function` — how to aggregate baseline samples. One of: `AVG`, `MIN`, `MAX`. Backend rejects anything else: `Must be one of: AVG, MIN, MAX.`
+- `baseline_interval_minutes` — lookback window for the baseline, in minutes (e.g. `1440` = last 24h). Required with `type="change"`; the backend accepts up to `129600` (90 days).
+- `is_threshold_relative` — `true` if `threshold_value` is a percentage (relative to baseline), `false` if it is an absolute delta. Defaults to `false`.
+
+Omitting these on a `change`-type condition produces stacked `required` / `Aggregate function is required` / `Lookback Interval in minutes should be between 0 and 129600` backend errors.
+
+### Operator and type pairing
+
+Not every operator is accepted for every threshold type. The default `threshold` type only supports: `EQ`, `NEQ`, `LT`, `LTE`, `GT`, `GTE`, `OUTSIDE_RANGE`, `INSIDE_RANGE`. Pair `INSIDE_RANGE` / `OUTSIDE_RANGE` with `lower_threshold` + `upper_threshold` instead of `threshold_value`.
+
+If the user is unsure what threshold to set, help them reason about it: "What value would indicate a problem? If the query returns X, should that fire an alert?"
+
+---
+
+## SQL Query Requirements
+
+The SQL query MUST return exactly **one row with one numeric column**. This is non-negotiable -- the monitor compares that single value against the alert conditions.
+
+### Rules
+
+- Use aggregate functions: `COUNT(*)`, `SUM()`, `AVG()`, `MAX()`, `MIN()`, or similar.
+- Can reference any table, view, or materialized view accessible in the warehouse.
+- Can use joins, subqueries, CTEs, window functions -- any valid SQL.
+- Do **NOT** include trailing semicolons.
+- Do **NOT** include comments (`--` or `/* */`) -- some warehouses strip them inconsistently.
+
+### SQL Validation Tips
+
+These are the most common mistakes that cause custom SQL monitors to fail or produce misleading results:
+
+1. **Handle NULLs with COALESCE.** If your aggregate could return NULL (e.g., `SUM(amount)` on an empty result set), wrap it: `SELECT COALESCE(SUM(amount), 0) FROM ...`. A NULL result cannot be compared against a threshold and will not trigger alerts.
+
+2. **Ensure exactly one row, one column.** If your query could return zero rows (e.g., a filtered `SELECT` with no `GROUP BY`), wrap it in an outer aggregate: `SELECT COUNT(*) FROM (SELECT ...) sub`. If it returns multiple columns, select only the one you need.
+
+3. **Test the query mentally.** Before finalizing, ask: "If this query returns 5, will the alert condition fire correctly?" Walk through the logic with a concrete number.
+
+4. **For time-windowed checks, use appropriate date functions.** SQL syntax for date arithmetic varies by warehouse (see Warehouse-Specific SQL Notes below). Always scope time windows to avoid scanning the entire table history.
+
+5. **Avoid non-deterministic results.** Queries using `LIMIT` without `ORDER BY`, or `RANDOM()`, produce unpredictable results that make alerting unreliable.
+
+---
+
+## Warehouse-Specific SQL Notes
+
+SQL syntax for date arithmetic and functions varies across warehouses. When writing time-windowed queries, use the correct syntax for the user's warehouse:
+
+| Operation | Snowflake | BigQuery | Redshift |
+|-----------|-----------|----------|----------|
+| Subtract 1 day from now | `DATEADD(day, -1, CURRENT_TIMESTAMP())` | `DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL 1 DAY)` | `DATEADD(day, -1, GETDATE())` |
+| Subtract 1 hour from now | `DATEADD(hour, -1, CURRENT_TIMESTAMP())` | `TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 1 HOUR)` | `DATEADD(hour, -1, GETDATE())` |
+| Current timestamp | `CURRENT_TIMESTAMP()` | `CURRENT_TIMESTAMP()` | `GETDATE()` |
+| Date truncation | `DATE_TRUNC('day', col)` | `DATE_TRUNC(col, DAY)` | `DATE_TRUNC('day', col)` |
+
+When unsure which warehouse the user is on, ask. Getting the syntax wrong causes the monitor to fail on every scheduled run.
+
+---
+
+## Examples
+
+### Orphan records (GT 0)
+
+Alert when orders reference customers that don't exist.
+
+```json
+{
+  "name": "orphan_orders_check",
+  "description": "Detect orders referencing non-existent customers",
+  "warehouse": "production_snowflake",
+  "sql": "SELECT COUNT(*) FROM analytics.core.orders o LEFT JOIN analytics.core.customers c ON o.customer_id = c.id WHERE c.id IS NULL",
+  "alert_condition": {
+    "operator": "GT",
+    "threshold_value": 0
+  }
+}
+```
+
+### Daily revenue floor (LT threshold)
+
+Alert when total revenue for the past 24 hours drops below a minimum.
+
+```json
+{
+  "name": "daily_revenue_floor",
+  "description": "Alert when daily revenue falls below $10,000",
+  "warehouse": "production_snowflake",
+  "sql": "SELECT COALESCE(SUM(amount), 0) FROM analytics.billing.transactions WHERE created_at >= DATEADD(day, -1, CURRENT_TIMESTAMP())",
+  "alert_condition": {
+    "operator": "LT",
+    "threshold_value": 10000
+  }
+}
+```
+
+### Duplicate rate exceeds threshold
+
+Alert when the duplicate rate on a key field exceeds 1%.
+
+```json
+{
+  "name": "order_id_duplicate_rate",
+  "description": "Alert when order_id duplicate rate exceeds 1%",
+  "warehouse": "production_snowflake",
+  "sql": "SELECT COALESCE(1.0 - (COUNT(DISTINCT order_id) * 1.0 / NULLIF(COUNT(*), 0)), 0) FROM analytics.core.orders WHERE created_at >= DATEADD(day, -1, CURRENT_TIMESTAMP())",
+  "alert_condition": {
+    "operator": "GT",
+    "threshold_value": 0.01
+  }
+}
+```
+
+### Range check (OUTSIDE_RANGE)
+
+Alert when a value falls outside an acceptable range. A two-sided range is a single condition with `lower_threshold` + `upper_threshold`, not two separate conditions.
+
+```json
+{
+  "name": "avg_order_amount_range",
+  "description": "Alert when average order amount is outside the $20-$500 range",
+  "warehouse": "production_snowflake",
+  "sql": "SELECT COALESCE(AVG(amount), 0) FROM analytics.core.orders WHERE created_at >= DATEADD(day, -1, CURRENT_TIMESTAMP()) AND status = 'completed'",
+  "alert_condition": {
+    "operator": "OUTSIDE_RANGE",
+    "lower_threshold": 20,
+    "upper_threshold": 500
+  }
+}
+```
+
+### Cross-table freshness check (BigQuery syntax)
+
+Alert when the latest row in a downstream table is more than 2 hours behind the source.
+
+```json
+{
+  "name": "pipeline_lag_check",
+  "description": "Alert when downstream table lags source by more than 2 hours",
+  "warehouse": "production_bigquery",
+  "sql": "SELECT COALESCE(TIMESTAMP_DIFF(s.max_ts, t.max_ts, MINUTE), 9999) FROM (SELECT MAX(event_timestamp) AS max_ts FROM project.raw.events) s CROSS JOIN (SELECT MAX(processed_at) AS max_ts FROM project.analytics.events_processed) t",
+  "alert_condition": {
+    "operator": "GT",
+    "threshold_value": 120
+  }
+}
+```

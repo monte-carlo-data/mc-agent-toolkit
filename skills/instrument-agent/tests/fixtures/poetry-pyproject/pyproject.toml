@@ -1,0 +1,15 @@
+[tool.poetry]
+name = "my-agent"
+version = "0.1.0"
+description = "Sample Poetry project for detect_libraries fixture"
+authors = ["Test <test@example.com>"]
+
+[tool.poetry.dependencies]
+python = ">=3.10"
+langchain = "^0.1.0"
+openai = "^1.10.0"
+crewai = "^0.30.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

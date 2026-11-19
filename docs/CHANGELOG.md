@@ -1,0 +1,427 @@
+# Changelog
+
+All notable changes to the Monte Carlo Agent Toolkit plugin for Snowflake Cortex Code will be documented in this file.
+
+Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [1.32.0] - 2026-11-19
+
+### Added
+
+- Cortex Code: CoCo Desktop install. Each release publishes a copy of the plugin that is already in CoCo Desktop's format to the `coco-desktop` branch and tags it `coco-desktop-v<version>`. Install it with **Add from GitHub** and update it with **Sync**; CoCo installs it without rewriting it. `scripts/build_coco_desktop.py` builds the copy and `scripts/publish_coco_desktop.py` publishes it from the release workflow.
+
+### Fixed
+
+- Cortex Code: hooks load and fire in CoCo Desktop. They now live in one `hooks/hooks.json` at the plugin root, because Desktop 2.0.0 ignored the manifest's list of hook files, and their matchers use Cortex's lowercase tool IDs (`^bash$`, `^(edit|write|multi_edit)$`, `^skill$`), because matching is case-sensitive and the PascalCase matchers never fired in Desktop. Hook commands now quote the plugin root, so install paths with spaces work.
+- reinforce-agent: when a run stops after setting the fix on a Cortex agent's live version, and the live version holds neither the fix as written (a lost escape, say) nor the current spec, or can't be read, the report now gives the user the statement that puts the current spec back, with its check, and says it overwrites whatever the live version holds, so the user decides. Before, the run left the live version holding neither spec and gave no way back. The SQL printed for someone else to run says the same.
+- reinforce-agent: when it isn't known whether the fix's `COMMIT` landed, the run no longer says to write nothing more; it stops and lets "When the run stops" read the versions again and recover, as that section already described. If they still don't show whether it landed, it writes nothing and reports them.
+
+## [1.31.0] - 2026-11-19
+
+### Changed
+
+- tune-monitor: starts from Monte Carlo's tuning agent. With no monitor named, it lists the monitors with a pending suggestion (`get_monitor_tuning_suggestions`). For one monitor, it reads the stored analysis or previews with `tune_monitor`, and applies only the changes the user approves. A stored analysis counts as current only while the monitor is on the pending list with the same `run_uuid` and nothing was retuned since; otherwise it previews again and asks again. Monitors managed as code are never applied. Its own report analysis is the fallback when the agent cannot analyze the monitor.
+- remediation: reuses an existing troubleshooting result instead of starting a new run, and reuses the alert's triage verdict instead of calling `alert_assessment`. It follows the remediation plan from `get_remediation_instructions` and its destinations, and asks before running any check or step from the plan. Monitor tuning from a plan goes through tune-monitor's apply step. It reads the plan's `assessment`: while the plan waits for evidence it does not close, mark or fix the alert, and it does not repeat an action Monte Carlo already took.
+- incident-response: reads the alert's triage verdict, troubleshooting result and remediation plan before running anything, reports them, and offers the missing step instead of running it unasked (`references/prior-agent-work.md`).
+- asset-health, prevent: show each alert's triage verdict from `get_alerts` (`triage_priority`).
+- context-detection: routes monitor noise to tune-monitor and "how do I fix this alert" to remediation.
+- evals: routing cases for tune-monitor, remediation, incident-response and context-detection, and trigger evals for tune-monitor and remediation.
+
+## [1.30.0] - 2026-11-18
+
+### Added
+
+- reinforce-agent: starts from one issue handed over from Monte Carlo, an agent health issue link, or a prompt naming `agent_name`, `trace_table_mcon` and `issue_uuid`, and reads it with `get_reinforcement_loop_report(issue_uuid=...)`.
+- reinforce-agent: fixes a Snowflake Cortex agent by committing a new agent version instead of opening a pull request. `scripts/patch_agent_spec.py` builds the new specification from the current one and a merge patch, and reports every changed path, so the spec is never retyped. It checks first that the session's roles can change the agent; when they can't, it prints complete SQL for someone who can. Before writing it checks the agent hasn't changed, and before committing that the new version holds exactly the new spec. When the user wants to test before releasing, it pins the default version before any write, and it runs one statement at a time, so no commit can release the fix early. On an agent whose only committed version is `VERSION$1`, which Snowflake serves from the live version, it first commits the live version unchanged, so production never sees an edit before release. When a committed version is waiting to be released, it lists each with its comment and offers to release it, drop it, or stop. If a run stops after pinning the default, it says so and how to restore it. It reads the current spec from the default version in `SHOW VERSIONS`, since `DESCRIBE AGENT` can return an empty spec on an agent with no live version. It names the agent in full in every statement, checks the session can change the agent before offering any write, and, if a run stops while the live version holds an uncommitted fix, puts the current spec back. After a `COMMIT` error it checks `SHOW VERSIONS` for a new version before treating the commit as failed, and it checks the committed version holds the new spec before offering a release. If a run stops, it recovers first (puts the old spec back, or rolls back a fix that is already live but unchecked), then reports what the agent holds. Before offering to release or drop a version waiting to be released, it shows what that version would change, with the script's new `--compare` mode. The change report names each changed item inside an array, such as one tool's description, and marks a field that was added or removed.
+- reinforce-agent: after the user confirms the fix is released, marks the issue fixed with `update_reinforcement_loop_issue` (`MARK_FIXED`), passing the pull request when there is one. A fix not yet released can be marked in progress (`MARK_IN_PROGRESS`).
+- reinforce-agent: picks how to land a fix from the agent's `backend_class`, not its trace table MCON.
+
+## [1.29.9] - 2026-11-18
+
+### Changed
+
+- onboarding: name the any-platform `get_collection_agent`, `delete_collection_agent`, `get_collection_data_store` and `delete_collection_data_store` tools in place of the per-platform ones the MCP server no longer has, and regenerate the API reference (adds Hive credentials)
+
+## [1.29.8] - 2026-11-11
+
+### Changed
+
+- Skills read tables with `get_asset` instead of `get_table`. Columns and monitoring capabilities are asked for with `include=["fields", "capabilities"]`.
+- Live evals expect `get_asset`. Tool names in eval criteria now match exactly, so `get_asset` no longer matches `get_asset_lineage`; a name ending in `_` is still a prefix.
+
+## [1.29.7] - 2026-11-06
+
+### Changed
+
+- onboarding: credentials of any kind are read with `get_credentials` and deleted with `delete_credentials`, by id. The MCP server no longer serves the per-type `get_<type>_credentials` and `delete_<type>_credentials` tools.
+- onboarding: supported types come from `list_connection_types`. A type can use a self-hosted reference when it lists stores in `self_hosted_credentials_storages`, and Monte Carlo can store its credentials when it has an `mc_managed_credentials_operation`. That create is an MCP tool when `mc_managed_credentials_secret` is false (Glue, Athena), and a CLI or Terraform step otherwise. `parent` and `warehouse_type` say what the connection goes on, which replaces the rule that settled a non-warehouse type from existing connections, the docs or a `create_warehouse` refusal.
+- onboarding: built-in ETL tools such as Fivetran and Airflow are handed off to the UI.
+- onboarding: a type with `requires_one_of_connection_types`, such as the Databricks SQL warehouse, gets one of those connections on its warehouse first.
+- onboarding: live evals updated to match; `unmapped-connection-type-settled-by-api` is now `connection-type-mapped-from-list`, and a new case covers a Glue connection planned with `create_glue_credentials`.
+
+## [1.29.6] - 2026-11-06
+
+### Changed
+
+- account-analytics: reads the docs with the MCP server's `get_account_analytics_docs` tool (the page list, or one page as Markdown by its slug), which returns the same pages as the Monte Carlo docs. When the tool is missing or fails, it fetches the `.md` pages from the docs site as before.
+
+## [1.29.5] - 2026-11-04
+
+### Changed
+
+- account-analytics: the user picks the dashboard format again. With none named, the skill asks once, the recommended format first (in a chat app, the app's saved page such as a Claude artifact; in a coding agent, an HTML file), and builds the recommended one if the reply names none. Replaces "builds the HTML file without asking first" from 1.29.4.
+- account-analytics: a pace divides by the time the data covers; the "No domain" row is the account metric minus the per-grouping metric without its grouping; doc pages are fetched verbatim.
+
+## [1.29.4] - 2026-11-04
+
+### Changed
+
+- account-analytics: the Analytics API tools are live, so the draft note is gone.
+- account-analytics: reads the docs as Markdown (`.md` pages); totals come from the account metric, with a "No domain" row; shares are of the total; large lists are split, not dropped; a pace counts up to `data_as_of`; "build a dashboard" builds the HTML file without asking first; the matching example and Dashboard style are read before every dashboard.
+- Regenerated the API v2 tools from api-codegen.
+
+## [1.29.3] - 2026-11-04
+
+### Changed
+
+- analyze-root-cause, monitoring-advisor, remediation: call `get_queries` instead of `get_queries_for_table`, the MCP tool's new name. It also reads the queries an ETL job ran. Query examples now pass the required `start_time` and `end_time`.
+
+## [1.29.2] - 2026-10-30
+
+### Changed
+
+- tune-monitor: daily agent cost monitors (`SUM` on `total_cost`, `AUTO_HIGH`, fixed daily schedule) keep those settings when tuned; sensitivity is the only detection setting that can change, while audience and notification routing remain supported. Noise reduction lowers sensitivity one step; explicit requests to increase it are still supported. Cortex edits omit `trace_table`, and the report has a no-change outcome when neither detection nor notification settings need changing. Other agent metrics keep their existing tuning guidance.
+
+- tune-monitor: agent metric edits explicitly preserve alert and run-failure recipients, including audience conditions and empty lists, unless a routing change is approved.
+
+## [1.29.1] - 2026-10-28
+
+### Changed
+
+- tune-monitor: a judge-criteria rewrite of an agent evaluation prompt keeps its sections and defines every score of a numeric scale on its own line.
+- monitoring-advisor: agent evaluation prompt templates and examples use the sectioned template structure (role, evaluation criteria, input, instructions with one line per score, answer format).
+
+## [1.29.0] - 2026-10-22
+
+### Added
+
+- onboarding: Terraform can create the Snowflake service user too. When the customer asks for it, the onboarding Terraform adds the `snowflakedb/snowflake` provider and creates user `MONTE_CARLO` (`TYPE=SERVICE`), role `MONTE_CARLO_ROLE`, warehouse `MONTE_CARLO_WH` and the grants from https://docs.getmontecarlo.com/docs/snowflake: `IMPORTED PRIVILEGES` on `SNOWFLAKE`, and grants on existing and future schemas and objects in each database the customer names. The skill proposes the docs' names. Terraform signs in to Snowflake as the customer's admin through a key file path. The customer generates the service user's key pair with `openssl`, and Terraform reads both files by path. The private key reaches the agent's Secrets Manager secret only through `secret_string_wo`, never state; `tls_private_key` is not used. The checklist asks for the future-grants check output (schemas and object types only) and flags row access policies.
+- onboarding: the generated Terraform for the Snowflake service user, agent and connection is applied once. The connection is validated right after the apply. Preconditions stop an encrypted or PKCS#1 private key, or a non-PEM public key, at plan. The secret's version is derived from the public key, so rotating the key pair re-sends the private key in the same apply. User, role and warehouse names are variables, with the docs' names proposed.
+- evals: `terraform-snowflake-service-user-end-to-end` checks the plan and the key handling.
+
+## [1.28.1] - 2026-10-20
+
+### Changed
+
+- onboarding: Terraform for an AWS collection agent or AWS data store reads Monte Carlo's AWS account from the provider's `montecarlo_hosting_private_link` data source, so the skill no longer asks for the Collection AWS account ID on those paths. The agent passes `aws.account_id` to the `mcd-agent` module's `cloud_account_id`; the data store role trusts `arn:aws:iam::<account>:root` with it, and AWS-only data store Terraform keeps the `montecarlo` provider for this data source. The provider block requires `>= 0.1.27`, the first version with the data source, so an older locked provider fails with a version constraint error. The `monte_carlo_collection_account_id` and `mcd_account_id` variables are gone. CloudFormation and CLI steps still take the account from Account information.
+
+## [1.28.0] - 2026-10-13
+
+### Added
+
+- onboarding: custom connectors over the REST API v2 tools. The skill finds the type with `list_custom_connector_types` and puts it on its agent's deployment: a `custom-etl-connector` ETL container, a `custom-bi-connector` BI container, or a `custom-integration` warehouse. It references self-hosted credentials with the custom type as `connection_type`, then creates and validates the connection. A push-only ETL or BI connector gets a container with no deployment and a connection with no credentials, and its ingestion key is a CLI or Terraform step (`montecarlo integration-keys create ingestion`, `montecarlo_ingestion_key`). Refusals such as `custom_connector_has_no_agent` and `custom_connector_deployment_mismatch` are explained in plain language. New live and trigger evals.
+
+## [1.27.1] - 2026-10-07
+
+### Changed
+
+- onboarding: the Python script output mode imports the REST API v2 SDK as `pycarlo2`, its settled name for both the PyPI distribution and the import (was the provisional `montecarlo`). The `montecarlo` CLI commands are unchanged. Static test stubs follow.
+
+## [1.27.0] - 2026-10-06
+
+### Added
+
+- onboarding: **BI tools** (Tableau, Looker, Looker git clone, Power BI). Their connections go on a **BI container** (`create_bi_container`, Step 3b), never a warehouse; one `looker` container holds both the Looker API and the LookML repository connection. Discovery and the inventory include BI containers. BI credentials are managed types created by a CLI or Terraform step (`montecarlo credentials create tableau|looker|looker-git-clone|power-bi`, `montecarlo_<type>_credentials` with `<field>_wo`), or a self-hosted reference read by a collection agent. `reference/connection-inputs.md` lists each type's inputs, including Tableau's three exclusive sign-in methods and Power BI's `auth_mode`; `reference/output-modes.md` has the Terraform and CLI steps. Replaces the 1.26.5 note that BI tools are connected in the UI. Live eval `bi-integration-not-served` becomes `bi-tableau-on-a-bi-container`; new static tests and trigger cases.
+
+## [1.26.5] - 2026-10-01
+
+### Changed
+
+- onboarding: fixes from running the onboarding scenarios across models. **A credentials pass does not rule out IAM** (`reference/troubleshooting.md`): the agent keeps a recently read secret for a few minutes, so removed access can show as "credentials valid, no warning" plus "Could not connect"; run the per-secret simulator before network checks, and re-validate a few minutes after an IAM change. **Policy edits compare normalised JSON** (`diff <(jq -S . …) <(jq -S . …)`). **Single-ARN simulator** uses the same query (`EvalResourceDecision` exists only per resource). New **Revoke the agent's access to one secret** (`reference/output-modes.md`): read the policy, delete only a policy that grants just that secret, check the result. **Grant handover** (SKILL.md) uses the output-modes commands as written. **Never repeat a pasted secret**, not even to ask for rotation. **BI tools** (`reference/connection-inputs.md`): not created by these tools; connected in the UI. New live eval `bi-integration-not-served`; static tests for each rule.
+
+## [1.26.4] - 2026-10-01
+
+### Changed
+
+- onboarding: fixes from scenario S6. **Ask how an existing resource was created before deleting it** (`SKILL.md` Step 6): Monte Carlo does not record whether Terraform, the CLI, the UI or an earlier run created a resource, so for anything the run did not create, ask before offering a delete tool; a Terraform-managed resource is removed by Terraform, since deleting it through Monte Carlo leaves the state behind and the next apply creates it again. New **Remove what Terraform manages** (`reference/output-modes.md`): a state check (`terraform state list -id`) that prints the managing address, never the state, and the remove-block → plan → apply steps (or `state rm` to stop managing it). **One Terraform version floor**: every Terraform artifact, including one with only AWS resources, starts from the shared `terraform` block (`>= 1.11`). New live eval `delete-existing-asks-provenance`; static tests for both rules.
+
+## [1.26.3] - 2026-09-30
+
+### Changed
+
+- onboarding: fixes from scenarios S4 and S14. **Removing an AWS agent** (`reference/output-modes.md`): Monte Carlo cleanup order first, then empty the agent's versioned bucket of every object version and delete marker (a tested loop; `list-objects-v2` doesn't show them and `terraform destroy` / `delete-stack` fail with `BucketNotEmpty`), confirm the bucket and exact stack name, and expect 15–40 minutes for a VPC agent's stack delete; Step 6 points to it. **Brace rule** now covers brackets: zsh reads `$VAR[…]` as an array subscript. **Duplicate collection** (Step 3): warn before creating a second connection to an already-connected account, host, secret or managed identity, and offer reuse or name the old connection to remove. **Polling**: read `get_validation_run` again directly; at most a ~3 s pause, never longer or repeated `sleep`. New live evals `remove-agent-plan`, `duplicate-connection-warning`.
+
+## [1.26.2] - 2026-09-30
+
+### Changed
+
+- onboarding: troubleshooting follow-up from the post-merge S13 verification (7 → 5 turns). `reference/troubleshooting.md` step 3 now carries the exact per-secret IAM simulator query (`ResourceSpecificResults` / `EvalResourceDecision`) and forbids the grouped `EvaluationResults[].[EvalResourceName,EvalDecision]` form with several ARNs; step 5 hands over a read-only loop that shows which inline policy grants which secret before any edit, so a fix is no longer built on the assumption that the failing grant sits next to a working one. Both snippets run in bash and zsh against a real role. The `troubleshoot-failed-connection` live eval fails on the grouped query form.
+
+## [1.26.1] - 2026-09-30
+
+### Changed
+
+- onboarding: fixes from end-to-end scenario runs (dev, headless, Opus 5.5). **Terraform/SDK endpoint**: the provider example no longer hard-codes `https://api.getmontecarlo.com` (it overrode the profile's `mcd_api_endpoint` and sent keys to the wrong environment, "explicit deny"); it takes `var.montecarlo_endpoint` (null → profile), and the SDK example reads `MCD_API_ENDPOINT`; new offline tests guard both. **Rules for every command the customer runs** (`reference/output-modes.md`): never a command that reads a secret's value (not even `get-secret-value | jq keys`), short paste-safe lines with variables and parameter/policy files, `${VAR}` braces (zsh `$VAR:s` modifier), macOS-portable (no `date -d`). **AWS CLI section**: CloudFormation with a parameters file and names from the template, a separately named inline grant on the `ExecutionRole`, backup/`jq`/diff edits, and the IAM simulator per secret (`ResourceSpecificResults`). **Grant, then validate, then create** for self-hosted references. New **`reference/troubleshooting.md`** for a connection that stopped working (validate → compare a healthy connection on the same agent → agent access per secret → audit log between fixed UTC times → reviewed fix → support ids; agent logs are redacted and exception types aren't diagnostic). MySQL secrets have no `database` key; an empty new database fails the Tables check. Description mentions fixing connections. New live evals `troubleshoot-failed-connection`, `terraform-endpoint-not-hardcoded`, `agent-grant-before-validate`; trigger eval `should-17`.
+
+## [1.26.0] - 2026-09-29
+
+### Changed
+
+- onboarding: new opening. Step 0 now discovers the account's deployments, agents, data stores, warehouses and connections, shows the customer that inventory and what can be added, then asks what they want to connect (skipped when the request names it) and lets them lead; the rules and later steps keep applying to every turn. One run can onboard several integrations, sharing a compatible deployment, with a per-integration summary. Each integration is checked for support before any deployment or credential question. `reference/connection-inputs.md` gains a support section that says how to discover supported types from the session's tools instead of listing them: self-hosted references (via a collection agent) for every type `create_warehouse` can take a warehouse type from; Monte Carlo-managed credentials for each type with a `get_`/`delete_<type>_credentials` tool or listed by `montecarlo credentials create --help`; anything else to the UI. It states the credential options as the whole menu, notes that the credential choice can decide the deployment, and recommends the agent route when the customer can't run local commands, only when every remaining setup step is an MCP tool (an existing agent or a new AWS agent; not a new GCP, Azure or Generic agent). Managed credentials are generalized from the Snowflake key pair (now the worked example) to any managed type, with secret fields passed only as `@<path>`, `--<field>-prompt` or Terraform `<field>_wo`. Rule 6 is now tools first: a local step only when it carries a secret or its tool isn't served, offered as the mc-cli command and the Terraform resource side by side; the customer runs it, never the agent, even with a shell and a file path. Command adapters and README match. Fixed the mc-cli validate commands to `montecarlo credentials validate <type>` (was `validate-<type>-credentials`). A connection type that is not itself a warehouse `type` counts as supported only when an existing connection or the integration's docs page shows it; otherwise, on a reused deployment, `create_warehouse(connection_type=…)` settles it (a refusal creates nothing), and no new deployment is provisioned for it. New live eval `unmapped-connection-type-settled-by-api`. Skill description shortened to the 250-character limit. New live evals `bare-invocation-shows-inventory`, `multi-integration-support-check`, `managed-credentials-discovered-not-hardcoded`, `no-local-commands-recommends-agent` and `no-local-commands-new-gcp-agent`; new trigger evals `should-15` and `should-16`.
+
+## [1.25.7] - 2026-09-29
+
+### Changed
+
+- onboarding: rule 2 now covers a secret on disk as well as one pasted into the chat. When the user gives the path of a key or credential file on their machine, the agent never opens, lists, reads or inspects it with any tool (not even its first line to check the format), says so before anything else, and offers the routes the deployment allows: the customer stores the secret in their own secret store and gives its reference (collection agent only), or runs the mc-cli or Terraform step that reads the file locally. Step 2 and `reference/connection-inputs.md` say the key path is only for the customer's command, and that a path on the customer's machine is not a `create_file_credentials` path. New live eval `local-key-path-not-read`.
+
+## [1.25.6] - 2026-09-29
+
+### Changed
+
+- onboarding: the skill's introduction and its Tools table no longer say "REST API v2": the intro names the tools by what they manage (deployments, credentials, warehouses and connections) and the table header is "Tools". Restores the wording the mc-onboarding MCP prompt was first copied with.
+
+## [1.25.5] - 2026-09-28
+
+### Changed
+
+- onboarding: a new rule and `reference/connection-inputs.md` make every required input come from the customer or discovery before the first write, in every output mode. The reference lists the inputs per deployment, credential path and connection type, including inputs the API marks optional but the connection needs (the Snowflake warehouse) and the keys each connection type's self-hosted secret must carry, and says never to take example values as defaults. A credential field (account, user, warehouse, host, key path, secret reference) never gets a default value in any output mode: no Terraform `default`, no script fallback, no filled-in CLI placeholder, so a missing value fails at once and names the field instead of creating a connection that fails validation with an error that doesn't say which value was wrong. The Snowflake key-pair examples in `output-modes.md` read the account, user, warehouse and key path from variables and placeholders instead of `MONTE_CARLO` / `MONTE_CARLO_WH` / `xy12345.us-east-1`, which were being copied into generated Terraform and failed validation (`JWT token is invalid`, "No active warehouse selected"). The deployment, warehouse and connection names in the Terraform and CLI examples are variables and placeholders too. Step 1b warns that the Collection AWS account ID is never the account the agent runs in; Step 5 maps those validation errors back to the inputs. New live eval `terraform-missing-connection-inputs`.
+
+## [1.25.4] - 2026-09-25
+
+### Changed
+
+- onboarding: a new rule in the skill has Terraform artifacts take every secret write-only and never output generated ones; the Terraform examples pass every secret as a write-only argument (`<name>_wo` with `<name>_wo_version`), so it is never stored in state or a plan, and require Terraform 1.11 or later. The generic agent example writes its OAuth client secret to Secrets Manager write-only and points the EKS module at it (`oauth_secret`, `token_secret = { create = false }`) instead of passing it through `oauth_credentials`/`token_credentials`, which stored it a second time. Follows terraform-provider-montecarlo#23. The SDK example validates a credential reference and stops unless every validation passed before creating it, as the skill's Step 2 requires.
+
+## [1.25.3] - 2026-09-25
+
+### Changed
+
+- onboarding: the final step now validates the connection over MCP — `validate_connection`, then `get_validation_run` until the run completes — and reports each validation's result judged by `passed`, with what to do on a failure, a run that is still going or the per-account limit on concurrent runs; the pre-create credentials check reads its run the same way. The UI test remains only as a fallback when the session does not serve the validation tools
+- onboarding: the skill now explains to the user, the first time the flow reaches a credential, that Monte Carlo exposes no MCP tool that accepts or returns a secret, because anything a tool receives or returns is visible to the model; credentials are referenced from the customer's own secret store or created by a local CLI/Terraform step. The README gains a *How credentials are handled* section, and its intro no longer describes validation as a UI step
+- onboarding: local steps and non-MCP operations are now written for mc-cli (https://github.com/monte-carlo-data/mc-cli, the `montecarlo` command for the REST API v2) by default, with Terraform or an SDK script only on request; the skill tells the user to confirm with `montecarlo deployments --help` that mc-cli, not the legacy `montecarlodata` CLI of the same name, is on their path, and to set the profile token at the prompt. Install steps match mc-cli's README
+
+## [1.25.2] - 2026-09-24
+
+### Changed
+
+- Onboarding skill: the per-tag API reference is marked plugin-only, so the Monte Carlo MCP server's `mc-onboarding` prompt no longer inlines a restatement of the tools' own schemas.
+- Portability contract (CONTRIBUTING): mention reference files by relative path; the MCP prompt renderer inlines those mentioned outside plugin-only blocks.
+
+## [1.25.1] - 2026-09-24
+
+### Fixed
+
+- onboarding: the skill now triggers on requests to generate the Terraform or a script for onboarding, not only on requests to connect a warehouse
+
+## [1.25.0] - 2026-09-22
+
+### Added
+
+- onboarding: new Setup skill that connects a warehouse to Monte Carlo over the REST API v2 MCP tools — discover existing resources and resolve connection origin, credential custody and sample storage, then reuse a suitable deployment or provision one for a collection agent or a customer-owned data store (never one with nothing behind it), credentials by reference (no secret through the chat; Snowflake key pairs and generic-agent tokens become a CLI/Terraform step), warehouse, connection, "validate in the UI", and a summary of created ids on every run. Guided tool/local-handoff execution by default, or requested Terraform (`terraform-provider-montecarlo` + `mcd-agent` modules), or an SDK/CLI script. Registered as `/monte-carlo-onboarding` with trigger evals
+- skills: `<!-- plugin-only:start -->` / `<!-- plugin-only:end -->` portability markers for plugin-only sections, so the MCP server can render prompts from the same SKILL.md (documented in CONTRIBUTING and the skill-author guidance)
+
+## [1.24.2] - 2026-09-08
+
+### Fixed
+
+- performance-diagnosis: replace the hallucinated `get_top_slow_queries` tool with the real `get_query_perf_profile` and its actual parameters (`start_time` required, `query_type` read/write)
+- asset-health, prevent: call `get_asset_lineage` with the published `mcons` list parameter and uppercase `direction` values; the singular/lowercase forms fail schema validation
+- monitoring-advisor: document metric and custom-SQL monitor alert-condition fields in their real camelCase form (`thresholdValue`, `baselineAggFunction`, ...); the snake_case names previously shown are rejected with `extra_forbidden` validation errors
+
+## [1.24.1] - 2026-08-10
+
+### Changed
+
+- tune-monitor: check every recommended lever against the configuration read in
+  Phase 2c before naming it — a setting the monitor is already on is a report
+  that the user's change did not take, not a recommendation (AI-872)
+
+## [1.24.0] - 2026-08-02
+
+### Added
+
+- tune-monitor: agent evaluation / trajectory / validation monitor support — new `references/agent-{evaluation,trajectory,validation}-monitor.md` (judge-criteria verbatim-prompt rule, transforms/sampling and condition-tree re-pass traps, lookback-vs-schedule axis), Phase 1.5 dispatch rows, and the `create_or_update_agent_{evaluation,trajectory,validation}_monitor` apply flows (AI-781)
+
+## [1.23.0] - 2026-07-29
+
+### Added
+
+- tune-monitor: agent metric monitor support — new `references/agent-metric-monitor.md` (agent-reference verbatim rule, span-filter write-shape traps, trace-aggregation exclusivity), Phase 1.5 dispatch row, and the `create_or_update_agent_metric_monitor` apply flow (AI-780)
+
+## [1.22.3] - 2026-07-29
+
+### Changed
+
+- monitoring-advisor: judge model selection via `modelName` on LLM-based eval transforms; `modelConnectionId` is BigQuery-only (AI-771)
+
+## [1.22.2] - 2026-07-27
+
+### Changed
+
+- reinforce-agent: renamed the Monte Carlo tools the skill calls to their reinforcement loop names — `get_agent_health_summaries` → `get_reinforcement_loop_summaries` and `get_agent_health` → `get_reinforcement_loop_report` — and rebranded the skill guidance from "agent-health" to "reinforcement loop" (ORB-444).
+
+## [1.22.1] - 2026-07-26
+
+### Fixed
+
+- troubleshoot-agent-traces: document that `get_agent_trace` (single-trace span tree)
+  reads only the Monte Carlo–managed OTel store (`ao_clickhouse_otel`) and errors on
+  the Cortex, Genie, customer-OTel, and MLflow backends. Backend guides, alert
+  playbooks, direct-trace intake, and the tool tables now route span-grain drill-down
+  on those backends through `run_troubleshooting_agent` (AI-710).
+
+## [1.22.0] - 2026-07-22
+
+### Added
+
+- reinforce-agent: new skill that turns an AI agent's Monte Carlo agent-health diagnosis into code fixes — ranks diagnosed issues per workflow via `get_agent_health_summaries`, deep-dives a user-chosen workflow via `get_agent_health`, proposes fixes, and opens a PR. User-gated at each fan-out (which workflow, which issue, and before pushing).
+
+## [1.21.0] - 2026-07-22
+
+### Changed
+
+- monitoring-advisor: conversation evals can now see tool calls — `includeToolCalls` (default ON at conversation grain) documented across the eval reference: TOOL entries in the judged `{{conversation}}`, action-aware checks (right tool, right config, did it error; query-before-answer), template library and Output-pillar packs updated, span-grain rejection noted
+
+## [1.20.3] - 2026-07-22
+
+### Changed
+
+- troubleshoot-agent-traces: platform-agent conversation clustering (AI-677) — backend references updated for the server's Cortex/Genie clustering coverage: ClickHouse "only backend with conversation-grain eval monitors" drift fixed, clustering signal bullets + cluster-first localization steps added to Cortex/Genie, customer-OTel/MLflow-SDK "managed-store-only" claims rescoped, eval-alert grain rules now name Cortex/Genie as conversation-grain capable
+
+## [1.20.2] - 2026-07-22
+
+### Changed
+
+- troubleshoot-agent-traces: follow-up to the AI-629 breaching-side guidance — the flag-eval side-resolution rule is now symmetric across `true_*`/`false_*` metrics and both breach directions (a rising `false_rate`, e.g. `content_safe`, breaches at the BOTTOM of the score range), quality scores breaching high are enumerated explicitly, and the Cortex backend reference defers to the shared side resolution instead of "worst-first" sampling.
+
+## [1.20.1] - 2026-07-22
+
+### Changed
+
+- troubleshoot-agent-traces: the agent-alert-evaluation reference is now breaching-side aware (AI-629) — the breaching set follows the monitor's metric polarity + breach direction (flag evals breaching on a true-count sit at the TOP scores), replacing the direction-blind "worst-scoring / bottom 10" guidance; step-4 verification and a new common-mistakes row call out the wrong-side sampling trap.
+
+## [1.20.0] - 2026-07-22
+
+### Changed
+
+- monitoring-advisor: Context pillar upgraded from a recommendation to an executable flow — user-named upstream tables → tagged freshness/schema/volume table monitors → optional `Context for {AGENT_NAME}` data product wrapper (dry-run footprint preview first; Data Mesh rejection keeps the monitors) → field-level depth via the data-monitor references; `create_or_update_data_product` added to the skill tool tables (AI-650)
+
+## [1.19.0] - 2026-07-21
+
+### Changed
+
+- monitoring-advisor: agent-onboarding monitor conventions (AI-651) — every
+  monitor in the POBC playbook (agent monitors and Context-pillar data-quality
+  monitors) carries the `agent:{AGENT_NAME}` footprint tag; audiences are asked
+  once and applied to every create (with `failure_audiences` defaulting to the
+  same selection); one domain across the footprint; audit/teardown via
+  `get_monitors(monitor_tags=["agent:<AGENT_NAME>"])`
+- agent-validation-monitor reference: documented the `tags` parameter
+- data-monitor-creation reference: agent-onboarding conditional for tagging
+  warehouse DQ monitors created for an agent
+
+## [1.18.1] - 2026-07-21
+
+### Added
+
+- monitoring-advisor: Behavior pillar (AI-648) — agent-understanding investigation summary before proposing monitors (purpose, dominant tool span, healthy trajectory shape, intents, failure modes); runaway-loop trajectory playbook with thresholds derived from observed trace history (max observed + headroom; zero historical matches by design — a regression guardrail, proven with a pre-create breach preview); ungrounded-in-data pattern created as a draft with a breach preview and an LLM-judge upgrade path; `preview` / `is_draft` documented on the trajectory reference with the `agent:<AGENT_NAME>` tag convention
+
+## [1.18.0] - 2026-07-21
+
+### Added
+
+- monitoring-advisor: custom-prompt template library (`frustration_free_score`, `answer_attempt_score`, `user_correction`) and Output-pillar eval packs — baseline pack for every agent, analytics pack for Snowflake Cortex / Databricks Genie — in `agent-evaluation-monitor.md`, with pack routing in `agent-monitor-creation.md` and a starting-packs pointer in the POBC walkthrough's Output row (AI-647)
+- monitoring-advisor: documented the `tags` parameter on `create_or_update_agent_evaluation_monitor` (name/value shape) and the tag-every-monitor `agent:<AGENT_NAME>` default (AI-647)
+
+## [1.17.0] - 2026-07-21
+
+### Added
+
+- monitoring-advisor: Performance pillar baseline monitor set in the agent-metric-monitor reference — p50+p95 latency anomaly, p50+p95 token anomaly, daily token SUM, status_code error-level anomaly, and a measured-p95 latency SLO threshold, with per-backend gating and shared defaults (daily schedule, agent tag, draft-capable) (AI-646)
+- monitoring-advisor: documented `tags` and `is_draft` (un-draft-on-edit footgun) on create_or_update_agent_metric_monitor; routing rows for performance-coverage asks
+
+## [1.16.0] - 2026-07-21
+
+### Changed
+
+- monitoring-advisor: POBC proposal walkthrough in the agent monitor creation
+  reference — open with the Performance/Output/Behavior/Context framing, walk
+  the user through the plan pillar by pillar (evidence → proposed monitors →
+  confirm), Context as a recommendation-only pillar until lineage wiring
+  lands. Global defaults: daily schedules (`interval_minutes=1440`) and
+  count-based eval sampling (`{"count": 100}`). (AI-645)
+
+## [1.15.2] - 2026-07-20
+
+### Changed
+
+- monitoring-advisor: conversation-grain evaluation guidance updated for the AI-636 backend change — Snowflake Cortex and Databricks Genie agents now support `is_agent_conversation_aggregation` (Databricks MLflow agents remain span-only); added Genie no-token/model caveats to the metric guidance and a `backend_class` capability note to agent-monitor-creation
+
+## [1.15.1] - 2026-07-20
+
+### Changed
+
+- troubleshoot-agent-traces: the direct (no-alert) path resolves the exact backend from `get_agent_metadata`'s new `backend_class` field instead of asking the user / splitting on `sourceType` (AI-635; a null `backend_class` — older server or unclassifiable agent — still falls back to asking)
+- monitoring-advisor, troubleshoot-agent-traces, instrument-agent: `get_agent_metadata` field docs gain `backend_class`
+
+## [1.15.0] - 2026-07-19
+
+### Added
+
+- New `troubleshoot-agent-traces` skill (`/monte-carlo-troubleshoot-agent-traces`): investigates AI-agent alerts (evaluation, metric, trajectory, validation) and agent traces/conversations. Kicks off the trace troubleshooting agent in parallel (`run_troubleshooting_agent`), identifies the agent's backend exclusively from the new `get_alert_agent_classification` tool (server-side classification — never name/MCON heuristics), and routes to per-alert-type and per-backend investigation playbooks (ClickHouse OTel, Snowflake Cortex, Databricks Genie, customer OTel trace table, Databricks MLflow SDK, MLflow Knowledge Assistant).
+
+### Changed
+
+- analyze-root-cause, incident-response, and context-detection route agent-monitor alerts to the new skill; monitoring-advisor's "investigating agent traces" trigger moved there (it keeps monitor creation).
+
+## [1.14.0] - 2026-07-03
+
+### Changed
+
+- Refresh agent monitor references to match the current tool contract: single `agent` reference source (no `dw_id`/`data_source`), required `warehouse` for metric/evaluation/validation, `schedule_type` limited to `fixed`/`manual` with per-type interval floors, and `agent_span_filters` capped at one filter object.
+- Agent monitor warehouse is now sourced from `get_agent_metadata`'s `warehouse_uuid`/`warehouse_name` (show the name, pass the uuid; fall back to `get_warehouses` only when both are null).
+- Evaluation reference: correct predefined transform functions (`output_length`, `json_validity`, `keywords`), typed custom transforms (`custom_prompt`/`custom_sql` with camelCase `outputType`/`sqlExpression`), boolean-output alerting via `TRUE_RATE`/`FALSE_RATE`, and removal of unsupported `classification`/`sentiment`.
+- Metric reference: full agent metric catalog, `NEQ` operator, operator/threshold rules, `ROW_COUNT_CHANGE` and trace-aggregation constraints.
+- Validation reference: `negated`-flag negation (no `not_equal`/`not_null`), UNARY `value` vs BINARY `left`/`right`, numeric `status_code`.
+- Trajectory reference: `SPAN_OCCURRENCE` and `SPAN_RELATION` conditions, OR-only combination, occurrence count floors, `spanField` hierarchy, and the negated-relation pattern for a missing step.
+- Span-field reference: add `parent_span_id`, `model_name`, `status_code`, `is_tool_call`, `is_llm_call`, `has_prompts`, `has_completions` and the platform-vs-OpenTelemetry availability caveat.
+
+## [1.13.3] - 2026-06-23
+
+### Changed
+
+- Authenticated Monte Carlo MCP requests now carry the toolkit's anonymous install id (`x-mcd-toolkit-install-id`) and version (`x-mcd-toolkit-version`) as HTTP headers, so the anonymous usage-beacon stream can be joined to authenticated MCP activity server-side — no new user- or account-level identifier is introduced. Headers are injected by whatever mechanism each editor supports: a runtime headers helper in Claude Code and Cortex Code (which also send a per-session `x-mcd-toolkit-session-id`), and install-time MCP registration for Cursor, Codex, Copilot, and OpenCode. Fail-open and honors `MC_AGENT_TOOLKIT_TELEMETRY_DISABLED=1`.
+
+## [1.13.2] - 2026-06-19
+
+### Changed
+
+- Skills now route Monte Carlo MCP tool calls explicitly to the plugin-bundled server. Every skill that uses Monte Carlo MCP tools carries a standard routing rule directing the model to the fully-qualified `mcp__plugin_mc-agent-toolkit_monte-carlo-mcp__<tool>` names, so a separately-configured server of the same name can no longer shadow the bundled one. Soft (model-compliance) enforcement, with the canonical rule documented as the single source of truth in `.claude/rules/skills.md`.
+
+### Fixed
+
+- Corrected the MCP pre-approval grant in Claude Code and Cortex Code `settings.json` (`…_monte-carlo__*` → `…_monte-carlo-mcp__*`) so it matches the bundled server's actual tool namespace and suppresses permission prompts as intended.
+- Replaced obsolete Monte Carlo tool-namespace examples (`mcp__monte_carlo__getAlerts`, `mcp__mc__search`) in the remediation skill's tool-discovery reference with current plugin-bundled, snake_case names.
+
+## [1.13.1] - 2026-06-18
+
+### Added
+
+- `Toolkit Installed` telemetry beacon, fired once per machine+editor **per toolkit version** — on first install and after each version change — independent of skill usage, closing the gap where an install that never invoked a skill was invisible and adding version-adoption signal. Deduped by a per-editor `beacon_sent_version` marker. Wired across all six editor plugins (Claude Code, Cortex Code, Cursor, Codex, Copilot, OpenCode). Fail-open and non-blocking; honors `MC_AGENT_TOOLKIT_TELEMETRY_DISABLED=1` and the `MCD_TOOLKIT_BEACON_URL` override.
+
+### Changed
+
+- Shared hook logic now also covers telemetry: the canonical install beacon lives in `plugins/shared/telemetry/lib/` and is synced into each editor plugin by `./scripts/bump-version.sh --sync-only`, with a CI check enforcing it stays in sync — mirroring the existing `prevent/lib` convention.
+
+## [1.13.0] - 2026-06-15
+
+### Added
+
+- Snowflake Cortex Code plugin (`plugins/cortex-code/`) — the 6th supported editor. Cortex Code wraps Claude Code, so it ships all 17 skills, the full prevent hook lifecycle, slash commands, and the Monte Carlo MCP server; install via `plugins/cortex-code/scripts/install.sh`.
+
+### Changed
+
+- Hardened the prevent impact-check gate: the pre-edit deny reason no longer contains a string that satisfies its own marker scanner, closing a latent self-unlock on harnesses that persist hook output back into the scanned transcript. Added `table_name` path sanitization for the `/tmp` cache, an unknown-transcript-format fail-closed guard, and tolerance for stray bytes when scanning Cortex's `.history.jsonl`. These shared-lib changes apply to all editor plugins.
+- Skill-usage telemetry stores its install/session IDs under Cortex Code's own config home (`~/.snowflake/cortex/mc-agent-toolkit`) rather than `~/.claude` — a toolkit install in Cortex Code is a distinct installation from one in Claude Code, so each editor keeps its own identity. The beacon payload now also carries a `harness` field (`cortex-code`) so the telemetry sink can tell editors apart.

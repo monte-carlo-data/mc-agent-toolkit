@@ -1,0 +1,37 @@
+---
+name: mc
+description: "List all Monte Carlo data observability skills and workflows. Triggers: /mc, mc."
+---
+
+List all available Monte Carlo skills and workflows. Present them grouped by category:
+
+## Workflows
+
+- **`/monte-carlo-incident-response`** — Triage, investigate, fix, and prevent data incidents. Sequences automated-triage, root cause analysis, remediation, and monitor creation.
+- **`/monte-carlo-proactive-monitoring`** — Assess coverage gaps and create monitors. Sequences asset-health, coverage analysis, and monitor creation.
+- **`/monte-carlo-onboarding`** — Connect a warehouse to Monte Carlo: pick or provision the deployment (cloud node, collection agent, data store), reference credentials, create the warehouse and connection. Act via tools, or emit Terraform or an SDK/CLI script.
+
+## Skills
+
+- **`/automated-triage`** — Triage Monte Carlo alerts: score, classify, and investigate interactively or build an automated workflow.
+- **`/tune-monitor`** — Tune noisy monitors, or find which ones to tune, starting from Monte Carlo's tuning agent; applies only approved changes.
+- **`/monitoring-advisor`** — Analyze data coverage, identify gaps, and create monitors for warehouse tables and AI agents.
+- **`/instrument-agent`** — Instrument a new AI agent in a Python codebase for Monte Carlo Agent Observability: detect libraries, install the OpenTelemetry SDK, propose `mc.setup()` and decorator diffs.
+- **`/monte-carlo-troubleshoot-agent-traces`** — Investigate AI agent alerts (evaluation, metric, trajectory, validation) and agent traces — kicks off the trace troubleshooting agent and guides a backend-aware manual investigation.
+- **`/mc-validate`** — Generate and run validation queries for dbt model changes.
+- **`/mc-build-*`** — Push ingestion commands: build metadata, lineage, and query log collectors.
+
+## Skills Available via Natural Language
+
+These skills don't have dedicated commands but activate automatically when you ask about their topics:
+
+- **Asset Health** — "check health of table X", "how is X doing?", "status of X"
+- **Root Cause Analysis** — "why is this table stale?", "investigate this alert", "debug this incident"
+- **Automated Triage** — "triage my alerts", "what alerts are firing?", "score and troubleshoot my open alerts"
+- **Remediation** — "fix this alert", "remediate this issue", "handle this incident"
+- **Tune Monitor** — "this monitor is too noisy", "which monitors should I tune?", "my monitors are noisy"
+- **Storage Cost Analysis** — "unused tables", "storage costs", "zombie tables"
+- **Performance Diagnosis** — "slow pipeline", "expensive queries", "query performance"
+- **Prevent** — Auto-activates via hooks when you edit dbt models or SQL files
+
+**User provided input**: $ARGUMENTS
