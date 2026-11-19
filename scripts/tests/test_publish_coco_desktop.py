@@ -168,6 +168,22 @@ class PublishTest(unittest.TestCase):
             self.publish("v9.9.10")
         self.assertNotIn("coco-desktop-v9.9.10", self.remote_git("tag"))
 
+    def test_missing_branch_message_names_the_highest_version_pin(self):
+        # The newest pin by date is 9.9.10, published after 9.10.0, but the branch belongs on 9.10.0.
+        self.publish("v9.9.9")
+        self.git("checkout", "-q", "-b", "hotfix", "v9.9.9")
+        self.release("9.9.10")
+        self.git("checkout", "-q", "main")
+        self.release("9.10.0")
+        self.publish("v9.10.0")
+        self.publish("v9.9.10")
+        self.remote_git("update-ref", "-d", "refs/heads/coco-desktop")
+        with self.assertRaises(publish_mod.PublishError) as caught:
+            self.publish("v9.10.0")
+        message = str(caught.exception)
+        self.assertIn("coco-desktop-v9.10.0", message)
+        self.assertNotIn("coco-desktop-v9.9.10", message)
+
     def test_branch_holding_this_version_with_different_files_fails(self):
         self.publish("v9.9.9")
         self.remote_git("tag", "-d", "coco-desktop-v9.9.9")

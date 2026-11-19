@@ -55,13 +55,14 @@ jobs:
             exit 1
           fi
           # GitHub marks a new release Latest unless told otherwise, so a retried older
-          # release would take Latest from a newer one. Mark it Latest only if no release
-          # with a higher version exists.
+          # release would take Latest from a newer one. Mark it Latest only if its version is
+          # the highest released. If the list can't be read, the step fails rather than guess.
           if ! gh release view "$TAG" >/dev/null 2>&1; then
-            LATEST=$(gh release view --json tagName -q .tagName 2>/dev/null || true)
-            MAKE_LATEST=true
-            if [[ -n "$LATEST" && "$(printf '%s\n%s\n' "${LATEST#v}" "${TAG#v}" | sort -V | tail -1)" != "${TAG#v}" ]]; then
-              MAKE_LATEST=false
+            RELEASED=$(gh release list --limit 1000 --exclude-drafts --exclude-pre-releases --json tagName -q '.[].tagName')
+            HIGHEST=$(printf '%s\n' "$RELEASED" "$TAG" | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)
+            MAKE_LATEST=false
+            if [[ "$HIGHEST" == "$TAG" ]]; then
+              MAKE_LATEST=true
             fi
             gh release create "$TAG" --generate-notes --latest="$MAKE_LATEST"
           fi

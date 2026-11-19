@@ -70,6 +70,19 @@ def remote_ref(repo: Path, remote: str, ref: str) -> str | None:
     return git(repo, "rev-parse", "FETCH_HEAD^{commit}")
 
 
+def highest_pin(listing: str) -> str | None:
+    """The highest-version pin tag in an ls-remote listing, or None. Creation order doesn't count:
+    an older release published late gets its pin after newer ones."""
+    pins = {}
+    for line in listing.splitlines():
+        ref = line.split()[-1].removesuffix("^{}")
+        name = ref.removeprefix("refs/tags/")
+        version = name.removeprefix(TAG_PREFIX)
+        if re.fullmatch(r"\d+\.\d+\.\d+", version):
+            pins[version_tuple(version)] = name
+    return pins[max(pins)] if pins else None
+
+
 def build_tree(repo: Path, tag: str, commit: str, work: Path) -> str:
     """Build the plugin at the tag's commit and return the git tree id of the output."""
     archive = work / "source.tar"
@@ -117,13 +130,15 @@ def publish(tag: str, repo: Path = Path("."), remote: str = "origin", expect_sha
         tree = build_tree(repo, tag, source_sha, Path(tmp))
 
     head = remote_ref(repo, remote, f"refs/heads/{BRANCH}")
-    if head is None and git(repo, "ls-remote", "--tags", remote, f"refs/tags/{TAG_PREFIX}*"):
-        # Published before, so the branch was deleted. Recreating it from this release could
-        # move it back to an older version than a pin that already exists.
-        raise PublishError(
-            f"the {BRANCH} branch is missing but {TAG_PREFIX}* tags exist; push the newest "
-            f"{TAG_PREFIX}* tag's commit to refs/heads/{BRANCH} by hand, then re-run"
-        )
+    if head is None:
+        pins = highest_pin(git(repo, "ls-remote", "--tags", remote, f"refs/tags/{TAG_PREFIX}*"))
+        if pins:
+            # Published before, so the branch was deleted. Recreating it from this release could
+            # move it back to an older version than a pin that already exists.
+            raise PublishError(
+                f"the {BRANCH} branch is missing but {TAG_PREFIX}* tags exist; push the commit of "
+                f"{pins}, the highest version, to refs/heads/{BRANCH} by hand, then re-run"
+            )
     existing_pin = remote_ref(repo, remote, f"refs/tags/{pin}")
     if existing_pin:
         if git(repo, "rev-parse", f"{existing_pin}^{{tree}}") != tree:
