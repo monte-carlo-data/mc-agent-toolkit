@@ -1,0 +1,67 @@
+# Routing evals for AI-1687: tune-monitor reads the tuning agent's work before doing its own.
+#
+# Account-independent: no case names a warehouse, table or monitor. Each case starts from the
+# account-wide suggestion list, which the dev account fills from Monte Carlo's background
+# tuning analysis. If that list is empty, the judge accepts "nothing pending" as correct.
+
+no_apply: &no_apply
+  # Nothing is changed without the user's confirmation.
+  tool_input_must_not_contain: ['"dry_run": false']
+  must_not_call: [create_or_update_, mark_, update_alert, batch_update_alerts]
+
+cases:
+  - id: tm-01-which-monitors-to-tune
+    turns:
+      - prompt: "Some of my Monte Carlo monitors are really noisy. Which ones should I tune?"
+        criteria:
+          must_call: [get_monitor_tuning_suggestions]
+          <<: *no_apply
+    criteria:
+      judge_rubric: |
+        The user asks which monitors to tune. Monte Carlo already analyzes noisy monitors in the
+        background, so the agent should read that analysis (get_monitor_tuning_suggestions with
+        no arguments) instead of working out tuning itself from monitor reports.
+
+        Good: lists the monitors with a pending suggestion, as links, with their names and
+        recommendation counts or titles, and offers to go through one in detail.
+        Also good: says nothing is pending when the list is empty.
+        Bad: fetches monitor reports and writes its own tuning analysis without reading the
+        stored suggestions; presents the titles as its own recommendations; applies anything.
+
+        NOTE: Do NOT penalize Read or Skill tool calls.
+
+  - id: tm-02-tune-one-from-the-list
+    turns:
+      - prompt: "Which of my monitors have tuning suggestions waiting?"
+        criteria:
+          must_call: [get_monitor_tuning_suggestions]
+          <<: *no_apply
+      - prompt: "Go through the first one on that list with me. What would you change?"
+        criteria:
+          must_call_before:
+            # Substring match: also orders tune_monitors and get_tune_monitors_results after the read.
+            get_monitor_tuning_suggestions: [tune_monitor, get_monitor_report]
+          <<: *no_apply
+    criteria:
+      judge_rubric: |
+        Turn 1: the agent reads the account-wide suggestion list.
+
+        Turn 2: the agent fetches the stored analysis for that one monitor
+        (get_monitor_tuning_suggestions with its monitor_uuid) and explains it: each
+        recommendation's reasoning and change, whether it resets the monitor (would_reset),
+        whether it came from Monte Carlo or from a preview the user ran, and whether it is still
+        current (the monitor is on the turn-1 list with the same run_uuid and
+        changes_applied_since is empty). If it is not current, a fresh tune_monitor preview
+        replaces it. It asks which changes to apply and does not apply any.
+
+        A tune_monitor call without dry_run=false is a preview (dry_run defaults to true): it
+        changes nothing and is fine, for example when the monitor was retuned after the stored
+        analysis. Calls that apply a change are tune_monitor with dry_run=false, create_or_update_*,
+        mark_event_as_normal, mark_data_point_as_normal, update_alert and batch_update_alerts
+        (the deterministic checks already fail those).
+
+        Bad: re-derives tuning from get_monitor_report while a stored analysis exists; applies
+        a change; hides the reset warning.
+        If the list in turn 1 was empty, a clear "nothing to go through" is correct.
+
+        NOTE: Do NOT penalize Read or Skill tool calls.

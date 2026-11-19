@@ -1,0 +1,68 @@
+# Routing evals for AI-1687: remediation reuses the troubleshooting result and follows the
+# remediation agent's plan.
+#
+# rm-01 is account-independent: the agent picks the most recent alert itself, which may or may
+# not have a troubleshooting run yet. Both paths are correct (see the rubric), and the order
+# check holds on both.
+#
+# rm-02 pins the success path (existing troubleshooting run + remediation plan) so it does not
+# depend on account state or case order.
+# Test-data dependency (dev env):
+#  - alert 2c7b1d25-95cb-42ed-8000-f69da52efb5c (smoke_tests.test_ai_recommendations_table,
+#    metric comparison monitor): troubleshooting status `success` and a remediation plan
+#    (hand_off), confirmed in run remediation_dev_20261110_161406. If dev prunes the alert or
+#    its analysis, rm-02 loses signal: re-pin to another dev alert that has both.
+#
+# Tool names match exactly, so `update_alert` blocks status changes but not
+# `create_or_update_alert_comment`, which remediation may post.
+
+cases:
+  - id: rm-01-how-do-i-fix-latest-alert
+    turns:
+      - prompt: "How do I fix my most recent Monte Carlo alert? Look at the last 7 days."
+        criteria:
+          must_call: [get_alerts, get_troubleshooting_agent_results]
+          must_call_before:
+            get_troubleshooting_agent_results: [run_troubleshooting_agent, get_remediation_instructions]
+          # Closing or changing the alert, or applying a tuning change, needs the user's confirmation.
+          tool_input_must_not_contain: ['"dry_run": false']
+          must_not_call: [update_alert, batch_update_alerts, mark_]
+    criteria:
+      judge_rubric: |
+        The user wants the fix for one alert. The agent should check for an existing
+        troubleshooting result (get_troubleshooting_agent_results) before starting a new run,
+        and get the recommended fix from the remediation agent (get_remediation_instructions)
+        rather than inventing one from a table of patterns.
+
+        Good: when troubleshooting already succeeded, calls get_remediation_instructions and
+        presents its title, summary and next step, following its destinations (fix the code,
+        tune the monitor, close the alert, or hand to a person). When no run exists, starts
+        one and either waits for it and reads the plan, or says it is running and what comes
+        next.
+        Bad: starts a new troubleshooting run while a successful one exists; proposes a fix
+        without reading the plan when one exists; changes the alert without asking.
+
+        NOTE: Do NOT penalize Read or Skill tool calls.
+
+  - id: rm-02-existing-analysis-reads-plan
+    turns:
+      - prompt: "How do I fix Monte Carlo alert 2c7b1d25-95cb-42ed-8000-f69da52efb5c?"
+        criteria:
+          # Troubleshooting already succeeded and a plan exists: read both, run nothing new.
+          must_call: [get_troubleshooting_agent_results, get_remediation_instructions]
+          must_call_before:
+            get_troubleshooting_agent_results: [get_remediation_instructions]
+          must_not_call: [run_troubleshooting_agent, update_alert, batch_update_alerts, mark_]
+          tool_input_must_not_contain: ['"dry_run": false']
+    criteria:
+      judge_rubric: |
+        The alert already has a successful troubleshooting run and a remediation plan. The agent
+        should read both and present the plan (title, summary, next step) following its
+        destination, instead of re-investigating from scratch.
+
+        Good: calls get_troubleshooting_agent_results, then get_remediation_instructions, and
+        presents the plan, including the hand-off to the owning team when that is what the plan says.
+        Bad: starts a new troubleshooting run; runs its own lineage or table investigation instead
+        of using the plan; invents a fix that is not in the plan; changes the alert without asking.
+
+        NOTE: Do NOT penalize Read or Skill tool calls.

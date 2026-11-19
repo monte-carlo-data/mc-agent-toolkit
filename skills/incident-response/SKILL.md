@@ -15,9 +15,9 @@ version: 1.0.0
 # Monte Carlo Incident Response Workflow
 
 This workflow orchestrates the full lifecycle of a data incident by sequencing
-existing Monte Carlo skills. It does not contain investigation or remediation
-logic itself — each step loads the relevant skill's SKILL.md which has the
-actual instructions.
+existing Monte Carlo skills. Apart from reading what Monte Carlo's agents already
+found, it does not contain investigation or remediation logic itself — each step
+loads the relevant skill's SKILL.md which has the actual instructions.
 
 > **Monte Carlo tool routing (required):** Always call Monte Carlo MCP tools through this plugin's
 > bundled server, whose fully-qualified tool names are
@@ -48,11 +48,35 @@ Activate when:
 ## Workflow Steps
 
 ```
+Step 0: Read what is already known — direct reads, no agent runs
 Step 1 (conditional): Triage — when user has multiple/unknown alerts
 Step 2: Root Cause Analysis — the core investigation
 Step 3: Remediation — fix or escalate
 Step 4 (optional): Prevent Recurrence — add monitoring
 ```
+
+### Step 0: Read what is already known
+
+Once you know which alert, always read what Monte Carlo's agents already found, even if the
+alert fired minutes ago. Do this before choosing an entry point:
+
+1. The triage verdict, from that alert's `get_alerts` fields `triage_priority` and
+   `triage_result` (no extra call).
+2. `get_troubleshooting_agent_results(incident_id=...)`: an existing root cause.
+3. If that succeeded, `get_remediation_instructions(alert_id=...)`: the recommended fix.
+
+Do not call `triage_alert` or `run_troubleshooting_agent` before these reads. Full order,
+empty-result handling, tuning and teammate activity: `references/prior-agent-work.md`.
+
+Report what you found and what is missing. Then run nothing unasked: go on to Step 2 or 3
+only when the user asked to investigate or fix.
+
+- A root cause and plan exist → report them and offer **Step 3: Remediation**.
+- A root cause exists, with no plan → report it and offer Step 3.
+- An analysis is `running` → report it and poll `get_troubleshooting_agent_results`. Do not
+  start Step 2's troubleshooting run.
+- Nothing exists yet → say so. If the user asked to investigate, continue with the entry point
+  below; otherwise offer it.
 
 ### Determine entry point
 
@@ -139,7 +163,7 @@ When loading monitoring-advisor for this step, frame the request as direct monit
 ## Orchestration Rules
 
 - **Users can enter at any step.** The entry point section above determines where to start.
-- **Each step loads the actual skill's SKILL.md** via relative path. This workflow does not replicate skill logic — it sequences it.
+- **Each step loads the actual skill's SKILL.md** via relative path. Apart from Step 0's reads of existing agent results, this workflow does not replicate skill logic — it sequences it.
 - **Context carries forward** through conversation naturally. Alert IDs, table names, root cause findings from earlier steps are available to later steps without explicit state passing.
 - **No state tracking or hooks.** This is purely prompt-driven sequencing.
 - **User can exit anytime.** If they say "that's enough" or "stop", respect it immediately.

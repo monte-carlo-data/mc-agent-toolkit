@@ -190,7 +190,7 @@ Downstream blast radius:
   - Key assets affected: <list or "none">
 
 Active incidents:
-  - <alert title, status> or "none"
+  - <alert title, status, triage verdict (triage_priority; NOT_TRIAGED or PENDING = "not triaged")> or "none"
 
 Column exposure (for columns being changed):
   - Found in <N> recent queries (e.g. <query snippet>)
@@ -225,6 +225,10 @@ Explicitly connect each key finding to a specific recommendation:
   → Recommend deferring or minimally scoping the change until alerts are resolved
   → Explain: "There are N active alerts on this table — making this change now
      risks compounding an existing data quality issue"
+  → Weigh them by their triage verdict: a HIGH-triaged alert is a stronger reason to wait than
+     a LOW one. Use each alert's `triage_priority` from the alerts you already have (asset-health's
+     report or step 4's `get_alerts` call); NOT_TRIAGED/PENDING count as no verdict yet. Do not
+     triage or troubleshoot the alerts from here (that is monte-carlo-incident-response).
 
 - Key assets downstream:
   → Recommend defensive coding patterns: null guards, backward-compatible changes,

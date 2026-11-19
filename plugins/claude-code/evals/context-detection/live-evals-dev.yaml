@@ -7,6 +7,13 @@
 #    present or the case will lose signal.
 #
 # If these tables change or alerts clear, update prompts accordingly.
+#
+# cd-06 and cd-07 (AI-1687) are account-independent routing checks; the skills they route to
+# are loaded as peers so their instructions apply.
+
+peer_skills:
+  - tune-monitor
+  - remediation
 
 cases:
   - id: cd-01-vague-data-issue
@@ -140,3 +147,45 @@ cases:
         This is a general programming question with no Monte Carlo or data
         observability context. No MC MCP tools should be invoked. The agent
         should just help with the Python task directly.
+
+  - id: cd-06-noisy-monitor-routes-to-tuning
+    turns:
+      - prompt: "My monitors keep firing alerts that turn out to be nothing. Can we cut the noise?"
+        criteria:
+          must_call: [get_monitor_tuning_suggestions]
+          tool_input_must_not_contain: ['"dry_run": false']
+          must_not_call: [create_or_update_, mark_, update_alert, batch_update_alerts]
+    criteria:
+      judge_rubric: |
+        Monitor noise is a tuning request. The agent should route to the tune-monitor flow and
+        start from Monte Carlo's stored tuning analysis (get_monitor_tuning_suggestions), then
+        offer to go through a monitor's recommendations. It must not apply any change.
+
+        Bad: treats this as an incident (alert triage or root cause); asks only generic
+        questions when the stored suggestions would answer them; applies a change.
+
+        NOTE: Do NOT penalize Read or Skill tool calls.
+
+  - id: cd-07-how-do-i-fix-routes-to-remediation
+    turns:
+      - prompt: "What's the fix for my latest alert from the last 7 days?"
+        criteria:
+          must_call: [get_alerts, get_troubleshooting_agent_results]
+          must_call_before:
+            get_troubleshooting_agent_results: [run_troubleshooting_agent, get_remediation_instructions]
+          # `update_alert` blocks status changes but still allows `create_or_update_alert_comment`.
+          tool_input_must_not_contain: ['"dry_run": false']
+          must_not_call: [update_alert, batch_update_alerts, mark_]
+    criteria:
+      judge_rubric: |
+        The user wants the fix for one alert, so this routes to remediation. The agent should
+        find the alert, check for an existing troubleshooting result before running a new one,
+        and read the remediation agent's plan (get_remediation_instructions) once troubleshooting
+        has completed. When no run exists (not_found or failed), starting one is correct: the
+        agent either waits for it and reads the plan, or says it is running and what comes next.
+
+        Bad: a generic coverage or health answer; skipping troubleshooting and proposing its own
+        fix when no run exists; starting a troubleshooting run while one
+        already succeeded; inventing a fix without the plan; changing the alert without asking.
+
+        NOTE: Do NOT penalize Read or Skill tool calls.

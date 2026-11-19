@@ -30,6 +30,7 @@ Response field mapping for the alert table:
 - **Date** → `createdTime`
 - **Type** → `alert_types` (array, e.g., "Volume", "Metric anomaly", "Freshness")
 - **Priority** → `priority` (e.g., "P1", "P2", "P3")
+- **Triage** → `triage_priority` (never absent): `HIGH` / `MEDIUM` / `LOW` as given; `NOT_TRIAGED` → "Not triaged"; `PENDING` → "Triage running". `triage_result.triage_summary` feeds the Diagnosis.
 - **Status** → `status` (e.g., "Not acknowledged", "Acknowledged", "Work in progress")
 - **Link** → construct as `<MC_WEBAPP_URL>/alerts/<uuid>` where `MC_WEBAPP_URL`
   comes from `get_mc_webapp_url()` (called in Phase 1). Display as bare URL.

@@ -1,0 +1,60 @@
+{
+  "skill": "tune-monitor",
+  "description": "Trigger accuracy evals for tune-monitor (AI-1687): monitor-noise and which-monitors-to-tune requests trigger it, including with no monitor named; incidents, monitor creation and coverage do not.",
+  "cases": [
+    {
+      "id": "should-01",
+      "prompt": "tune monitor 94c2dd3a-ef49-40f8-b1c1-741ba057cabf",
+      "expected": "trigger",
+      "rationale": "Explicit tune request with a monitor UUID"
+    },
+    {
+      "id": "should-02",
+      "prompt": "Which of my monitors should I tune?",
+      "expected": "trigger",
+      "rationale": "No monitor named: starts from the account-wide suggestion list"
+    },
+    {
+      "id": "should-03",
+      "prompt": "My monitors keep firing alerts that turn out to be nothing. Can we cut the noise?",
+      "expected": "trigger",
+      "rationale": "Monitor noise without a named monitor"
+    },
+    {
+      "id": "should-04",
+      "prompt": "This freshness monitor on orders alerts every morning and it's always fine. Make it less sensitive.",
+      "expected": "trigger",
+      "rationale": "Sensitivity change on a noisy monitor"
+    },
+    {
+      "id": "should-05",
+      "prompt": "Are there any tuning suggestions waiting for me in Monte Carlo?",
+      "expected": "trigger",
+      "rationale": "Asks for the tuning agent's stored suggestions"
+    },
+    {
+      "id": "should-not-01",
+      "prompt": "My orders table is stale, figure out why.",
+      "expected": "no-trigger",
+      "rationale": "Incident root cause, not monitor noise (incident-response)"
+    },
+    {
+      "id": "should-not-02",
+      "prompt": "Create a volume monitor on the payments table.",
+      "expected": "no-trigger",
+      "rationale": "Monitor creation (monitoring-advisor)"
+    },
+    {
+      "id": "should-not-03",
+      "prompt": "What should I monitor in my warehouse?",
+      "expected": "no-trigger",
+      "rationale": "Coverage gaps (proactive-monitoring)"
+    },
+    {
+      "id": "should-not-04",
+      "prompt": "How do I fix the alert on dim_customers from this morning?",
+      "expected": "no-trigger",
+      "rationale": "Fixing an alert is remediation; it reaches tuning only when the plan says the monitor is noise"
+    }
+  ]
+}
