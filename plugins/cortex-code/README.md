@@ -75,12 +75,13 @@ The data is stored in Mixpanel and Datadog and is used only for product-developm
 
 All 21 skills are bundled — see the [skills directory](../../skills/) for the full list. CoCo Desktop has no slash commands, so the Desktop build turns them into skills: it has 35 in all.
 
-The Prevent feature includes **PreToolUse hooks that block edits to dbt SQL files** until an impact assessment runs. The hooks only fire on `.sql` files inside dbt model, macro, or snapshot directories — they do not affect non-dbt files.
+The Prevent feature includes **PreToolUse hooks that block edits to dbt SQL files** until an impact assessment runs. The hooks only fire on `.sql` files inside dbt model, macro, or snapshot directories — they do not affect non-dbt files, except that a CoCo Desktop patch that changes a gated dbt file and other files together is blocked as a whole.
 
-In CoCo Desktop, hooks run only in a trusted workspace. Two Prevent behaviors are CLI-only for now:
+In CoCo Desktop, hooks run only in a trusted workspace. Desktop gives models whose name contains "gpt" or "openai" an `apply_patch` tool instead of edit and write tools; the hooks check every file a patch touches, so those models are gated too.
 
-- **Edit gate with GPT models.** CoCo Desktop gives models whose name contains "gpt" or "openai" an `apply_patch` tool instead of edit and write tools, and the Prevent hooks don't inspect patches yet. With those models, dbt edits are not gated in Desktop. Claude models are gated.
-- **Pre-commit checkpoint.** Desktop doesn't pass a pre-tool hook's added context to the model, so the reminder before `git commit` doesn't appear in Desktop.
+One Prevent behavior is CLI-only for now: the **pre-commit checkpoint**. Desktop doesn't pass a pre-tool hook's added context to the model, so the reminder before `git commit` doesn't appear in Desktop.
+
+Also in Desktop, the first retry of an edit right after the impact assessment is denied once more, because Desktop saves the assistant's completion line to the session history only after that retry's hook has run. Retrying the edit again goes through.
 
 **To disable the Prevent hooks**, set `MC_PREVENT_HOOKS_DISABLED=1` in your environment. The hooks will exit immediately without blocking any edits.
 
@@ -110,7 +111,7 @@ cortex plugin uninstall mc-agent-toolkit
 
 ## Architecture
 
-Cortex Code wraps Claude Code, so this plugin reuses the same SKILL.md skills, the same prevent hook lifecycle (PreToolUse/PostToolUse/Stop), and the same MCP configuration. Hooks live in a single `hooks/hooks.json` at the plugin root, which CoCo Desktop loads (it ignored the manifest's list of hook files), and their matchers use Cortex's lowercase tool IDs (`^bash$`, `^(edit|write|multi_edit)$`, `^skill$`) because matching is case-sensitive. The CoCo Desktop copy is built by `scripts/build_coco_desktop.py` and published by `scripts/publish_coco_desktop.py` from the release workflow. The other Cortex-specific adaptation is the prevent transcript reader: Cortex stores session messages in a sibling `<id>.history.jsonl` and persists hook output back into the transcript, so the gate scans only assistant-authored text to find its completion marker. See the [plugins README](../README.md) for the editor-support comparison and hook-format details, and the [Plugin Architecture Guide](../../docs/plugin-architecture-guide.md) for the shared-core/adapter design.
+Cortex Code wraps Claude Code, so this plugin reuses the same SKILL.md skills, the same prevent hook lifecycle (PreToolUse/PostToolUse/Stop), and the same MCP configuration. Hooks live in a single `hooks/hooks.json` at the plugin root, which CoCo Desktop loads (it ignored the manifest's list of hook files), and their matchers use Cortex's lowercase tool IDs (`^bash$`, `^(edit|write|multi_edit|apply_patch)$`, `^skill$`) because matching is case-sensitive. For Desktop's `apply_patch`, the edit hooks read the patch text and check or track each file in it (`hooks/prevent/apply_patch.py`). The CoCo Desktop copy is built by `scripts/build_coco_desktop.py` and published by `scripts/publish_coco_desktop.py` from the release workflow. The other Cortex-specific adaptation is the prevent transcript reader: Cortex stores session messages in a sibling `<id>.history.jsonl` and persists hook output back into the transcript, so the gate scans only assistant-authored text to find its completion marker. See the [plugins README](../README.md) for the editor-support comparison and hook-format details, and the [Plugin Architecture Guide](../../docs/plugin-architecture-guide.md) for the shared-core/adapter design.
 
 ## Changelog
 
