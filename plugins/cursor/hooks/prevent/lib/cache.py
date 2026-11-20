@@ -106,6 +106,27 @@ def get_impact_check_state(session_id: str, table_name: str) -> str | None:
         return None
 
 
+def has_verified_impact_check(session_id: str) -> bool:
+    """Whether any table's impact check is verified in this session.
+
+    Session IDs may contain underscores, so another session whose ID extends
+    this one can match the file prefix. That only costs a missed shortcut.
+    """
+    prefix = f"{IC_PREFIX}{_validate_session_id(session_id)}_"
+    try:
+        names = [n for n in os.listdir(CACHE_DIR) if n.startswith(prefix)]
+    except OSError:
+        return False
+    for name in names:
+        try:
+            with open(os.path.join(CACHE_DIR, name), "r") as f:
+                if json.load(f).get("state") == "verified":
+                    return True
+        except (json.JSONDecodeError, OSError, AttributeError):
+            continue
+    return False
+
+
 def mark_impact_check_injected(session_id: str, table_name: str) -> None:
     path = _w4_path(session_id, table_name)
     _write_secure(path, json.dumps({"state": "injected", "timestamp": time.time()}))

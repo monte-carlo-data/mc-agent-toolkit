@@ -44,19 +44,28 @@ class TestSupportedForms:
         "git --no-pager commit -m x",
     ])
     def test_accepted_in_cwd(self, command):
-        assert target(command) == CommitTarget(repo_dir=CWD, amend=False)
+        assert target(command) == CommitTarget(repo_dir=CWD)
+
+    @pytest.mark.parametrize("command", [
+        "git commit --fixup=HEAD",
+        "git commit --fixup HEAD~1",
+        "git commit --fixup=amend:HEAD -m x",
+        "git commit --squash=HEAD",
+    ])
+    def test_fixup_and_squash_record_the_index(self, command):
+        assert target(command) == CommitTarget(repo_dir=CWD)
 
     def test_amend(self):
-        assert target("git commit --amend --no-edit") == CommitTarget(repo_dir=CWD, amend=True)
+        assert target("git commit --amend --no-edit") == CommitTarget(repo_dir=CWD)
 
     def test_message_that_looks_like_dry_run_is_a_real_commit(self):
         # Option arguments are consumed, not read as options.
-        assert target("git commit -m '--dry-run'") == CommitTarget(repo_dir=CWD, amend=False)
-        assert target("git commit -m --dry-run") == CommitTarget(repo_dir=CWD, amend=False)
+        assert target("git commit -m '--dry-run'") == CommitTarget(repo_dir=CWD)
+        assert target("git commit -m --dry-run") == CommitTarget(repo_dir=CWD)
 
     def test_message_containing_operators_is_one_word(self):
-        assert target("git commit -m 'a && b; c | d > e'") == CommitTarget(repo_dir=CWD, amend=False)
-        assert target('git commit -m "a && b; c"') == CommitTarget(repo_dir=CWD, amend=False)
+        assert target("git commit -m 'a && b; c | d > e'") == CommitTarget(repo_dir=CWD)
+        assert target('git commit -m "a && b; c"') == CommitTarget(repo_dir=CWD)
 
     def test_heredoc_message_via_command_substitution(self):
         command = (
@@ -67,10 +76,10 @@ class TestSupportedForms:
             "EOF\n"
             ')"'
         )
-        assert target(command) == CommitTarget(repo_dir=CWD, amend=False)
+        assert target(command) == CommitTarget(repo_dir=CWD)
 
     def test_backtick_substitution_in_message(self):
-        assert target('git commit -m "`cat msg`"') == CommitTarget(repo_dir=CWD, amend=False)
+        assert target('git commit -m "`cat msg`"') == CommitTarget(repo_dir=CWD)
 
     @pytest.mark.parametrize("command", [
         "git commit -m x 2>&1",
@@ -80,7 +89,7 @@ class TestSupportedForms:
         "git commit -m x < /dev/null",
     ])
     def test_redirections_are_ignored(self, command):
-        assert target(command) == CommitTarget(repo_dir=CWD, amend=False)
+        assert target(command) == CommitTarget(repo_dir=CWD)
 
 
 class TestTrailingCommands:
@@ -104,11 +113,11 @@ class TestTrailingCommands:
         'git commit -m "$(cat <<\'EOF\'\nmsg\nEOF\n)" && git status --short',
     ])
     def test_accepted(self, command):
-        assert target(command) == CommitTarget(repo_dir=CWD, amend=False)
+        assert target(command) == CommitTarget(repo_dir=CWD)
 
     def test_with_cd_prefix(self):
         assert target("cd dbt && git commit -m x && git status") == \
-            CommitTarget(repo_dir="/work/repo/dbt", amend=False)
+            CommitTarget(repo_dir="/work/repo/dbt")
 
     @pytest.mark.parametrize("command", [
         "git commit -am x && git status",
@@ -127,7 +136,7 @@ class TestAddBeforeCommit:
 
     def test_one_path(self):
         assert target("git add models/orders.sql && git commit -m x") == CommitTarget(
-            repo_dir=CWD, amend=False, add_paths=("/work/repo/models/orders.sql",))
+            repo_dir=CWD, add_paths=("/work/repo/models/orders.sql",))
 
     def test_several_paths_and_adds(self):
         t = target("git add a.sql b.sql && git add -- -odd.sql && git commit -m x")
@@ -135,11 +144,11 @@ class TestAddBeforeCommit:
 
     def test_add_and_commit_with_dash_c(self):
         t = target("git -C /r add models/o.sql && git -C /r commit -m x && git log -1")
-        assert t == CommitTarget(repo_dir="/r", amend=False, add_paths=("/r/models/o.sql",))
+        assert t == CommitTarget(repo_dir="/r", add_paths=("/r/models/o.sql",))
 
     def test_cd_prefix(self):
         t = target("cd dbt && git add models/o.sql && git commit -m x")
-        assert t == CommitTarget(repo_dir="/work/repo/dbt", amend=False,
+        assert t == CommitTarget(repo_dir="/work/repo/dbt",
                                  add_paths=("/work/repo/dbt/models/o.sql",))
 
     def test_paths_are_normalized(self):
@@ -203,11 +212,11 @@ class TestNewBranchBeforeCommit:
         "git -C /work/repo checkout -b jonathan/review-orders && git commit -m x",
     ])
     def test_accepted(self, command):
-        assert target(command) == CommitTarget(repo_dir=CWD, amend=False)
+        assert target(command) == CommitTarget(repo_dir=CWD)
 
     def test_with_add_and_cd(self):
         t = target("cd dbt && git checkout -b feat && git add models/o.sql && git commit -m x && git status")
-        assert t == CommitTarget(repo_dir="/work/repo/dbt", amend=False,
+        assert t == CommitTarget(repo_dir="/work/repo/dbt",
                                  add_paths=("/work/repo/dbt/models/o.sql",))
 
     def test_after_the_add(self):
@@ -239,23 +248,23 @@ class TestNewBranchBeforeCommit:
 
 class TestDirectory:
     def test_dash_c_relative(self):
-        assert target("git -C dbt commit -m x") == CommitTarget(repo_dir="/work/repo/dbt", amend=False)
+        assert target("git -C dbt commit -m x") == CommitTarget(repo_dir="/work/repo/dbt")
 
     def test_dash_c_absolute(self):
-        assert target("git -C /elsewhere commit -m x") == CommitTarget(repo_dir="/elsewhere", amend=False)
+        assert target("git -C /elsewhere commit -m x") == CommitTarget(repo_dir="/elsewhere")
 
     def test_dash_c_chains(self):
-        assert target("git -C a -C b commit") == CommitTarget(repo_dir="/work/repo/a/b", amend=False)
+        assert target("git -C a -C b commit") == CommitTarget(repo_dir="/work/repo/a/b")
 
     def test_dash_c_home(self):
         expected = os.path.join(os.path.expanduser("~"), "repo")
-        assert target("git -C ~/repo commit") == CommitTarget(repo_dir=expected, amend=False)
+        assert target("git -C ~/repo commit") == CommitTarget(repo_dir=expected)
 
     def test_cd_prefix(self):
-        assert target("cd dbt && git commit -m x") == CommitTarget(repo_dir="/work/repo/dbt", amend=False)
+        assert target("cd dbt && git commit -m x") == CommitTarget(repo_dir="/work/repo/dbt")
 
     def test_cd_prefix_quoted_dir(self):
-        assert target("cd 'my dbt' && git commit -m x") == CommitTarget(repo_dir="/work/repo/my dbt", amend=False)
+        assert target("cd 'my dbt' && git commit -m x") == CommitTarget(repo_dir="/work/repo/my dbt")
 
     @pytest.mark.parametrize("command", [
         "git -C $REPO commit -m x",
@@ -293,6 +302,12 @@ class TestUnsupported:
         "git commit --patch",
         "git commit --interactive",
         "git commit --pathspec-from-file=f",
+        # commits that don't record the index: a message-only fixup, a status listing
+        "git commit --fixup=reword:HEAD --no-edit",
+        "git commit --fixup reword:HEAD",
+        "git commit -z -m x",
+        "git commit -zm x",
+        "git commit --null -m x",
         # unknown options are not guessed at
         "git commit --frobnicate",
         "git commit -X",

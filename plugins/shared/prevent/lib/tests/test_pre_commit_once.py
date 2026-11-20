@@ -321,6 +321,15 @@ class TestAddBeforeCommit:
         git(repo, "add", "models/orders.sql")
         assert once(repo).action == "noop"
 
+    def test_order_of_staged_and_added_models_does_not_matter(self, repo):
+        # The digest must not depend on whether a model was staged before or by the command.
+        stage(repo, "models/zeta.sql")
+        write(repo, "models/alpha.sql")
+        verify("s1", "zeta", "alpha")
+        assert once(repo, command="git add models/alpha.sql && git commit -m x").action == "deny"
+        git(repo, "add", "models/alpha.sql")
+        assert once(repo).action == "noop"
+
     def test_missing_untracked_path_stays_silent(self, repo):
         # git add fails, so the commit never runs.
         stage(repo, "models/orders.sql")
@@ -350,6 +359,19 @@ def _pause_reason_for_plain_commit(repo):
     git(repo, "add", "models/orders.sql")
     verify("s2", "orders")
     return once(repo, session="s2").reason
+
+
+class TestNoPreventInSession:
+    def test_no_git_runs_without_a_verified_table(self, repo, monkeypatch):
+        # A session where Prevent never ran shouldn't pay for reading the commit.
+        import lib.protocol as protocol
+        stage(repo, "models/orders.sql")
+        cache.mark_impact_check_injected("s1", "orders")  # injected, not verified
+        verify("other", "orders")
+        calls = []
+        monkeypatch.setattr(protocol, "_git", lambda *a, **k: calls.append(a) or None)
+        assert once(repo).action == "noop"
+        assert calls == []
 
 
 class TestStaysSilent:

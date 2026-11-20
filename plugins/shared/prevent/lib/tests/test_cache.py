@@ -200,6 +200,37 @@ class TestFilePermissions:
         assert self._get_perms(path) == 0o600
 
 
+class TestHasVerifiedImpactCheck:
+    def test_none(self):
+        assert cache.has_verified_impact_check("s1") is False
+
+    def test_injected_only(self):
+        cache.mark_impact_check_injected("s1", "orders")
+        assert cache.has_verified_impact_check("s1") is False
+
+    def test_verified(self):
+        cache.mark_impact_check_injected("s1", "orders")
+        cache.mark_impact_check_injected("s1", "customers")
+        cache.mark_impact_check_verified("s1", "customers")
+        assert cache.has_verified_impact_check("s1") is True
+
+    def test_other_session(self):
+        cache.mark_impact_check_injected("s2", "orders")
+        cache.mark_impact_check_verified("s2", "orders")
+        assert cache.has_verified_impact_check("s1") is False
+
+    @pytest.mark.parametrize("content", ["not json", "[]"])
+    def test_unreadable_file_is_skipped(self, content):
+        with open(os.path.join(cache.CACHE_DIR, cache.IC_PREFIX + "s1_bad"), "w") as f:
+            f.write(content)
+        cache.mark_impact_check_injected("s1", "orders")
+        assert cache.has_verified_impact_check("s1") is False
+
+    def test_missing_cache_dir(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(cache, "CACHE_DIR", str(tmp_path / "gone"))
+        assert cache.has_verified_impact_check("s1") is False
+
+
 class TestRemoveEditedTables:
     def test_removes_only_the_named_tables_in_order(self):
         for t in ("a", "b", "c"):

@@ -136,14 +136,56 @@ class TestReadStagedModels:
         calls = []
         real_git = protocol._git
 
-        def spy(args, cwd, text=True):
-            calls.append(args[0])
-            return real_git(args, cwd, text=text)
+        def spy(args, cwd, text=True, **kwargs):
+            calls.append(args)
+            return real_git(args, cwd, text=text, **kwargs)
 
         monkeypatch.setattr(protocol, "_git", spy)
         _, models = _read_staged_models(str(repo))
         assert [m.table for m in models] == ["orders"]
+        cat_files = [a for a in calls if a[0] == "cat-file"]
+        assert len(cat_files) == 1
+
+    def test_reads_all_blobs_in_one_git_call(self, repo, monkeypatch):
+        # One git process per staged model made a 400-model commit take seconds.
+        import lib.protocol as protocol
+        for i in range(5):
+            write(repo, f"models/m{i}.sql", DBT_SQL)
+        write(repo, "models/plain.sql", "-- not a model\n")
+        write(repo, "models/empty.sql", "")
+        (repo / "models/latin1.sql").write_bytes(b"-- caf\xe9\n" + DBT_SQL.encode())
+        git(repo, "add", ".")
+        calls = []
+        real_git = protocol._git
+
+        def spy(args, cwd, text=True, **kwargs):
+            calls.append(args[0])
+            return real_git(args, cwd, text=text, **kwargs)
+
+        monkeypatch.setattr(protocol, "_git", spy)
+        _, models = _read_staged_models(str(repo))
+        assert sorted(m.table for m in models) == ["latin1", "m0", "m1", "m2", "m3", "m4"]
         assert calls.count("cat-file") == 1
+
+    def test_each_path_gets_its_own_blob(self, repo):
+        write(repo, "models/a.sql", "-- not a model\n")
+        write(repo, "models/b.sql", DBT_SQL)
+        write(repo, "models/c.sql", DBT_SQL + "-- c\n")
+        git(repo, "add", ".")
+        _, models = _read_staged_models(str(repo))
+        assert [(m.path, m.table) for m in models] == [("models/b.sql", "b"), ("models/c.sql", "c")]
+
+    @pytest.mark.parametrize("reply", [
+        b"abc missing\n",
+        b"abc blob x\n\n",
+        b"abc tree 3\nxyz\n",
+        b"abc blob 99\nshort\n",
+        b"",
+    ])
+    def test_unreadable_batch_reply_is_none(self, repo, monkeypatch, reply):
+        import lib.protocol as protocol
+        monkeypatch.setattr(protocol, "_git", lambda *a, **k: reply)
+        assert protocol._read_blobs(["abc"], str(repo)) is None
 
     def test_nothing_staged(self, repo):
         toplevel, models = _read_staged_models(str(repo))
