@@ -88,7 +88,10 @@ def _gate_patch(raw: dict) -> None:
             try:
                 result = evaluate_pre_edit(_hook_input(raw, path))
                 if result.action == "deny":
-                    denied[extract_table_name(path)] = result.reason
+                    # Keep the first file's reason: it carries the assessment instructions
+                    # and starts the grace period, so a later file of the same table only
+                    # gets the short "not completed yet" text.
+                    denied.setdefault(extract_table_name(path), result.reason)
                     denied_paths.add(path)
             except Exception:
                 continue

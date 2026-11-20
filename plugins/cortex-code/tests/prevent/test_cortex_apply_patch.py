@@ -126,6 +126,17 @@ class TestParseOperations:
         # header with nothing after it is not an operation.
         assert self._ops(_patch(*_update("README.md"), "*** Delete File: \ufeff")) == [("update", "README.md", None)]
 
+    @pytest.mark.parametrize("char", ["\x1c", "\x1d", "\x1e", "\x1f", "\x85"])
+    def test_python_only_whitespace_is_not_trimmed(self, char):
+        """JavaScript's trim keeps these five, which Python's isspace counts as whitespace."""
+        assert self._ops(_patch(*_update(f"{char}/../models/orders.sql"))) == [
+            ("update", f"{char}/../models/orders.sql", None)
+        ]
+        # The Add's path is the character itself, so the Update section ends and the
+        # indented header after it is read.
+        text = _patch(*_update("README.md"), f"*** Add File: {char}", "  *** Update File: models/orders.sql")
+        assert self._ops(text)[-1] == ("update", "models/orders.sql", None)
+
     def test_first_move_kept(self):
         text = _patch("*** Update File: models/a.sql", "*** Move to: models/b.sql", "*** Move to: models/c.sql")
         assert self._ops(text) == [("update", "models/a.sql", "models/b.sql")]
@@ -383,6 +394,16 @@ class TestPreEditApplyPatch:
         text = _patch(*_update("models/orders.sql"), *_update("./models/orders.sql", "c", "d"))
         reason = _run_pre(_pre_stdin(text, str(project), _session_files(tmp_path)), capsys)["permissionDecisionReason"]
         assert reason.startswith("Monte Carlo Prevent: run the change impact assessment for orders")
+
+    def test_two_files_with_the_same_table_name_get_the_full_instructions(self, project, tmp_path, capsys):
+        """The second file is inside the first one's grace period; its short reason must
+        not replace the first file's instructions."""
+        (project / "models" / "b").mkdir()
+        (project / "models" / "b" / "orders.sql").write_text(MODEL_SQL)
+        text = _patch(*_update("models/orders.sql"), *_update("models/b/orders.sql", "c", "d"))
+        reason = _run_pre(_pre_stdin(text, str(project), _session_files(tmp_path)), capsys)["permissionDecisionReason"]
+        assert reason.startswith("Monte Carlo Prevent: run the change impact assessment for orders")
+        assert "has not completed yet" not in reason
 
     def test_split_hint_only_when_other_files_are_in_the_patch(self, project, tmp_path, capsys):
         models_only = _patch(*_update("models/orders.sql"), *_update("models/customers.sql"))

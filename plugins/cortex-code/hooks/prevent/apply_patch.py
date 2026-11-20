@@ -51,9 +51,13 @@ class Op(NamedTuple):
     move_to: str | None = None
 
 
+# Python's isspace counts these as whitespace; JavaScript's trim keeps them.
+_PYTHON_ONLY_SPACE = frozenset("\x1c\x1d\x1e\x1f\x85")
+
+
 def _is_js_space(char: str) -> bool:
-    """JavaScript's trim also removes U+FEFF; Python's strip does not."""
-    return char.isspace() or char == "\ufeff"
+    """Whitespace as JavaScript's trim sees it: U+FEFF counts, U+001C-U+001F and U+0085 don't."""
+    return char == "\ufeff" or (char.isspace() and char not in _PYTHON_ONLY_SPACE)
 
 
 def _strip_leading_whitespace(text: str) -> str:
