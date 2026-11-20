@@ -114,6 +114,22 @@ class TestParseOperations:
         text = _patch("*** Update File: models/a.sql", "*** Move to: models/b.sql")
         assert self._ops(text) == [("update", "models/a.sql", "models/b.sql")]
 
+    def test_move_after_a_hunk_still_counts(self):
+        """The clients reject this patch; reading the Move anyway only adds a file to check."""
+        text = _patch("*** Update File: models/a.sql", "@@", "-x", "+y", "*** Move to: models/b.sql")
+        assert self._ops(text) == [("update", "models/a.sql", "models/b.sql")]
+
+    def test_bom_after_header_inside_update_section(self):
+        text = _patch(*_update("README.md"), "*** Delete File: models/orders.sql\ufeff")
+        assert self._ops(text)[-1] == ("delete", "models/orders.sql", None)
+        # Trailing whitespace is stripped the JavaScript way (U+FEFF included), so a
+        # header with nothing after it is not an operation.
+        assert self._ops(_patch(*_update("README.md"), "*** Delete File: \ufeff")) == [("update", "README.md", None)]
+
+    def test_first_move_kept(self):
+        text = _patch("*** Update File: models/a.sql", "*** Move to: models/b.sql", "*** Move to: models/c.sql")
+        assert self._ops(text) == [("update", "models/a.sql", "models/b.sql")]
+
     def test_move_not_right_after_update_is_ignored(self):
         text = _patch("*** Add File: models/a.sql", "*** Move to: models/b.sql", "+x")
         assert self._ops(text) == [("add", "models/a.sql", None)]
@@ -135,6 +151,29 @@ class TestParseOperations:
 
     def test_path_is_trimmed(self):
         assert self._ops(_patch("*** Delete File:   models/a.sql  ")) == [("delete", "models/a.sql", None)]
+
+    def test_path_trailing_bom_is_trimmed(self):
+        """JavaScript's trim, which the clients use on paths, also removes U+FEFF."""
+        assert self._ops(_patch("*** Delete File: models/orders.sql\ufeff")) == [("delete", "models/orders.sql", None)]
+
+    def test_indented_patch_outside_update_hunks(self):
+        """The Cortex Code CLI trims a line before matching a header outside an Update hunk."""
+        text = "  *** Begin Patch\n  *** Delete File: models/orders.sql\n  *** End Patch\n"
+        assert self._ops(text) == [("delete", "models/orders.sql", None)]
+
+    def test_indented_header_after_add_or_delete(self):
+        text = _patch("*** Add File: notes.txt", "+hi", "  *** Update File: models/orders.sql", "@@", "-a", "+b",
+                      "*** Delete File: x.txt", "\t*** Delete File: models/customers.sql")
+        assert [p for _, p, _ in self._ops(text)] == ["notes.txt", "models/orders.sql", "x.txt", "models/customers.sql"]
+
+    def test_indented_line_in_update_hunk_is_content(self):
+        """Inside an Update's hunks the CLI only strips trailing whitespace, so an indented
+        header there is a context line, not a new operation."""
+        text = _patch("*** Update File: README.md", "@@", "  *** Delete File: models/orders.sql", "-a", "+b")
+        assert self._ops(text) == [("update", "README.md", None)]
+
+    def test_update_header_on_last_line(self):
+        assert self._ops("*** Begin Patch\n*** Update File: models/orders.sql") == [("update", "models/orders.sql", None)]
 
     def test_hunk_content_that_looks_like_a_header_is_not_one(self):
         text = _patch("*** Update File: README.md", "@@", "-old", "+*** Update File: models/orders.sql",
@@ -233,6 +272,34 @@ class TestAppliedOperations:
         assert len(self._applied(None)) == 3
         assert len(self._applied("not json")) == 3
         assert len(self._applied(json.dumps({"unexpected": True}))) == 3
+        assert len(self._applied("null")) == 3
+        assert len(self._applied("5")) == 3
+
+    def test_failure_beyond_the_last_operation_keeps_all(self):
+        assert len(self._applied(self._resp("Error: Patch partially applied through operation 9/3: x"))) == 3
+
+    @pytest.mark.parametrize("text", [
+        "apply_patch verification failed: Update file hunk for path 'models/orders.sql' is empty",
+        "apply_patch received invalid input text",
+        "apply_patch handler received non-apply_patch input",
+        "Missing required parameter: input",
+    ])
+    def test_cli_errors_before_writing_keep_none(self, text):
+        """Cortex Code CLI results returned before any file is written, as a plain string
+        or as the CLI's result object."""
+        assert self._applied(text) == []
+        assert self._applied({"content": [{"type": "text", "text": text}], "status": "error"}) == []
+        assert self._applied(json.dumps({"content": [{"type": "text", "text": text}], "status": "error"})) == []
+
+    def test_cli_success_object_keeps_all(self):
+        response = {"content": [{"type": "text", "text": "Applied patch successfully (3 file operation(s))."}],
+                    "status": "success"}
+        assert len(self._applied(response)) == 3
+
+    def test_cli_error_during_operations_keeps_all(self):
+        """A CLI failure partway through can follow earlier writes, so nothing is dropped."""
+        response = {"content": [{"type": "text", "text": "Cannot update missing file: /p/README.md"}], "status": "error"}
+        assert len(self._applied(response)) == 3
 
 
 # --- Pre-edit gate ---
@@ -306,6 +373,30 @@ class TestPreEditApplyPatch:
         reason = _run_pre(_pre_stdin(_patch(*_update("models/orders.sql")), str(project),
                                      _session_files(tmp_path)), capsys)["permissionDecisionReason"]
         assert reason.startswith("Monte Carlo Prevent: run the change impact assessment for orders")
+
+    def test_rename_of_a_model_keeps_the_plain_reason(self, project, tmp_path, capsys):
+        text = _patch("*** Update File: models/orders.sql", "*** Move to: models/orders_v2.sql")
+        reason = _run_pre(_pre_stdin(text, str(project), _session_files(tmp_path)), capsys)["permissionDecisionReason"]
+        assert reason.startswith("Monte Carlo Prevent: run the change impact assessment for orders")
+
+    def test_same_file_twice_keeps_the_plain_reason(self, project, tmp_path, capsys):
+        text = _patch(*_update("models/orders.sql"), *_update("./models/orders.sql", "c", "d"))
+        reason = _run_pre(_pre_stdin(text, str(project), _session_files(tmp_path)), capsys)["permissionDecisionReason"]
+        assert reason.startswith("Monte Carlo Prevent: run the change impact assessment for orders")
+
+    def test_split_hint_only_when_other_files_are_in_the_patch(self, project, tmp_path, capsys):
+        models_only = _patch(*_update("models/orders.sql"), *_update("models/customers.sql"))
+        reason = _run_pre(_pre_stdin(models_only, str(project), _session_files(tmp_path)), capsys)["permissionDecisionReason"]
+        assert "this patch touches 2 files" in reason
+        assert "split out" not in reason
+
+        mixed = _patch(*_update("models/orders.sql"), *_update("README.md"))
+        reason = _run_pre(_pre_stdin(mixed, str(project), _session_files(tmp_path)), capsys)["permissionDecisionReason"]
+        assert "split out the changes to other files" in reason
+
+    def test_indented_patch_still_gated(self, project, tmp_path, capsys):
+        text = "  *** Begin Patch\n  *** Delete File: models/orders.sql\n  *** End Patch\n"
+        assert _run_pre(_pre_stdin(text, str(project), _session_files(tmp_path)), capsys)["permissionDecision"] == "deny"
 
     def test_non_dbt_patch_allowed(self, project, tmp_path, capsys):
         assert _run_pre(_pre_stdin(_patch(*_update("README.md")), str(project), _session_files(tmp_path)), capsys) is None
@@ -402,6 +493,8 @@ class TestPostEditApplyPatch:
                       *_update("models/schema.yml"), *_update("README.md"))
 
     def test_success_tracks_every_dbt_file(self, project):
+        # The gate allowed the move only after customers was assessed.
+        cache.mark_impact_check_verified(SESSION, "customers")
         (project / "models" / "schema.yml").write_text("version: 2\n")
         (project / "models" / "customers.sql").rename(project / "models" / "clients.sql")
         _run_post(_post_stdin(self._patch(), str(project), "Applied 4 operation(s) (3 added, 3 removed) across 5 file(s)."))
@@ -411,7 +504,36 @@ class TestPostEditApplyPatch:
         _run_post(_post_stdin(self._patch(), str(project), "Error parsing apply_patch input: bad hunk"))
         assert cache.get_edited_tables(SESSION) == []
 
+    def test_added_model_tracked(self, project):
+        (project / "models" / "brand_new.sql").write_text(MODEL_SQL)
+        _run_post(_post_stdin(_patch("*** Add File: models/brand_new.sql", "+select 1"), str(project),
+                              "Applied 1 operation(s)."))
+        assert cache.get_edited_tables(SESSION) == ["brand_new"]
+
+    def test_deleted_model_tracked(self, project):
+        cache.mark_impact_check_verified(SESSION, "orders")
+        (project / "models" / "orders.sql").unlink()
+        _run_post(_post_stdin(_patch("*** Delete File: models/orders.sql"), str(project), "Applied 1 operation(s)."))
+        assert cache.get_edited_tables(SESSION) == ["orders"]
+
+    def test_deleted_plain_sql_not_tracked(self, project):
+        """A .sql file with no dbt constructs isn't gated; once it's gone it must not be
+        tracked as a changed model."""
+        (project / "models" / "plain.sql").write_text("select 1\n")
+        (project / "models" / "plain.sql").unlink()
+        _run_post(_post_stdin(_patch("*** Delete File: models/plain.sql"), str(project), "Applied 1 operation(s)."))
+        assert cache.get_edited_tables(SESSION) == []
+
+    def test_moved_away_plain_sql_not_tracked(self, project):
+        (project / "models" / "plain.sql").write_text("select 1\n")
+        (project / "models" / "plain.sql").rename(project / "models" / "plain2.sql")
+        _run_post(_post_stdin(_patch("*** Update File: models/plain.sql", "*** Move to: models/plain2.sql"),
+                              str(project), "Applied 1 operation(s)."))
+        assert cache.get_edited_tables(SESSION) == []
+
     def test_partial_failure_tracks_completed_operations(self, project):
+        cache.mark_impact_check_verified(SESSION, "customers")
+        (project / "models" / "customers.sql").rename(project / "models" / "clients.sql")
         _run_post(_post_stdin(self._patch(), str(project),
                               "Error: Patch partially applied through operation 3/4: context not found"))
         assert sorted(cache.get_edited_tables(SESSION)) == ["clients", "customers", "orders"]

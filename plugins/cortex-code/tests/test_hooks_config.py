@@ -4,7 +4,7 @@ Cortex Code reads a plugin's hooks from ``hooks/hooks.json`` at the plugin root.
 Desktop 2.0.0 ignored a manifest ``hooks`` array, so the manifest must not declare one.
 Matchers are unanchored, case-sensitive regexes tested against Cortex's lowercase tool
 IDs (``bash``, ``edit``, ``write``, ``multi_edit``, ``apply_patch``, ``skill``); PascalCase
-names never match. CoCo Desktop gives GPT and OpenAI models ``apply_patch`` in place of the
+names never match. Cortex Code gives GPT and OpenAI models ``apply_patch`` in place of the
 edit tools, so the edit hooks match it too. ``${CORTEX_PLUGIN_ROOT}`` is substituted into the command text, not exported, so
 the commands must quote it to survive install paths that contain spaces.
 
