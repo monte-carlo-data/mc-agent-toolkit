@@ -12,7 +12,7 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "^(edit|write|multi_edit)$",
+        "matcher": "^(edit|write|multi_edit|apply_patch)$",
         "hooks": [
           {
             "type": "command",
@@ -41,7 +41,7 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "^(edit|write|multi_edit)$",
+        "matcher": "^(edit|write|multi_edit|apply_patch)$",
         "hooks": [
           {
             "type": "command",

@@ -38,7 +38,7 @@ jobs:
         with:
           python-version: '3.11'
 
-      # Stdlib only — no pip install needed.
+      # Stdlib only, except the prevent adapter tests, which need pytest.
       - name: Hook config matches how Cortex Code loads and matches hooks
         run: python3 plugins/cortex-code/tests/test_hooks_config.py
 
@@ -47,3 +47,8 @@ jobs:
 
       - name: CoCo Desktop publish
         run: python3 scripts/tests/test_publish_coco_desktop.py
+
+      - name: Prevent hook adapters
+        run: |
+          python3 -m pip install pytest==8.3.5
+          python3 -m pytest -q plugins/cortex-code/tests/prevent
