@@ -151,3 +151,22 @@ jobs:
           python3 -m unittest discover -s scripts/tests -p 'test_skill_tool_routing.py' -v 2>&1 | tee test.log
           # discover exits 0 when it finds no tests; require that they ran.
           grep -Eq '^Ran [1-9][0-9]* tests?' test.log
+
+  skill-frontmatter-valid-yaml:
+    name: Skill frontmatter is valid YAML
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install PyYAML
+        run: python -m pip install PyYAML==6.0.3
+
+      - name: Checker tests
+        run: python3 scripts/tests/test_check_skill_frontmatter.py
+
+      - name: Every SKILL.md frontmatter parses and has a name and description
+        run: python3 scripts/check_skill_frontmatter.py

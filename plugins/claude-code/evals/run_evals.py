@@ -22,6 +22,8 @@ import re
 import sys
 from pathlib import Path
 
+import yaml
+
 from claude_judge import ask_sync
 
 EVALS_DIR = Path(__file__).parent
@@ -58,30 +60,22 @@ def load_skill_metadata(skill_dir: Path) -> tuple[str, str, str]:
     skill_md = skill_dir / "SKILL.md"
     content = skill_md.read_text()
 
-    frontmatter = re.search(r"^---\n(.*?)\n---", content, re.DOTALL)
+    frontmatter = re.match(r"---\n(.*?)\n---(?:\n|\Z)", content, re.DOTALL)
     if not frontmatter:
         raise ValueError(f"No frontmatter found in {skill_md}")
+    fields = yaml.safe_load(frontmatter.group(1))
+    if fields is None:
+        fields = {}
+    if not isinstance(fields, dict):
+        raise ValueError(f"Frontmatter in {skill_md} is not a mapping of keys to values")
 
-    fm = frontmatter.group(1)
-    name_match = re.search(r"^name:\s*(.+)$", fm, re.MULTILINE)
-    # description may be multi-line (YAML block scalar with > or |);
-    # block scalars may contain blank lines between paragraphs, so accept
-    # indented lines or empty lines and stop at the next top-level key.
-    desc_match = re.search(r"^description:\s*[>|]\n((?:(?:  .*\n)|\n)+)", fm, re.MULTILINE)
-    if not desc_match:
-        desc_match = re.search(r"^description:\s*(.+)$", fm, re.MULTILINE)
-    # when_to_use is typically a |-block; also accept inline single-line form.
-    wtu_match = re.search(r"^when_to_use:\s*[>|]\n((?:(?:  .*\n)|\n)+)", fm, re.MULTILINE)
-    if not wtu_match:
-        wtu_match = re.search(r"^when_to_use:\s*(.+)$", fm, re.MULTILINE)
-
-    name = name_match.group(1).strip() if name_match else "unknown"
-    description = re.sub(r"\s+", " ", desc_match.group(1).strip()) if desc_match else ""
-    when_to_use = wtu_match.group(1).strip() if wtu_match else ""
-    # For when_to_use, preserve internal line breaks to keep the block readable
-    # to the judge, but strip leading indentation from the |-block.
-    if when_to_use:
-        when_to_use = "\n".join(line.strip() for line in when_to_use.splitlines() if line.strip())
+    name = str(fields.get("name") or "unknown").strip()
+    description = re.sub(r"\s+", " ", str(fields.get("description") or "")).strip()
+    # Keep when_to_use's line breaks so the block stays readable to the judge; drop
+    # indentation and blank lines.
+    when_to_use = "\n".join(
+        line.strip() for line in str(fields.get("when_to_use") or "").splitlines() if line.strip()
+    )
     return name, description, when_to_use
 
 
