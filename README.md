@@ -66,14 +66,14 @@ The data is stored in Mixpanel and Datadog and is used only for product-developm
 
 | Feature | Description | Details |
 |---|---|---|
-| **Monitoring Advisor** | Analyzes data coverage, creates monitors for warehouse tables and AI agents — covers coverage gaps, use-case analysis, data monitor creation, and agent observability. | [Skill README](https://github.com/monte-carlo-data/mc-agent-toolkit/blob/v1.32.0/skills/monitoring-advisor/README.md) |
-| **Prevent** | Gates dbt model edits with impact assessments, generates monitors-as-code, and produces targeted validation queries. Full hook enforcement. | [Skill README](https://github.com/monte-carlo-data/mc-agent-toolkit/blob/v1.32.0/skills/prevent/README.md) |
-| **Generate Validation Notebook** | Generates SQL validation notebooks for dbt model changes from a PR or local repo. | [Skill README](https://github.com/monte-carlo-data/mc-agent-toolkit/blob/v1.32.0/skills/generate-validation-notebook/README.md) |
-| **Push Ingestion** | Generates warehouse-specific collection scripts for pushing metadata, lineage, and query logs to Monte Carlo. Includes 10 `/mc-*` slash commands. | [Skill README](https://github.com/monte-carlo-data/mc-agent-toolkit/blob/v1.32.0/skills/push-ingestion/README.md) |
-| **Onboarding** | Connects a warehouse to Monte Carlo through the REST API v2 tools: deployment choice, credential references, warehouse and connection; Terraform or SDK/CLI script output on request. `/monte-carlo-onboarding`. | [Skill README](https://github.com/monte-carlo-data/mc-agent-toolkit/blob/v1.32.0/skills/onboarding/README.md) |
-| **Automated Triage** | Guides you through automated alert triage — scoring, deep troubleshooting, classification, and actions. Requires extended MCP toolset. | [SKILL](https://github.com/monte-carlo-data/mc-agent-toolkit/blob/v1.32.0/skills/automated-triage/SKILL.md) |
+| **Monitoring Advisor** | Analyzes data coverage, creates monitors for warehouse tables and AI agents — covers coverage gaps, use-case analysis, data monitor creation, and agent observability. | [Skill README](https://github.com/monte-carlo-data/mc-agent-toolkit/blob/v1.32.1/skills/monitoring-advisor/README.md) |
+| **Prevent** | Gates dbt model edits with impact assessments, generates monitors-as-code, and produces targeted validation queries. Full hook enforcement. | [Skill README](https://github.com/monte-carlo-data/mc-agent-toolkit/blob/v1.32.1/skills/prevent/README.md) |
+| **Generate Validation Notebook** | Generates SQL validation notebooks for dbt model changes from a PR or local repo. | [Skill README](https://github.com/monte-carlo-data/mc-agent-toolkit/blob/v1.32.1/skills/generate-validation-notebook/README.md) |
+| **Push Ingestion** | Generates warehouse-specific collection scripts for pushing metadata, lineage, and query logs to Monte Carlo. Includes 10 `/mc-*` slash commands. | [Skill README](https://github.com/monte-carlo-data/mc-agent-toolkit/blob/v1.32.1/skills/push-ingestion/README.md) |
+| **Onboarding** | Connects a warehouse to Monte Carlo through the REST API v2 tools: deployment choice, credential references, warehouse and connection; Terraform or SDK/CLI script output on request. `/monte-carlo-onboarding`. | [Skill README](https://github.com/monte-carlo-data/mc-agent-toolkit/blob/v1.32.1/skills/onboarding/README.md) |
+| **Automated Triage** | Guides you through automated alert triage — scoring, deep troubleshooting, classification, and actions. Requires extended MCP toolset. | [SKILL](https://github.com/monte-carlo-data/mc-agent-toolkit/blob/v1.32.1/skills/automated-triage/SKILL.md) |
 
-All 21 skills are bundled — see the [skills directory](https://github.com/monte-carlo-data/mc-agent-toolkit/tree/v1.32.0/skills) for the full list. CoCo Desktop has no slash commands, so the Desktop build turns them into skills: it has 35 in all.
+All 21 skills are bundled — see the [skills directory](https://github.com/monte-carlo-data/mc-agent-toolkit/tree/v1.32.1/skills) for the full list. CoCo Desktop has no slash commands, so the Desktop build turns them into skills: it has 35 in all.
 
 The Prevent feature includes **PreToolUse hooks that block edits to dbt SQL files** until an impact assessment runs. The hooks only fire on `.sql` files inside dbt model, macro, or snapshot directories — they do not affect non-dbt files.
 
@@ -84,7 +84,7 @@ In CoCo Desktop, hooks run only in a trusted workspace. Two Prevent behaviors ar
 
 **To disable the Prevent hooks**, set `MC_PREVENT_HOOKS_DISABLED=1` in your environment. The hooks will exit immediately without blocking any edits.
 
-See the [Prevent Hook Behavior](https://github.com/monte-carlo-data/mc-agent-toolkit/blob/v1.32.0/plugins/README.md#prevent-hook-behavior) section in the plugins README for full details on scope and configuration.
+See the [Prevent Hook Behavior](https://github.com/monte-carlo-data/mc-agent-toolkit/blob/v1.32.1/plugins/README.md#prevent-hook-behavior) section in the plugins README for full details on scope and configuration.
 
 ## Updating
 
@@ -110,7 +110,7 @@ cortex plugin uninstall mc-agent-toolkit
 
 ## Architecture
 
-Cortex Code wraps Claude Code, so this plugin reuses the same SKILL.md skills, the same prevent hook lifecycle (PreToolUse/PostToolUse/Stop), and the same MCP configuration. Hooks live in a single `hooks/hooks.json` at the plugin root, which CoCo Desktop loads (it ignored the manifest's list of hook files), and their matchers use Cortex's lowercase tool IDs (`^bash$`, `^(edit|write|multi_edit)$`, `^skill$`) because matching is case-sensitive. The CoCo Desktop copy is built by `scripts/build_coco_desktop.py` and published by `scripts/publish_coco_desktop.py` from the release workflow. The other Cortex-specific adaptation is the prevent transcript reader: Cortex stores session messages in a sibling `<id>.history.jsonl` and persists hook output back into the transcript, so the gate scans only assistant-authored text to find its completion marker. See the [plugins README](https://github.com/monte-carlo-data/mc-agent-toolkit/blob/v1.32.0/plugins/README.md) for the editor-support comparison and hook-format details, and the [Plugin Architecture Guide](https://github.com/monte-carlo-data/mc-agent-toolkit/blob/v1.32.0/docs/plugin-architecture-guide.md) for the shared-core/adapter design.
+Cortex Code wraps Claude Code, so this plugin reuses the same SKILL.md skills, the same prevent hook lifecycle (PreToolUse/PostToolUse/Stop), and the same MCP configuration. Hooks live in a single `hooks/hooks.json` at the plugin root, which CoCo Desktop loads (it ignored the manifest's list of hook files), and their matchers use Cortex's lowercase tool IDs (`^bash$`, `^(edit|write|multi_edit)$`, `^skill$`) because matching is case-sensitive. The CoCo Desktop copy is built by `scripts/build_coco_desktop.py` and published by `scripts/publish_coco_desktop.py` from the release workflow. The other Cortex-specific adaptation is the prevent transcript reader: Cortex stores session messages in a sibling `<id>.history.jsonl` and persists hook output back into the transcript, so the gate scans only assistant-authored text to find its completion marker. See the [plugins README](https://github.com/monte-carlo-data/mc-agent-toolkit/blob/v1.32.1/plugins/README.md) for the editor-support comparison and hook-format details, and the [Plugin Architecture Guide](https://github.com/monte-carlo-data/mc-agent-toolkit/blob/v1.32.1/docs/plugin-architecture-guide.md) for the shared-core/adapter design.
 
 ## Changelog
 
