@@ -1,0 +1,20 @@
+test_flags_each_client_form (test_skill_tool_routing.ClientToolIdScanner.test_flags_each_client_form) ... ok
+test_passes_ordinary_text (test_skill_tool_routing.ClientToolIdScanner.test_passes_ordinary_text) ... ok
+test_canonical_block_parses (test_skill_tool_routing.RoutedSkillsCarryTheNote.test_canonical_block_parses) ... ok
+test_every_routed_skill (test_skill_tool_routing.RoutedSkillsCarryTheNote.test_every_routed_skill) ... ok
+test_example_the_skill_never_names (test_skill_tool_routing.RoutingCheckCanFail.test_example_the_skill_never_names) ... ok
+test_forbidden_example (test_skill_tool_routing.RoutingCheckCanFail.test_forbidden_example) ... ok
+test_label_renamed (test_skill_tool_routing.RoutingCheckCanFail.test_label_renamed) ... ok
+test_note_deleted (test_skill_tool_routing.RoutingCheckCanFail.test_note_deleted) ... ok
+test_note_duplicated (test_skill_tool_routing.RoutingCheckCanFail.test_note_duplicated) ... ok
+test_one_word_edited (test_skill_tool_routing.RoutingCheckCanFail.test_one_word_edited) ... ok
+test_plugin_paragraph_deleted (test_skill_tool_routing.RoutingCheckCanFail.test_plugin_paragraph_deleted) ... ok
+test_plugin_paragraph_exposed (test_skill_tool_routing.RoutingCheckCanFail.test_plugin_paragraph_exposed) ... ok
+test_portable_note_hidden_in_markers (test_skill_tool_routing.RoutingCheckCanFail.test_portable_note_hidden_in_markers) ... ok
+test_unbalanced_markers (test_skill_tool_routing.RoutingCheckCanFail.test_unbalanced_markers) ... ok
+test_no_client_tool_id_under_skills (test_skill_tool_routing.SharedSkillsNameNoClientToolIds.test_no_client_tool_id_under_skills) ... ok
+
+----------------------------------------------------------------------
+Ran 15 tests in 0.111s
+
+OK
