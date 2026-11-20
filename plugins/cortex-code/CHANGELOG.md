@@ -5,6 +5,13 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Snowflake Cortex
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.32.3] - 2026-11-19
+
+### Fixed
+
+- Cortex Code: Prevent gates dbt edits from GPT and OpenAI models in CoCo Desktop. Desktop gives those models an `apply_patch` tool instead of edit and write tools, and the hooks didn't see it, so their edits to dbt models weren't gated. The edit hooks now match `apply_patch` and read every file a patch adds, updates, deletes or moves. If any file needs an impact assessment, the whole patch is blocked with one message naming every table. After the patch runs, the files it may have changed are tracked for the validation prompt; a patch that failed before writing isn't counted.
+- Cortex Code: CI runs the Prevent hook tests.
+
 ## [1.32.2] - 2026-11-19
 
 ### Fixed
