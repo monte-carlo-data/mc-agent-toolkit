@@ -48,7 +48,8 @@ Use when Phase 2b concludes with a scaffolded `skills/<name>/SKILL.md`.
    plugins/<editor>/skills/<name> -> ../../../skills/<name>
    ```
 5. **Portability markers.** Confirm every plugin-only passage in the new `SKILL.md` (slash commands, hooks, `Read` instructions) sits inside `<!-- plugin-only:start -->` / `<!-- plugin-only:end -->` per `CONTRIBUTING.md § Portability markers for plugin-only sections`.
-6. **Claude Code commands entry.** Create `plugins/claude-code/commands/<name>/` with at least one `.md` command file. Add the directory name to the `commands` array in `plugins/claude-code/.claude-plugin/plugin.json`.
+6. **Monte Carlo tool routing.** If the skill calls Monte Carlo MCP tools, add the routing block from `.claude/rules/skills.md § Route Monte Carlo MCP calls`, add the skill to `ROUTED_SKILLS` in `scripts/tests/test_skill_tool_routing.py`, and run `python3 -m unittest discover -s scripts/tests -p 'test_skill_tool_routing.py'`. Name operations bare everywhere under `skills/`, never a client's prefixed tool ID.
+7. **Claude Code commands entry.** Create `plugins/claude-code/commands/<name>/` with at least one `.md` command file. Add the directory name to the `commands` array in `plugins/claude-code/.claude-plugin/plugin.json`.
 
 ## Partial checklist (extend)
 

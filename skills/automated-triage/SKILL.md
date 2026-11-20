@@ -12,13 +12,20 @@ version: 1.1.1
 
 This skill helps you design, test, and deploy an automated triage agent for Monte Carlo alerts. Rather than a fixed workflow, it gives you the building blocks — a set of MCP tools, a description of each triage stage, and a working example — so you can build a process that matches how your team actually responds to alerts.
 
-> **Monte Carlo tool routing (required):** Always call Monte Carlo MCP tools through this plugin's
-> bundled server, whose fully-qualified tool names are
-> `mcp__plugin_mc-agent-toolkit_monte-carlo-mcp__<tool>` (e.g.
-> `mcp__plugin_mc-agent-toolkit_monte-carlo-mcp__get_alerts`). Bare tool names used in this skill
-> (`get_alerts`, `search`, `get_asset`, …) refer to that bundled server. If the session also has a
-> separately-configured `monte-carlo-mcp` server, do **not** route to it — it may point at a
-> different endpoint or credentials.
+> **Monte Carlo tool routing (required):** For Monte Carlo operations such as `get_alerts`,
+> `run_troubleshooting_agent` and `update_alert`, use the tool ID your client exposes on the
+> connection for the intended account. Proceed when there is one suitable connection and no evidence
+> of an account or source mismatch. If the choice is ambiguous, ask which connection to use before
+> making a Monte Carlo call; if you can't get an answer, leave the call pending. Use the selected
+> connection throughout. If it is unavailable or lacks the operation, follow this skill's fallback
+> where it has one, or report what is missing.
+
+<!-- plugin-only:start -->
+> **With the Agent Toolkit plugin:** When using the toolkit plugin or its installer, prefer the
+> connection it provides or configures (normally named `monte-carlo-mcp`) when it is suitable for the
+> intended account. If you know that connection is missing, confirm the intended alternative before
+> using another one.
+<!-- plugin-only:end -->
 
 Read the reference files before proceeding:
 

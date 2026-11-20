@@ -115,7 +115,7 @@ The `run` subcommand only works if all three of the following are in place — o
 
 - **dbt installed** and a `dbt_project.yml` discoverable from the changed model (the workflow walks up from the model file to find it).
 - **`profiles.yml`** present (typically in `~/.dbt/profiles.yml`) with a working Snowflake target. The skill parses it to resolve your dev database.
-- **Snowflake MCP server** registered in the editor session — the skill detects this by looking for an `mcp__snowflake__*` tool. Without it, queries cannot execute and the substituted SQL is left on disk for you to run manually.
+- **Snowflake MCP server** registered in the editor session, with a tool that runs a SQL query — the skill looks for a Snowflake server among the session's tools by name and description, since each editor spells tool IDs differently. If it is missing at pre-flight, the run aborts before the build. If the server becomes unavailable while queries run, the substituted SQL is left on disk for you to run manually.
 
 The `run` subcommand performs a connection pre-flight check before kicking off the build. If any prerequisite is missing, it aborts early and tells you what to fix — rather than failing after a partial build.
 

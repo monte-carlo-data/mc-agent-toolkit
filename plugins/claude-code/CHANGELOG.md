@@ -5,6 +5,14 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Claude Code will
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.32.1] - 2026-11-19
+
+### Fixed
+
+- Skills no longer name Claude Code's MCP tool format (`mcp__plugin_…__<tool>`), which other clients don't use; CoCo Desktop, for one, names the same tool `mcp_monte-carlo-m_search`. The routing note in each skill that calls Monte Carlo MCP tools now says to use the tool ID the client exposes on the connection for the intended account, to ask when more than one connection could be meant, and, inside the plugin-only markers, to prefer the toolkit's own connection.
+- remediation: finds other MCP servers (Airflow, dbt, GitHub, …) by server and tool description instead of scanning for `mcp__*__*` tool IDs.
+- prevent: `/mc-validate run` finds the Snowflake MCP server's query tool by server and description instead of requiring a tool ID that starts with `mcp__snowflake__`, so it no longer aborts on clients that spell tool IDs differently.
+
 ## [1.32.0] - 2026-11-19
 
 ### Added
