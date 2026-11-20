@@ -7,7 +7,8 @@
 # and the two never share an install_id or clobber each other's session_id.
 # Also persists toolkit_version and seeds the MCP headers helper into the id dir, so the
 # monte-carlo-mcp headersHelper (.mcp.json) can stamp install_id/session_id/version on authed
-# MCP traffic — see mcp-headers-helper.py.
+# MCP traffic — see mcp-headers-helper.py. Neither CoCo Desktop nor the Cortex Code CLI runs
+# headersHelper yet, so the seeded helper is in place for when one does.
 # Fails closed (exit 0) on any error — telemetry must never break a Cortex Code session.
 # If UUID files don't get written, skill-beacon.sh detects missing IDs and bails out.
 # Every session it also invokes the install beacon, which fires once per toolkit
