@@ -5,6 +5,14 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Claude Code will
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.32.2] - 2026-11-19
+
+### Fixed
+
+- onboarding: quote the skill description so its frontmatter is valid YAML. Unquoted, its `: ` made strict YAML parsers reject the skill.
+- CI checks that every `SKILL.md` frontmatter parses with PyYAML and has a `name` and a `description` (`scripts/check_skill_frontmatter.py`).
+- Trigger evals read skill frontmatter with a YAML parser, so a quoted description reaches the judge without its quotes.
+
 ## [1.32.1] - 2026-11-19
 
 ### Fixed
