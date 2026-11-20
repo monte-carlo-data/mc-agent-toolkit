@@ -791,7 +791,7 @@ top-level summary listing one status line per model.
 **Trigger:** *Never auto-invoked from a file-open or table-mention trigger.*
 W5 fires only when:
 
-1. The post-edit / turn-end hook injects the monitor-coverage prompt — driven
+1. The pre-commit or turn-end hook injects the monitor-coverage prompt — driven
    by the `MC_MONITOR_GAP` marker emitted during Workflow 2 — **or**
 2. The engineer explicitly asks to add a monitor for the just-edited model
    (e.g. "add a monitor", "create a monitor for X").
@@ -805,7 +805,7 @@ a coverage gap, *or* the engineer is explicitly requesting monitor generation.
 
    > "Generate monitor definitions for the new logic? (yes/no)"
 
-2. On **no** → stop. The post-edit hook has already cleared the gap state;
+2. On **no** → stop. The hook that asked has already cleared the gap state;
    no further action.
 
 3. On **yes** → invoke the `monte-carlo-monitoring-advisor` skill via the
@@ -825,7 +825,7 @@ If the engineer edits the same model again, the pre-edit gate forces Workflow 2
 to re-run, which re-evaluates monitor coverage via `get_monitors`. If the
 generated monitors now cover the changed columns, Workflow 2 will not re-emit
 `MC_MONITOR_GAP` — the gap is genuinely closed. If a fresh gap exists, Workflow 2
-re-emits the marker and the post-edit hook prompts again. Self-healing — no
+re-emits the marker and the hooks prompt again. Self-healing — no
 explicit "already generated" tracking needed.
 
 ### What this workflow does NOT do

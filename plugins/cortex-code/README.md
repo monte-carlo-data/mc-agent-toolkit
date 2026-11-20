@@ -77,10 +77,11 @@ All 21 skills are bundled — see the [skills directory](../../skills/) for the 
 
 The Prevent feature includes **PreToolUse hooks that block edits to dbt SQL files** until an impact assessment runs. The hooks only fire on `.sql` files inside dbt model, macro, or snapshot directories — they do not affect non-dbt files.
 
-In CoCo Desktop, hooks run only in a trusted workspace. Two Prevent behaviors are CLI-only for now:
+**Before a commit**, if models with a completed impact assessment are staged, the pre-commit hook pauses the `git commit` once so the agent can ask whether to run validation queries, and whether to generate monitors where the assessment found a coverage gap. Cortex Code doesn't pass a pre-tool hook's added context to the model, so the pause is how the question reaches the agent. Running the same commit again goes through; changing the staged models pauses again. The end-of-turn validation question isn't repeated for models the pause already asked about, unless they're edited again. The hook looks at a `git commit` of what is staged, or of what is staged plus files named in a `git add` just before it (`git add models/orders.sql && git commit`). Changing directory or creating a new branch first in the same command (`cd <dir> &&`, `git checkout -b <name> &&` or `git switch -c <name> &&`) is fine too. Commands after the commit, such as `&& git status`, are fine. It stays silent for `git commit -a`, a commit that names files, `git add` of a folder, a glob or with options (such as `git add .` or `git add -A`), and a commit chained after any other command, such as `git status &&`.
+
+In CoCo Desktop, hooks run only in a trusted workspace. One Prevent behavior is CLI-only for now:
 
 - **Edit gate with GPT models.** CoCo Desktop gives models whose name contains "gpt" or "openai" an `apply_patch` tool instead of edit and write tools, and the Prevent hooks don't inspect patches yet. With those models, dbt edits are not gated in Desktop. Claude models are gated.
-- **Pre-commit checkpoint.** Desktop doesn't pass a pre-tool hook's added context to the model, so the reminder before `git commit` doesn't appear in Desktop.
 
 **To disable the Prevent hooks**, set `MC_PREVENT_HOOKS_DISABLED=1` in your environment. The hooks will exit immediately without blocking any edits.
 

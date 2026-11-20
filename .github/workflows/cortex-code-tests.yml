@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'plugins/cortex-code/**'
+      - 'plugins/shared/prevent/**'
       - 'skills/**'
       - 'LICENSE'
       - 'scripts/build_coco_desktop.py'
@@ -16,6 +17,7 @@ on:
   pull_request:
     paths:
       - 'plugins/cortex-code/**'
+      - 'plugins/shared/prevent/**'
       - 'skills/**'
       - 'LICENSE'
       - 'scripts/build_coco_desktop.py'
@@ -47,3 +49,14 @@ jobs:
 
       - name: CoCo Desktop publish
         run: python3 scripts/tests/test_publish_coco_desktop.py
+
+      # The Prevent hooks' tests use pytest. Each suite runs in its own process:
+      # both import a package named `lib`, from different directories.
+      - name: Install pytest
+        run: python3 -m pip install pytest==8.3.4
+
+      - name: Shared Prevent hook logic
+        run: python3 -m pytest -q plugins/shared/prevent/lib/tests
+
+      - name: Cortex Code Prevent hooks
+        run: python3 -m pytest -q plugins/cortex-code/tests/prevent

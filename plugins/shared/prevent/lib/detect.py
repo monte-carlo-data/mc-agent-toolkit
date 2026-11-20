@@ -35,7 +35,21 @@ def _get_macro_dirs(file_path: str) -> set[str]:
     return {p.rstrip("/").rsplit("/", 1)[-1] for p in paths.get("macro-paths", [])}
 
 
-def is_dbt_model(file_path: str) -> bool:
+def _has_dbt_patterns(lines) -> bool:
+    """True if any of the first MAX_SCAN_LINES lines holds a dbt ref/source or block."""
+    for i, line in enumerate(lines):
+        if i >= MAX_SCAN_LINES:
+            break
+        for pattern in REF_PATTERNS:
+            if pattern in line:
+                return True
+        for pattern in DBT_BLOCK_PATTERNS:
+            if pattern in line:
+                return True
+    return False
+
+
+def is_dbt_model(file_path: str, content: str | None = None) -> bool:
     """Check if file_path is a dbt SQL file that could affect data.
 
     Gates any .sql file in a dbt project (models, macros, snapshots) since
@@ -50,6 +64,9 @@ def is_dbt_model(file_path: str) -> bool:
     - NOT in seed or analysis directories
     - IS in a model, macro, or snapshot directory
     - Contains dbt patterns in first 50 lines, OR file doesn't exist yet
+
+    When content is given (for example a staged blob), it is scanned instead of
+    the file on disk, and whether the file exists doesn't matter.
     """
     ext = os.path.splitext(file_path)[1].lower()
     if ext != ".sql":
@@ -68,6 +85,9 @@ def is_dbt_model(file_path: str) -> bool:
     if not (parts & gated):
         return False
 
+    if content is not None:
+        return _has_dbt_patterns(content.splitlines())
+
     # If file doesn't exist yet, it's a new file being created — treat as dbt SQL
     if not os.path.exists(file_path):
         return True
@@ -75,19 +95,9 @@ def is_dbt_model(file_path: str) -> bool:
     # Existing .sql files must contain dbt patterns in first 50 lines
     try:
         with open(file_path, "r", encoding="utf-8") as f:
-            for i, line in enumerate(f):
-                if i >= MAX_SCAN_LINES:
-                    break
-                for pattern in REF_PATTERNS:
-                    if pattern in line:
-                        return True
-                for pattern in DBT_BLOCK_PATTERNS:
-                    if pattern in line:
-                        return True
+            return _has_dbt_patterns(f)
     except (OSError, UnicodeDecodeError):
         return False
-
-    return False
 
 
 def is_dbt_schema_file(file_path: str) -> bool:

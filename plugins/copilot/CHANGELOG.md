@@ -5,6 +5,13 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Copilot CLI will
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.32.3] - 2026-11-19
+
+### Fixed
+
+- Cortex Code: Prevent's pre-commit checkpoint now reaches the agent in CoCo Desktop and the `cortex` CLI. Neither passes a pre-tool hook's added context to the model, so the hook now pauses a `git commit` once, with the validation and monitor-coverage questions as the reason. Running the same commit again goes through; changing the staged models pauses again. The end-of-turn validation question isn't repeated for models the pause already asked about. It applies to a `git commit` of what is staged, including after `cd <dir>`, a `git add` of named files or a new branch (`git checkout -b`, `git switch -c`) in the same command. It stays silent for `-a`, commits that name files, `git add` of a folder, a glob or with options, and commits chained after any other command. Commands chained after the commit, such as `&& git status`, are fine.
+- Prevent: the pre-commit hook read staged files from the wrong place when the agent ran from a subdirectory of the repository, so any `.sql` file under a models folder counted as a dbt model. It now reads them from the repository root.
+
 ## [1.32.2] - 2026-11-19
 
 ### Fixed
