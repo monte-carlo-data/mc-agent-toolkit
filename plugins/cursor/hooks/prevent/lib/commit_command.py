@@ -39,7 +39,6 @@ from typing import NamedTuple
 
 class CommitTarget(NamedTuple):
     repo_dir: str
-    amend: bool
     add_paths: tuple[str, ...] = ()  # files a preceding `git add` stages, resolved
 
 
@@ -70,14 +69,15 @@ _GIT_GLOBAL_FLAGS = {
 }
 
 # Every option not listed below is unsupported. That covers the dry runs
-# (--dry-run, --short, --long, --porcelain) and the options that commit
-# something other than the index (--all, --only, --include, --patch,
-# --interactive, --pathspec-from-file).
+# (--dry-run, --short, --long, --porcelain, and -z/--null, which imply one),
+# and the options that commit something other than the index (--all, --only,
+# --include, --patch, --interactive, --pathspec-from-file). A --fixup=reword:
+# commit changes only the message, so it is rejected too.
 _COMMIT_NOARG_LONG = {
     "--amend", "--no-edit", "--edit", "--signoff", "--no-signoff", "--no-verify",
     "--verify", "--quiet", "--verbose", "--allow-empty", "--allow-empty-message",
     "--reset-author", "--status", "--no-status", "--no-gpg-sign",
-    "--no-post-rewrite", "--null",
+    "--no-post-rewrite",
 }
 _COMMIT_ARG_LONG = {
     "--message", "--file", "--reuse-message", "--reedit-message", "--fixup",
@@ -85,7 +85,7 @@ _COMMIT_ARG_LONG = {
 }
 _COMMIT_OPTARG_LONG = {"--untracked-files", "--gpg-sign"}  # value only as --opt=value
 
-_COMMIT_NOARG_SHORT = set("snevqz")
+_COMMIT_NOARG_SHORT = set("snevq")
 _COMMIT_ARG_SHORT = set("mFcCt")
 _COMMIT_OPTARG_SHORT = set("uS")  # value only attached, e.g. -uno
 
@@ -291,9 +291,8 @@ def _resolve_dir(base: str, word: _Word) -> str:
     return os.path.normpath(os.path.join(base, path))
 
 
-def _parse_commit_options(words) -> bool:
-    """Validate `git commit` arguments. Return True for --amend."""
-    amend = False
+def _parse_commit_options(words) -> None:
+    """Validate `git commit` arguments; raise _Unsupported for any it can't accept."""
     i = 0
     while i < len(words):
         w = words[i]
@@ -306,13 +305,17 @@ def _parse_commit_options(words) -> bool:
         if text.startswith("--"):
             name, eq, _ = text.partition("=")
             if name in _COMMIT_NOARG_LONG and not eq:
-                amend = amend or name == "--amend"
                 continue
             if name in _COMMIT_ARG_LONG:
-                if not eq:
+                if eq:
+                    value = text.partition("=")[2]
+                else:
                     if i >= len(words):
                         raise _Unsupported(f"{name} needs a value")
+                    value = words[i].text
                     i += 1
+                if name == "--fixup" and value.startswith("reword:"):
+                    raise _Unsupported("--fixup=reword: doesn't record the index")
                 continue
             if name in _COMMIT_OPTARG_LONG:
                 continue
@@ -335,7 +338,6 @@ def _parse_commit_options(words) -> bool:
                 raise _Unsupported(f"-{ch} is unsupported")
             continue
         raise _Unsupported("pathspec")
-    return amend
 
 
 _PATHSPEC_GLOB = re.compile(r"[*?\[]")
@@ -461,7 +463,7 @@ def parse_commit_command(command: str, cwd: str) -> CommitTarget | None:
                 continue
             if subcommand != "commit":
                 raise _Unsupported("not a commit")
-            amend = _parse_commit_options(args)
-            return CommitTarget(repo_dir=repo_dir, amend=amend, add_paths=tuple(add_paths))
+            _parse_commit_options(args)
+            return CommitTarget(repo_dir=repo_dir, add_paths=tuple(add_paths))
     except _Unsupported:
         return None

@@ -21,6 +21,7 @@ from lib.cache import (
     get_impact_check_state,
     get_pending_validation_tables,
     has_monitor_gap,
+    has_verified_impact_check,
     is_valid_session_id,
     mark_impact_check_injected,
     mark_impact_check_verified,
@@ -211,11 +212,11 @@ def _scan_markers(inp: "HookInput", table_name: str) -> dict:
 _GIT_TIMEOUT_SECONDS = 10
 
 
-def _git(args: list[str], cwd: str, text: bool = True):
+def _git(args: list[str], cwd: str, text: bool = True, input=None):
     """Run git in cwd. Return stdout, or None if git fails or can't run."""
     try:
         result = subprocess.run(
-            ["git", *args], capture_output=True, text=text, cwd=cwd,
+            ["git", *args], capture_output=True, text=text, cwd=cwd, input=input,
             timeout=_GIT_TIMEOUT_SECONDS,
             **({"encoding": "utf-8", "errors": "surrogateescape"} if text else {}),
         )
@@ -311,19 +312,48 @@ def _read_staged_models(cwd: str) -> tuple[str, list[StagedModel]] | None:
     out = _git(["diff", "--cached", "--raw", "-z", "--no-abbrev"], toplevel)
     if out is None:
         return None
-    models = []
+    entries = []
     for status, path, old_blob, new_blob in _parse_raw_diff(out):
         if os.path.splitext(path)[1].lower() != ".sql":
             continue
-        full_path = os.path.join(toplevel, path)
         content_blob = old_blob if status == "D" else new_blob
-        content = _git(["cat-file", "blob", content_blob], toplevel, text=False)
-        if content is None:
-            return None
+        entries.append((path, new_blob, content_blob))
+    contents = _read_blobs([e[2] for e in entries], toplevel)
+    if contents is None:
+        return None
+    models = []
+    for (path, new_blob, _), content in zip(entries, contents):
+        full_path = os.path.join(toplevel, path)
         if not is_dbt_model(full_path, content=content.decode("utf-8", errors="replace")):
             continue
         models.append(StagedModel(path=path, blob=new_blob, table=extract_table_name(full_path)))
     return toplevel, models
+
+
+def _read_blobs(blob_ids: list[str], toplevel: str) -> list[bytes] | None:
+    """Contents of each blob, in order, from one `git cat-file --batch`. None on failure."""
+    if not blob_ids:
+        return []
+    out = _git(["cat-file", "--batch"], toplevel, text=False,
+               input="".join(b + "\n" for b in blob_ids).encode("ascii"))
+    if out is None:
+        return None
+    contents = []
+    pos = 0
+    for _ in blob_ids:
+        end = out.find(b"\n", pos)
+        if end == -1:
+            return None
+        header = out[pos:end].split()
+        if len(header) != 3 or header[1] != b"blob" or not header[2].isdigit():
+            return None
+        size = int(header[2])
+        start = end + 1
+        if start + size > len(out):
+            return None
+        contents.append(out[start:start + size])
+        pos = start + size + 1  # skip the newline after each object
+    return contents
 
 
 def _rev_blob(rev: str, toplevel: str) -> str | None:
@@ -622,6 +652,9 @@ def evaluate_pre_commit_once(inp: HookInput) -> HookOutput:
     target = parse_commit_command(inp.command or "", os.path.abspath(inp.cwd or "."))
     if target is None:
         return HookOutput()
+    # Reading the commit runs git; skip it in sessions where Prevent hasn't verified anything.
+    if not has_verified_impact_check(inp.session_id):
+        return HookOutput()
     staged = _read_commit_models(target.repo_dir, target.add_paths)
     if staged is None:
         return HookOutput()
@@ -637,6 +670,9 @@ def evaluate_pre_commit_once(inp: HookInput) -> HookOutput:
     ).hexdigest()
 
     cleanup_stale_cache()
+    # The claim is taken before the deny reaches the model, so if the harness
+    # drops the deny, the retry commits without the question. The pause is
+    # advisory, and claiming first is what keeps concurrent attempts to one pause.
     if not claim_commit_checkpoint(inp.session_id, digest):
         return HookOutput()
 
