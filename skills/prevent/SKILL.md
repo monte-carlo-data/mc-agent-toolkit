@@ -149,7 +149,7 @@ for impact assessment purposes.
 
 ## Pre-edit gate — check before modifying any file
 
-**Before calling Edit, Write, or MultiEdit on any `.sql` or dbt model
+**Before calling Edit, Write, MultiEdit, or apply_patch on any `.sql` or dbt model
 file, you MUST check:**
 
 1. Has the synthesis step been run for THIS SPECIFIC CHANGE in the
