@@ -149,8 +149,8 @@ mkdir -p "$(dirname "$HOOKS_FILE")"
 
 # SessionStart fires on every session (startup/resume/clear/compact) — no matcher,
 # since the install_id marker dedups the one-shot "Toolkit Installed" beacon to
-# once per machine+editor. Note: Codex currently only emits PreToolUse/PostToolUse
-# for the Bash tool; Edit|Write matchers are omitted until Codex expands tool coverage.
+# once per machine+editor. Codex 0.124.0+ sends PreToolUse/PostToolUse for its own
+# apply_patch tool; older versions only for Bash, and ignore the apply_patch matchers.
 cat > "$HOOKS_FILE" << HOOKEOF
 {
   "hooks": {
@@ -171,6 +171,26 @@ cat > "$HOOKS_FILE" << HOOKEOF
           {
             "type": "command",
             "command": "python3 '$HOOKS_DIR/bash_hook.py'"
+          }
+        ]
+      },
+      {
+        "matcher": "apply_patch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 '$HOOKS_DIR/bash_hook.py'"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "apply_patch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 '$HOOKS_DIR/post_edit_hook.py'"
           }
         ]
       }

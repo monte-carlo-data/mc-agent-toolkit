@@ -31,14 +31,20 @@ After installation, restart Codex in your project. You should see "Installed mc-
 
 ## How It Works
 
-The plugin uses two hooks to enforce the Monte Carlo Prevent workflow:
+The plugin registers these hooks to enforce the Monte Carlo Prevent workflow:
 
 | Hook | Event | Matcher | Purpose |
 |------|-------|---------|---------|
-| pre_commit | PreToolUse | Bash | Prompt for validation before git commit |
+| bash_hook | PreToolUse | `Bash` | Gate `apply_patch` sent through the shell; prompt for validation before `git commit` |
+| bash_hook | PreToolUse | `apply_patch` | Gate edits made with Codex's own `apply_patch` tool |
+| post_edit | PostToolUse | `apply_patch` | Track the dbt models a successful `apply_patch` changed |
 | turn_end | Stop | — | Suggest validation queries for pending tables |
 
-**Note:** Codex currently only emits PreToolUse/PostToolUse for the Bash tool. Pre-edit and post-edit hooks (Edit|Write) are included in the plugin for forward compatibility but are not registered until Codex expands tool coverage.
+Every file a patch adds, deletes, updates or moves (both paths of a move) is checked before the patch runs. If any of them is a dbt model without an impact assessment, the whole patch is blocked with one message naming every table.
+
+**Codex versions.** Codex 0.124.0 and later send hook events for the `apply_patch` tool, so edits made with it are gated. Older versions only send them for shell commands, so only `apply_patch` run through the shell is gated there.
+
+**`apply_patch` in the shell.** Prevent checks the paths in a shell patch against the directory the command runs in. It knows that directory for `apply_patch <<'EOF'`, for `cd <dir> && apply_patch <<'EOF'`, and for any command with no `cd`, `pushd` or `popd` outside a subshell. When it can't tell the directory and the patch touches a `.sql`, `.yml` or `.yaml` file, or when the patch isn't written out in the command (`apply_patch < file`, `"$(...)"`, a pipe), the command is blocked with a request to retry with the `apply_patch` tool or the plain heredoc form. `MC_PREVENT_HOOKS_DISABLED=1` turns this off along with the rest of the gate.
 
 ## Skills
 
@@ -57,7 +63,7 @@ Codex activates skills automatically when you work with dbt models or SQL files.
 
 Codex hook coverage is incomplete, which may cause hooks to not fire consistently:
 
-- [openai/codex#16732](https://github.com/openai/codex/issues/16732): `ApplyPatchHandler` doesn't emit PreToolUse/PostToolUse hook events — hooks only fire for the Bash tool. When Codex uses its native edit path (`• Edited`), our pre-edit gate is bypassed entirely. We work around this by parsing `apply_patch` commands within the Bash hook, but native edits remain ungated.
+- `apply_patch` limits. The checks assume the patch runs on this machine: a patch for a remote environment is checked against local paths. A path through a symlink is checked both as written and as the file it reaches, so deleting a link to a model asks for that model's assessment too. A patch that fails partway may have changed files without being tracked, because Codex sends PostToolUse only after a successful patch. Another hook that rewrites the patch after Prevent checked it isn't seen. Shell forms Prevent doesn't recognise as an `apply_patch` call (such as `bash -c "apply_patch ..."`), like `git apply` or `sed`, aren't gated.
 - [openai/codex#14754](https://github.com/openai/codex/issues/14754): Add PreToolUse and PostToolUse hook events for code quality enforcement — tracks the broader request for non-Bash hook parity.
 - [openai/codex#16246](https://github.com/openai/codex/issues/16246): PostToolUse is missing for tools that complete via exec session / polling path — prevents reliable post-edit tracking.
 
@@ -75,4 +81,4 @@ The data is stored in Mixpanel and Datadog and is used only for product-developm
 
 ## Architecture
 
-This plugin uses the shared core library at `hooks/prevent/lib/` (symlinked). All business logic lives in the shared library; the hooks in this plugin are thin adapters (~20 lines each) that translate Codex JSON to/from the platform-agnostic interface.
+This plugin uses the shared core library at `hooks/prevent/lib/`, a copy of `plugins/shared/prevent/lib/` kept in sync by `./scripts/bump-version.sh --sync-only` (CI rejects symlinks there). The gate, the `apply_patch` parser and edit tracking live in the shared library; the hooks in this plugin are adapters that translate Codex JSON to and from it. `shell_patch.py` is Codex-only: it finds `apply_patch` calls in a shell command and the directory each one runs in.

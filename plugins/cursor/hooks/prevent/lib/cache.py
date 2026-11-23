@@ -22,9 +22,12 @@ TURN_PREFIX = "mc_prevent_turn_"
 PENDING_PREFIX = "mc_prevent_pending_"
 DBT_CONFIG_PREFIX = "mc_prevent_dbt_config_"
 COMMITCP_PREFIX = "mc_prevent_commitcp_"
+PATCH_PREFIX = "mc_prevent_patch_"
 CLEANUP_MARKER = "mc_prevent_last_cleanup"
 
-ALL_PREFIXES = (IC_PREFIX, MG_PREFIX, TURN_PREFIX, PENDING_PREFIX, DBT_CONFIG_PREFIX, COMMITCP_PREFIX)
+ALL_PREFIXES = (
+    IC_PREFIX, MG_PREFIX, TURN_PREFIX, PENDING_PREFIX, DBT_CONFIG_PREFIX, COMMITCP_PREFIX, PATCH_PREFIX,
+)
 STALE_THRESHOLD_SECONDS = 6 * 3600  # 6 hours — covers long sessions, cleans between days
 
 # dbt_project.yml defaults per https://docs.getdbt.com/reference/project-configs
@@ -89,6 +92,35 @@ def _turn_path(session_id: str) -> str:
 
 def _pending_path(session_id: str) -> str:
     return os.path.join(CACHE_DIR, f"{PENDING_PREFIX}{_validate_session_id(session_id)}")
+
+
+def _patch_record_path(session_id: str, call_id: str) -> str:
+    # Hash the pair: tool-call IDs come from the client and aren't validated like session IDs.
+    key = hashlib.sha256(f"{_validate_session_id(session_id)}\0{call_id}".encode()).hexdigest()
+    return os.path.join(CACHE_DIR, f"{PATCH_PREFIX}{key}")
+
+
+# --- Per-call patch record (pre-edit → post-edit) ---
+
+def save_patch_record(session_id: str, call_id: str, paths: list[str]) -> None:
+    """Keep a tool call's paths for its PostToolUse. Swept as stale if no post event comes."""
+    _write_secure(_patch_record_path(session_id, call_id), json.dumps(paths))
+
+
+def pop_patch_record(session_id: str, call_id: str) -> list[str] | None:
+    """The paths saved for this call, removing the record; None when there is none."""
+    path = _patch_record_path(session_id, call_id)
+    try:
+        with open(path, "r") as f:
+            data = json.load(f)
+    except FileNotFoundError:
+        return None
+    finally:
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+    return [p for p in data if isinstance(p, str)] if isinstance(data, list) else None
 
 
 # --- Impact check three-state marker ---

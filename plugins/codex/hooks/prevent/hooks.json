@@ -9,6 +9,26 @@
                         "command": "python3 ${CODEX_PLUGIN_ROOT}/hooks/prevent/bash_hook.py"
                     }
                 ]
+            },
+            {
+                "matcher": "apply_patch",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "python3 ${CODEX_PLUGIN_ROOT}/hooks/prevent/bash_hook.py"
+                    }
+                ]
+            }
+        ],
+        "PostToolUse": [
+            {
+                "matcher": "apply_patch",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "python3 ${CODEX_PLUGIN_ROOT}/hooks/prevent/post_edit_hook.py"
+                    }
+                ]
             }
         ],
         "Stop": [

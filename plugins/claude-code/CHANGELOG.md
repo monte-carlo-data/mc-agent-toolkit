@@ -5,6 +5,17 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Claude Code will
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.32.7] - 2026-11-24
+
+### Fixed
+
+- Codex: Prevent gates edits made with Codex's own `apply_patch` tool. Since Codex 0.124.0 that tool sends hook events, but the plugin only listened for shell commands, so those edits to dbt models weren't gated. The plugin and the installer now register `apply_patch` for PreToolUse and PostToolUse.
+- Codex: Prevent checks every file in an `apply_patch`, not only updated ones. A patch that added a file over a dbt model, deleted one, or moved a file onto or away from one wasn't gated. Every file a patch adds, deletes, updates or moves (both paths) is now checked before the patch runs, and the whole patch is blocked with one message naming every table. A blocked patch no longer counts as an edit.
+- Codex: a shell `cd <dir> && apply_patch` checks the files under `<dir>`, not the directory the command started in. When Prevent can't tell where a shell patch runs, or the patch isn't written out in the command, a patch that may touch `.sql` or `.yml` files is blocked with a request to retry with the `apply_patch` tool.
+- Cortex Code: plain SQL written over a dbt model with `apply_patch` is tracked as an edit of that model. A file that only shares a model's name is no longer tracked.
+- Codex and Cortex Code: a patch path through a symlink is also checked as the file it reaches. A patch to `link/orders.sql`, where `link` points at the models folder, wasn't gated, because Prevent reads folder names in the path.
+- Codex: CI runs the Prevent hook tests.
+
 ## [1.32.6] - 2026-11-24
 
 ### Changed
