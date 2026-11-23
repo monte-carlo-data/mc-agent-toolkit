@@ -279,7 +279,7 @@ class TestSymlinks:
         assert _edited() == ["orders"]
 
 
-# --- Shell: forms the hook can't resolve (D5) ---
+# --- Shell: forms the hook can't resolve ---
 
 class TestShellUnresolved:
     @pytest.mark.parametrize("prefix", [
@@ -336,7 +336,15 @@ class TestShellRecognition:
     @pytest.mark.parametrize("prefix", ["FOO=1 ", "/usr/local/bin/", "command ", "exec "])
     def test_prefixed_invocation_gated(self, project, capsys, prefix):
         cmd = _shell(_patch(*_update("models/orders.sql")), prefix=prefix)
-        assert _denied(_run_pre(cmd, project, capsys))
+        out = _run_pre(cmd, project, capsys)
+        assert _denied(out)
+        assert "orders" in out["permissionDecisionReason"]
+        assert "couldn't check" not in out["permissionDecisionReason"]
+
+    def test_scanned_add_allowed_and_tracked(self, project, capsys):
+        text = _patch("*** Add File: models/brand_new.sql", "+SELECT * FROM {{ ref('raw') }}")
+        assert _run_pre(_shell(text, prefix="FOO=1 "), project, capsys) is None
+        assert _edited() == ["brand_new"]
 
     @pytest.mark.parametrize("cmd", [
         "grep -rn apply_patch .",
@@ -352,6 +360,65 @@ class TestShellRecognition:
         with patch("bash_hook.evaluate_pre_commit", return_value=HookOutput(action="context", context="ctx")):
             out = _run_pre("git commit -m 'x'", project, capsys)
         assert out["additionalContext"] == "ctx"
+
+
+# --- Shell: forms the scanner doesn't find, or resolves against the wrong folder ---
+
+_DELETE_ORDERS = _patch("*** Delete File: models/orders.sql")
+_DOCS_ONLY = _patch("*** Update File: docs/readme.md", "@@", "-a", "+b")
+
+
+class TestShellFormsNotRecognised:
+    def test_backslash_continuation_after_cd(self, project, capsys):
+        text = _patch("*** Delete File: orders.sql")
+        cmd = "cd models && \\\n" + _shell(text)
+        out = _run_pre(cmd, project, capsys)
+        assert _denied(out)
+        assert "orders" in out["permissionDecisionReason"]
+        assert "couldn't check" not in out["permissionDecisionReason"]
+
+    def test_assignment_with_expansion(self, project, capsys):
+        cmd = _shell(_DELETE_ORDERS, prefix='FOO="$(pwd)" ')
+        out = _run_pre(cmd, project, capsys)
+        assert _denied(out)
+        assert "orders" in out["permissionDecisionReason"]
+        assert "couldn't check" not in out["permissionDecisionReason"]
+
+    @pytest.mark.parametrize("prefix", ["env ", "env FOO=1 ", "timeout 30 ", "nice -n 5 ", "nohup "])
+    def test_wrapper_commands(self, project, capsys, prefix):
+        assert _denied(_run_pre(_shell(_DELETE_ORDERS, prefix=prefix), project, capsys))
+
+    def test_command_substitution(self, project, capsys):
+        cmd = "out=$(" + _shell(_DELETE_ORDERS) + ")"
+        assert _denied(_run_pre(cmd, project, capsys))
+
+    @pytest.mark.parametrize("shell", ["bash -lc", "zsh -c"])
+    def test_shell_argv_form(self, project, capsys, shell):
+        script = f"apply_patch <<EOF\n{_DELETE_ORDERS}\nEOF"
+        assert _denied(_run_pre(f"{shell} '{script}'", project, capsys))
+
+    def test_heredoc_with_argument(self, project, capsys):
+        cmd = _shell(_DOCS_ONLY).replace("apply_patch", 'apply_patch "$P"', 1)
+        assert _denied(_run_pre(cmd, project, capsys))
+
+    def test_heredoc_then_file_redirection(self, project, capsys):
+        cmd = _shell(_DOCS_ONLY).replace("<<'EOF'", "<<'EOF' < other.patch", 1)
+        assert _denied(_run_pre(cmd, project, capsys))
+
+    def test_builtin_cd(self, project, capsys):
+        text = _patch("*** Delete File: orders.sql")
+        assert _denied(_run_pre(_shell(text, prefix="builtin cd models && "), project, capsys))
+
+    @pytest.mark.parametrize("prefix", ["source env.sh && ", ". env.sh && "])
+    def test_sourced_script(self, project, capsys, prefix):
+        text = _patch("*** Delete File: orders.sql")
+        assert _denied(_run_pre(_shell(text, prefix=prefix), project, capsys))
+
+    def test_env_wrapper_docs_only_allowed(self, project, capsys):
+        assert _run_pre(_shell(_DOCS_ONLY, prefix="env "), project, capsys) is None
+
+    def test_mention_in_echo_allowed(self, project, capsys):
+        assert _run_pre("echo apply_patch is a tool", project, capsys) is None
 
 
 # --- Codex's own apply_patch tool ---

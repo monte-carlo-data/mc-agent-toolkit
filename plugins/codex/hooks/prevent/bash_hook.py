@@ -20,16 +20,13 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 from lib.safe_run import safe_run
 from lib.apply_patch import (
-    gate_patch, link_targets, op_groups, op_paths, parse_operations, remember_existing_models, resolve_path,
+    gate_and_remember, gate_patch, link_targets, op_groups, op_paths, parse_operations, resolve_path,
 )
 from lib.protocol import (
     HookInput, _prevent_hooks_disabled, evaluate_pre_commit, evaluate_pre_edit, evaluate_post_edit,
 )
-from shell_patch import find_invocations
-
-# The only extensions the gate or edit tracking acts on; a patch touching none of them
-# needs no check, wherever it runs.
-_DBT_EXTENSIONS = (".sql", ".yml", ".yaml")
+from lib.detect import may_be_dbt_file
+from shell_patch import find_invocations, text_outside_data
 
 
 def _deny(reason: str) -> None:
@@ -62,13 +59,9 @@ def _unresolved_reason(problems: list[str]) -> str:
 
 
 def _gate_native(raw: dict, command: str) -> None:
-    groups = op_groups(parse_operations(command, "codex"), raw.get("cwd"))
-    reason = gate_patch(groups, _make_input(raw), evaluate_pre_edit)
+    reason = gate_and_remember(command, "codex", raw, _make_input(raw), evaluate_pre_edit)
     if reason:
         _deny(reason)
-        return
-    remember_existing_models(raw.get("session_id", "unknown"), raw.get("tool_use_id"),
-                             [p for files in groups for p in files])
 
 
 def _gate_shell(raw: dict, invocations) -> None:
@@ -83,7 +76,7 @@ def _gate_shell(raw: dict, invocations) -> None:
             if inv.base is not None:
                 groups += op_groups(ops, resolve_path(inv.base, cwd) if inv.base else cwd)
                 continue
-            if not any(p.lower().endswith(_DBT_EXTENSIONS) for p in op_paths(ops)):
+            if not any(may_be_dbt_file(p) for p in op_paths(ops)):
                 continue
             problem = "the directory it runs in can't be known before it runs"
         if problem not in problems:
@@ -115,6 +108,19 @@ def main():
     if invocations:
         _gate_shell(raw, invocations)
         return
+
+    # The scanner missed a call (a wrapper, `$(...)`, `bash -c '...'`). A patch written out in
+    # the text still shows which files it would touch, though not where it would run.
+    # Heredocs feeding other commands (`cat > notes.md <<'EOF'`) are data, not calls.
+    start = -1
+    if "apply_patch" in command or "applypatch" in command:
+        command_text = text_outside_data(command)
+        start = command_text.find("*** Begin Patch")
+    if start != -1:
+        ops = parse_operations(command_text[start:], "codex")
+        if any(may_be_dbt_file(p) for p in op_paths(ops)) and not _prevent_hooks_disabled():
+            _deny(_unresolved_reason(["Prevent doesn't recognise how apply_patch is called in this command"]))
+            return
 
     if "git commit" in command:
         inp = HookInput(

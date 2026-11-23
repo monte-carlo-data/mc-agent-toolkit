@@ -49,6 +49,15 @@ def _has_dbt_patterns(lines) -> bool:
     return False
 
 
+MODEL_EXTENSIONS = (".sql",)
+SCHEMA_EXTENSIONS = (".yml", ".yaml")
+
+
+def may_be_dbt_file(path: str) -> bool:
+    """Path-only check, for when the file can't be classified: any extension dbt gating acts on."""
+    return path.lower().endswith(MODEL_EXTENSIONS + SCHEMA_EXTENSIONS)
+
+
 def is_dbt_model(file_path: str, content: str | None = None) -> bool:
     """Check if file_path is a dbt SQL file that could affect data.
 
@@ -69,7 +78,7 @@ def is_dbt_model(file_path: str, content: str | None = None) -> bool:
     the file on disk, and whether the file exists doesn't matter.
     """
     ext = os.path.splitext(file_path)[1].lower()
-    if ext != ".sql":
+    if ext not in MODEL_EXTENSIONS:
         return False
 
     normalized = file_path.replace("\\", "/")
@@ -106,7 +115,7 @@ def is_dbt_schema_file(file_path: str) -> bool:
     Used by PostToolUse for tracking edits, but not for PreToolUse gating.
     """
     ext = os.path.splitext(file_path)[1].lower()
-    if ext not in (".yml", ".yaml"):
+    if ext not in SCHEMA_EXTENSIONS:
         return False
 
     normalized = file_path.replace("\\", "/")

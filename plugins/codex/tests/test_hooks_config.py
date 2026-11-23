@@ -6,7 +6,9 @@ letters, digits, `_` and `|` matches a tool name exactly (`codex-rs/hooks/src/en
 
 Two configs register the hooks: the plugin's `hooks/prevent/hooks.json`, and the
 project-level `.codex/hooks.json` that `scripts/install.sh` writes. Both are checked, and
-each registered Prevent script is run with an apply_patch payload to prove it reads it.
+each registered command is run through a shell with the env vars Codex gives plugin hooks
+(`PLUGIN_ROOT`, `CLAUDE_PLUGIN_ROOT`; never `CODEX_PLUGIN_ROOT`), from a copy of the plugin
+whose path contains a space, to prove it starts, reads an apply_patch payload, denies, and tracks.
 
 Stdlib only, so CI can run it with plain ``python3``.
 """
@@ -14,7 +16,7 @@ Stdlib only, so CI can run it with plain ``python3``.
 import json
 import os
 import re
-import shlex
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -46,18 +48,6 @@ def codex_matches(matcher, tool_name):
     return tool_name is not None and re.search(matcher, tool_name) is not None
 
 
-# Runs a hook script as __main__ with Prevent's cache in a temp dir, so the test never
-# touches /tmp/mc_prevent_* state of agent sessions running on this machine.
-_RUN_WITH_CACHE_DIR = """
-import runpy, sys
-script, cache_dir = sys.argv[1], sys.argv[2]
-sys.argv = [script]
-sys.path.insert(0, __import__("os").path.dirname(script))
-import lib.cache
-lib.cache.CACHE_DIR = cache_dir
-runpy.run_path(script, run_name="__main__")
-"""
-
 
 def installer_hooks(hooks_dir, telemetry_dir):
     """The JSON install.sh writes, with its shell variables filled in."""
@@ -77,18 +67,17 @@ def handlers(config, event, tool_name):
 
 class HookConfigTests(unittest.TestCase):
     def configs(self):
-        root = "${CODEX_PLUGIN_ROOT}"
         return {
-            "plugin": (json.loads(PLUGIN_HOOKS.read_text()), root),
-            "installer": (installer_hooks(str(PLUGIN_ROOT / "hooks" / "prevent"),
-                                          str(PLUGIN_ROOT / "hooks" / "telemetry" / "scripts")), str(PLUGIN_ROOT)),
+            "plugin": json.loads(PLUGIN_HOOKS.read_text()),
+            "installer": installer_hooks(str(PLUGIN_ROOT / "hooks" / "prevent"),
+                                         str(PLUGIN_ROOT / "hooks" / "telemetry" / "scripts")),
         }
 
     def test_manifest_points_at_the_plugin_hooks(self):
         self.assertEqual(json.loads(MANIFEST.read_text())["hooks"], "./hooks/prevent/hooks.json")
 
     def test_each_tool_reaches_its_script_once(self):
-        for name, (config, root) in self.configs().items():
+        for name, config in self.configs().items():
             for event, tool, script in EXPECTED:
                 with self.subTest(config=name, event=event, tool=tool):
                     commands = handlers(config, event, tool)
@@ -96,46 +85,81 @@ class HookConfigTests(unittest.TestCase):
                     self.assertEqual(len(matching), 1, commands)
 
     def test_lookalike_tools_reach_no_prevent_edit_hook(self):
-        for name, (config, _) in self.configs().items():
+        for name, config in self.configs().items():
             for event in ("PreToolUse", "PostToolUse"):
                 for tool in NEVER:
                     with self.subTest(config=name, event=event, tool=tool):
                         self.assertEqual(handlers(config, event, tool), [])
 
     def test_installer_keeps_session_start(self):
-        config, _ = self.configs()["installer"]
+        config = self.configs()["installer"]
         commands = handlers(config, "SessionStart", None)
         self.assertTrue(any("ensure-toolkit-ids.sh" in c for c in commands), commands)
 
     def test_registered_commands_gate_and_track_a_patch(self):
-        """Run what each config registers, as Codex would, on a real dbt project."""
-        for name, (config, root) in self.configs().items():
+        """Run what each config registers the way Codex does, from a copy of the plugin
+        whose path has a space, and check a deny and an allow-then-track."""
+        for name in ("plugin", "installer"):
             with self.subTest(config=name), tempfile.TemporaryDirectory() as tmp:
-                project = Path(tmp) / "proj"
+                tmp = Path(tmp)
+                plugin_copy = tmp / "my plugin"
+                shutil.copytree(PLUGIN_ROOT / "hooks", plugin_copy / "hooks",
+                                ignore=shutil.ignore_patterns("__pycache__"))
+                hooks_dir = plugin_copy / "hooks" / "prevent"
+                cache_dir = tmp / "cache"
+                cache_dir.mkdir()
+                cache_py = hooks_dir / "lib" / "cache.py"
+                source = cache_py.read_text()
+                rewritten = re.sub(r"(?m)^CACHE_DIR = .*$", lambda _: f"CACHE_DIR = {str(cache_dir)!r}", source)
+                self.assertNotEqual(rewritten, source, "CACHE_DIR assignment not found")
+                cache_py.write_text(rewritten)
+
+                if name == "plugin":
+                    config = json.loads(PLUGIN_HOOKS.read_text())
+                else:
+                    config = installer_hooks(str(hooks_dir), str(plugin_copy / "hooks" / "telemetry" / "scripts"))
+
+                env = {**os.environ, "PLUGIN_ROOT": str(plugin_copy), "CLAUDE_PLUGIN_ROOT": str(plugin_copy)}
+                env.pop("CODEX_PLUGIN_ROOT", None)
+                env.pop("MC_PREVENT_HOOKS_DISABLED", None)
+
+                project = tmp / "proj"
                 (project / "models").mkdir(parents=True)
                 (project / "models" / "orders.sql").write_text("SELECT * FROM {{ ref('raw') }}\n")
-                cache_dir = Path(tmp) / "cache"
-                cache_dir.mkdir()
-                env = {**os.environ, "CODEX_PLUGIN_ROOT": str(PLUGIN_ROOT)}
-                env.pop("MC_PREVENT_HOOKS_DISABLED", None)
-                patch = "*** Begin Patch\n*** Delete File: models/orders.sql\n*** End Patch"
+                session_id = f"cfg_{name}"
 
-                def run(event, tool, extra=None):
-                    (command,) = [c for c in handlers(config, event, tool) if "/prevent/" in c]
-                    argv = shlex.split(command.replace("${CODEX_PLUGIN_ROOT}", str(PLUGIN_ROOT)))
-                    payload = {"session_id": f"cfg_{name}", "transcript_path": "", "cwd": str(project),
+                def run(event, tool, command_text, tool_use_id):
+                    (command,) = handlers(config, event, tool)
+                    payload = {"session_id": session_id, "transcript_path": "", "cwd": str(project),
                                "hook_event_name": event, "tool_name": tool,
-                               "tool_input": {"command": patch}, "tool_use_id": "call_cfg", **(extra or {})}
-                    return subprocess.run([sys.executable, "-c", _RUN_WITH_CACHE_DIR, argv[1], str(cache_dir)],
-                                          input=json.dumps(payload),
-                                          capture_output=True, text=True, env=env, check=True).stdout
+                               "tool_input": {"command": command_text}, "tool_use_id": tool_use_id}
+                    result = subprocess.run(command, shell=True, env=env, input=json.dumps(payload),
+                                            capture_output=True, text=True)
+                    self.assertEqual(result.returncode, 0,
+                                     f"{command!r} exited {result.returncode}: {result.stderr}")
+                    return result.stdout
 
-                out = run("PreToolUse", "apply_patch")
-                self.assertEqual(json.loads(out)["hookSpecificOutput"]["permissionDecision"], "deny")
-                shell = run("PreToolUse", "Bash", {"tool_input": {
-                    "command": f"apply_patch <<'EOF'\n{patch}\nEOF\n"}})
-                self.assertEqual(json.loads(shell)["hookSpecificOutput"]["permissionDecision"], "deny")
-                self.assertEqual(run("PostToolUse", "apply_patch"), "")
+                def decision(out):
+                    return json.loads(out)["hookSpecificOutput"]["permissionDecision"] if out.strip() else None
+
+                delete = "*** Begin Patch\n*** Delete File: models/orders.sql\n*** End Patch"
+                self.assertEqual(decision(run("PreToolUse", "apply_patch", delete, "call_del")), "deny")
+                shell = f"apply_patch <<'EOF'\n{delete}\nEOF\n"
+                self.assertEqual(decision(run("PreToolUse", "Bash", shell, "call_sh")), "deny")
+
+                add = ("*** Begin Patch\n*** Add File: models/brand_new.sql\n"
+                       "+SELECT * FROM {{ ref('raw') }}\n*** End Patch")
+                self.assertNotEqual(decision(run("PreToolUse", "apply_patch", add, "call_add")), "deny")
+                (project / "models" / "brand_new.sql").write_text("SELECT * FROM {{ ref('raw') }}\n")
+                run("PostToolUse", "apply_patch", add, "call_add")
+
+                read_tables = (
+                    "import json, sys; sys.path.insert(0, sys.argv[1]); "
+                    "from lib.cache import get_edited_tables; print(json.dumps(get_edited_tables(sys.argv[2])))"
+                )
+                tables = subprocess.run([sys.executable, "-c", read_tables, str(hooks_dir), session_id],
+                                        capture_output=True, text=True, check=True).stdout
+                self.assertEqual(json.loads(tables), ["brand_new"])
 
 
 if __name__ == "__main__":

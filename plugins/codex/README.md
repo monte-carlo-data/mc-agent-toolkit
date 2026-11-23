@@ -44,7 +44,7 @@ Every file a patch adds, deletes, updates or moves (both paths of a move) is che
 
 **Codex versions.** Codex 0.124.0 and later send hook events for the `apply_patch` tool, so edits made with it are gated. Older versions only send them for shell commands, so only `apply_patch` run through the shell is gated there.
 
-**`apply_patch` in the shell.** Prevent checks the paths in a shell patch against the directory the command runs in. It knows that directory for `apply_patch <<'EOF'`, for `cd <dir> && apply_patch <<'EOF'`, and for any command with no `cd`, `pushd` or `popd` outside a subshell. When it can't tell the directory and the patch touches a `.sql`, `.yml` or `.yaml` file, or when the patch isn't written out in the command (`apply_patch < file`, `"$(...)"`, a pipe), the command is blocked with a request to retry with the `apply_patch` tool or the plain heredoc form. `MC_PREVENT_HOOKS_DISABLED=1` turns this off along with the rest of the gate.
+**`apply_patch` in the shell.** Prevent checks the paths in a shell patch against the directory the command runs in. It knows that directory for `apply_patch <<'EOF'`, for `cd <dir> && apply_patch <<'EOF'`, and for any command with no `cd`, `pushd` or `popd` outside a subshell. A command that runs `source`, `.`, `eval` or `builtin cd` before `apply_patch` counts as running in an unknown directory. When `apply_patch` gets both an argument and a heredoc, Prevent checks the argument, because that is the patch the executable applies. When it can't tell the directory and the patch touches a `.sql`, `.yml` or `.yaml` file, or when the patch isn't written out in the command (`apply_patch < file`, `"$(...)"`, a pipe), the command is blocked with a request to retry with the `apply_patch` tool or the plain heredoc form. A command that mentions `apply_patch` in a form Prevent doesn't recognise (an `env` or `timeout` wrapper, `$(apply_patch ...)`, `bash -lc '...'`) is blocked the same way when the patch in the command names a `.sql`, `.yml` or `.yaml` file. `MC_PREVENT_HOOKS_DISABLED=1` turns this off along with the rest of the gate.
 
 ## Skills
 
@@ -61,13 +61,11 @@ Codex activates skills automatically when you work with dbt models or SQL files.
 
 ## Known Issues
 
-Codex hook coverage is incomplete, which may cause hooks to not fire consistently:
+Known limits:
 
-- `apply_patch` limits. The checks assume the patch runs on this machine: a patch for a remote environment is checked against local paths. A path through a symlink is checked both as written and as the file it reaches, so deleting a link to a model asks for that model's assessment too. A patch that fails partway may have changed files without being tracked, because Codex sends PostToolUse only after a successful patch. Another hook that rewrites the patch after Prevent checked it isn't seen. Shell forms Prevent doesn't recognise as an `apply_patch` call (such as `bash -c "apply_patch ..."`), like `git apply` or `sed`, aren't gated.
-- [openai/codex#14754](https://github.com/openai/codex/issues/14754): Add PreToolUse and PostToolUse hook events for code quality enforcement — tracks the broader request for non-Bash hook parity.
-- [openai/codex#16246](https://github.com/openai/codex/issues/16246): PostToolUse is missing for tools that complete via exec session / polling path — prevents reliable post-edit tracking.
+- `apply_patch` limits. The checks assume the patch runs on this machine: a patch for a remote environment is checked against local paths. A path through a symlink is checked both as written and as the file it reaches, so deleting a link to a model asks for that model's assessment too. A patch that fails partway may have changed files without being tracked, because Codex sends PostToolUse only after a successful patch. Another hook that rewrites the patch after Prevent checked it isn't seen. A shell command that mentions `apply_patch` in a form Prevent doesn't recognise (such as `bash -c "apply_patch ..."`) is blocked when its patch names a dbt file. A change whose patch isn't in the command at all, like `git apply`, `sed` or a script, isn't seen.
 
-The skill-based impact assessment (via `SKILL.md`) works reliably regardless of these hook limitations.
+The skill-based impact assessment (via `SKILL.md`) works reliably regardless of these limits.
 
 ## Telemetry
 

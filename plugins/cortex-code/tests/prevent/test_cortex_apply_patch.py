@@ -102,7 +102,7 @@ class TestAppliedOperations:
             "*** Delete File: README.md"))
 
     def _applied(self, response):
-        from apply_patch import applied_operations
+        from patch_result import applied_operations
         return [op.path for op in applied_operations(self._ops(), response)]
 
     def _resp(self, text):

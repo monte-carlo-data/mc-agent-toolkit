@@ -21,19 +21,20 @@ through. Each client reads headers its own way, so the parser takes a dialect:
   JavaScript's trim does. A Move counts anywhere in its Update section.
 - "codex" (Codex 0.171.0, `codex-rs/apply-patch`): lines are trimmed the way Rust's
   `str::trim` does (only `trim_end` inside an Update), the path is the rest of the line
-  as is, a Move counts only before the Update's first hunk line, and a `<<EOF` wrapper
-  around the patch is accepted.
+  as is, a Move counts only before the Update's first hunk line (a leading
+  `*** End of File` isn't one), and a `<<EOF` wrapper around the patch is accepted.
 """
 import json
 import os
 from typing import Callable, NamedTuple
 
-from lib.cache import pop_patch_record, save_patch_record
+from lib.cache import add_edited_table, pop_patch_record, save_patch_record
 from lib.detect import extract_table_name, is_dbt_model, is_dbt_schema_file
 
 BEGIN = "*** Begin Patch"
 END = "*** End Patch"
 MOVE_TO = "*** Move to: "
+EOF_MARKER = "*** End of File"
 _HEADERS = (
     ("add", "*** Add File: "),
     ("delete", "*** Delete File: "),
@@ -54,7 +55,7 @@ _CONTROL_SEPARATORS = frozenset("\x1c\x1d\x1e\x1f")
 
 def _is_js_space(char: str) -> bool:
     """Whitespace as JavaScript's trim sees it: U+FEFF counts, U+001C-U+001F and U+0085 don't."""
-    return char == "﻿" or (char.isspace() and char not in _CONTROL_SEPARATORS and char != "\x85")
+    return char == "\N{ZERO WIDTH NO-BREAK SPACE}" or (char.isspace() and char not in _CONTROL_SEPARATORS and char != "\x85")
 
 
 def _is_rust_space(char: str) -> bool:
@@ -122,7 +123,9 @@ def parse_operations(text, dialect: str = "cortex") -> list[Op]:
                 continue
             ops[-1] = ops[-1]._replace(move_to=trim_path(candidate[len(MOVE_TO):]))
         elif in_update:
-            update_has_hunk = True
+            # Codex opens no chunk for an `*** End of File` line before any hunk content.
+            if not (codex and not update_has_hunk and candidate == EOF_MARKER):
+                update_has_hunk = True
     return ops
 
 
@@ -188,11 +191,10 @@ def _patch_deny_reason(denied: dict[str, str], file_count: int, other_files: boo
 def gate_patch(groups: list[list[str]], make_input: Callable, evaluate: Callable) -> str | None:
     """Check every file of a patch; the deny reason for the whole patch, or None to allow.
 
-    `groups` holds each operation's resolved paths. Every path is evaluated once, even
-    after a deny, so each table gets its own assessment state, and so is the file it
-    reaches through symlinks. An error on one file
-    doesn't drop denials found for others; a patch whose only problem is an error is
-    allowed, like any other hook error.
+    `groups` holds each operation's resolved paths. Every path, and the file it reaches
+    through symlinks, is evaluated once, even after a deny, so each table gets its own
+    assessment state. An error on one file doesn't drop denials found for others; a
+    patch whose only problem is an error is allowed, like any other hook error.
     """
     denied: dict[str, str] = {}
     denied_paths: set[str] = set()
@@ -272,6 +274,36 @@ def patched_tables(paths: list[str], were_models: set[str]) -> list[str]:
         if counts and table not in tables:
             tables.append(table)
     return tables
+
+
+def gate_and_remember(patch_text, dialect: str, raw: dict, make_input: Callable, evaluate: Callable) -> str | None:
+    """PreToolUse for an `apply_patch` tool call: the deny reason, or None after recording.
+
+    On allow, records which of the patch's paths are models now, for the call's PostToolUse.
+    `raw` is the hook payload; `cwd`, `session_id` and `tool_use_id` are read from it.
+    """
+    groups = op_groups(parse_operations(patch_text, dialect), raw.get("cwd"))
+    reason = gate_patch(groups, make_input, evaluate)
+    if reason:
+        return reason
+    remember_existing_models(raw.get("session_id", "unknown"), raw.get("tool_use_id"),
+                             [p for files in groups for p in files])
+    return None
+
+
+def track_patch(patch_text, dialect: str, raw: dict, keep_ops: Callable | None = None) -> None:
+    """PostToolUse for an `apply_patch` tool call: add the tables it changed to the session.
+
+    `keep_ops`, when given, filters the parsed operations (e.g. to those that may have run).
+    """
+    session_id = raw.get("session_id", "unknown")
+    were_models = recall_existing_models(session_id, raw.get("tool_use_id"))
+    ops = parse_operations(patch_text, dialect)
+    if keep_ops:
+        ops = keep_ops(ops)
+    paths = [resolve_path(p, raw.get("cwd")) for p in op_paths(ops)]
+    for table in patched_tables(paths, were_models):
+        add_edited_table(session_id, table)
 
 
 def _is_schema_file(path: str) -> bool:

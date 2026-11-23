@@ -18,7 +18,7 @@ import os
 sys.path.insert(0, os.path.dirname(__file__))
 
 from lib.safe_run import safe_run
-from lib.apply_patch import gate_patch, op_groups, parse_operations, remember_existing_models
+from lib.apply_patch import gate_and_remember
 from lib.protocol import HookInput, evaluate_pre_edit
 
 
@@ -50,13 +50,10 @@ def _hook_input(raw: dict, file_path: str) -> HookInput:
 
 def _gate_patch(raw: dict) -> None:
     tool_input = raw.get("tool_input") or {}
-    groups = op_groups(parse_operations(tool_input.get("input")), raw.get("cwd"))
-    reason = gate_patch(groups, lambda path: _hook_input(raw, path), evaluate_pre_edit)
+    reason = gate_and_remember(tool_input.get("input"), "cortex", raw,
+                               lambda path: _hook_input(raw, path), evaluate_pre_edit)
     if reason:
         _deny(reason)
-        return
-    remember_existing_models(raw.get("session_id", "unknown"), raw.get("tool_use_id"),
-                             [p for files in groups for p in files])
 
 
 @safe_run

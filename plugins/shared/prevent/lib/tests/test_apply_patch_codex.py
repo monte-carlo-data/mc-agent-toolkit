@@ -44,6 +44,17 @@ class TestCodexDialect:
         text = _patch("*** Update File: a.sql", "@@", "-x", "+y", "*** Move to: b.sql")
         assert _ops(text) == [("update", "a.sql", None)]
 
+    def test_move_after_a_content_line_is_content(self):
+        for content in (" context", "+x", "-x"):
+            text = _patch("*** Update File: a.sql", content, "*** Move to: b.sql")
+            assert _ops(text) == [("update", "a.sql", None)], content
+
+    def test_move_after_leading_end_of_file_marker(self):
+        """An `*** End of File` line with no chunk yet doesn't open one, so the Move still counts."""
+        text = _patch("*** Update File: notes.txt", "*** End of File", "*** Move to: models/orders.sql",
+                      "@@", "-a", "+b")
+        assert _ops(text) == [("update", "notes.txt", "models/orders.sql")]
+
     def test_eof_wrapper(self):
         for wrapper in ("<<EOF", "<<'EOF'", '<<"EOF"'):
             assert _ops(f"{wrapper}\n" + _patch("*** Delete File: a.sql") + "\nEOF") == [("delete", "a.sql", None)]

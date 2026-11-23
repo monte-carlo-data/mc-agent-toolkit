@@ -14,6 +14,9 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Codex: a shell `cd <dir> && apply_patch` checks the files under `<dir>`, not the directory the command started in. When Prevent can't tell where a shell patch runs, or the patch isn't written out in the command, a patch that may touch `.sql` or `.yml` files is blocked with a request to retry with the `apply_patch` tool.
 - Cortex Code: plain SQL written over a dbt model with `apply_patch` is tracked as an edit of that model. A file that only shares a model's name is no longer tracked.
 - Codex and Cortex Code: a patch path through a symlink is also checked as the file it reaches. A patch to `link/orders.sql`, where `link` points at the models folder, wasn't gated, because Prevent reads folder names in the path.
+- Codex: a shell command that mentions `apply_patch` in a form Prevent doesn't recognise (an `env` or `timeout` wrapper, `$(apply_patch ...)`, `bash -lc '...'`) is blocked when the patch in the command names a `.sql`, `.yml` or `.yaml` file, with a request to retry with the `apply_patch` tool. It used to run unchecked. `MC_PREVENT_HOOKS_DISABLED=1` turns this off.
+- Codex: a Move written after a leading `*** End of File` line in a patch is now checked.
+- Codex: the plugin's bundled `hooks/prevent/hooks.json` uses `${PLUGIN_ROOT}`, quoted. It used `${CODEX_PLUGIN_ROOT}`, which Codex doesn't set, so every hook failed in a plugin-bundled install. Installs through `scripts/install.sh` weren't affected.
 - Codex: CI runs the Prevent hook tests.
 
 ## [1.32.6] - 2026-11-24
