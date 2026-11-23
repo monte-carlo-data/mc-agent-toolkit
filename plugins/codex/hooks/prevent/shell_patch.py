@@ -57,6 +57,12 @@ def _has_expansion(text: str) -> bool:
     return any(c in text for c in _EXPANSION_CHARS)
 
 
+def _headers_literal(body: str) -> bool:
+    """Whether expanding an unquoted heredoc can't change its header lines. Any line starting
+    with `*` counts, since a backslash-newline can join `**\\` and `* Delete File:` into one."""
+    return not any(_has_expansion(line) for line in body.split("\n") if line.lstrip().startswith("*"))
+
+
 def _heredoc_body(text: str, start: int, delim: str, dash: bool) -> tuple[str, int] | None:
     """The body of a heredoc starting at `start`, and the index after its delimiter line."""
     lines = []
@@ -103,9 +109,10 @@ def _intercepted(command: str) -> Invocation | None:
             return None
         if not base:
             return None
-    # If this matched while Codex's own parser didn't, the shell runs it and an unquoted
-    # heredoc expands. Leave those to the general scan, which treats them as unknown.
-    if not quoted and _has_expansion(body):
+    # Codex takes the body as written even with an unquoted delimiter, so `$` or `\\` in a
+    # hunk line is just content. Header lines that could expand are left to the general
+    # scan, in case Codex's parser didn't match and a real shell runs the command.
+    if not quoted and not _headers_literal(body):
         return None
     return Invocation(body, base)
 
@@ -356,9 +363,13 @@ def _body(cmd: _Command) -> str | None:
     if not cmd.stdin or cmd.stdin[-1][0] != "heredoc":
         return None  # stdin from a pipe, a file, a here-string or nothing at all
     _, body, quoted = cmd.stdin[-1]
-    if body is None:
+    if body is None or quoted:
+        return body
+    # A real shell expands this body. A backslash can only join lines, but `$` or a backtick
+    # could write new header lines.
+    if "$" in body or "`" in body or not _headers_literal(body):
         return None
-    return body if quoted or not _has_expansion(body) else None
+    return body
 
 
 def find_invocations(command) -> list[Invocation]:

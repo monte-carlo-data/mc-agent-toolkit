@@ -325,6 +325,38 @@ class TestShellUnresolved:
         assert _denied(out)
         assert "couldn't check" in out["permissionDecisionReason"]
 
+    # Codex applies an intercepted heredoc as written, even with an unquoted delimiter, so
+    # `$`, backticks and backslashes in hunk lines don't make it unreadable.
+    def test_intercepted_unquoted_expansions_in_hunk_allowed(self, project, capsys):
+        text = _patch("*** Update File: src/app.js", "@@", "-const s = 'a';",
+                      "+const s = `${name}`;", "+print(\"a\\n\")")
+        assert _run_pre(_shell(text, delim="EOF"), project, capsys) is None
+
+    def test_intercepted_unquoted_expansions_in_hunk_still_gate_models(self, project, capsys):
+        text = _patch(*_update("models/orders.sql", new="SELECT '$1' FROM {{ ref('raw') }}"))
+        out = _run_pre(_shell(text, prefix="cd . && ", delim="EOF"), project, capsys)
+        assert _denied(out)
+        assert "orders" in out["permissionDecisionReason"]
+        assert "couldn't check" not in out["permissionDecisionReason"]
+
+    # Outside Codex's two forms a real shell expands the body: a backslash can only join
+    # lines, but `$(...)` or `$VAR` could write new header lines.
+    def test_shell_unquoted_backslash_only_allowed(self, project, capsys):
+        text = _patch("*** Update File: src/app.py", "@@", "-x", "+print(\"a\\n\")")
+        assert _run_pre(_shell(text, prefix="FOO=1 ", delim="EOF"), project, capsys) is None
+
+    def test_shell_unquoted_dollar_in_hunk_denied(self, project, capsys):
+        text = _patch("*** Update File: src/app.js", "@@", "-x", "+$(printf 'y')")
+        out = _run_pre(_shell(text, prefix="FOO=1 ", delim="EOF"), project, capsys)
+        assert _denied(out)
+        assert "couldn't check" in out["permissionDecisionReason"]
+
+    def test_shell_unquoted_backslash_joining_a_header_denied(self, project, capsys):
+        # The shell joins these two lines into `*** Delete File: models/orders.sql`.
+        text = _patch("**\\", "* Delete File: models/orders.sql")
+        out = _run_pre(_shell(text, prefix="FOO=1 ", delim="EOF"), project, capsys)
+        assert _denied(out)
+
     def test_disable_switch_suppresses_unresolved_deny(self, project, capsys, monkeypatch):
         monkeypatch.setenv("MC_PREVENT_HOOKS_DISABLED", "1")
         assert _run_pre("apply_patch < /tmp/p.diff", project, capsys) is None

@@ -55,6 +55,10 @@ class TestCodexDialect:
                       "@@", "-a", "+b")
         assert _ops(text) == [("update", "notes.txt", "models/orders.sql")]
 
+    def test_unknown_dialect_rejected(self):
+        with pytest.raises(ValueError):
+            parse_operations(_patch("*** Delete File: a.sql"), "Codex")
+
     def test_eof_wrapper(self):
         for wrapper in ("<<EOF", "<<'EOF'", '<<"EOF"'):
             assert _ops(f"{wrapper}\n" + _patch("*** Delete File: a.sql") + "\nEOF") == [("delete", "a.sql", None)]

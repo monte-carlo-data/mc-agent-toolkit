@@ -17,6 +17,8 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Codex: a shell command that mentions `apply_patch` in a form Prevent doesn't recognise (an `env` or `timeout` wrapper, `$(apply_patch ...)`, `bash -lc '...'`) is blocked when the patch in the command names a `.sql`, `.yml` or `.yaml` file, with a request to retry with the `apply_patch` tool. It used to run unchecked. `MC_PREVENT_HOOKS_DISABLED=1` turns this off.
 - Codex: a Move written after a leading `*** End of File` line in a patch is now checked.
 - Codex: the plugin's bundled `hooks/prevent/hooks.json` uses `${PLUGIN_ROOT}`, quoted. It used `${CODEX_PLUGIN_ROOT}`, which Codex doesn't set, so every hook failed in a plugin-bundled install. Installs through `scripts/install.sh` weren't affected.
+- Codex: `apply_patch <<EOF` (unquoted) with `$`, a backtick or `\` in its changed lines is checked like any other patch. It used to be blocked as unreadable even when it touched no dbt files.
+- Codex: removed `pre_edit_hook.py` and `pre_commit_hook.py`, which no hook registration ran; `bash_hook.py` gates edits and commits.
 - Codex: CI runs the Prevent hook tests.
 
 ## [1.32.6] - 2026-11-24

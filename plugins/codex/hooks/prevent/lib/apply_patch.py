@@ -90,6 +90,8 @@ def _header(line: str, trim_path) -> tuple[str, str] | None:
 
 def parse_operations(text, dialect: str = "cortex") -> list[Op]:
     """Operations in an apply_patch body, in order. [] when it is not a patch."""
+    if dialect not in ("cortex", "codex"):
+        raise ValueError(f"unknown apply_patch dialect: {dialect!r}")
     if not isinstance(text, str):
         return []
     codex = dialect == "codex"
