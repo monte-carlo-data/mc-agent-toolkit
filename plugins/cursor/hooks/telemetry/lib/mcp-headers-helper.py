@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Emit toolkit telemetry headers for the Monte Carlo MCP server (``headersHelper``).
 
-Claude Code / Cortex Code invoke this script as the ``headersHelper`` for the
+Claude Code invokes this script as the ``headersHelper`` for the
 ``monte-carlo-mcp`` HTTP server (see each plugin's ``.mcp.json``). On every MCP
 connection it prints a JSON object of HTTP headers to stdout, which the editor
-attaches to authenticated MCP requests:
+attaches to authenticated MCP requests. Cortex Code's ``.mcp.json`` names it too,
+but current Cortex Code releases (CoCo Desktop and the CLI) don't run
+``headersHelper``, so Cortex Code requests carry none of these headers:
 
     x-mcd-toolkit-install-id   stable per-machine install UUID
     x-mcd-toolkit-session-id   per-session UUID (rotated each session)
