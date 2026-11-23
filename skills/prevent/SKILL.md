@@ -310,10 +310,17 @@ to remind the engineer about monitor coverage at commit time. Only output this
 marker when the gap is specifically about the columns or logic being changed —
 not for general table-level monitor absence.
 
-After the prompt is delivered, the post-edit / pre-commit hook clears the gap
-state internally so it won't re-prompt for the same gap; if the engineer edits
-the model again, Workflow 2 will re-evaluate from scratch and re-emit the
-marker only if a gap still exists.
+After the prompt is delivered, the pre-commit or turn-end hook that delivered it
+clears the gap state internally so it won't re-prompt for the same gap; if the
+engineer edits the model again, Workflow 2 will re-evaluate from scratch and
+re-emit the marker only if a gap still exists.
+
+<!-- plugin-only:start -->
+In some editors (Cortex Code) the pre-commit hook delivers these questions by
+pausing the `git commit` once. Ask the engineer the questions in the pause
+message and wait for their answers. Then, unless they decided not to commit, run
+the same commit command again: it goes through. Don't commit by another route.
+<!-- plugin-only:end -->
 
 ### Sandbox build ran (W4.1)
 
