@@ -5,6 +5,12 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Copilot CLI will
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.32.4] - 2026-11-23
+
+### Fixed
+
+- Cortex Code: the docs no longer say the Cortex Code CLI sends the toolkit's MCP headers. Neither CoCo Desktop 2.0.0 nor Cortex Code CLI 1.2.46 runs the plugin's headers helper, so Cortex Code requests to the Monte Carlo MCP server carry no install id, session id or toolkit version. The plugin keeps the helper in place for when a Cortex Code release runs it.
+
 ## [1.32.3] - 2026-11-19
 
 ### Fixed
