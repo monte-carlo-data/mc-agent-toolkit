@@ -54,6 +54,8 @@ Returns `items`. Response fields per item: id, name, type, runtime_platform, ena
 
 Provision a deployment for a collection agent or a data store you will run in your own cloud, or create an AGENT_OBSERVABILITY deployment Monte Carlo hosts to store agent traces. Call list_deployments first: it includes the cloud deployment Monte Carlo hosts for the account when it runs on the current collection platform, and this cannot create another one. Create a collector deployment only when a warehouse has to be reached from inside your network (a collection agent) or sampled rows have to stay in your storage (a data store). A deployment with nothing registered on it serves no connections, so never create one without an agent or data store to put on it. For a collector, takes the deployment type and the platform it will run on, and returns the external id when that platform needs one. Registering the agent or data store is a second call. For AGENT_OBSERVABILITY, send no platform. The deployment comes back with status PROVISIONING: poll get_deployment until it is READY or FAILED. It is protected from deletion once ready unless deletion_protection is false. Refused when the account cannot have Monte Carlo hosted Agent Observability, already holds as many as it may, or has created as many as a day allows.
 
+The new deployment may not be ready yet. Call `get_deployment` until its `status` is `READY` or `FAILED`. `FAILED` means it failed, and `status_detail` says why.
+
 - **Effect:** creates; repeating it creates again.
 - **Pairs with:** `list_deployments`, `get_deployment`, `update_deployment`, `delete_deployment`.
 
