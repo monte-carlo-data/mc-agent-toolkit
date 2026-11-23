@@ -21,9 +21,10 @@ MG_PREFIX = "mc_prevent_mg_"
 TURN_PREFIX = "mc_prevent_turn_"
 PENDING_PREFIX = "mc_prevent_pending_"
 DBT_CONFIG_PREFIX = "mc_prevent_dbt_config_"
+COMMITCP_PREFIX = "mc_prevent_commitcp_"
 CLEANUP_MARKER = "mc_prevent_last_cleanup"
 
-ALL_PREFIXES = (IC_PREFIX, MG_PREFIX, TURN_PREFIX, PENDING_PREFIX, DBT_CONFIG_PREFIX)
+ALL_PREFIXES = (IC_PREFIX, MG_PREFIX, TURN_PREFIX, PENDING_PREFIX, DBT_CONFIG_PREFIX, COMMITCP_PREFIX)
 STALE_THRESHOLD_SECONDS = 6 * 3600  # 6 hours — covers long sessions, cleans between days
 
 # dbt_project.yml defaults per https://docs.getdbt.com/reference/project-configs
@@ -59,6 +60,10 @@ def _validate_session_id(session_id: str) -> str:
     if not _SESSION_ID_RE.match(session_id):
         raise ValueError(f"Invalid session_id: {session_id!r}")
     return session_id
+
+
+def is_valid_session_id(session_id) -> bool:
+    return isinstance(session_id, str) and bool(_SESSION_ID_RE.match(session_id))
 
 
 def _safe_table_component(table_name: str) -> str:
@@ -99,6 +104,27 @@ def get_impact_check_state(session_id: str, table_name: str) -> str | None:
         return data.get("state")
     except (json.JSONDecodeError, OSError):
         return None
+
+
+def has_verified_impact_check(session_id: str) -> bool:
+    """Whether any table's impact check is verified in this session.
+
+    Session IDs may contain underscores, so another session whose ID extends
+    this one can match the file prefix. That only costs a missed shortcut.
+    """
+    prefix = f"{IC_PREFIX}{_validate_session_id(session_id)}_"
+    try:
+        names = [n for n in os.listdir(CACHE_DIR) if n.startswith(prefix)]
+    except OSError:
+        return False
+    for name in names:
+        try:
+            with open(os.path.join(CACHE_DIR, name), "r") as f:
+                if json.load(f).get("state") == "verified":
+                    return True
+        except (json.JSONDecodeError, OSError, AttributeError):
+            continue
+    return False
 
 
 def mark_impact_check_injected(session_id: str, table_name: str) -> None:
@@ -179,10 +205,42 @@ def add_edited_table(session_id: str, table_name: str) -> None:
     _append_secure(path, table_name + "\n")
 
 
+def remove_edited_tables(session_id: str, table_names) -> None:
+    """Drop these tables from the turn's edited tables, keeping the rest in order."""
+    remaining = [t for t in get_edited_tables(session_id) if t not in set(table_names)]
+    if remaining:
+        _write_secure(_turn_path(session_id), "".join(t + "\n" for t in remaining))
+    else:
+        clear_edited_tables(session_id)
+
+
 def clear_edited_tables(session_id: str) -> None:
     path = _turn_path(session_id)
     if os.path.exists(path):
         os.remove(path)
+
+
+# --- Pre-commit checkpoint claims ---
+
+_DIGEST_RE = re.compile(r"^[0-9a-f]{64}$")
+
+
+def claim_commit_checkpoint(session_id: str, digest: str) -> bool:
+    """Record that the checkpoint for this staged change was shown in this session.
+
+    Returns True only for the first caller: the file is created exclusively, so
+    concurrent attempts can't both claim it. digest is a sha256 hex string, so the
+    `<session>_<digest>` file name can't be confused with another pair.
+    """
+    if not _DIGEST_RE.match(digest):
+        raise ValueError(f"Invalid digest: {digest!r}")
+    path = os.path.join(CACHE_DIR, f"{COMMITCP_PREFIX}{_validate_session_id(session_id)}_{digest}")
+    try:
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, _FILE_PERMISSIONS)
+    except FileExistsError:
+        return False
+    os.close(fd)
+    return True
 
 
 # --- Pending validation ---

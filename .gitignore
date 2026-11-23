@@ -14,3 +14,6 @@ temp/
 __pycache__/
 *.pyc
 .work/
+
+# Local CI runs (the skill-routing step tees its output here)
+test.log
