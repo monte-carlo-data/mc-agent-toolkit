@@ -10,10 +10,14 @@ import re
 import subprocess
 
 from lib.cache import (
+    add_bayes_offered_tables,
     add_edited_table,
     cleanup_stale_cache,
+    clear_head_snapshot,
     clear_monitor_gap,
+    get_bayes_offered_tables,
     get_edited_tables,
+    get_head_snapshot,
     get_impact_check_age_seconds,
     get_impact_check_state,
     get_pending_validation_tables,
@@ -22,6 +26,7 @@ from lib.cache import (
     mark_impact_check_verified,
     mark_monitor_gap,
     move_to_pending_validation,
+    save_head_snapshot,
 )
 from lib.detect import extract_table_name, is_dbt_model, is_dbt_schema_file
 
@@ -222,10 +227,61 @@ def _get_staged_model_tables(cwd: str) -> list[str]:
         return []
 
 
+def _git_out(cwd: str, *args: str) -> str | None:
+    """stdout of a git command, or None when it fails or git can't run."""
+    try:
+        result = subprocess.run(
+            ["git", *args], capture_output=True, text=True, cwd=cwd, timeout=10,
+        )
+    except (subprocess.SubprocessError, OSError):
+        return None
+    return result.stdout.strip() if result.returncode == 0 else None
+
+
+def _get_head_sha(cwd: str) -> str | None:
+    """HEAD's sha; "" when the repo has no commits yet; None outside a repo."""
+    sha = _git_out(cwd, "rev-parse", "--verify", "--quiet", "HEAD")
+    if sha is not None:
+        return sha
+    return "" if _git_out(cwd, "rev-parse", "--is-inside-work-tree") is not None else None
+
+
+def _get_committed_model_tables(cwd: str) -> list[str]:
+    """Model tables changed by the HEAD commit. Macros are left out: the offer is
+    about a table and what reads from it."""
+    root = _git_out(cwd, "rev-parse", "--show-toplevel")
+    files = _git_out(cwd, "diff-tree", "--root", "--no-commit-id", "--name-only", "-r", "HEAD")
+    if not root or files is None:
+        return []
+    tables = []
+    for line in files.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        full_path = os.path.join(root, line)
+        if not is_dbt_model(full_path):
+            continue
+        table = extract_table_name(full_path)
+        if not table.startswith("macro:"):
+            tables.append(table)
+    return list(dict.fromkeys(tables))
+
+
 # --- Decision functions ---
 
 def _prevent_hooks_disabled() -> bool:
     return os.environ.get("MC_PREVENT_HOOKS_DISABLED", "").strip() == "1"
+
+
+def _bayes_followup_disabled() -> bool:
+    return (
+        _prevent_hooks_disabled()
+        or os.environ.get("MC_BAYES_FOLLOWUP_DISABLED", "").strip() == "1"
+    )
+
+
+def _is_git_commit(command: str) -> bool:
+    return "git commit" in command
 
 
 def evaluate_pre_edit(inp: HookInput) -> HookOutput:
@@ -349,10 +405,17 @@ def evaluate_pre_commit(inp: HookInput) -> HookOutput:
     if _prevent_hooks_disabled():
         return HookOutput()
     command = inp.command or ""
-    if "git commit" not in command:
+    if not _is_git_commit(command):
         return HookOutput()
 
     cwd = inp.cwd or "."
+    if not _bayes_followup_disabled():
+        # Taken before any early return: `git commit -a` stages its files only
+        # when it runs, so there may be nothing staged yet.
+        head = _get_head_sha(cwd)
+        if head is not None:
+            save_head_snapshot(inp.session_id, cwd, head)
+
     staged_tables = _get_staged_model_tables(cwd)
     if not staged_tables:
         return HookOutput()
@@ -428,6 +491,61 @@ def evaluate_turn_end(inp: HookInput) -> HookOutput:
 
     move_to_pending_validation(session_id)
     return HookOutput(action="block", reason=reason)
+
+
+def _bayes_offer_text(tables: list[str]) -> str:
+    """What the hook tells the AI after a commit. The AI offers; only the user decides.
+
+    `schedule_agent_task` must never run because a hook said so (its own description
+    says so too), so this text asks the AI to ask, and nothing more.
+    """
+    table_list = ", ".join(tables)
+    first = tables[0]
+    return (
+        f"Monte Carlo: this commit changed dbt model(s): {table_list}. "
+        f"Bayes, Monte Carlo's AI teammate, can check these tables and the tables "
+        f"downstream of them later, once the change is deployed, and send the answer "
+        f"as a Slack direct message.\n\n"
+        f"Only if the Monte Carlo MCP tool `schedule_agent_task` is available in this "
+        f"session: when you have finished with the commit, ask the user once, in one "
+        f"line, for example \"Do you want Bayes to check {first} and its downstream "
+        f"tables after this deploys?\". Do NOT call `schedule_agent_task` unless the "
+        f"user says yes. If they say yes, ask when to check (and their time zone if you "
+        f"don't know it) and whether Bayes may run read-only SQL on their tables, then "
+        f"follow the tool's instructions. Name the tables in `request`: the run cannot "
+        f"see this conversation. If they say no, drop it and don't ask again. If the "
+        f"tool is not available, say nothing about this."
+    )
+
+
+def evaluate_post_commit(inp: HookInput) -> HookOutput:
+    """After `git commit`: offer a Bayes follow-up on the models the commit changed.
+
+    Acts only when HEAD moved since the pre-commit snapshot, so a failed or aborted
+    commit offers nothing. Each table is offered at most once per session.
+    """
+    if _bayes_followup_disabled():
+        return HookOutput()
+    if not _is_git_commit(inp.command or ""):
+        return HookOutput()
+
+    snapshot = get_head_snapshot(inp.session_id)
+    if snapshot is None:
+        return HookOutput()
+    clear_head_snapshot(inp.session_id)
+
+    cwd = snapshot["cwd"]
+    head = _get_head_sha(cwd)
+    if not head or head == snapshot["sha"]:
+        return HookOutput()
+
+    offered = set(get_bayes_offered_tables(inp.session_id))
+    tables = [t for t in _get_committed_model_tables(cwd) if t not in offered]
+    if not tables:
+        return HookOutput()
+
+    add_bayes_offered_tables(inp.session_id, tables)
+    return HookOutput(action="context", context=_bayes_offer_text(tables))
 
 
 def evaluate_validate_command(inp: HookInput) -> HookOutput:

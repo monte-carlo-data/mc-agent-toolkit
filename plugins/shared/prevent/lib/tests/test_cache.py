@@ -4,6 +4,8 @@ import time
 import json
 import pytest
 
+import lib.cache as cache
+
 from lib.cache import (
     CACHE_DIR,
     IC_PREFIX,
@@ -196,3 +198,36 @@ class TestFilePermissions:
         move_to_pending_validation("perm_test_session2")
         path = os.path.join(CACHE_DIR, f"{PENDING_PREFIX}perm_test_session2")
         assert self._get_perms(path) == 0o600
+
+
+class TestHeadSnapshot:
+    def test_missing_returns_none(self):
+        assert cache.get_head_snapshot("s1") is None
+
+    def test_save_and_get(self):
+        cache.save_head_snapshot("s1", "/repo", "abc123")
+        assert cache.get_head_snapshot("s1") == {"cwd": "/repo", "sha": "abc123"}
+
+    def test_clear(self):
+        cache.save_head_snapshot("s1", "/repo", "abc123")
+        cache.clear_head_snapshot("s1")
+        assert cache.get_head_snapshot("s1") is None
+
+    def test_file_is_owner_only(self):
+        cache.save_head_snapshot("perm_head", "/repo", "abc123")
+        path = os.path.join(CACHE_DIR, f"{cache.HEAD_PREFIX}perm_head")
+        assert oct(os.stat(path).st_mode & 0o777) == oct(0o600)
+
+
+class TestBayesOffer:
+    def test_offered_tables_empty(self):
+        assert cache.get_bayes_offered_tables("s1") == []
+
+    def test_add_offered_tables_dedupes(self):
+        cache.add_bayes_offered_tables("s1", ["orders", "customers"])
+        cache.add_bayes_offered_tables("s1", ["orders", "payments"])
+        assert cache.get_bayes_offered_tables("s1") == ["orders", "customers", "payments"]
+
+    def test_cleanup_covers_new_prefixes(self):
+        assert cache.HEAD_PREFIX in cache.ALL_PREFIXES
+        assert cache.BAYES_OFFERED_PREFIX in cache.ALL_PREFIXES

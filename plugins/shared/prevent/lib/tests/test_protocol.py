@@ -1,5 +1,7 @@
 import os
 import json
+import subprocess
+
 import pytest
 
 import lib.cache as cache
@@ -9,6 +11,7 @@ from lib.protocol import (
     evaluate_pre_edit,
     evaluate_post_edit,
     evaluate_pre_commit,
+    evaluate_post_commit,
     evaluate_turn_end,
     evaluate_validate_command,
     scan_transcript_for_markers,
@@ -496,3 +499,144 @@ class TestEvaluatePreEditCortex:
         inp = HookInput(session_id="s1", file_path=str(sql_file),
                         transcript_path=str(h), transcript_format="messages-jsonl")  # typo
         assert evaluate_pre_edit(inp).action == "deny"
+
+
+# --- Post-commit Bayes follow-up offer ---
+
+_MODEL_SQL = "select * from {{ ref('raw_orders') }}\n"
+
+
+def _git(repo, *args):
+    subprocess.run(
+        ["git", "-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", *args],
+        cwd=repo, check=True, capture_output=True,
+    )
+
+
+@pytest.fixture
+def dbt_repo(tmp_path):
+    """A git repo holding a dbt project, with one commit."""
+    repo = tmp_path / "repo"
+    (repo / "models").mkdir(parents=True)
+    (repo / "macros").mkdir()
+    (repo / "dbt_project.yml").write_text("name: demo\n")
+    (repo / "README.md").write_text("demo\n")
+    _git(repo, "init", "-q")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-q", "-m", "init")
+    return repo
+
+
+def _commit(repo, files, message="change"):
+    for rel, content in files.items():
+        path = repo / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content)
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-q", "-m", message)
+
+
+def _pre(repo, session="s1", command="git commit -m change"):
+    return evaluate_pre_commit(HookInput(session_id=session, command=command, cwd=str(repo)))
+
+
+def _post(session="s1", command="git commit -m change"):
+    return evaluate_post_commit(HookInput(session_id=session, command=command))
+
+
+class TestEvaluatePostCommit:
+    def test_model_commit_offers_follow_up(self, dbt_repo):
+        _pre(dbt_repo)
+        _commit(dbt_repo, {"models/orders.sql": _MODEL_SQL})
+        result = _post()
+        assert result.action == "context"
+        assert "orders" in result.context
+        assert "schedule_agent_task" in result.context
+        assert "Do NOT call `schedule_agent_task` unless the user says yes" in result.context
+
+    def test_failed_commit_noop(self, dbt_repo):
+        (dbt_repo / "models").joinpath("orders.sql").write_text(_MODEL_SQL)
+        _git(dbt_repo, "add", ".")
+        _git(dbt_repo, "commit", "-q", "-m", "orders")
+        _pre(dbt_repo)
+        # The commit fails: HEAD stays where it was, even though HEAD changes a model.
+        assert _post().action == "noop"
+
+    def test_no_snapshot_noop(self, dbt_repo):
+        _commit(dbt_repo, {"models/orders.sql": _MODEL_SQL})
+        assert _post().action == "noop"
+
+    def test_non_commit_command_noop(self, dbt_repo):
+        _pre(dbt_repo)
+        _commit(dbt_repo, {"models/orders.sql": _MODEL_SQL})
+        assert _post(command="git status").action == "noop"
+
+    def test_non_model_files_noop(self, dbt_repo):
+        _pre(dbt_repo)
+        _commit(dbt_repo, {"README.md": "changed\n", "scripts/load.py": "print(1)\n"})
+        assert _post().action == "noop"
+
+    def test_macro_only_noop(self, dbt_repo):
+        _pre(dbt_repo)
+        _commit(dbt_repo, {"macros/cents.sql": "{% macro cents(x) %}{{ x }}*100{% endmacro %}\n"})
+        assert _post().action == "noop"
+
+    def test_commit_all_flag_is_seen(self, dbt_repo):
+        """`git commit -a` stages at commit time, so nothing is staged when pre-commit runs."""
+        _commit(dbt_repo, {"models/orders.sql": _MODEL_SQL})
+        (dbt_repo / "models" / "orders.sql").write_text(_MODEL_SQL + "-- edited\n")
+        _pre(dbt_repo, command="git commit -am edit")
+        _git(dbt_repo, "commit", "-q", "-am", "edit")
+        result = _post(command="git commit -am edit")
+        assert result.action == "context"
+        assert "orders" in result.context
+
+    def test_same_table_offered_once_per_session(self, dbt_repo):
+        _pre(dbt_repo)
+        _commit(dbt_repo, {"models/orders.sql": _MODEL_SQL})
+        assert _post().action == "context"
+
+        _pre(dbt_repo)
+        _commit(dbt_repo, {"models/orders.sql": _MODEL_SQL + "-- again\n"})
+        assert _post().action == "noop"
+
+    def test_new_table_offered_alone(self, dbt_repo):
+        _pre(dbt_repo)
+        _commit(dbt_repo, {"models/orders.sql": _MODEL_SQL})
+        _post()
+
+        _pre(dbt_repo)
+        _commit(dbt_repo, {
+            "models/orders.sql": _MODEL_SQL + "-- again\n",
+            "models/customers.sql": _MODEL_SQL,
+        })
+        result = _post()
+        assert result.action == "context"
+        assert "customers" in result.context
+        assert "orders" not in result.context
+
+    def test_other_session_offered_again(self, dbt_repo):
+        _pre(dbt_repo, session="s1")
+        _commit(dbt_repo, {"models/orders.sql": _MODEL_SQL})
+        _post(session="s1")
+
+        _pre(dbt_repo, session="s2")
+        _commit(dbt_repo, {"models/orders.sql": _MODEL_SQL + "-- again\n"})
+        assert _post(session="s2").action == "context"
+
+    @pytest.mark.parametrize("env_var", ["MC_BAYES_FOLLOWUP_DISABLED", "MC_PREVENT_HOOKS_DISABLED"])
+    def test_off_switch(self, dbt_repo, monkeypatch, env_var):
+        monkeypatch.setenv(env_var, "1")
+        _pre(dbt_repo)
+        _commit(dbt_repo, {"models/orders.sql": _MODEL_SQL})
+        assert _post().action == "noop"
+
+    def test_off_switch_keeps_pre_commit_prompt(self, dbt_repo, monkeypatch):
+        """MC_BAYES_FOLLOWUP_DISABLED turns off the offer only, not the validation prompt."""
+        from unittest.mock import patch
+        monkeypatch.setenv("MC_BAYES_FOLLOWUP_DISABLED", "1")
+        cache.mark_impact_check_verified("s1", "orders")
+        with patch("lib.protocol._get_staged_model_tables", return_value=["orders"]):
+            result = _pre(dbt_repo)
+        assert result.action == "context"
+        assert "validation" in result.context.lower()

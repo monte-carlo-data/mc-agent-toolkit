@@ -22,7 +22,7 @@ def clean_cache():
 def isolate_hook_modules():
     """Ensure Cursor hook modules are loaded from Cursor's hooks dir."""
     hook_modules = [
-        "pre_edit_hook", "post_edit_hook", "pre_commit_hook",
+        "pre_edit_hook", "post_edit_hook", "pre_commit_hook", "post_commit_hook",
         "turn_end_hook", "validate_command",
     ]
     for mod_name in hook_modules:

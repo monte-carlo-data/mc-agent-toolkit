@@ -19,13 +19,14 @@ Currently, only the **Prevent** skill leverages hooks for *enforcement*; the oth
 
 ### Prevent Hook Behavior
 
-The Prevent feature uses four hooks and a slash command to enforce the impact-assessment-first workflow:
+The Prevent feature uses five hooks and a slash command to enforce the impact-assessment-first workflow:
 
 | Component | What it does |
 |---|---|
 | **Pre-edit hook** | Blocks edits to dbt models (and macros/snapshots) until a change impact assessment has been presented. |
 | **Post-edit hook** | Tracks which models were modified in the session for downstream validation. |
 | **Pre-commit hook** | Gates `git commit` when modified models have unresolved monitor coverage gaps. |
+| **Post-commit hook** | After a commit that changes a dbt model, asks the agent to offer a Bayes follow-up on those tables (Claude Code and Cursor). Nothing is scheduled unless the user says yes. Turn off with `MC_BAYES_FOLLOWUP_DISABLED=1`. |
 | **Turn-end hook** | Fires at the end of each turn to inject validation reminders when models were edited without running validation queries. |
 | **`/mc-validate` command** | Explicitly generates validation queries for all dbt models changed in the session. |
 
@@ -33,7 +34,7 @@ The Prevent feature uses four hooks and a slash command to enforce the impact-as
 
 1. **You edit a model** — the pre-edit hook blocks until a change impact assessment runs. The agent surfaces downstream blast radius, active alerts, monitor coverage, and a risk-tiered recommendation.
 2. **You confirm and edit** — the post-edit hook records the change. The skill offers to generate monitors for new logic.
-3. **You commit** — the pre-commit hook checks for unresolved monitor coverage gaps flagged during the assessment.
+3. **You commit** — the pre-commit hook checks for unresolved monitor coverage gaps flagged during the assessment. Once the commit lands, the agent offers to have Bayes, Monte Carlo's AI teammate, check the changed tables and their downstream tables after the change deploys; the answer arrives as a Slack direct message. Each table is offered once per session.
 4. **You validate** — run `/mc-validate` or ask the agent to generate validation queries. Targeted SQL checks are saved to `validation/<table>_<timestamp>.sql`.
 
 Hook availability and behavior varies by agent — see each agent's README for platform-specific details. The [Hook Format Comparison](#hook-format-comparison) table below shows the technical differences.
