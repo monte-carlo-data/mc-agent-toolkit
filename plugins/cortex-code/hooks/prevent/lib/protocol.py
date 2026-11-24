@@ -433,25 +433,26 @@ def _get_committed_model_tables(cwd: str) -> list[str]:
     about a table and what reads from it.
 
     diff-tree prints paths relative to the repository root, so they are joined
-    to the root, not to cwd.
+    to the root, not to cwd. `-z` stops git quoting non-ASCII paths.
     """
     root = _git_toplevel(cwd)
     if root is None:
         return []
-    files = _git(["diff-tree", "--root", "--no-commit-id", "--name-only", "-r", "HEAD"], root)
+    files = _git(["diff-tree", "--root", "--no-commit-id", "--name-only", "-r", "-z", "HEAD"], root)
     if files is None:
         return []
     tables = []
-    for line in files.splitlines():
-        line = line.strip()
-        if not line:
+    for rel in files.split("\0"):
+        if not rel:
             continue
-        full_path = os.path.join(root, line)
+        full_path = os.path.join(root, rel)
         if not is_dbt_model(full_path):
             continue
         table = extract_table_name(full_path)
-        if not table.startswith("macro:"):
-            tables.append(table)
+        # Names go into the agent's context and a newline-delimited cache file.
+        if table.startswith("macro:") or not re.fullmatch(r"\w+", table):
+            continue
+        tables.append(table)
     return list(dict.fromkeys(tables))
 
 
@@ -608,13 +609,6 @@ def evaluate_pre_commit(inp: HookInput) -> HookOutput:
         return HookOutput()
 
     cwd = inp.cwd or "."
-    if not _bayes_followup_disabled():
-        # Taken before any early return: `git commit -a` stages its files only
-        # when it runs, so there may be nothing staged yet.
-        head = _get_head_sha(cwd)
-        if head is not None:
-            save_head_snapshot(inp.session_id, cwd, head)
-
     staged_tables = _get_staged_model_tables(cwd)
     if not staged_tables:
         return HookOutput()
@@ -793,28 +787,44 @@ def evaluate_turn_end(inp: HookInput) -> HookOutput:
 
 
 def _bayes_offer_text(tables: list[str]) -> str:
-    """What the hook tells the AI after a commit. The AI offers; only the user decides.
+    """Context injected after a commit: asks the AI to offer, never to schedule.
 
-    `schedule_agent_task` must never run because a hook said so (its own description
-    says so too), so this text asks the AI to ask, and nothing more.
+    `schedule_agent_task` must not run on a hook's say-so; its tool description
+    (ai-agent mcp-server/mcp_server/mcp_tools/schedule_agent_task.py) says the same.
     """
     table_list = ", ".join(tables)
     first = tables[0]
     return (
         f"Monte Carlo: this commit changed dbt model(s): {table_list}. "
         f"Bayes, Monte Carlo's AI teammate, can check these tables and the tables "
-        f"downstream of them later, once the change is deployed, and send the answer "
-        f"as a Slack direct message.\n\n"
+        f"downstream of them later, once the change is deployed, and answer in Slack.\n\n"
         f"Only if the Monte Carlo MCP tool `schedule_agent_task` is available in this "
         f"session: when you have finished with the commit, ask the user once, in one "
         f"line, for example \"Do you want Bayes to check {first} and its downstream "
         f"tables after this deploys?\". Do NOT call `schedule_agent_task` unless the "
         f"user says yes. If they say yes, ask when to check (and their time zone if you "
         f"don't know it) and whether Bayes may run read-only SQL on their tables, then "
-        f"follow the tool's instructions. Name the tables in `request`: the run cannot "
-        f"see this conversation. If they say no, drop it and don't ask again. If the "
+        f"follow the tool's instructions; it says where the answer can go, so let the "
+        f"user pick. Name the tables in `request` and say the check is for after this "
+        f"change deploys: the run cannot see this conversation. If the user isn't sure "
+        f"when it deploys, ask whether Bayes should keep watching (`keep_watching`) in "
+        f"case it hasn't landed yet. If they say no, drop it and don't ask again. If the "
         f"tool is not available, say nothing about this."
     )
+
+
+def record_pre_commit_head(inp: HookInput) -> None:
+    """Pre-commit half of the Bayes follow-up: snapshot HEAD before `git commit` runs.
+
+    Pair with evaluate_post_commit, which offers only if HEAD moved. Runs on every
+    commit, staged models or not: `git commit -a` stages its files only when it runs.
+    """
+    if _bayes_followup_disabled() or not _is_git_commit(inp.command or ""):
+        return
+    cwd = inp.cwd or "."
+    head = _get_head_sha(cwd)
+    if head is not None:
+        save_head_snapshot(inp.session_id, cwd, head)
 
 
 def evaluate_post_commit(inp: HookInput) -> HookOutput:
@@ -822,6 +832,7 @@ def evaluate_post_commit(inp: HookInput) -> HookOutput:
 
     Acts only when HEAD moved since the pre-commit snapshot, so a failed or aborted
     commit offers nothing. Each table is offered at most once per session.
+    Needs `record_pre_commit_head` in the same editor's pre-commit hook.
     """
     if _bayes_followup_disabled():
         return HookOutput()

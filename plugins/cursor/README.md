@@ -41,7 +41,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/monte-carlo-data/mc-agent-to
 
 ## Prevent
 
-**Bayes follow-up after a commit.** After a commit that changes a dbt model, the agent asks whether you want Bayes, Monte Carlo's AI teammate, to check those tables and their downstream tables after the change deploys. The answer arrives as a Slack direct message. Nothing is scheduled unless you say yes, each table is offered once per session, and the offer only appears when the Monte Carlo MCP server offers `schedule_agent_task`. **To turn it off**, set `MC_BAYES_FOLLOWUP_DISABLED=1`; `MC_PREVENT_HOOKS_DISABLED=1` turns it off too.
+**Bayes follow-up after a commit.** After a commit that changes a dbt model, the agent asks whether you want Bayes, Monte Carlo's AI teammate, to check those tables and their downstream tables after the change deploys. The answer arrives in Slack, as a direct message or in the domain's Teammate channel, whichever you pick. Nothing is scheduled unless you say yes, each table is offered once per session, and the offer only appears when the Monte Carlo MCP server offers `schedule_agent_task`. **To turn it off**, set `MC_BAYES_FOLLOWUP_DISABLED=1`; `MC_PREVENT_HOOKS_DISABLED=1` turns it off too.
 
 ## Known Issues
 

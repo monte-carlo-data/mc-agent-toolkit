@@ -7,7 +7,7 @@ import os
 sys.path.insert(0, os.path.dirname(__file__))
 
 from lib.safe_run import safe_run
-from lib.protocol import HookInput, evaluate_pre_commit
+from lib.protocol import HookInput, evaluate_pre_commit, record_pre_commit_head
 
 
 @safe_run
@@ -18,6 +18,7 @@ def main():
         command=raw.get("tool_input", {}).get("command", ""),
         cwd=raw.get("cwd", "."),
     )
+    record_pre_commit_head(inp)
     result = evaluate_pre_commit(inp)
     if result.action == "context":
         print(json.dumps({

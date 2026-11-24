@@ -228,9 +228,24 @@ class TestBayesOffer:
         cache.add_bayes_offered_tables("s1", ["orders", "payments"])
         assert cache.get_bayes_offered_tables("s1") == ["orders", "customers", "payments"]
 
-    def test_cleanup_covers_new_prefixes(self):
-        assert cache.HEAD_PREFIX in cache.ALL_PREFIXES
-        assert cache.BAYES_OFFERED_PREFIX in cache.ALL_PREFIXES
+    def test_stale_head_and_offered_files_are_swept(self):
+        cache.save_head_snapshot("s1", "/repo", "abc123")
+        cache.add_bayes_offered_tables("s1", ["orders"])
+        paths = [
+            os.path.join(cache.CACHE_DIR, f"{cache.HEAD_PREFIX}s1"),
+            os.path.join(cache.CACHE_DIR, f"{cache.BAYES_OFFERED_PREFIX}s1"),
+        ]
+        for path in paths:
+            assert os.path.exists(path)
+        old = time.time() - cache.STALE_THRESHOLD_SECONDS - 60
+        for path in paths:
+            os.utime(path, (old, old))
+        marker = os.path.join(cache.CACHE_DIR, cache.CLEANUP_MARKER)
+        if os.path.exists(marker):
+            os.remove(marker)
+        cache.cleanup_stale_cache()
+        for path in paths:
+            assert not os.path.exists(path)
 
 
 class TestHasVerifiedImpactCheck:

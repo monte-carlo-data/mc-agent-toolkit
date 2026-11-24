@@ -12,6 +12,7 @@ from lib.protocol import (
     evaluate_post_edit,
     evaluate_pre_commit,
     evaluate_post_commit,
+    record_pre_commit_head,
     evaluate_turn_end,
     evaluate_validate_command,
     scan_transcript_for_markers,
@@ -537,7 +538,9 @@ def _commit(repo, files, message="change"):
 
 
 def _pre(repo, session="s1", command="git commit -m change"):
-    return evaluate_pre_commit(HookInput(session_id=session, command=command, cwd=str(repo)))
+    inp = HookInput(session_id=session, command=command, cwd=str(repo))
+    record_pre_commit_head(inp)
+    return evaluate_pre_commit(inp)
 
 
 def _post(session="s1", command="git commit -m change"):
@@ -553,6 +556,15 @@ class TestEvaluatePostCommit:
         assert "orders" in result.context
         assert "schedule_agent_task" in result.context
         assert "Do NOT call `schedule_agent_task` unless the user says yes" in result.context
+
+    def test_offer_lets_user_pick_where_answer_goes(self, dbt_repo):
+        # schedule_agent_task takes deliver="dm"|"channel" and says never pick for the user.
+        _pre(dbt_repo)
+        _commit(dbt_repo, {"models/orders.sql": _MODEL_SQL})
+        result = _post()
+        assert result.action == "context"
+        assert "direct message" not in result.context.lower()
+        assert "let the user pick" in result.context
 
     def test_failed_commit_noop(self, dbt_repo):
         (dbt_repo / "models").joinpath("orders.sql").write_text(_MODEL_SQL)
@@ -625,10 +637,83 @@ class TestEvaluatePostCommit:
         assert _post(session="s2").action == "context"
 
     @pytest.mark.parametrize("env_var", ["MC_BAYES_FOLLOWUP_DISABLED", "MC_PREVENT_HOOKS_DISABLED"])
-    def test_off_switch(self, dbt_repo, monkeypatch, env_var):
-        monkeypatch.setenv(env_var, "1")
+    def test_off_switch_after_snapshot(self, dbt_repo, monkeypatch, env_var):
         _pre(dbt_repo)
         _commit(dbt_repo, {"models/orders.sql": _MODEL_SQL})
+        monkeypatch.setenv(env_var, "1")
+        assert _post().action == "noop"
+
+    @pytest.mark.parametrize("env_var", ["MC_BAYES_FOLLOWUP_DISABLED", "MC_PREVENT_HOOKS_DISABLED"])
+    def test_off_switch_takes_no_snapshot(self, dbt_repo, monkeypatch, env_var):
+        monkeypatch.setenv(env_var, "1")
+        record_pre_commit_head(
+            HookInput(session_id="s1", command="git commit -m change", cwd=str(dbt_repo))
+        )
+        assert cache.get_head_snapshot("s1") is None
+
+    def test_subdirectory_cwd_offers_follow_up(self, dbt_repo):
+        _pre(dbt_repo / "models")
+        _commit(dbt_repo, {"models/orders.sql": _MODEL_SQL})
+        result = _post()
+        assert result.action == "context"
+        assert "orders" in result.context
+
+    def test_nested_dbt_project_offers_follow_up(self, dbt_repo):
+        (dbt_repo / "dbt").mkdir()
+        (dbt_repo / "dbt" / "dbt_project.yml").write_text("name: nested\n")
+        _pre(dbt_repo / "dbt")
+        _commit(dbt_repo, {"dbt/models/customers.sql": _MODEL_SQL})
+        result = _post()
+        assert result.action == "context"
+        assert "customers" in result.context
+
+    def test_first_commit_in_empty_repo_offers_follow_up(self, tmp_path):
+        repo = tmp_path / "fresh"
+        (repo / "models").mkdir(parents=True)
+        (repo / "dbt_project.yml").write_text("name: demo\n")
+        (repo / "models" / "orders.sql").write_text(_MODEL_SQL)
+        _git(repo, "init", "-q")
+        _pre(repo)
+        assert cache.get_head_snapshot("s1")["sha"] == ""
+        _git(repo, "add", ".")
+        _git(repo, "commit", "-q", "-m", "first")
+        result = _post()
+        assert result.action == "context"
+        assert "orders" in result.context
+
+    @staticmethod
+    def _offered_tables(context):
+        return set(context.split("changed dbt model(s): ")[1].split(". ")[0].split(", "))
+
+    def test_deleted_model_is_offered(self, dbt_repo):
+        _commit(dbt_repo, {"models/orders.sql": _MODEL_SQL})
+        _pre(dbt_repo)
+        _git(dbt_repo, "rm", "-q", "models/orders.sql")
+        _git(dbt_repo, "commit", "-q", "-m", "drop orders")
+        result = _post()
+        assert result.action == "context"
+        assert "orders" in result.context
+
+    def test_renamed_model_offers_old_and_new_names(self, dbt_repo):
+        _commit(dbt_repo, {"models/orders.sql": _MODEL_SQL})
+        _pre(dbt_repo)
+        _git(dbt_repo, "mv", "models/orders.sql", "models/fct_orders.sql")
+        _git(dbt_repo, "commit", "-q", "-m", "rename")
+        result = _post()
+        assert result.action == "context"
+        assert "changed dbt model(s): " in result.context
+        assert self._offered_tables(result.context) == {"orders", "fct_orders"}
+
+    def test_non_ascii_model_name_is_offered(self, dbt_repo):
+        _pre(dbt_repo)
+        _commit(dbt_repo, {"models/é.sql": _MODEL_SQL})
+        result = _post()
+        assert result.action == "context"
+        assert "é" in result.context
+
+    def test_model_name_with_space_is_not_offered(self, dbt_repo):
+        _pre(dbt_repo)
+        _commit(dbt_repo, {"models/bad name.sql": _MODEL_SQL})
         assert _post().action == "noop"
 
     def test_off_switch_keeps_pre_commit_prompt(self, dbt_repo, monkeypatch):
