@@ -15,7 +15,8 @@ Any other command runs in a real shell, where Codex's standalone `apply_patch` e
 reads the patch from its first argument, or from stdin when it has none, relative to
 wherever the shell is by then. The hook doesn't work out where that is. Instead, in a
 command that names `apply_patch`, it reads every `*** Begin Patch` up to the next
-`*** End Patch` that isn't the body of a recognised call, and reports:
+`*** End Patch` that isn't the body of a recognised call, both as written and as the
+shell may join it (quoted pieces that touch, backslash-newlines), and reports:
   - `unchecked_patch_paths`: the paths in that patch text that may be dbt files;
   - `patch_may_expand`: whether that text holds `$` or a backtick, which the shell may
     expand into other headers;
@@ -50,16 +51,22 @@ _SAFE_BARE_DIR_RE = re.compile(r"[A-Za-z0-9_./@%+:,=][A-Za-z0-9_./@%+:,=-]*")
 
 _QUOTE_CHARS_RE = re.compile(r"[\\'\"]")
 # A rough split of shell text into operators, redirections and words, for finding calls.
-_TOKEN_RE = re.compile(r"[;&|()`\n]|[<>]+|[^\s;&|()<>`]+")
-# Words after which the next word still runs as a command.
-_CALL_PREFIX_WORDS = (
-    "env", "command", "builtin", "exec", "nohup", "time", "sudo", "xargs", "noglob", "nocorrect",
-    "-", "{", "!", "if", "then", "else", "elif", "do", "while", "until",
+_TOKEN_RE = re.compile(r"\d*(?:>\||[<>]+&?)|[;&|()`\n]|[^\s;&|()<>`]+")
+# Commands that run a later word as a command, after options and option values the hook
+# doesn't parse.
+_WRAPPER_WORDS = (
+    "env", "command", "builtin", "exec", "nohup", "time", "sudo", "xargs", "noglob", "nocorrect", "-",
 )
+# Reserved words after which the next word is a command.
+_KEYWORD_WORDS = ("{", "!", "if", "then", "else", "elif", "do", "while", "until")
+# Words after which a later word may still run as a command.
+_CALL_PREFIX_WORDS = _WRAPPER_WORDS + _KEYWORD_WORDS
 _ASSIGNMENT_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*=")
+# `command -v` and `-V` look a name up without running it.
+_LOOKUP_OPTION_RE = re.compile(r"-[A-Za-z]*[vV][A-Za-z]*")
+_CONTROL_CHARS = ";&|)\n"
+_SINGLE_QUOTED_RE = re.compile(r"(?:'[^']*')+")
 _HEREDOC_OP_RE = re.compile(r"<<(?!<)-?[ \t]*(?P<delim>[^\s;&|()<>]+)")
-# A redirection of stdin that isn't a heredoc or a process substitution.
-_STDIN_REDIRECT_RE = re.compile(r"(?<!<)<(?![<(])")
 
 
 class Invocation(NamedTuple):
@@ -170,8 +177,14 @@ def _unaccounted_patches(command: str, invocation: Invocation | None) -> list[st
 
     Only a patch that starts the body counts as that body (after the `<<EOF` line Codex's
     parser skips): one further in may be text a real shell would apply on its own. Each is
-    read twice, as written and with backslash-newlines removed, since the shell removes them
-    in some places and not in others."""
+    read as written and with backslash-newlines removed, since the shell removes them in
+    some places and not in others.
+
+    With no recognised call, each is also read with quotes and backslashes removed, since
+    the shell joins quoted pieces that touch: `'*** Begin'' Patch'` reaches apply_patch as
+    `*** Begin Patch`. A recognised command needs no such view: it is the whole command,
+    Codex reads its body as written, and a real shell doesn't remove quotes from a heredoc
+    body either, so patch text nested in it is already read as the shell would pass it."""
     joined, cuts = _without_continuations(command)
 
     def in_joined(i: int) -> int:
@@ -181,6 +194,8 @@ def _unaccounted_patches(command: str, invocation: Invocation | None) -> list[st
     views = [(command, spans)]
     if cuts:
         views.append((joined, [(in_joined(a), in_joined(b)) for a, b in spans]))
+    if invocation is None:
+        views += [(_QUOTE_CHARS_RE.sub("", text), []) for text in dict.fromkeys([command, joined])]
     found: list[str] = []
     for text, accounted in views:
         start = text.find(BEGIN)
@@ -216,49 +231,72 @@ def patch_may_expand(command, invocation: Invocation | None) -> bool:
     return False
 
 
-def _calls(text: str) -> list[str]:
-    """For each word in `text` that runs `apply_patch`, the rest of its line. A word runs it
-    when it is the first of a command (after an operator, a newline, assignments or a word
-    such as `env` or `command`) and, without quotes and leading folders, is the name. This
-    is a rough reading: it doesn't know quotes, so `echo "x; apply_patch"` counts."""
+def _calls(text: str) -> list[tuple[bool, str]]:
+    """For each word in `text` that runs `apply_patch`: whether its simple command redirects
+    stdin before it, and the text after it. A word runs it when it is the first of a command
+    (after an operator, a newline, assignments, redirections or a reserved word such as
+    `then`) and, without quotes and leading folders, is the name. After a wrapper such as
+    `env` or `xargs` any later word with the name counts, so options and their values
+    (`-u FOO`, `-I {}`) can't hide a call; `xargs grep apply_patch` counts too. This is a
+    rough reading: it doesn't know quotes, so `echo "x; apply_patch"` counts."""
     found = []
-    at_start = True
+    at_start, wrapper, stdin_before, redirect_target = True, None, False, False
     for m in _TOKEN_RE.finditer(text):
         token = m.group()
         if token in ";&|()`\n":
-            at_start = True
+            at_start, wrapper, stdin_before, redirect_target = True, None, False, False
             continue
-        if token[0] in "<>":
-            at_start = False
+        if token.lstrip("0123456789")[:1] in ("<", ">"):
+            stdin_before = stdin_before or "<" in token
+            redirect_target = True
+            continue
+        if redirect_target:
+            # The file a redirection names; the word after it keeps its place.
+            redirect_target = False
             continue
         word = _QUOTE_CHARS_RE.sub("", token)
-        if at_start and os.path.basename(word) in _NAMES:
-            end = text.find("\n", m.end())
-            found.append(text[m.end():None if end == -1 else end])
+        if (at_start or wrapper) and os.path.basename(word) in _NAMES:
+            found.append((stdin_before, text[m.end():]))
             at_start = False
             continue
+        if wrapper == "command" and _LOOKUP_OPTION_RE.fullmatch(word):
+            wrapper = None
+        elif at_start and wrapper is None and word in _WRAPPER_WORDS:
+            wrapper = word
         at_start = at_start and (word in _CALL_PREFIX_WORDS or _ASSIGNMENT_RE.match(token) is not None)
     return found
 
 
+def _ends_simple_command(rest: str) -> bool:
+    """Whether `rest` holds nothing more for the current simple command."""
+    rest = rest.lstrip(" \t")
+    return not rest or rest[0] in _CONTROL_CHARS
+
+
+def _written_out(rest: str, expands: bool) -> bool:
+    """Whether what follows a call is exactly one literal argument or one heredoc. Any other
+    word, redirection or here-string may hand apply_patch a patch the command doesn't show:
+    the executable reads an argument before stdin, and a later `<` replaces a heredoc."""
+    rest = rest.lstrip(" \t")
+    quoted = _SINGLE_QUOTED_RE.match(rest)
+    if quoted:
+        return _ends_simple_command(rest[quoted.end():])
+    heredoc = _HEREDOC_OP_RE.match(rest)
+    if not heredoc or not _ends_simple_command(rest[heredoc.end():]):
+        return False
+    # With an unquoted delimiter the shell expands the body, which may then be any text.
+    return not expands or any(q in heredoc.group("delim") for q in "'\"\\")
+
+
 def reads_unwritten_patch(command) -> bool:
     """Whether a call to `apply_patch` in the command may read a patch the command doesn't
-    spell out. The executable reads its first argument, or stdin when it has none, so the
-    patch is written out only when the call is followed by a single-quoted argument, or by
-    a heredoc that no later `<` on its line replaces and that the shell can't expand into
-    other text (a quoted delimiter, or no `$` or backtick in the command). A pipe, a file,
-    a here-string, a variable or a heredoc on another fd all read text the hook can't see."""
+    spell out. A call is written out only when nothing redirects stdin before it and what
+    follows it, up to the next control operator, is exactly one single-quoted argument (its
+    pieces may touch: `'a''b'`) or exactly one heredoc whose delimiter is quoted or whose
+    command holds no `$` or backtick. A pipe, a file, a here-string, a variable, an extra
+    argument or a heredoc on another fd all hand it text the hook can't see."""
     if not names_apply_patch(command):
         return False
     joined = _without_continuations(command)[0]
     expands = "$" in joined or "`" in joined
-    for rest in _calls(joined):
-        rest = rest.lstrip(" \t")
-        if rest.startswith("'"):
-            continue
-        heredoc = _HEREDOC_OP_RE.match(rest)
-        if not heredoc or _STDIN_REDIRECT_RE.search(rest, heredoc.end()):
-            return True
-        if expands and not any(q in heredoc.group("delim") for q in "'\"\\"):
-            return True
-    return False
+    return any(stdin_before or not _written_out(rest, expands) for stdin_before, rest in _calls(joined))

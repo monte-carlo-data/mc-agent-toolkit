@@ -49,7 +49,9 @@ while [[ $# -gt 0 ]]; do
 done
 
 TARGET_REPO="${TARGET_REPO:-.}"
-TARGET_REPO="$(cd "$TARGET_REPO" && pwd)"
+# The physical path: macOS cpio won't extract through a symlinked directory
+# (/var -> /private/var, or a repo under a linked folder).
+TARGET_REPO="$(cd "$TARGET_REPO" && pwd -P)"
 TARGET="$TARGET_REPO/plugins/$PLUGIN_NAME"
 HOOKS_FILE="$TARGET_REPO/.codex/hooks.json"
 
@@ -98,7 +100,11 @@ fi
 mkdir -p "$TARGET"
 cd "$REPO_ROOT/$PLUGIN_SRC"
 find . -not -type l -not -path './__pycache__/*' -not -path './.pytest_cache/*' \
-       -not -path './tests/*' -not -name '*.pyc' | cpio -pdm "$TARGET" 2>/dev/null
+       -not -path './tests/*' -not -name '*.pyc' | cpio -pdm --quiet "$TARGET"
+if [ ! -f "$TARGET/.codex-plugin/plugin.json" ]; then
+  echo "ERROR: Plugin files weren't copied to $TARGET"
+  exit 1
+fi
 
 # --- Materialize skills (symlinks were filtered above) ---
 mkdir -p "$TARGET/skills"
@@ -111,6 +117,21 @@ done
 find "$TARGET" -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
 find "$TARGET" -name "*.pyc" -delete 2>/dev/null || true
 rm -rf "$TARGET/hooks/prevent/lib/tests" "$TARGET/hooks/telemetry/tests"
+
+# Step 3 registers the hooks in .codex/hooks.json. If this copy also declared
+# them, Codex would load both sets and run every hook twice, so drop the
+# plugin's own declaration and its hooks.json.
+python3 - "$TARGET/.codex-plugin/plugin.json" << 'PYEOF'
+import json, sys
+path = sys.argv[1]
+with open(path) as f:
+    manifest = json.load(f)
+manifest.pop("hooks", None)
+with open(path, "w") as f:
+    json.dump(manifest, f, indent=2, ensure_ascii=False)
+    f.write("\n")
+PYEOF
+rm -f "$TARGET/hooks/prevent/hooks.json"
 
 echo "  Plugin files installed."
 

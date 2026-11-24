@@ -545,6 +545,160 @@ class TestShellUnwrittenPatch:
         assert reads_unwritten_patch(cmd) is expected
 
 
+# --- Shell: quoted pieces the shell joins ---
+
+_SPLIT_MODEL = "\n".join(["*** Update File: models/orders.sql", "@@", "-select 1 as id", "+select 9 as id",
+                          "*** End Patch"])
+
+
+class TestShellQuoteJoinedPatch:
+    """The shell joins quoted pieces that touch, so `'*** Begin'' Patch'` reaches apply_patch
+    as `*** Begin Patch`."""
+
+    @pytest.mark.parametrize("cmd", [
+        pytest.param(f"apply_patch '*** Begin'' Patch\n{_SPLIT_MODEL}'", id="single-quoted-begin"),
+        pytest.param(f'apply_patch "*** Begin"" Patch\n{_SPLIT_MODEL}"', id="double-quoted-begin"),
+        pytest.param("apply_patch '*** Begin Patch\n" + _SPLIT_MODEL.replace("orders.sql", "orders.s'ql'", 1) + "'",
+                     id="single-quoted-path"),
+        pytest.param(f"env apply_patch '*** Begin\\ Patch\n{_SPLIT_MODEL}'", id="backslash-in-begin"),
+    ])
+    def test_model_patch_denied(self, project, capsys, cmd):
+        _unchecked_deny(_run_pre(cmd, project, capsys), "models/orders.sql")
+
+    def test_docs_only_split_patch_allowed(self, project, capsys):
+        cmd = "apply_patch '*** Begin'' Patch\n*** Update File: docs/readme.md\n@@\n-a\n+b\n*** End Patch'"
+        assert _run_pre(cmd, project, capsys) is None
+
+    def test_expansion_after_a_split_begin_denied(self, project, capsys):
+        cmd = "env apply_patch \"*** Begin\"\" Patch\n*** Update File: src/app.js\n@@\n-x\n+$(y)\n*** End Patch\""
+        assert "the shell may expand" in _unchecked_deny(_run_pre(cmd, project, capsys))
+
+    def test_recognised_body_read_as_written(self, project, capsys):
+        """A heredoc body gets no quote removal, so a split `Begin` in a hunk line is just text,
+        and the `$` after it isn't patch text the shell expands."""
+        cmd = _shell(_patch("*** Update File: docs/a.md", "@@", "-x", "+*** Begin'' Patch", '+echo "$HOME"'))
+        assert _run_pre(cmd, project, capsys) is None
+
+
+# --- Shell: where a call reads its patch from, behind each wrapper ---
+
+# Each word that keeps the next word in command position, with how it reads before and after
+# the call: (prefix, suffix) pairs, with and without an option where the word takes one.
+_CALL_CONTEXTS = {
+    "env": [("env ", ""), ("env -u FOO ", ""), ("env FOO=1 ", "")],
+    "command": [("command ", ""), ("command -p ", "")],
+    "builtin": [("builtin ", ""), ("builtin -- ", "")],
+    "exec": [("exec ", ""), ("exec -a name ", "")],
+    "nohup": [("nohup ", ""), ("nohup -- ", "")],
+    "time": [("time ", ""), ("time -p ", "")],
+    "sudo": [("sudo ", ""), ("sudo -u root ", "")],
+    "xargs": [("xargs ", ""), ("xargs -0 ", ""), ("xargs -I {} ", "")],
+    "noglob": [("noglob ", "")],
+    "nocorrect": [("nocorrect ", "")],
+    "-": [("- ", "")],
+    "{": [("{ ", "; }")],
+    "!": [("! ", "")],
+    "if": [("if ", "; then :; fi")],
+    "then": [("if true; then ", "; fi")],
+    "else": [("if false; then :; else ", "; fi")],
+    "elif": [("if false; then :; elif ", "; then :; fi")],
+    "do": [("while true; do ", "; break; done")],
+    "while": [("while ", "; do break; done")],
+    "until": [("until ", "; do :; done")],
+}
+_CONTEXTS = [("", "")] + [c for cs in _CALL_CONTEXTS.values() for c in cs]
+
+
+def _context_id(context):
+    return " ".join(filter(None, [context[0].strip(), "CALL", context[1].strip()]))
+
+# (text before the name, text after it, heredoc body or None)
+_UNWRITTEN_SHAPES = {
+    "argument-beside-heredoc": ("", " <<'EOF' \"$(cat p.txt)\"", _DOCS_ONLY),
+    "here-string-beside-heredoc": ("", " <<'EOF' <<<\"$(cat p.txt)\"", ""),
+    "redirect-before-name": ("< p.txt ", "", None),
+    "fd-redirect-before-name": ("0<p.txt ", "", None),
+    "redirect-after-name": ("", " < p.txt", None),
+    "substituted-argument": ("", ' "$(cat p.txt)"', None),
+    "here-string": ("", ' <<<"$(cat p.txt)"', None),
+    "no-argument": ("", "", None),
+}
+_WRITTEN_SHAPES = {
+    "quoted-heredoc": ("", " <<'EOF'", _DOCS_ONLY),
+    "single-quoted-argument": ("", f" '{_DOCS_ONLY}'", None),
+}
+
+
+def _call(context, shape):
+    (prefix, suffix), (before, after, body) = context, shape
+    cmd = f"{prefix}{before}apply_patch{after}{suffix}"
+    if body is not None:
+        cmd += f"\n{body}\nEOF" if body else "\nEOF"
+    return cmd + "\n"
+
+
+class TestShellCallShapes:
+    def test_every_prefix_word_has_contexts(self):
+        from shell_patch import _CALL_PREFIX_WORDS
+        assert set(_CALL_CONTEXTS) == set(_CALL_PREFIX_WORDS)
+
+    @pytest.mark.parametrize("shape", _UNWRITTEN_SHAPES)
+    @pytest.mark.parametrize("context", _CONTEXTS, ids=_context_id)
+    def test_unwritten_denied(self, project, capsys, context, shape):
+        (project / "p.txt").write_text(_DELETE_ORDERS + "\n")
+        cmd = _call(context, _UNWRITTEN_SHAPES[shape])
+        assert "the patch isn't written out" in _unchecked_deny(_run_pre(cmd, project, capsys)), cmd
+
+    @pytest.mark.parametrize("shape", _WRITTEN_SHAPES)
+    @pytest.mark.parametrize("context", _CONTEXTS, ids=_context_id)
+    def test_written_docs_patch_allowed(self, project, capsys, context, shape):
+        from shell_patch import reads_unwritten_patch
+        cmd = _call(context, _WRITTEN_SHAPES[shape])
+        assert reads_unwritten_patch(cmd) is False, cmd
+        assert _run_pre(cmd, project, capsys) is None, cmd
+
+    @pytest.mark.parametrize("context", _CONTEXTS, ids=_context_id)
+    def test_written_model_patch_names_the_model(self, project, capsys, context):
+        cmd = _call(context, ("", " <<'EOF'", _DELETE_ORDERS))
+        out = _run_pre(cmd, project, capsys)
+        assert _denied(out) and "orders" in out["permissionDecisionReason"], cmd
+
+    @pytest.mark.parametrize("cmd", [
+        "< p.txt env apply_patch",
+        "xargs -0 apply_patch < p.txt",
+        "env -u FOO apply_patch < p.txt",
+        "apply_patch '*** Begin Patch' x",
+        "apply_patch '*** Begin Patch'\"$(cat p.txt)\"",
+        "apply_patch <<'EOF' > out.txt\nEOF\n",
+        "apply_patch <<'EOF' 'x'\nEOF\n",
+        "sudo -u root /usr/bin/applypatch < p.txt",
+        "xargs grep apply_patch < files.txt",
+        # Whatever follows, a stdin redirect before the name is read as unwritten.
+        "< p.txt apply_patch '*** Begin Patch'",
+        "0<p.txt env apply_patch <<'EOF'\nEOF\n",
+    ])
+    def test_reads_unwritten(self, cmd):
+        from shell_patch import reads_unwritten_patch
+        assert reads_unwritten_patch(cmd) is True
+
+    @pytest.mark.parametrize("cmd", [
+        "apply_patch '*** Begin'' Patch'",
+        "apply_patch '*** Begin Patch'; echo done",
+        "apply_patch '*** Begin Patch' | cat",
+        "apply_patch <<'EOF' && echo done\nEOF\n",
+        "env -u FOO apply_patch <<'EOF'\nEOF\n",
+        "command -v apply_patch",
+        "command -pv apply_patch",
+        "command -V apply_patch",
+        "grep -rn apply_patch .",
+        'git commit -m "use apply_patch"',
+        "echo apply_patch < p.txt",
+    ])
+    def test_reads_written_or_no_call(self, cmd):
+        from shell_patch import reads_unwritten_patch
+        assert reads_unwritten_patch(cmd) is False
+
+
 # --- Shell: patch text the shell may expand ---
 
 class TestShellExpandingPatch:

@@ -77,6 +77,60 @@ class HookConfigTests(unittest.TestCase):
     def test_manifest_points_at_the_plugin_hooks(self):
         self.assertEqual(json.loads(MANIFEST.read_text())["hooks"], "./hooks/prevent/hooks.json")
 
+    def run_installer(self, tmp: Path, repo: Path) -> None:
+        """Run the real installer into `repo`, with HOME in a temp dir and a stub `codex`."""
+        home, bin_dir = tmp / "home", tmp / "bin"
+        for d in (home, bin_dir):
+            d.mkdir()
+        stub = bin_dir / "codex"
+        stub.write_text("#!/bin/sh\nexit 0\n")
+        stub.chmod(0o755)
+        env = {**os.environ, "HOME": str(home), "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}"}
+        result = subprocess.run(["bash", str(INSTALLER), "--local", str(PLUGIN_ROOT.parents[1]), str(repo)],
+                                env=env, capture_output=True, text=True, stdin=subprocess.DEVNULL)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_installs_into_a_path_through_a_symlink(self):
+        """macOS cpio won't extract through a symlinked directory, as in /var -> /private/var
+        or a repo under a linked folder, so the installer must copy to the real path."""
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp).resolve()
+            (tmp / "real" / "repo").mkdir(parents=True)
+            (tmp / "link").symlink_to(tmp / "real")
+            self.run_installer(tmp, tmp / "link" / "repo")
+            installed = tmp / "real" / "repo" / "plugins" / "mc-agent-toolkit"
+            self.assertTrue((installed / ".codex-plugin" / "plugin.json").is_file())
+            self.assertTrue((installed / "hooks" / "prevent" / "bash_hook.py").is_file())
+            written = json.loads((tmp / "real" / "repo" / ".codex" / "hooks.json").read_text())
+            commands = handlers(written, "PreToolUse", "apply_patch")
+            self.assertEqual(len(commands), 1, commands)
+            self.assertIn(str(installed / "hooks" / "prevent" / "bash_hook.py"), commands[0])
+
+    def test_installed_copy_does_not_declare_hooks_the_installer_registers(self):
+        """Codex loads a plugin's declared hooks and .codex/hooks.json without removing
+        duplicates, so the copy install.sh makes must not declare them."""
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            repo = tmp / "repo"
+            repo.mkdir()
+            self.run_installer(tmp, repo)
+
+            installed = repo.resolve() / "plugins" / "mc-agent-toolkit"
+            raw = (installed / ".codex-plugin" / "plugin.json").read_text()
+            manifest = json.loads(raw)
+            expected = json.loads(MANIFEST.read_text())
+            del expected["hooks"]
+            self.assertNotIn("hooks", manifest)
+            self.assertEqual(manifest, expected)
+            self.assertEqual(raw, json.dumps(expected, indent=2, ensure_ascii=False) + "\n")
+            self.assertFalse((installed / "hooks" / "prevent" / "hooks.json").exists())
+            self.assertTrue((installed / "hooks" / "prevent" / "bash_hook.py").is_file())
+
+            written = json.loads((repo / ".codex" / "hooks.json").read_text())
+            commands = handlers(written, "PreToolUse", "apply_patch")
+            self.assertEqual(len(commands), 1, commands)
+            self.assertIn(str(installed / "hooks" / "prevent" / "bash_hook.py"), commands[0])
+
     def test_each_tool_reaches_its_script_once(self):
         for name, config in self.configs().items():
             for event, tool, script in EXPECTED:
