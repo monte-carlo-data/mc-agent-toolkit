@@ -280,9 +280,30 @@ class TestSymlinks:
         assert _edited() == ["orders"]
 
 
-# --- Shell: forms the hook can't resolve ---
 
-class TestShellUnresolved:
+# --- Shell: forms Codex doesn't apply itself ---
+#
+# Only `apply_patch <<'EOF'` and `cd <dir> && apply_patch <<'EOF'` are gated against a
+# folder. Any other command naming apply_patch is denied as unchecked when its patch may
+# change a dbt file, and allowed otherwise. The forms below each run a model patch in a
+# folder, or from text, that the hook can't know before the shell runs it.
+
+_DELETE_ORDERS = _patch("*** Delete File: models/orders.sql")
+_DOCS_ONLY = _patch("*** Update File: docs/readme.md", "@@", "-a", "+b")
+_ADD_NOTES = _patch("*** Add File: notes.txt", "+hi")
+
+
+def _unchecked_deny(out, *paths):
+    """Assert a couldn't-check deny naming `paths`; return its reason."""
+    assert _denied(out)
+    reason = out["permissionDecisionReason"]
+    assert reason.startswith("Monte Carlo Prevent: couldn't check this apply_patch command")
+    for path in paths:
+        assert path in reason
+    return reason
+
+
+class TestShellOtherForms:
     @pytest.mark.parametrize("prefix", [
         "cd dbt; ",
         "cd dbt && cd models && ",
@@ -292,43 +313,257 @@ class TestShellUnresolved:
         "cd ~/dbt && ",
         "cd - && ",
         "pushd dbt && ",
+        "chdir models && ",
+        "C=cd; $C models && ",
+        "trap 'cd models' DEBUG; ",
+        "builtin cd models && ",
+        "source env.sh && ",
+        ". env.sh && ",
+        "c\\\nd models && ",
+        "f() { :; }; ",
+        "function f { :; }; ",
+        "alias x=y; ",
+        "eval cd models; ",
+        "if cd models; then :; fi; ",
+        "while cd models; do break; done; ",
+        "if true; then cd models; fi; ",
+        "if false; then :; else cd models; fi; ",
+        "if false; then :; elif cd models; then :; fi; ",
+        "while true; do cd models; break; done; ",
+        "until cd models; do :; done; ",
+        "{ cd models; }; ",
+        "! cd models; ",
+        "time cd models; ",
+        "command -p cd models && ",
+        "command -- cd models && ",
+        "command -p -- cd models && ",
+        "builtin -- cd models && ",
+        "exec -c cd models && ",
+        "exec -a name cd models && ",
+        "time -p cd models && ",
+        "noglob cd models && ",
+        "nocorrect cd models && ",
+        "- cd models && ",
+        "command -x cd models && ",
     ])
-    def test_unknown_directory_with_sql_denied(self, project, capsys, prefix):
-        out = _run_pre(_shell(_patch(*_update("models/orders.sql")), prefix=prefix), project, capsys)
-        assert _denied(out)
-        assert "couldn't check" in out["permissionDecisionReason"]
+    def test_directory_change_before_the_call(self, project, capsys, prefix):
+        """The shell may run apply_patch from `models`, so `orders.sql` may be a model."""
+        out = _run_pre(_shell(_patch(*_update("orders.sql")), prefix=prefix), project, capsys)
+        _unchecked_deny(out, "orders.sql")
 
-    def test_unknown_directory_names_one_reason(self, project, capsys):
-        reason = _run_pre(_shell(_DELETE_ORDERS, prefix="cd dbt; "), project, capsys)["permissionDecisionReason"]
-        assert "can't be known" in reason and "doesn't recognise" not in reason
+    @pytest.mark.parametrize("prefix", [
+        "FOO=1 ",
+        'FOO="$(pwd)" ',
+        "FOO=1 \\\n",
+        "/usr/local/bin/",
+        "command ",
+        "command -p ",
+        "command -- ",
+        "exec ",
+        "exec -c ",
+        "exec -a name ",
+        "builtin -- ",
+        "noglob ",
+        "nocorrect ",
+        "- ",
+        "time -p ",
+        "env ",
+        "env FOO=1 ",
+        "timeout 30 ",
+        "nice -n 5 ",
+        "nohup ",
+        "a=(x y); ",
+        "diff <(ls) x; ",
+        "cat <<< hi\n",
+    ])
+    def test_prefix_before_the_call(self, project, capsys, prefix):
+        out = _run_pre(_shell(_DELETE_ORDERS, prefix=prefix), project, capsys)
+        _unchecked_deny(out, "models/orders.sql")
 
-    def test_subshell_cd_denied(self, project, capsys):
-        cmd = "(cd dbt && " + _shell(_patch(*_update("models/orders.sql"))).rstrip("\n") + "\n)"
-        assert _denied(_run_pre(cmd, project, capsys))
+    @pytest.mark.parametrize("cmd", [
+        pytest.param("(cd dbt && " + _shell(_DELETE_ORDERS).rstrip("\n") + "\n)", id="subshell"),
+        pytest.param("out=$(" + _shell(_DELETE_ORDERS) + ")", id="command-substitution"),
+        pytest.param(f"bash -lc 'apply_patch <<EOF\n{_DELETE_ORDERS}\nEOF'", id="bash-lc"),
+        pytest.param(f"zsh -c 'apply_patch <<EOF\n{_DELETE_ORDERS}\nEOF'", id="zsh-c"),
+        pytest.param(f"apply_patch <<'A'\n{_ADD_NOTES}\nA\nenv apply_patch <<'B'\n{_DELETE_ORDERS}\nB\n",
+                     id="recognised-call-then-env-call"),
+        pytest.param(f"env apply_patch <<'A'\n{_ADD_NOTES}\nA\nenv apply_patch <<'B'\n{_DELETE_ORDERS}\nB\n",
+                     id="two-env-calls"),
+        pytest.param(f"bash <<'EOF'\napply_patch <<'P'\n{_DELETE_ORDERS}\nP\nEOF\n", id="inside-bash-heredoc"),
+        pytest.param(f"cat <<'EOF' | env apply_patch\n{_DELETE_ORDERS}\nEOF\n", id="piped-to-env-call"),
+        pytest.param(f"cat > /tmp/p <<'EOF'\n{_DELETE_ORDERS}\nEOF\nenv apply_patch < /tmp/p\n",
+                     id="file-redirected-into-env-call"),
+        pytest.param(f"cat > notes.md <<'EOF'\napply_patch <<'X'\n{_DELETE_ORDERS}\nX\nEOF\n",
+                     id="in-another-commands-heredoc"),
+        pytest.param(f"apply_patch <<$+x\n{_patch('*** Add File: notes.txt', '+x', '*** Delete File: models/orders.sql')}"
+                     "\n$+x\n", id="delimiter-with-dollar"),
+        pytest.param(f"apply_patch <<$'EOF'\n{_DELETE_ORDERS}\nEOF\n", id="ansi-quoted-delimiter"),
+        pytest.param(_shell(_DELETE_ORDERS).replace("apply_patch", "apply\\\n_patch", 1),
+                     id="continuation-inside-name"),
+        pytest.param(_shell(_DELETE_ORDERS).replace("<<'EOF'", "< other.patch <<'EOF'", 1),
+                     id="stdin-file-then-heredoc"),
+        pytest.param(f"apply_patch '{_DELETE_ORDERS}'", id="single-quoted-argument"),
+        pytest.param(f"apply_patch '<<EOF\n{_DELETE_ORDERS}\nEOF'", id="wrapper-in-argument"),
+        pytest.param(_shell(_DELETE_ORDERS) + 'echo "$(true)"\n', id="text-after-the-heredoc"),
+    ])
+    def test_model_patch_denied(self, project, capsys, cmd):
+        _unchecked_deny(_run_pre(cmd, project, capsys), "models/orders.sql")
 
-    def test_unknown_directory_yaml_denied(self, project, capsys):
+    def test_continuation_before_dash_names_both_patches(self, project, capsys):
+        """`<<\\⏎-EOF` is `<<-EOF`; the call after it is read too."""
+        body = "\n".join("\t" + line for line in _DELETE_ORDERS.split("\n"))
+        second = _patch("*** Delete File: models/customers.sql")
+        cmd = f"apply_patch <<\\\n-EOF\n{body}\n\tEOF\napply_patch '{second}'\n"
+        _unchecked_deny(_run_pre(cmd, project, capsys), "models/orders.sql", "models/customers.sql")
+
+    def test_yaml_denied(self, project, capsys):
         text = _patch("*** Update File: models/schema.YML", "@@", "-a", "+b")
-        assert _denied(_run_pre(_shell(text, prefix="cd dbt; "), project, capsys))
+        _unchecked_deny(_run_pre(_shell(text, prefix="cd dbt; "), project, capsys), "models/schema.YML")
 
-    def test_unknown_directory_move_to_sql_denied(self, project, capsys):
+    def test_move_to_sql_denied(self, project, capsys):
         text = _patch("*** Update File: notes.md", "*** Move to: models/orders.sql", "@@", "-a", "+b")
-        assert _denied(_run_pre(_shell(text, prefix="cd dbt; "), project, capsys))
+        _unchecked_deny(_run_pre(_shell(text, prefix="cd dbt; "), project, capsys), "models/orders.sql")
 
-    def test_unknown_directory_markdown_only_allowed(self, project, capsys):
-        text = _patch("*** Update File: README.md", "@@", "-hello", "+hi")
-        assert _run_pre(_shell(text, prefix="cd dbt; "), project, capsys) is None
+    def test_one_reason_lists_every_path(self, project, capsys):
+        cmd = _shell(_DELETE_ORDERS, prefix="env ") + _shell(_patch("*** Delete File: models/customers.sql"),
+                                                              prefix="env ")
+        reason = _unchecked_deny(_run_pre(cmd, project, capsys), "models/orders.sql, models/customers.sql")
+        assert reason.count("couldn't check") == 1
+        assert "isn't written out" not in reason and "expand" not in reason
+
+    def test_denied_even_after_assessment_and_nothing_tracked(self, project, capsys):
+        cache.mark_impact_check_verified(SESSION, "orders")
+        _unchecked_deny(_run_pre(_shell(_DELETE_ORDERS, prefix="FOO=1 "), project, capsys))
         assert _edited() == []
 
+    def test_two_calls_second_denied_tracks_nothing(self, project, capsys):
+        first = _shell(_patch("*** Add File: models/brand_new.sql", "+select 1"))
+        second = _shell(_patch(*_update("models/orders.sql")))
+        _unchecked_deny(_run_pre(first + second, project, capsys), "models/orders.sql")
+        assert _edited() == []
+
+    @pytest.mark.parametrize("path", ["models/orders.sql/", "models/orders.sql/."])
+    def test_trailing_slash_denied(self, project, capsys, path):
+        _unchecked_deny(_run_pre(_shell(_patch(*_update(path)), prefix="env "), project, capsys), path)
+
+    @pytest.mark.parametrize("cmd", [
+        _shell(_DOCS_ONLY, prefix="env "),
+        _shell(_DOCS_ONLY, prefix="FOO=1 "),
+        _shell(_DOCS_ONLY, prefix="cd dbt; "),
+        "(cd dbt && " + _shell(_DOCS_ONLY).rstrip("\n") + "\n)",
+        _shell(_DOCS_ONLY) + _shell(_ADD_NOTES),
+        f"apply_patch '{_DOCS_ONLY}'",
+        _shell(_patch("*** Update File: src/app.py", "@@", "-x", "+print(\"a\\n\")"), prefix="FOO=1 ", delim="EOF"),
+    ] + [_shell(_patch(*_update(path)), prefix="env ") for path in ["models/", "notes.md", "notes.md/"]])
+    def test_non_dbt_patch_allowed_and_not_tracked(self, project, capsys, cmd):
+        assert _run_pre(cmd, project, capsys) is None
+        assert _edited() == []
+
+    def test_backslash_joining_a_header_denied(self, project, capsys):
+        """The shell joins these two lines into `*** Delete File: models/orders.sql`."""
+        text = _patch("**\\", "* Delete File: models/orders.sql")
+        _unchecked_deny(_run_pre(_shell(text, prefix="FOO=1 ", delim="EOF"), project, capsys), "models/orders.sql")
+
+    def test_continuation_hiding_end_of_patch(self, project, capsys):
+        """The shell joins `+hi\\` and `*** End Patch`, so the patch goes on to the next header."""
+        text = _patch("*** Add File: notes.txt", "+hi\\", "*** End Patch", "*** Delete File: models/orders.sql")
+        _unchecked_deny(_run_pre(_shell(text, prefix="FOO=1 ", delim="EOF"), project, capsys), "models/orders.sql")
+
+    def test_long_nested_command_after_a_model_patch_denied(self, project, capsys):
+        inner = "true"
+        for _ in range(600):
+            inner = f'"$({inner})"'
+        cmd = _shell(_patch(*_update("models/orders.sql"))) + f"echo {inner}\n"
+        _unchecked_deny(_run_pre(cmd, project, capsys), "models/orders.sql")
+
+
+# --- Shell: a patch the command doesn't spell out ---
+
+class TestShellUnwrittenPatch:
     @pytest.mark.parametrize("cmd", [
         "apply_patch < /tmp/p.diff",
         'apply_patch "$(cat /tmp/p.diff)"',
         "cat /tmp/p.diff | apply_patch",
+        "cat /tmp/p.diff | ap''ply_patch",
         "apply_patch <<EOF\n*** Begin Patch\n*** Update File: $F\n@@\n-a\n+b\n*** End Patch\nEOF\n",
+        _shell(_DOCS_ONLY).replace("apply_patch", 'apply_patch "$P"', 1),
+        _shell(_DOCS_ONLY).replace("<<'EOF'", "<<'EOF' < other.patch", 1),
+        _shell(_DOCS_ONLY).replace("<<'EOF'", "3<<'EOF'", 1),
+        f"apply_patch <<< '{_DOCS_ONLY}'",
+        f"cat > /tmp/p <<'EOF'\n{_DOCS_ONLY}\nEOF\nenv apply_patch < /tmp/p\n",
+        _shell(_DELETE_ORDERS) + "apply_patch < f.patch\n",
     ])
-    def test_opaque_body_denied(self, project, capsys, cmd):
-        out = _run_pre(cmd, project, capsys)
-        assert _denied(out)
-        assert "couldn't check" in out["permissionDecisionReason"]
+    def test_denied(self, project, capsys, cmd):
+        assert "the patch isn't written out" in _unchecked_deny(_run_pre(cmd, project, capsys))
+
+    def test_unquoted_heredoc_built_from_a_variable_denied(self, project, capsys):
+        """The patch text sits in `$X`, where no header line is written out."""
+        cmd = ("X=$'*** Begin Patch\\n*** Delete File: models/orders.sql\\n*** End Patch'\n"
+               "apply_patch <<EOF\n$X\nEOF\n")
+        assert "the patch isn't written out" in _unchecked_deny(_run_pre(cmd, project, capsys))
+
+    def test_continuation_in_delimiter_leaves_it_unquoted(self, project, capsys):
+        """The shell drops the backslash-newline first, so `<<E\\⏎OF` is a plain `<<EOF`
+        whose body it expands."""
+        text = _patch("*** Update File: src/app.js", "@@", "-x", "+$(printf 'y')")
+        assert "the patch isn't written out" in _unchecked_deny(
+            _run_pre(f"apply_patch <<E\\\nOF\n{text}\nEOF\n", project, capsys))
+
+    def test_mixed_command_blocked_and_nothing_tracked(self, project, capsys):
+        cache.mark_impact_check_verified(SESSION, "orders")
+        cmd = _shell(_patch(*_update("models/orders.sql"))) + "apply_patch < f.patch\n"
+        reason = _unchecked_deny(_run_pre(cmd, project, capsys), "models/orders.sql")
+        assert "the patch isn't written out" in reason
+        assert _edited() == []
+
+    @pytest.mark.parametrize("cmd", [
+        "grep -rn apply_patch .",
+        "echo 'run apply_patch <<EOF later'",
+        "# apply_patch < x\nls",
+        "echo apply_patch is a tool",
+        "command -v apply_patch",
+        "command -V apply_patch",
+        f"cat > notes.md <<'EOF'\napply_patch <<'X'\n{_patch('*** Update File: docs/a.md')}\nX\nEOF\n",
+    ])
+    def test_mention_is_not_a_call(self, project, capsys, cmd):
+        assert _run_pre(cmd, project, capsys) is None
+
+    @pytest.mark.parametrize("cmd,expected", [
+        ('git commit -m "use apply_patch"', False),
+        ("apply_patch", True),
+        ("x=1 env apply_patch", True),
+        ("/usr/bin/applypatch < p", True),
+        ("echo hi; apply_patch", True),
+        ("echo hi && apply_patch <<'EOF'\nEOF\n", False),
+        ("FOO=$x apply_patch <<EOF\nEOF\n", True),
+        ("FOO=$x apply_patch <<\\EOF\nEOF\n", False),
+        ("apply_patch '*** Begin Patch'", False),
+        ("apply_patch <<(ls)", True),
+    ])
+    def test_reads_unwritten_patch(self, cmd, expected):
+        from shell_patch import reads_unwritten_patch
+        assert reads_unwritten_patch(cmd) is expected
+
+
+# --- Shell: patch text the shell may expand ---
+
+class TestShellExpandingPatch:
+    def test_dollar_in_hunk_of_an_unquoted_heredoc_denied(self, project, capsys):
+        text = _patch("*** Update File: src/app.js", "@@", "-x", "+$(printf 'y')")
+        reason = _unchecked_deny(_run_pre(_shell(text, prefix="FOO=1 ", delim="EOF"), project, capsys))
+        assert "expand" in reason
+
+    @pytest.mark.parametrize("hunk", ["+$(printf 'y')", "+`printf y`", "+$X"])
+    def test_expansion_in_patch_text_alone_denied(self, project, capsys, hunk):
+        """Inside `bash -c "..."` the shell expands the patch text, wherever it is."""
+        text = _patch("*** Update File: src/app.js", "@@", "-x", hunk)
+        reason = _unchecked_deny(_run_pre(f"bash -c \"apply_patch <<'P'\n{text}\nP\"", project, capsys))
+        assert "the shell may expand" in reason
+        assert "isn't written out" not in reason
+
+    def test_expansion_after_the_end_of_the_patch_is_not_the_patch(self, project, capsys):
+        cmd = f"env apply_patch <<'EOF'\n{_DOCS_ONLY}\nEOF\necho \"$HOME\"\n"
+        assert _run_pre(cmd, project, capsys) is None
 
     # Codex applies an intercepted heredoc as written, even with an unquoted delimiter, so
     # `$`, backticks and backslashes in hunk lines don't make it unreadable.
@@ -344,68 +579,127 @@ class TestShellUnresolved:
         assert "orders" in out["permissionDecisionReason"]
         assert "couldn't check" not in out["permissionDecisionReason"]
 
-    # Outside Codex's two forms a real shell expands the body: a backslash can only join
-    # lines, but `$(...)` or `$VAR` could write new header lines.
-    def test_shell_unquoted_backslash_only_allowed(self, project, capsys):
-        text = _patch("*** Update File: src/app.py", "@@", "-x", "+print(\"a\\n\")")
-        assert _run_pre(_shell(text, prefix="FOO=1 ", delim="EOF"), project, capsys) is None
 
-    def test_shell_unquoted_dollar_in_hunk_denied(self, project, capsys):
-        text = _patch("*** Update File: src/app.js", "@@", "-x", "+$(printf 'y')")
-        out = _run_pre(_shell(text, prefix="FOO=1 ", delim="EOF"), project, capsys)
-        assert _denied(out)
-        assert "couldn't check" in out["permissionDecisionReason"]
+# --- Shell: the recognised forms, read exactly ---
 
-    def test_shell_unquoted_backslash_joining_a_header_denied(self, project, capsys):
-        # The shell joins these two lines into `*** Delete File: models/orders.sql`.
-        text = _patch("**\\", "* Delete File: models/orders.sql")
-        out = _run_pre(_shell(text, prefix="FOO=1 ", delim="EOF"), project, capsys)
-        assert _denied(out)
-
-    def test_disable_switch_suppresses_unresolved_deny(self, project, capsys, monkeypatch):
-        monkeypatch.setenv("MC_PREVENT_HOOKS_DISABLED", "1")
-        assert _run_pre("apply_patch < /tmp/p.diff", project, capsys) is None
-
-    @pytest.mark.parametrize("cmd", [
-        "env apply_patch <<'EOF'\n*** Begin Patch\n*** Delete File: models/orders.sql\n*** End Patch\nEOF\n",
-        "bash -lc 'apply_patch <<EOF\n*** Begin Patch\n*** Delete File: models/orders.sql\n*** End Patch\nEOF'",
-    ])
-    def test_disable_switch_suppresses_unrecognised_call_deny(self, project, capsys, monkeypatch, cmd):
-        monkeypatch.setenv("MC_PREVENT_HOOKS_DISABLED", "1")
-        assert _run_pre(cmd, project, capsys) is None
-
-
-# --- Shell: recognising an invocation ---
-
-class TestShellRecognition:
-    @pytest.mark.parametrize("prefix", ["FOO=1 ", "/usr/local/bin/", "command ", "exec "])
-    def test_prefixed_invocation_gated(self, project, capsys, prefix):
-        cmd = _shell(_patch(*_update("models/orders.sql")), prefix=prefix)
+class TestShellRecognised:
+    def test_backslash_continuation_after_cd(self, project, capsys):
+        """Codex's parser sees through a backslash-newline between `&&` and the name."""
+        cmd = "cd models && \\\n" + _shell(_patch("*** Delete File: orders.sql"))
         out = _run_pre(cmd, project, capsys)
         assert _denied(out)
         assert "orders" in out["permissionDecisionReason"]
         assert "couldn't check" not in out["permissionDecisionReason"]
 
-    def test_scanned_add_allowed_and_tracked(self, project, capsys):
-        text = _patch("*** Add File: models/brand_new.sql", "+SELECT * FROM {{ ref('raw') }}")
-        assert _run_pre(_shell(text, prefix="FOO=1 "), project, capsys) is None
-        assert _edited() == ["brand_new"]
+    def test_backslash_at_end_of_unquoted_heredoc_line(self, project, capsys):
+        """In an unquoted heredoc a trailing backslash joins the next line, so the
+        `EOF` after it is body text and the heredoc runs on to the final `EOF`."""
+        text = "\n".join([
+            "*** Begin Patch", "*** Add File: notes.txt", "+hi\\", "EOF",
+            "*** Delete File: models/orders.sql", "*** End Patch",
+        ])
+        assert "+hi\\\nEOF\n" in text
+        out = _run_pre(f"apply_patch <<EOF\n{text}\nEOF\n", project, capsys)
+        assert _denied(out) and "orders" in out["permissionDecisionReason"]
+        assert "couldn't check" not in out["permissionDecisionReason"]
+
+    def test_patch_further_into_the_body_also_checked(self, project, capsys):
+        """A patch that doesn't start the body is text a real shell may apply on its own,
+        so it is checked by path, in the same reply as the body's own gate."""
+        text = _patch(*_update("models/orders.sql"), "+*** Begin Patch", "*** Delete File: models/customers.sql")
+        reason = _run_pre(_shell(text), project, capsys)["permissionDecisionReason"]
+        assert "couldn't check" in reason and "models/customers.sql" in reason
+        assert "run the change impact assessment for orders" in reason
 
     @pytest.mark.parametrize("cmd", [
-        "grep -rn apply_patch .",
-        "echo 'run apply_patch <<EOF later'",
-        "# apply_patch < x\nls",
-        "cat > notes.md <<'EOF'\napply_patch <<'X'\n*** Begin Patch\n*** Update File: docs/a.md\n*** End Patch\nX\nEOF\n",
+        f"apply_patch <<'X'\n<<EOF\n{_DELETE_ORDERS}\nEOF\nX\n",
+        f"apply_patch <<'X'\n\n\t{_DELETE_ORDERS}\nX\n",
     ])
-    def test_not_an_invocation(self, project, capsys, cmd):
+    def test_wrapper_and_leading_blanks_are_part_of_the_body(self, project, capsys, cmd):
+        cache.mark_impact_check_verified(SESSION, "orders")
+        assert _run_pre(cmd, project, capsys) is None
+        assert _edited() == ["orders"]
+
+
+# --- Patch text the recognised call doesn't gate ---
+
+class TestUncheckedPatchPaths:
+    @staticmethod
+    def _unchecked(command):
+        from shell_patch import find_invocation, unchecked_patch_paths
+        return unchecked_patch_paths(command, find_invocation(command))
+
+    def test_body_of_recognised_call_is_checked(self):
+        assert self._unchecked(_shell(_DELETE_ORDERS)) == []
+
+    def test_patch_text_further_into_a_body_is_checked_again(self):
+        text = _patch("*** Update File: docs/a.md", "@@", "-x", "+*** Begin Patch",
+                      "*** Delete File: models/orders.sql")
+        assert self._unchecked(_shell(text)) == ["models/orders.sql"]
+
+    def test_patch_after_leading_blank_lines(self):
+        assert self._unchecked(_shell("\n\t" + _DELETE_ORDERS)) == []
+
+    def test_other_forms(self):
+        assert self._unchecked(_shell(_DELETE_ORDERS, prefix="cd dbt; ")) == ["models/orders.sql"]
+        assert self._unchecked(f"apply_patch '{_DELETE_ORDERS}'") == ["models/orders.sql"]
+        assert self._unchecked(_shell(_DELETE_ORDERS, prefix="env ")) == ["models/orders.sql"]
+
+    def test_every_patch_counts(self):
+        cmd = _shell(_DOCS_ONLY, prefix="env ") + _shell(_DELETE_ORDERS, prefix="env ")
+        assert self._unchecked(cmd) == ["models/orders.sql"]
+
+    def test_patch_running_past_the_body(self):
+        cmd = "apply_patch '*** Begin Patch\n*** Add File: a.md\n+x'\n*** Delete File: models/orders.sql\n"
+        assert self._unchecked(cmd) == ["models/orders.sql"]
+
+    def test_non_dbt_paths_left_out(self):
+        assert self._unchecked(_shell(_DOCS_ONLY, prefix="env ")) == []
+
+    def test_no_apply_patch_name(self):
+        assert self._unchecked(f"cat <<'EOF'\n{_DELETE_ORDERS}\nEOF\n") == []
+
+    def test_header_split_by_continuation(self):
+        """The shell joins the header in an unquoted body."""
+        text = _patch("*** Delete File: models/or\\", "ders.sql")
+        assert self._unchecked(_shell(text, prefix="env ", delim="EOF")) == ["models/orders.sql"]
+
+    def test_header_after_continuation_in_quoted_body(self):
+        """A quoted body keeps its backslash-newlines, so the header stands on its own line."""
+        text = _patch("*** Add File: a.md", "+x\\", "*** Delete File: models/orders.sql")
+        assert self._unchecked(_shell(text, prefix="env ")) == ["models/orders.sql"]
+
+    def test_text_other_than_the_wrapper_before_the_patch_still_unchecked(self):
+        assert self._unchecked(f"apply_patch '<<END\n{_DELETE_ORDERS}\nEND'") == ["models/orders.sql"]
+
+
+# --- Shell: switches and fallbacks ---
+
+class TestShellSwitches:
+    @pytest.mark.parametrize("cmd", [
+        "apply_patch < /tmp/p.diff",
+        _shell(_DELETE_ORDERS, prefix="env "),
+        f"bash -lc 'apply_patch <<EOF\n{_DELETE_ORDERS}\nEOF'",
+        f"bash -c \"apply_patch <<'P'\n{_patch('*** Add File: a.js', '+$(x)')}\nP\"",
+    ])
+    def test_disable_switch_suppresses_unchecked_deny(self, project, capsys, monkeypatch, cmd):
+        monkeypatch.setenv("MC_PREVENT_HOOKS_DISABLED", "1")
         assert _run_pre(cmd, project, capsys) is None
 
-    def test_model_patch_in_another_commands_heredoc_denied(self, project, capsys):
-        """Text fed to another command may still run (`sh notes.md` later), so a patch in
-        it that may change models is checked by path."""
-        cmd = f"cat > notes.md <<'EOF'\napply_patch <<'X'\n{_patch('*** Delete File: models/orders.sql')}\nX\nEOF\n"
-        out = _run_pre(cmd, project, capsys)
+    def test_any_error_reading_an_apply_patch_command_denied(self, project, capsys):
+        with patch("bash_hook.find_invocation", side_effect=ValueError("boom")):
+            out = _run_pre(_shell(_DOCS_ONLY), project, capsys)
         assert _denied(out) and "couldn't check" in out["permissionDecisionReason"]
+        assert "boom" not in out["permissionDecisionReason"]
+
+    def test_read_error_respects_the_disable_switch(self, project, capsys, monkeypatch):
+        monkeypatch.setenv("MC_PREVENT_HOOKS_DISABLED", "1")
+        with patch("bash_hook.find_invocation", side_effect=ValueError("boom")):
+            assert _run_pre(_shell(_DOCS_ONLY), project, capsys) is None
+
+    def test_read_error_without_apply_patch_allowed(self, project, capsys):
+        with patch("bash_hook.find_invocation", side_effect=ValueError("boom")):
+            assert _run_pre("ls", project, capsys) is None
 
     def test_git_commit_still_checked(self, project, capsys):
         from lib.protocol import HookOutput
@@ -413,65 +707,11 @@ class TestShellRecognition:
             out = _run_pre("git commit -m 'x'", project, capsys)
         assert out["additionalContext"] == "ctx"
 
-
-# --- Shell: forms the scanner doesn't find, or resolves against the wrong folder ---
-
-_DELETE_ORDERS = _patch("*** Delete File: models/orders.sql")
-_DOCS_ONLY = _patch("*** Update File: docs/readme.md", "@@", "-a", "+b")
-
-
-class TestShellFormsNotRecognised:
-    def test_backslash_continuation_after_cd(self, project, capsys):
-        text = _patch("*** Delete File: orders.sql")
-        cmd = "cd models && \\\n" + _shell(text)
-        out = _run_pre(cmd, project, capsys)
-        assert _denied(out)
-        assert "orders" in out["permissionDecisionReason"]
-        assert "couldn't check" not in out["permissionDecisionReason"]
-
-    def test_assignment_with_expansion(self, project, capsys):
-        cmd = _shell(_DELETE_ORDERS, prefix='FOO="$(pwd)" ')
-        out = _run_pre(cmd, project, capsys)
-        assert _denied(out)
-        assert "orders" in out["permissionDecisionReason"]
-        assert "couldn't check" not in out["permissionDecisionReason"]
-
-    @pytest.mark.parametrize("prefix", ["env ", "env FOO=1 ", "timeout 30 ", "nice -n 5 ", "nohup "])
-    def test_wrapper_commands(self, project, capsys, prefix):
-        assert _denied(_run_pre(_shell(_DELETE_ORDERS, prefix=prefix), project, capsys))
-
-    def test_command_substitution(self, project, capsys):
-        cmd = "out=$(" + _shell(_DELETE_ORDERS) + ")"
-        assert _denied(_run_pre(cmd, project, capsys))
-
-    @pytest.mark.parametrize("shell", ["bash -lc", "zsh -c"])
-    def test_shell_argv_form(self, project, capsys, shell):
-        script = f"apply_patch <<EOF\n{_DELETE_ORDERS}\nEOF"
-        assert _denied(_run_pre(f"{shell} '{script}'", project, capsys))
-
-    def test_heredoc_with_argument(self, project, capsys):
-        cmd = _shell(_DOCS_ONLY).replace("apply_patch", 'apply_patch "$P"', 1)
-        assert _denied(_run_pre(cmd, project, capsys))
-
-    def test_heredoc_then_file_redirection(self, project, capsys):
-        cmd = _shell(_DOCS_ONLY).replace("<<'EOF'", "<<'EOF' < other.patch", 1)
-        assert _denied(_run_pre(cmd, project, capsys))
-
-    def test_builtin_cd(self, project, capsys):
-        text = _patch("*** Delete File: orders.sql")
-        assert _denied(_run_pre(_shell(text, prefix="builtin cd models && "), project, capsys))
-
-    @pytest.mark.parametrize("prefix", ["source env.sh && ", ". env.sh && "])
-    def test_sourced_script(self, project, capsys, prefix):
-        text = _patch("*** Delete File: orders.sql")
-        assert _denied(_run_pre(_shell(text, prefix=prefix), project, capsys))
-
-    def test_env_wrapper_docs_only_allowed(self, project, capsys):
-        assert _run_pre(_shell(_DOCS_ONLY, prefix="env "), project, capsys) is None
-
-    def test_mention_in_echo_allowed(self, project, capsys):
-        assert _run_pre("echo apply_patch is a tool", project, capsys) is None
-
+    def test_commit_message_naming_apply_patch_gets_the_commit_check(self, project, capsys):
+        from lib.protocol import HookOutput
+        with patch("bash_hook.evaluate_pre_commit", return_value=HookOutput(action="context", context="ctx")):
+            out = _run_pre('git commit -m "use apply_patch"', project, capsys)
+        assert out == {"hookEventName": "PreToolUse", "additionalContext": "ctx"}
 
 # --- Codex's own apply_patch tool ---
 
@@ -603,308 +843,24 @@ class TestNativeTool:
         assert not [n for n in os.listdir(cache.CACHE_DIR) if n.startswith(cache.PATCH_PREFIX)]
 
 
-# --- Shell: forms the scanner must not let slip past the gate ---
-
-_ADD_NOTES = _patch("*** Add File: notes.txt", "+hi")
-
-
-class TestShellScannerBypasses:
-    @staticmethod
-    def _denies_orders(command, project, capsys):
-        out = _run_pre(command, project, capsys)
-        assert _denied(out) and "orders" in out["permissionDecisionReason"]
-        return out["permissionDecisionReason"]
-
-    def test_recognised_call_then_env_call(self, project, capsys):
-        """`env apply_patch` runs the tool, so it is gated even after a plain call."""
-        cmd = (
-            f"apply_patch <<'A'\n{_ADD_NOTES}\nA\n"
-            f"env apply_patch <<'B'\n{_DELETE_ORDERS}\nB\n"
-        )
-        self._denies_orders(cmd, project, capsys)
-
-    def test_two_env_calls(self, project, capsys):
-        """Every `env apply_patch` heredoc is gated, not only the first."""
-        cmd = (
-            f"env apply_patch <<'A'\n{_ADD_NOTES}\nA\n"
-            f"env apply_patch <<'B'\n{_DELETE_ORDERS}\nB\n"
-        )
-        self._denies_orders(cmd, project, capsys)
-
-    def test_apply_patch_inside_bash_heredoc(self, project, capsys):
-        """A heredoc fed to `bash` is a script that runs apply_patch."""
-        cmd = f"bash <<'EOF'\napply_patch <<'P'\n{_DELETE_ORDERS}\nP\nEOF\n"
-        self._denies_orders(cmd, project, capsys)
-
-    def test_cat_heredoc_piped_to_env_apply_patch(self, project, capsys):
-        """A patch piped into `env apply_patch` is applied."""
-        cmd = f"cat <<'EOF' | env apply_patch\n{_DELETE_ORDERS}\nEOF\n"
-        self._denies_orders(cmd, project, capsys)
-
-    def test_patch_file_redirected_into_env_apply_patch(self, project, capsys):
-        """A patch written to a file and redirected into `env apply_patch` is applied."""
-        cmd = f"cat > /tmp/p <<'EOF'\n{_DELETE_ORDERS}\nEOF\nenv apply_patch < /tmp/p\n"
-        self._denies_orders(cmd, project, capsys)
-
-    def test_backslash_at_end_of_unquoted_heredoc_line(self, project, capsys):
-        """In an unquoted heredoc a trailing backslash joins the next line, so the
-        `EOF` after it is body text and the heredoc runs on to the final `EOF`."""
-        text = "\n".join([
-            "*** Begin Patch", "*** Add File: notes.txt", "+hi\\", "EOF",
-            "*** Delete File: models/orders.sql", "*** End Patch",
-        ])
-        assert "+hi\\\nEOF\n" in text
-        reason = self._denies_orders(f"apply_patch <<EOF\n{text}\nEOF\n", project, capsys)
-        assert "couldn't check" not in reason
-
-    def test_heredoc_delimiter_containing_dollar(self, project, capsys):
-        """`$+x` is a valid unquoted delimiter word; the body ends only at that line."""
-        text = _patch("*** Add File: notes.txt", "+x", "*** Delete File: models/orders.sql")
-        reason = self._denies_orders(f"apply_patch <<$+x\n{text}\n$+x\n", project, capsys)
-        assert "couldn't check" not in reason
-
-    def test_ansi_quoted_delimiter_is_not_guessed(self, project, capsys):
-        """Shells differ on what `$'EOF'` quotes to, so the body isn't read."""
-        out = _run_pre(f"apply_patch <<$'EOF'\n{_DELETE_ORDERS}\nEOF\n", project, capsys)
-        assert _denied(out) and "isn't written out" in out["permissionDecisionReason"]
-
-    @pytest.mark.parametrize("prefix", [
-        "chdir models && ",
-        "C=cd; $C models && ",
-        "trap 'cd models' DEBUG; ",
-    ])
-    def test_directory_change_the_scanner_misses(self, project, capsys, prefix):
-        """The shell may run apply_patch from `models`, so the patch's relative path
-        cannot be resolved against the payload cwd."""
-        cmd = _shell(_patch("*** Delete File: orders.sql"), prefix=prefix)
-        assert _denied(_run_pre(cmd, project, capsys))
-
-    def test_continuation_inside_command_name(self, project, capsys):
-        out = _run_pre(_shell(_DELETE_ORDERS).replace("apply_patch", "apply\\\n_patch", 1), project, capsys)
-        assert _denied(out) and "orders" in out["permissionDecisionReason"]
-        assert "couldn't check" not in out["permissionDecisionReason"]
-
-    def test_continuation_in_delimiter_leaves_it_unquoted(self, project, capsys):
-        """The shell drops the backslash-newline first, so `<<E\\⏎OF` is a plain `<<EOF`
-        whose body it expands."""
-        text = _patch("*** Update File: src/app.js", "@@", "-x", "+$(printf 'y')")
-        out = _run_pre(f"apply_patch <<E\\\nOF\n{text}\nEOF\n", project, capsys)
-        assert _denied(out) and "couldn't check" in out["permissionDecisionReason"]
-
-    def test_continuation_hiding_end_of_patch(self, project, capsys):
-        """The shell joins `+hi\\` and `*** End Patch`, so the patch goes on to the next header."""
-        text = _patch("*** Add File: notes.txt", "+hi\\", "*** End Patch", "*** Delete File: models/orders.sql")
-        out = _run_pre(_shell(text, prefix="FOO=1 ", delim="EOF"), project, capsys)
-        assert _denied(out)
-
-    @pytest.mark.parametrize("prefix", ["f() { :; }; ", "function f { :; }; ", "alias x=y; "])
-    def test_definitions_make_the_directory_unknown(self, project, capsys, prefix):
-        cmd = _shell(_patch("*** Delete File: orders.sql"), prefix=prefix)
-        out = _run_pre(cmd, project, capsys)
-        assert _denied(out) and "can't be known" in out["permissionDecisionReason"]
-
-    def test_array_assignment_keeps_the_directory(self, project, capsys):
-        out = _run_pre(_shell(_DELETE_ORDERS, prefix="a=(x y); "), project, capsys)
-        assert _denied(out) and "couldn't check" not in out["permissionDecisionReason"]
-
-    def test_process_substitution_keeps_the_directory(self, project, capsys):
-        out = _run_pre(_shell(_DELETE_ORDERS, prefix="diff <(ls) x; "), project, capsys)
-        assert _denied(out) and "couldn't check" not in out["permissionDecisionReason"]
-
-
-# --- Shell: the general scan's continuations and fd 0 ---
-
-class TestShellScanDetails:
-    def test_continuation_after_assignment(self, project, capsys):
-        out = _run_pre(_shell(_DELETE_ORDERS, prefix="FOO=1 \\\n"), project, capsys)
-        assert _denied(out) and "orders" in out["permissionDecisionReason"]
-
-    def test_continuation_inside_cd(self, project, capsys):
-        cmd = _shell(_patch("*** Delete File: orders.sql"), prefix="c\\\nd models && ")
-        assert _denied(_run_pre(cmd, project, capsys))
-
-    def test_heredoc_on_another_fd_is_not_the_patch(self, project, capsys):
-        out = _run_pre(_shell(_DOCS_ONLY).replace("<<'EOF'", "3<<'EOF'", 1), project, capsys)
-        assert _denied(out) and "isn't written out" in out["permissionDecisionReason"]
-
-    def test_continuation_before_dash(self, project, capsys):
-        """`<<\\⏎-EOF` is `<<-EOF`, so the heredoc ends at the tab-indented `EOF` and the
-        call after it is gated too."""
-        body = "\n".join("\t" + line for line in _DELETE_ORDERS.split("\n"))
-        second = _patch("*** Delete File: models/customers.sql")
-        cmd = f"apply_patch <<\\\n-EOF\n{body}\n\tEOF\napply_patch '{second}'\n"
-        out = _run_pre(cmd, project, capsys)
-        assert _denied(out) and "customers" in out["permissionDecisionReason"]
-        assert "couldn't check" not in out["permissionDecisionReason"]
-
-    def test_last_stdin_redirection_wins(self, project, capsys):
-        cmd = _shell(_DELETE_ORDERS).replace("<<'EOF'", "< other.patch <<'EOF'", 1)
-        out = _run_pre(cmd, project, capsys)
-        assert _denied(out) and "orders" in out["permissionDecisionReason"]
-        assert "couldn't check" not in out["permissionDecisionReason"]
-
-
-# --- Patch text no recognised call gates ---
-
-class TestUncheckedPatchPaths:
-    @staticmethod
-    def _unchecked(command):
-        from shell_patch import find_invocations, unchecked_patch_paths
-        return unchecked_patch_paths(command, find_invocations(command))
-
-    def test_body_of_call_with_known_base_is_checked(self):
-        assert self._unchecked(_shell(_DELETE_ORDERS)) == []
-
-    def test_patch_text_further_into_a_body_is_checked_again(self):
-        text = _patch("*** Update File: docs/a.md", "@@", "-x", "+*** Begin Patch",
-                      "*** Delete File: models/orders.sql")
-        assert self._unchecked(_shell(text)) == ["models/orders.sql"]
-
-    def test_patch_after_leading_blank_lines(self):
-        assert self._unchecked(_shell("\n\t" + _DELETE_ORDERS)) == []
-
-    def test_body_of_call_with_unknown_base(self):
-        assert self._unchecked(_shell(_DELETE_ORDERS, prefix="cd dbt; ")) == ["models/orders.sql"]
-
-    def test_single_quoted_argument_is_checked(self):
-        assert self._unchecked(f"apply_patch '{_DELETE_ORDERS}'") == []
-
-    def test_unrecognised_call(self):
-        assert self._unchecked(_shell(_DELETE_ORDERS, prefix="env ")) == ["models/orders.sql"]
-
-    def test_every_patch_counts(self):
-        cmd = _shell(_DOCS_ONLY, prefix="env ") + _shell(_DELETE_ORDERS, prefix="env ")
-        assert self._unchecked(cmd) == ["models/orders.sql"]
-
-    def test_patch_running_past_the_body(self):
-        cmd = "apply_patch '*** Begin Patch\n*** Add File: a.md\n+x'\n*** Delete File: models/orders.sql\n"
-        assert self._unchecked(cmd) == ["models/orders.sql"]
-
-    def test_non_dbt_paths_left_out(self):
-        assert self._unchecked(_shell(_DOCS_ONLY, prefix="env ")) == []
-
-    def test_no_apply_patch_name(self):
-        assert self._unchecked(f"cat <<'EOF'\n{_DELETE_ORDERS}\nEOF\n") == []
-
-    def test_header_split_by_continuation(self):
-        """The shell joins the header in an unquoted body."""
-        text = _patch("*** Delete File: models/or\\", "ders.sql")
-        assert self._unchecked(_shell(text, prefix="env ", delim="EOF")) == ["models/orders.sql"]
-
-    def test_header_after_continuation_in_quoted_body(self):
-        """A quoted body keeps its backslash-newlines, so the header stands on its own line."""
-        text = _patch("*** Add File: a.md", "+x\\", "*** Delete File: models/orders.sql")
-        assert self._unchecked(_shell(text, prefix="env ")) == ["models/orders.sql"]
-
-
-# --- Shell: a command the scanner can't read ---
-
-def _deeply_nested(levels):
-    inner = "true"
-    for _ in range(levels):
-        inner = f'"$({inner})"'
-    return f"echo {inner}"
-
-
-class TestShellUnreadable:
-    def test_deep_nesting_after_a_model_patch_denied(self, project, capsys):
-        cmd = _shell(_patch(*_update("models/orders.sql"))) + _deeply_nested(600) + "\n"
-        out = _run_pre(cmd, project, capsys)
-        assert _denied(out) and "couldn't check" in out["permissionDecisionReason"]
-
-    def test_deep_nesting_denied_even_after_assessment(self, project, capsys):
-        cache.mark_impact_check_verified(SESSION, "orders")
-        cmd = _shell(_patch(*_update("models/orders.sql"))) + _deeply_nested(600) + "\n"
-        assert _denied(_run_pre(cmd, project, capsys))
-        assert _edited() == []
-
-    def test_deep_nesting_is_reported_not_raised_as_recursion(self):
-        from shell_patch import UnreadableCommand, find_invocations
-        cmd = _shell(_patch(*_update("models/orders.sql"))) + _deeply_nested(600) + "\n"
-        with pytest.raises(UnreadableCommand):
-            find_invocations(cmd)
-
-    def test_moderate_nesting_still_read(self, project, capsys):
-        cmd = _shell(_patch(*_update("models/orders.sql"))) + _deeply_nested(20) + "\n"
-        out = _run_pre(cmd, project, capsys)
-        assert _denied(out) and "couldn't check" not in out["permissionDecisionReason"]
-
-    def test_deep_nesting_without_apply_patch_allowed(self, project, capsys):
-        assert _run_pre(_deeply_nested(600), project, capsys) is None
-
-    def test_any_scan_error_on_an_apply_patch_command_denied(self, project, capsys):
-        with patch("bash_hook.find_invocations", side_effect=ValueError("boom")):
-            out = _run_pre(_shell(_DOCS_ONLY), project, capsys)
-        assert _denied(out) and "couldn't check" in out["permissionDecisionReason"]
-        assert "boom" not in out["permissionDecisionReason"]
-
-    def test_scan_error_respects_the_disable_switch(self, project, capsys, monkeypatch):
-        monkeypatch.setenv("MC_PREVENT_HOOKS_DISABLED", "1")
-        with patch("bash_hook.find_invocations", side_effect=ValueError("boom")):
-            assert _run_pre(_shell(_DOCS_ONLY), project, capsys) is None
-
 
 # --- Shell: a command name the shell unquotes ---
 
 class TestShellQuotedName:
     @pytest.mark.parametrize("name", ["ap''ply_patch", 'ap""ply_patch', "apply\\_patch", "'apply_patch'",
                                       '"apply"_patch'])
-    def test_quoted_name_gated(self, project, capsys, name):
+    def test_quoted_name_denied(self, project, capsys, name):
         cmd = _shell(_patch(*_update("models/orders.sql")), delim="'PATCH'").replace("apply_patch", name, 1)
-        out = _run_pre(cmd, project, capsys)
-        assert _denied(out) and "orders" in out["permissionDecisionReason"]
+        _unchecked_deny(_run_pre(cmd, project, capsys), "models/orders.sql")
 
     def test_quoted_name_with_patch_in_a_pipe_denied(self, project, capsys):
         cmd = f"cat <<'EOF' | env ap''ply_patch\n{_DELETE_ORDERS}\nEOF\n"
-        out = _run_pre(cmd, project, capsys)
-        assert _denied(out) and "orders" in out["permissionDecisionReason"]
-
-
-# --- Shell: words that keep the next word in command position ---
-
-class TestShellPrefixWordOptions:
-    @pytest.mark.parametrize("prefix", [
-        "command -p cd models && ",
-        "command -- cd models && ",
-        "command -p -- cd models && ",
-        "builtin -- cd models && ",
-        "exec -c cd models && ",
-        "exec -a name cd models && ",
-        "time -p cd models && ",
-        "noglob cd models && ",
-        "nocorrect cd models && ",
-        "- cd models && ",
-        "command -x cd models && ",
-    ])
-    def test_directory_change_behind_a_prefix_denied(self, project, capsys, prefix):
-        out = _run_pre(_shell(_patch(*_update("orders.sql")), prefix=prefix), project, capsys)
-        assert _denied(out) and "can't be known" in out["permissionDecisionReason"]
-
-    @pytest.mark.parametrize("prefix", ["command -p ", "command -- ", "noglob ", "nocorrect ", "- ",
-                                        "time -p ", "exec -c ", "exec -a name ", "builtin -- "])
-    def test_call_behind_a_prefix_gated(self, project, capsys, prefix):
-        out = _run_pre(_shell(_patch(*_update("models/orders.sql")), prefix=prefix), project, capsys)
-        assert _denied(out) and "orders" in out["permissionDecisionReason"]
-        assert "couldn't check" not in out["permissionDecisionReason"]
-
-    @pytest.mark.parametrize("cmd", ["command -v apply_patch", "command -V apply_patch"])
-    def test_lookup_is_not_a_call(self, project, capsys, cmd):
-        assert _run_pre(cmd, project, capsys) is None
+        _unchecked_deny(_run_pre(cmd, project, capsys), "models/orders.sql")
 
 
 # --- Paths with a trailing slash ---
 
 class TestTrailingSlashPaths:
-    @pytest.mark.parametrize("path", ["models/orders.sql/", "models/orders.sql/."])
-    def test_unrecognised_call_denied(self, project, capsys, path):
-        out = _run_pre(_shell(_patch(*_update(path)), prefix="env "), project, capsys)
-        assert _denied(out) and "couldn't check" in out["permissionDecisionReason"]
-
-    @pytest.mark.parametrize("path", ["models/orders.sql/", "models/orders.sql/."])
-    def test_unknown_directory_denied(self, project, capsys, path):
-        out = _run_pre(_shell(_patch(*_update(path)), prefix="cd dbt; "), project, capsys)
-        assert _denied(out) and "can't be known" in out["permissionDecisionReason"]
-
     @pytest.mark.parametrize("path", ["models/orders.sql/", "models/orders.sql/."])
     def test_recognised_call_gates_the_model(self, project, capsys, path):
         assert _checked_paths(_shell(_patch(*_update(path))), project, capsys) == [
@@ -923,10 +879,6 @@ class TestTrailingSlashPaths:
         _run_post(text, project)
         assert _edited() == ["orders"]
 
-    @pytest.mark.parametrize("path", ["models/", "notes.md", "notes.md/"])
-    def test_non_dbt_paths_allowed(self, project, capsys, path):
-        assert _run_pre(_shell(_patch(*_update(path)), prefix="env "), project, capsys) is None
-
 
 # --- A patch inside Codex's `<<EOF` wrapper ---
 
@@ -935,29 +887,10 @@ def _wrapped(text, delim="EOF"):
 
 
 class TestCodexWrapperInShell:
-    @pytest.mark.parametrize("delim", ["EOF", '"EOF"'])
-    def test_argument_allowed_after_assessment(self, project, capsys, delim):
-        cache.mark_impact_check_verified(SESSION, "orders")
-        cmd = f"apply_patch '{_wrapped(_patch(*_update('models/orders.sql', 'a', 'b')), delim)}'"
-        assert _run_pre(cmd, project, capsys) is None
-        assert _edited() == ["orders"]
-
-    def test_argument_denied_before_assessment(self, project, capsys):
-        cmd = f"apply_patch '{_wrapped(_patch(*_update('models/orders.sql', 'a', 'b')))}'"
-        out = _run_pre(cmd, project, capsys)
-        assert _denied(out) and "orders" in out["permissionDecisionReason"]
-        assert "couldn't check" not in out["permissionDecisionReason"]
-
     @pytest.mark.parametrize("delim", ["EOF", "'EOF'", '"EOF"'])
     def test_heredoc_allowed_after_assessment(self, project, capsys, delim):
         cache.mark_impact_check_verified(SESSION, "orders")
         cmd = f"apply_patch <<'X'\n{_wrapped(_patch(*_update('models/orders.sql')), delim)}\nX\n"
-        assert _run_pre(cmd, project, capsys) is None
-        assert _edited() == ["orders"]
-
-    def test_scanned_heredoc_allowed_after_assessment(self, project, capsys):
-        cache.mark_impact_check_verified(SESSION, "orders")
-        cmd = f"FOO=1 apply_patch <<'X'\n{_wrapped(_patch(*_update('models/orders.sql')))}\nX\n"
         assert _run_pre(cmd, project, capsys) is None
         assert _edited() == ["orders"]
 
@@ -967,45 +900,19 @@ class TestCodexWrapperInShell:
         assert _denied(out) and "orders" in out["permissionDecisionReason"]
         assert "couldn't check" not in out["permissionDecisionReason"]
 
-    def test_text_other_than_the_wrapper_before_the_patch_still_unchecked(self):
-        from shell_patch import find_invocations, unchecked_patch_paths
-        cmd = f"apply_patch '<<END\n{_DELETE_ORDERS}\nEND'"
-        assert unchecked_patch_paths(cmd, find_invocations(cmd)) == ["models/orders.sql"]
+    @pytest.mark.parametrize("cmd", [
+        f"apply_patch '{_wrapped(_patch(*_update('models/orders.sql', 'a', 'b')))}'",
+        f"FOO=1 apply_patch <<'X'\n{_wrapped(_patch(*_update('models/orders.sql')))}\nX\n",
+    ])
+    def test_other_forms_denied_even_after_assessment(self, project, capsys, cmd):
+        cache.mark_impact_check_verified(SESSION, "orders")
+        _unchecked_deny(_run_pre(cmd, project, capsys), "models/orders.sql")
+        assert _edited() == []
 
 
 # --- Behaviours of the shell gate as a whole ---
 
 class TestShellGateContract:
-    def test_mixed_command_blocked_and_nothing_tracked(self, project, capsys):
-        cache.mark_impact_check_verified(SESSION, "orders")
-        cmd = _shell(_patch(*_update("models/orders.sql"))) + "apply_patch < f.patch\n"
-        out = _run_pre(cmd, project, capsys)
-        assert _denied(out) and "couldn't check" in out["permissionDecisionReason"]
-        assert _edited() == []
-
-    def test_mixed_command_keeps_the_assessment_instructions(self, project, capsys):
-        cmd = _shell(_patch(*_update("models/orders.sql"))) + "apply_patch < f.patch\n"
-        reason = _run_pre(cmd, project, capsys)["permissionDecisionReason"]
-        assert "couldn't check" in reason
-        assert "run the change impact assessment for orders" in reason
-
-    @pytest.mark.parametrize("prefix", [
-        "eval cd models; ",
-        "if cd models; then :; fi; ",
-        "while cd models; do break; done; ",
-        "if true; then cd models; fi; ",
-        "if false; then :; else cd models; fi; ",
-        "if false; then :; elif cd models; then :; fi; ",
-        "while true; do cd models; break; done; ",
-        "until cd models; do :; done; ",
-        "{ cd models; }; ",
-        "! cd models; ",
-        "time cd models; ",
-    ])
-    def test_directory_change_in_a_compound_command(self, project, capsys, prefix):
-        out = _run_pre(_shell(_patch(*_update("orders.sql")), prefix=prefix), project, capsys)
-        assert _denied(out) and "can't be known" in out["permissionDecisionReason"]
-
     @pytest.mark.parametrize("tool_name,command", [
         ("Bash", _shell(_patch(*_update("models/orders.sql")))),
         ("apply_patch", _patch(*_update("models/orders.sql"))),
@@ -1023,12 +930,6 @@ class TestShellGateContract:
             _run_pre(command, project, capsys, tool_name, transcript_path="/tmp/rollout.jsonl")
         assert seen and set(seen) == {"/tmp/rollout.jsonl"}
 
-    def test_commit_message_naming_apply_patch_gets_the_commit_check(self, project, capsys):
-        from lib.protocol import HookOutput
-        with patch("bash_hook.evaluate_pre_commit", return_value=HookOutput(action="context", context="ctx")):
-            out = _run_pre('git commit -m "use apply_patch"', project, capsys)
-        assert out == {"hookEventName": "PreToolUse", "additionalContext": "ctx"}
-
     @pytest.mark.parametrize("cmd", [
         _shell(_patch(*_update("models/orders.sql"))),
         "apply_patch < f.patch",
@@ -1041,12 +942,6 @@ class TestShellGateContract:
         out = _run_pre(_patch(*_update("models/orders.sql")), project, capsys, tool_name="apply_patch")
         assert _denied(out) and out["hookEventName"] == "PreToolUse"
 
-    def test_here_string_is_not_a_heredoc(self, project, capsys):
-        """A `<<<` word doesn't start a heredoc, so the lines after it are still commands."""
-        out = _run_pre("cat <<< hi\n" + _shell(_DELETE_ORDERS), project, capsys)
-        assert _denied(out) and "orders" in out["permissionDecisionReason"]
-        assert "couldn't check" not in out["permissionDecisionReason"]
-
-    def test_here_string_body_is_not_read(self, project, capsys):
-        out = _run_pre(f"apply_patch <<< '{_DOCS_ONLY}'", project, capsys)
-        assert _denied(out) and "isn't written out" in out["permissionDecisionReason"]
+    def test_other_form_is_not_tracked_or_gated(self, project, capsys):
+        """Only a recognised call's files reach the gate."""
+        assert _checked_paths(_shell(_DOCS_ONLY, prefix="env "), project, capsys) == []
