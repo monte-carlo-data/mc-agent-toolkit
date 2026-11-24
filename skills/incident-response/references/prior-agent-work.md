@@ -36,7 +36,8 @@ get_remediation_instructions(alert_id="<alert_uuid>")
 ```
 
 The plan's `title`, `summary` and `destinations` say what to do next. `plan_in_progress` means
-call again in a few seconds. Any other status means there is no plan for this analysis yet.
+the plan is still being built: it is usually ready within a few minutes and can take up to ten,
+so call again in about a minute. Any other status means there is no plan for this analysis yet.
 
 ## 4. Tuning analysis for the alert's monitors
 

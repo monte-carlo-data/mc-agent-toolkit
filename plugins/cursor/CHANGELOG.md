@@ -5,6 +5,12 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Cursor will be d
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.32.6] - 2026-11-24
+
+### Changed
+
+- remediation, incident-response: `plan_in_progress` wait guidance now says a plan is usually ready within a few minutes and can take up to ten (was "a few seconds").
+
 ## [1.32.5] - 2026-11-23
 
 ### Fixed
