@@ -60,6 +60,8 @@ The Prevent feature includes **PreToolUse hooks that can block edits to dbt SQL 
 
 **To disable the Prevent hooks**, set `MC_PREVENT_HOOKS_DISABLED=1` in your environment (e.g. in your `.zshrc` or `.bashrc`, or via `.claude/settings.json` under `env`). The hooks will exit immediately without blocking any edits.
 
+**Bayes follow-up after a commit.** After a commit that changes a dbt model, the agent asks whether you want Bayes, Monte Carlo's AI teammate, to check those tables and their downstream tables after the change deploys. The answer arrives in Slack, as a direct message or in the domain's Teammate channel, whichever you pick. Nothing is scheduled unless you say yes, each table is offered once per session, and the offer only appears when the Monte Carlo MCP server offers `schedule_agent_task`. **To turn it off**, set `MC_BAYES_FOLLOWUP_DISABLED=1`; `MC_PREVENT_HOOKS_DISABLED=1` turns it off too.
+
 See the [Prevent Hook Behavior](../README.md#prevent-hook-behavior) section in the plugins README for full details on scope and configuration.
 
 ## Updating

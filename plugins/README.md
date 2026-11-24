@@ -19,13 +19,14 @@ Currently, only the **Prevent** skill leverages hooks for *enforcement*; the oth
 
 ### Prevent Hook Behavior
 
-The Prevent feature uses four hooks and a slash command to enforce the impact-assessment-first workflow:
+The Prevent feature uses five hooks and a slash command to enforce the impact-assessment-first workflow:
 
 | Component | What it does |
 |---|---|
 | **Pre-edit hook** | Blocks edits to dbt models (and macros/snapshots) until a change impact assessment has been presented. |
 | **Post-edit hook** | Tracks which models were modified in the session for downstream validation. |
 | **Pre-commit hook** | Before `git commit`, when assessed models are staged, asks whether to run validation queries, and whether to generate monitors for coverage gaps the assessment found. |
+| **Post-commit hook** | After a commit that changes a dbt model, asks the agent to offer a Bayes follow-up on those tables (Claude Code and Cursor). Nothing is scheduled unless the user says yes. Turn off with `MC_BAYES_FOLLOWUP_DISABLED=1`. |
 | **Turn-end hook** | Fires at the end of each turn to inject validation reminders when models were edited without running validation queries. |
 | **`/mc-validate` command** | Explicitly generates validation queries for all dbt models changed in the session. |
 
@@ -33,7 +34,7 @@ The Prevent feature uses four hooks and a slash command to enforce the impact-as
 
 1. **You edit a model** — the pre-edit hook blocks until a change impact assessment runs. The agent surfaces downstream blast radius, active alerts, monitor coverage, and a risk-tiered recommendation.
 2. **You confirm and edit** — the post-edit hook records the change. The skill offers to generate monitors for new logic.
-3. **You commit** — when assessed models are staged, the pre-commit hook asks whether to run validation queries first, and whether to generate monitors for any coverage gap the assessment found. In Cortex Code it pauses the commit once to ask.
+3. **You commit** — when assessed models are staged, the pre-commit hook asks whether to run validation queries first, and whether to generate monitors for any coverage gap the assessment found. In Cortex Code it pauses the commit once to ask. In Claude Code and Cursor, once a commit that changes a dbt model lands, the agent offers to have Bayes, Monte Carlo's AI teammate, check the changed tables and their downstream tables after the change deploys, when `schedule_agent_task` is available. The answer arrives in Slack, as a direct message or in the domain's Teammate channel, whichever you pick. Each table is offered once per session.
 4. **You validate** — run `/mc-validate` or ask the agent to generate validation queries. Targeted SQL checks are saved to `validation/<table>_<timestamp>.sql`.
 
 Hook availability and behavior varies by agent — see each agent's README for platform-specific details. The [Hook Format Comparison](#hook-format-comparison) table below shows the technical differences.
@@ -71,7 +72,7 @@ For detailed architecture decisions, see the [Plugin Architecture Guide](../docs
 | Language | Python | Python | TypeScript | Python | Python | Python |
 | Hook config | `hooks/<skill>/hooks.json` | `hooks/<skill>/hooks.json` | Event handlers in `src/` | `hooks.json` (v1 format) at plugin root | `hooks/prevent/hooks.json` (manifest `hooks`), or `.codex/hooks.json` from `install.sh` | One `hooks/hooks.json` for all skills |
 | Command field | `"command"` | `"command"` | SDK events | `"bash"` | `"command"` | `"command"` |
-| Tool names | `Write`, `Edit`, `Bash` | `Write`, `Edit` | `edit`, `write`, `apply_patch` | `edit`, `create`, `bash` | `Bash`, `apply_patch` (Codex 0.124.0+) | `edit`, `write`, `multi_edit`, `apply_patch`, `bash`, `skill` (regex matchers; CoCo Desktop matches case-sensitively) |
+| Tool names | `Write`, `Edit`, `Bash` | `Write`, `Edit`, `Shell` | `edit`, `write`, `apply_patch` | `edit`, `create`, `bash` | `Bash`, `apply_patch` (Codex 0.124.0+) | `edit`, `write`, `multi_edit`, `apply_patch`, `bash`, `skill` (regex matchers; CoCo Desktop matches case-sensitively) |
 | Deny format | `hookSpecificOutput.permissionDecision` | `permission: "deny"` | Thrown `Error` | `permissionDecision: "deny"` | `hookSpecificOutput.permissionDecision` | `hookSpecificOutput.permissionDecision` |
 | Session ID | `session_id` | `conversation_id` | SDK client | PID (not provided) | `session_id` | `session_id` |
 

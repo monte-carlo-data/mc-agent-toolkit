@@ -12,11 +12,15 @@ import subprocess
 from typing import NamedTuple
 
 from lib.cache import (
+    add_bayes_offered_tables,
     add_edited_table,
     claim_commit_checkpoint,
     cleanup_stale_cache,
+    clear_head_snapshot,
     clear_monitor_gap,
+    get_bayes_offered_tables,
     get_edited_tables,
+    get_head_snapshot,
     get_impact_check_age_seconds,
     get_impact_check_state,
     get_pending_validation_tables,
@@ -28,6 +32,7 @@ from lib.cache import (
     mark_monitor_gap,
     move_to_pending_validation,
     remove_edited_tables,
+    save_head_snapshot,
 )
 from lib.commit_command import parse_commit_command
 from lib.detect import extract_table_name, is_dbt_model, is_dbt_schema_file
@@ -415,10 +420,57 @@ def _read_commit_models(repo_dir: str, add_paths=()) -> tuple[str, list[StagedMo
     return toplevel, models
 
 
+def _get_head_sha(cwd: str) -> str | None:
+    """HEAD's sha; "" when the repo has no commits yet; None outside a repo."""
+    sha = _git(["rev-parse", "--verify", "--quiet", "HEAD"], cwd)
+    if sha is not None:
+        return sha.strip()
+    return "" if _git(["rev-parse", "--is-inside-work-tree"], cwd) is not None else None
+
+
+def _get_committed_model_tables(cwd: str) -> list[str]:
+    """Model tables changed by the HEAD commit. Macros are left out: the offer is
+    about a table and what reads from it.
+
+    diff-tree prints paths relative to the repository root, so they are joined
+    to the root, not to cwd. `-z` stops git quoting non-ASCII paths.
+    """
+    root = _git_toplevel(cwd)
+    if root is None:
+        return []
+    files = _git(["diff-tree", "--root", "--no-commit-id", "--name-only", "-r", "-z", "HEAD"], root)
+    if files is None:
+        return []
+    tables = []
+    for rel in files.split("\0"):
+        if not rel:
+            continue
+        full_path = os.path.join(root, rel)
+        if not is_dbt_model(full_path):
+            continue
+        table = extract_table_name(full_path)
+        # Names go into the agent's context and a newline-delimited cache file.
+        if table.startswith("macro:") or not re.fullmatch(r"\w+", table):
+            continue
+        tables.append(table)
+    return list(dict.fromkeys(tables))
+
+
 # --- Decision functions ---
 
 def _prevent_hooks_disabled() -> bool:
     return os.environ.get("MC_PREVENT_HOOKS_DISABLED", "").strip() == "1"
+
+
+def _bayes_followup_disabled() -> bool:
+    return (
+        _prevent_hooks_disabled()
+        or os.environ.get("MC_BAYES_FOLLOWUP_DISABLED", "").strip() == "1"
+    )
+
+
+def _is_git_commit(command: str) -> bool:
+    return "git commit" in command
 
 
 def evaluate_pre_edit(inp: HookInput) -> HookOutput:
@@ -553,7 +605,7 @@ def evaluate_pre_commit(inp: HookInput) -> HookOutput:
     if _prevent_hooks_disabled():
         return HookOutput()
     command = inp.command or ""
-    if "git commit" not in command:
+    if not _is_git_commit(command):
         return HookOutput()
 
     cwd = inp.cwd or "."
@@ -732,6 +784,78 @@ def evaluate_turn_end(inp: HookInput) -> HookOutput:
 
     move_to_pending_validation(session_id)
     return HookOutput(action="block", reason=reason)
+
+
+def _bayes_offer_text(tables: list[str]) -> str:
+    """Context injected after a commit: asks the AI to offer, never to schedule.
+
+    `schedule_agent_task` must not run on a hook's say-so; its tool description
+    (ai-agent mcp-server/mcp_server/mcp_tools/schedule_agent_task.py) says the same.
+    """
+    table_list = ", ".join(tables)
+    first = tables[0]
+    return (
+        f"Monte Carlo: this commit changed dbt model(s): {table_list}. "
+        f"Bayes, Monte Carlo's AI teammate, can check these tables and the tables "
+        f"downstream of them later, once the change is deployed, and answer in Slack.\n\n"
+        f"Only if the Monte Carlo MCP tool `schedule_agent_task` is available in this "
+        f"session: when you have finished with the commit, ask the user once, in one "
+        f"line, for example \"Do you want Bayes to check {first} and its downstream "
+        f"tables after this deploys?\". Do NOT call `schedule_agent_task` unless the "
+        f"user says yes. If they say yes, ask when to check (and their time zone if you "
+        f"don't know it) and whether Bayes may run read-only SQL on their tables, then "
+        f"follow the tool's instructions; it says where the answer can go, so let the "
+        f"user pick. Name the tables in `request` and say the check is for after this "
+        f"change deploys: the run cannot see this conversation. If the user isn't sure "
+        f"when it deploys, ask whether Bayes should keep watching (`keep_watching`) in "
+        f"case it hasn't landed yet. If they say no, drop it and don't ask again. If the "
+        f"tool is not available, say nothing about this."
+    )
+
+
+def record_pre_commit_head(inp: HookInput) -> None:
+    """Pre-commit half of the Bayes follow-up: snapshot HEAD before `git commit` runs.
+
+    Pair with evaluate_post_commit, which offers only if HEAD moved. Runs on every
+    commit, staged models or not: `git commit -a` stages its files only when it runs.
+    """
+    if _bayes_followup_disabled() or not _is_git_commit(inp.command or ""):
+        return
+    cwd = inp.cwd or "."
+    head = _get_head_sha(cwd)
+    if head is not None:
+        save_head_snapshot(inp.session_id, cwd, head)
+
+
+def evaluate_post_commit(inp: HookInput) -> HookOutput:
+    """After `git commit`: offer a Bayes follow-up on the models the commit changed.
+
+    Acts only when HEAD moved since the pre-commit snapshot, so a failed or aborted
+    commit offers nothing. Each table is offered at most once per session.
+    Needs `record_pre_commit_head` in the same editor's pre-commit hook.
+    """
+    if _bayes_followup_disabled():
+        return HookOutput()
+    if not _is_git_commit(inp.command or ""):
+        return HookOutput()
+
+    snapshot = get_head_snapshot(inp.session_id)
+    if snapshot is None:
+        return HookOutput()
+    clear_head_snapshot(inp.session_id)
+
+    cwd = snapshot["cwd"]
+    head = _get_head_sha(cwd)
+    if not head or head == snapshot["sha"]:
+        return HookOutput()
+
+    offered = set(get_bayes_offered_tables(inp.session_id))
+    tables = [t for t in _get_committed_model_tables(cwd) if t not in offered]
+    if not tables:
+        return HookOutput()
+
+    add_bayes_offered_tables(inp.session_id, tables)
+    return HookOutput(action="context", context=_bayes_offer_text(tables))
 
 
 def evaluate_validate_command(inp: HookInput) -> HookOutput:

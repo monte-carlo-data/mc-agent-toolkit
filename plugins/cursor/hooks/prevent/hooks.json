@@ -13,6 +13,13 @@
                 "timeout": 5
             }
         ],
+        "postToolUse": [
+            {
+                "command": "python3 ${CURSOR_PLUGIN_ROOT}/hooks/prevent/post_commit_hook.py",
+                "matcher": "Shell",
+                "timeout": 5
+            }
+        ],
         "afterFileEdit": [
             {
                 "command": "python3 ${CURSOR_PLUGIN_ROOT}/hooks/prevent/post_edit_hook.py",
