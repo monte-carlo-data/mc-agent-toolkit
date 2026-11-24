@@ -4,7 +4,9 @@
 For `apply_patch`, tracks the files of the operations the tool's result says may have
 run, so a patch that failed before writing doesn't count as an edit. A file the patch
 deleted, moved away or overwrote with plain SQL counts if the pre-edit hook saw it as a
-dbt model before the patch ran; that hook records them per tool call.
+dbt model before the patch ran; that hook records them per tool call. Without that record
+(no tool_use_id, or one that doesn't match), such a file counts when its table has an
+impact-check state this session and its path is in a model folder.
 """
 import json
 import sys

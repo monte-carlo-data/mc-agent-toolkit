@@ -4,7 +4,9 @@
 Codex 0.124.0+ sends PostToolUse for its `apply_patch` tool, only after the patch
 succeeded; `tool_input.command` is the patch. A file the patch deleted, moved away or
 overwrote with plain SQL counts if bash_hook.py saw it as a dbt model before the patch
-ran; that hook records them per tool call. Other payloads are tracked by `file_path`.
+ran; that hook records them per tool call. Without that record, such a file counts when
+its table has an impact-check state this session and its path is in a model folder.
+Other payloads are tracked by `file_path`.
 """
 import json
 import sys

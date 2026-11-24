@@ -54,8 +54,11 @@ SCHEMA_EXTENSIONS = (".yml", ".yaml")
 
 
 def may_be_dbt_file(path: str) -> bool:
-    """Path-only check, for when the file can't be classified: any extension dbt gating acts on."""
-    return path.lower().endswith(MODEL_EXTENSIONS + SCHEMA_EXTENSIONS)
+    """Path-only check, for when the file can't be classified: any extension dbt gating acts on.
+
+    Normalised first, since a patch tool writes `models/orders.sql` for `models/orders.sql/`.
+    """
+    return os.path.normpath(path).lower().endswith(MODEL_EXTENSIONS + SCHEMA_EXTENSIONS)
 
 
 def is_dbt_model(file_path: str, content: str | None = None) -> bool:

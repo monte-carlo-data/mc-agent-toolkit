@@ -28,7 +28,7 @@ import json
 import os
 from typing import Callable, NamedTuple
 
-from lib.cache import add_edited_table, pop_patch_record, save_patch_record
+from lib.cache import add_edited_table, get_impact_check_state, pop_patch_record, save_patch_record
 from lib.detect import extract_table_name, is_dbt_model, is_dbt_schema_file
 
 BEGIN = "*** Begin Patch"
@@ -88,6 +88,16 @@ def _header(line: str, trim_path) -> tuple[str, str] | None:
     return None
 
 
+def strip_codex_wrapper(text: str) -> str:
+    """Where the "codex" dialect looks for `*** Begin Patch`: past leading whitespace and an
+    optional `<<EOF` wrapper line. Always a suffix of `text`."""
+    body = _lstrip(text, _is_rust_space)
+    first, newline, rest = body.partition("\n")
+    if newline and _strip(first, _is_rust_space) in _CODEX_WRAPPERS:
+        return _lstrip(rest, _is_rust_space)
+    return body
+
+
 def parse_operations(text, dialect: str = "cortex") -> list[Op]:
     """Operations in an apply_patch body, in order. [] when it is not a patch."""
     if dialect not in ("cortex", "codex"):
@@ -96,11 +106,7 @@ def parse_operations(text, dialect: str = "cortex") -> list[Op]:
         return []
     codex = dialect == "codex"
     is_space = _is_rust_space if codex else _is_js_space
-    body = _lstrip(text, is_space)
-    if codex:
-        first, _, rest = body.partition("\n")
-        if _strip(first, is_space) in _CODEX_WRAPPERS:
-            body = _lstrip(rest, is_space)
+    body = strip_codex_wrapper(text) if codex else _lstrip(text, is_space)
     if not body.startswith(BEGIN):
         return []
     lines = body.replace("\r\n", "\n").split("\n")[1:]
@@ -248,14 +254,33 @@ def remember_existing_models(session_id: str, call_id, paths: list[str]) -> None
         pass
 
 
-def recall_existing_models(session_id: str, call_id) -> set[str]:
-    """The paths recorded for this call, consuming the record; empty when there is none."""
+def recall_existing_models(session_id: str, call_id) -> set[str] | None:
+    """The paths recorded for this call, consuming the record; None when there is none."""
     if not call_id:
-        return set()
+        return None
     try:
-        return set(pop_patch_record(session_id, str(call_id)) or [])
+        record = pop_patch_record(session_id, str(call_id))
     except (OSError, ValueError, json.JSONDecodeError):
-        return set()
+        return None
+    return None if record is None else set(record)
+
+
+def _assessed_models(session_id: str, paths: list[str]) -> set[str]:
+    """The paths that are, by location, models whose table has an impact-check state.
+
+    Without a record from before the patch, a model it deleted or moved away can't be read
+    any more. One whose table went through the gate this session was gated as a model.
+    """
+    found = set()
+    for path in paths:
+        for target in link_targets(path):
+            try:
+                if get_impact_check_state(session_id, extract_table_name(target)) and is_dbt_model(target):
+                    found.add(path)
+                    break
+            except Exception:
+                continue
+    return found
 
 
 def patched_tables(paths: list[str], were_models: set[str]) -> list[str]:
@@ -306,6 +331,8 @@ def track_patch(patch_text, dialect: str, *, cwd: str | None, session_id: str, c
     if keep_ops:
         ops = keep_ops(ops)
     paths = [resolve_path(p, cwd) for p in op_paths(ops)]
+    if were_models is None:
+        were_models = _assessed_models(session_id, paths)
     for table in patched_tables(paths, were_models):
         add_edited_table(session_id, table)
 

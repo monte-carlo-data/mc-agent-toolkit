@@ -155,3 +155,71 @@ class TestResolvePath:
         from lib.apply_patch import resolve_path
         assert resolve_path("models/orders.sql", "") == "/models/orders.sql"
         assert resolve_path("models/orders.sql", None) == "/models/orders.sql"
+
+
+class TestTrailingSlash:
+    """Codex's applier writes `models/orders.sql` for `models/orders.sql/`."""
+
+    @pytest.mark.parametrize("path", ["models/orders.sql/", "models/orders.sql/.", "models/./orders.sql"])
+    def test_may_be_dbt_file(self, path):
+        from lib.detect import may_be_dbt_file
+        assert may_be_dbt_file(path)
+
+    @pytest.mark.parametrize("path", ["models/", "models/.", "notes.md", "notes.md/"])
+    def test_not_a_dbt_file(self, path):
+        from lib.detect import may_be_dbt_file
+        assert not may_be_dbt_file(path)
+
+    @pytest.mark.parametrize("path", ["models/orders.sql/", "models/orders.sql/."])
+    def test_resolved_to_the_file(self, path):
+        from lib.apply_patch import op_groups, parse_operations, resolve_path
+        assert resolve_path(path, "/proj") == "/proj/models/orders.sql"
+        assert op_groups(parse_operations(_patch(*_update(path))), "/proj") == [["/proj/models/orders.sql"]]
+
+    def test_resolved_path_is_a_model(self, tmp_path):
+        from lib.apply_patch import resolve_path
+        from lib.detect import is_dbt_model
+        (tmp_path / "models").mkdir()
+        (tmp_path / "models" / "orders.sql").write_text("select * from {{ ref('raw') }}\n")
+        assert is_dbt_model(resolve_path("models/orders.sql/", str(tmp_path)))
+
+
+class TestTrackWithoutRecord:
+    """A PostToolUse with no record of its PreToolUse (missing or unmatched call id)."""
+
+    @pytest.fixture
+    def project(self, tmp_path):
+        (tmp_path / "models").mkdir()
+        (tmp_path / "docs").mkdir()
+        return tmp_path
+
+    def _track(self, text, project, call_id="call_1"):
+        from lib.apply_patch import track_patch
+        track_patch(text, "codex", cwd=str(project), session_id="s1", call_id=call_id)
+        from lib.cache import get_edited_tables
+        return sorted(get_edited_tables("s1"))
+
+    def test_gone_model_with_an_assessment_tracked(self, project):
+        from lib.cache import mark_impact_check_verified
+        mark_impact_check_verified("s1", "orders")
+        assert self._track(_patch("*** Delete File: models/orders.sql"), project) == ["orders"]
+
+    def test_gone_model_without_call_id_tracked(self, project):
+        from lib.cache import mark_impact_check_verified
+        mark_impact_check_verified("s1", "orders")
+        assert self._track(_patch("*** Delete File: models/orders.sql"), project, call_id=None) == ["orders"]
+
+    def test_gone_file_without_an_assessment_not_tracked(self, project):
+        assert self._track(_patch("*** Delete File: models/orders.sql"), project) == []
+
+    def test_gone_non_model_with_an_assessed_stem_not_tracked(self, project):
+        from lib.cache import mark_impact_check_verified
+        mark_impact_check_verified("s1", "orders")
+        assert self._track(_patch("*** Delete File: docs/orders.sql"), project) == []
+
+    def test_record_present_wins_over_assessment(self, project):
+        """The pre hook saw no model at that path, so an old assessment of the stem doesn't count."""
+        from lib.cache import mark_impact_check_verified, save_patch_record
+        mark_impact_check_verified("s1", "orders")
+        save_patch_record("s1", "call_1", [])
+        assert self._track(_patch("*** Delete File: models/orders.sql"), project) == []

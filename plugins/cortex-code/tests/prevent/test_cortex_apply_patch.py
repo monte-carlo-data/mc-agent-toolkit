@@ -402,11 +402,33 @@ class TestPostEditApplyPatch:
         _run_post(_post_stdin(text, str(project), "Applied 1 operation(s)."))
         assert cache.get_edited_tables(SESSION) == ["orders"]
 
-    def test_deleted_model_without_a_pre_record_not_tracked(self, project):
-        """Without the pre hook's record, a file that is gone can't be told from plain SQL."""
+    def test_deleted_model_without_a_pre_record_tracked_by_its_assessment(self, project):
+        """Without the pre hook's record, a gone file whose table was assessed this session
+        was gated as a model, so it still counts."""
         cache.mark_impact_check_verified(SESSION, "orders")
         (project / "models" / "orders.sql").unlink()
         _run_post(_post_stdin(_patch("*** Delete File: models/orders.sql"), str(project), "Applied 1 operation(s)."))
+        assert cache.get_edited_tables(SESSION) == ["orders"]
+
+    def test_moved_model_with_an_unmatched_call_id_tracked_by_its_assessment(self, project, tmp_path, capsys):
+        cache.mark_impact_check_verified(SESSION, "orders")
+        text = _patch("*** Update File: models/orders.sql", "*** Move to: models/orders_v2.sql")
+        assert _run_pre(_pre_stdin(text, str(project), _session_files(tmp_path)), capsys) is None
+        (project / "models" / "orders.sql").rename(project / "models" / "orders_v2.sql")
+        stdin = json.loads(_post_stdin(text, str(project), "Applied 1 operation(s)."))
+        stdin["tool_use_id"] = "call_other"
+        _run_post(json.dumps(stdin))
+        assert sorted(cache.get_edited_tables(SESSION)) == ["orders", "orders_v2"]
+
+    def test_deleted_model_without_a_pre_record_or_assessment_not_tracked(self, project):
+        """Without the record or an assessment, a file that is gone can't be told from plain SQL."""
+        (project / "models" / "orders.sql").unlink()
+        _run_post(_post_stdin(_patch("*** Delete File: models/orders.sql"), str(project), "Applied 1 operation(s)."))
+        assert cache.get_edited_tables(SESSION) == []
+
+    def test_deleted_non_model_with_an_assessed_stem_not_tracked(self, project):
+        cache.mark_impact_check_verified(SESSION, "orders")
+        _run_post(_post_stdin(_patch("*** Delete File: docs/orders.sql"), str(project), "Applied 1 operation(s)."))
         assert cache.get_edited_tables(SESSION) == []
 
     def test_plain_sql_written_over_a_model_tracked(self, project, tmp_path, capsys):

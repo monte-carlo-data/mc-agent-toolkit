@@ -57,10 +57,10 @@ def elsewhere(tmp_path, monkeypatch):
     return other
 
 
-def _stdin(command, cwd, tool_name="Bash", event="PreToolUse", call_id="call_1"):
+def _stdin(command, cwd, tool_name="Bash", event="PreToolUse", call_id="call_1", transcript_path=""):
     return json.dumps({
         "session_id": SESSION,
-        "transcript_path": "",
+        "transcript_path": transcript_path,
         "cwd": str(cwd),
         "hook_event_name": event,
         "tool_name": tool_name,
@@ -69,8 +69,9 @@ def _stdin(command, cwd, tool_name="Bash", event="PreToolUse", call_id="call_1")
     })
 
 
-def _run_pre(command, cwd, capsys, tool_name="Bash", call_id="call_1"):
-    with patch("sys.stdin", StringIO(_stdin(command, cwd, tool_name, call_id=call_id))):
+def _run_pre(command, cwd, capsys, tool_name="Bash", call_id="call_1", transcript_path=""):
+    with patch("sys.stdin", StringIO(_stdin(command, cwd, tool_name, call_id=call_id,
+                                            transcript_path=transcript_path))):
         from bash_hook import main
         main()
     out = capsys.readouterr().out
@@ -554,6 +555,20 @@ class TestNativeTool:
         _run_post(text, project)
         assert _edited() == ["orders"]
 
+    def test_post_without_pre_record_tracks_deleted_assessed_model(self, project):
+        cache.mark_impact_check_verified(SESSION, "orders")
+        (project / "models" / "orders.sql").unlink()
+        _run_post(_patch("*** Delete File: models/orders.sql"), project)
+        assert _edited() == ["orders"]
+
+    def test_post_with_unmatched_call_id_tracks_moved_assessed_model(self, project, capsys):
+        cache.mark_impact_check_verified(SESSION, "orders")
+        text = _patch("*** Update File: models/orders.sql", "*** Move to: models/orders_v2.sql")
+        assert _run_pre(text, project, capsys, tool_name="apply_patch", call_id="call_a") is None
+        (project / "models" / "orders.sql").rename(project / "models" / "orders_v2.sql")
+        _run_post(text, project, call_id="call_b")
+        assert _edited() == ["orders", "orders_v2"]
+
     def test_interleaved_calls_keep_their_own_records(self, project, capsys):
         cache.mark_impact_check_verified(SESSION, "orders")
         cache.mark_impact_check_verified(SESSION, "customers")
@@ -564,10 +579,9 @@ class TestNativeTool:
         (project / "models" / "customers.sql").unlink()
         _run_post(b, project, call_id="call_b")
         assert _edited() == ["customers"]
-        # call_b's record is gone; replaying it doesn't add anything.
+        # Only call_b's record was consumed.
+        assert len([n for n in os.listdir(cache.CACHE_DIR) if n.startswith(cache.PATCH_PREFIX)]) == 1
         (project / "models" / "orders.sql").unlink()
-        _run_post(a, project, call_id="call_b")
-        assert _edited() == ["customers"]
         _run_post(a, project, call_id="call_a")
         assert _edited() == ["customers", "orders"]
 
@@ -781,3 +795,258 @@ class TestUncheckedPatchPaths:
         """A quoted body keeps its backslash-newlines, so the header stands on its own line."""
         text = _patch("*** Add File: a.md", "+x\\", "*** Delete File: models/orders.sql")
         assert self._unchecked(_shell(text, prefix="env ")) == ["models/orders.sql"]
+
+
+# --- Shell: a command the scanner can't read ---
+
+def _deeply_nested(levels):
+    inner = "true"
+    for _ in range(levels):
+        inner = f'"$({inner})"'
+    return f"echo {inner}"
+
+
+class TestShellUnreadable:
+    def test_deep_nesting_after_a_model_patch_denied(self, project, capsys):
+        cmd = _shell(_patch(*_update("models/orders.sql"))) + _deeply_nested(600) + "\n"
+        out = _run_pre(cmd, project, capsys)
+        assert _denied(out) and "couldn't check" in out["permissionDecisionReason"]
+
+    def test_deep_nesting_denied_even_after_assessment(self, project, capsys):
+        cache.mark_impact_check_verified(SESSION, "orders")
+        cmd = _shell(_patch(*_update("models/orders.sql"))) + _deeply_nested(600) + "\n"
+        assert _denied(_run_pre(cmd, project, capsys))
+        assert _edited() == []
+
+    def test_deep_nesting_is_reported_not_raised_as_recursion(self):
+        from shell_patch import UnreadableCommand, find_invocations
+        cmd = _shell(_patch(*_update("models/orders.sql"))) + _deeply_nested(600) + "\n"
+        with pytest.raises(UnreadableCommand):
+            find_invocations(cmd)
+
+    def test_moderate_nesting_still_read(self, project, capsys):
+        cmd = _shell(_patch(*_update("models/orders.sql"))) + _deeply_nested(20) + "\n"
+        out = _run_pre(cmd, project, capsys)
+        assert _denied(out) and "couldn't check" not in out["permissionDecisionReason"]
+
+    def test_deep_nesting_without_apply_patch_allowed(self, project, capsys):
+        assert _run_pre(_deeply_nested(600), project, capsys) is None
+
+    def test_any_scan_error_on_an_apply_patch_command_denied(self, project, capsys):
+        with patch("bash_hook.find_invocations", side_effect=ValueError("boom")):
+            out = _run_pre(_shell(_DOCS_ONLY), project, capsys)
+        assert _denied(out) and "couldn't check" in out["permissionDecisionReason"]
+        assert "boom" not in out["permissionDecisionReason"]
+
+    def test_scan_error_respects_the_disable_switch(self, project, capsys, monkeypatch):
+        monkeypatch.setenv("MC_PREVENT_HOOKS_DISABLED", "1")
+        with patch("bash_hook.find_invocations", side_effect=ValueError("boom")):
+            assert _run_pre(_shell(_DOCS_ONLY), project, capsys) is None
+
+
+# --- Shell: a command name the shell unquotes ---
+
+class TestShellQuotedName:
+    @pytest.mark.parametrize("name", ["ap''ply_patch", 'ap""ply_patch', "apply\\_patch", "'apply_patch'",
+                                      '"apply"_patch'])
+    def test_quoted_name_gated(self, project, capsys, name):
+        cmd = _shell(_patch(*_update("models/orders.sql")), delim="'PATCH'").replace("apply_patch", name, 1)
+        out = _run_pre(cmd, project, capsys)
+        assert _denied(out) and "orders" in out["permissionDecisionReason"]
+
+    def test_quoted_name_with_patch_in_a_pipe_denied(self, project, capsys):
+        cmd = f"cat <<'EOF' | env ap''ply_patch\n{_DELETE_ORDERS}\nEOF\n"
+        out = _run_pre(cmd, project, capsys)
+        assert _denied(out) and "orders" in out["permissionDecisionReason"]
+
+
+# --- Shell: words that keep the next word in command position ---
+
+class TestShellPrefixWordOptions:
+    @pytest.mark.parametrize("prefix", [
+        "command -p cd models && ",
+        "command -- cd models && ",
+        "command -p -- cd models && ",
+        "builtin -- cd models && ",
+        "exec -c cd models && ",
+        "exec -a name cd models && ",
+        "time -p cd models && ",
+        "noglob cd models && ",
+        "nocorrect cd models && ",
+        "- cd models && ",
+        "command -x cd models && ",
+    ])
+    def test_directory_change_behind_a_prefix_denied(self, project, capsys, prefix):
+        out = _run_pre(_shell(_patch(*_update("orders.sql")), prefix=prefix), project, capsys)
+        assert _denied(out) and "can't be known" in out["permissionDecisionReason"]
+
+    @pytest.mark.parametrize("prefix", ["command -p ", "command -- ", "noglob ", "nocorrect ", "- ",
+                                        "time -p ", "exec -c ", "exec -a name ", "builtin -- "])
+    def test_call_behind_a_prefix_gated(self, project, capsys, prefix):
+        out = _run_pre(_shell(_patch(*_update("models/orders.sql")), prefix=prefix), project, capsys)
+        assert _denied(out) and "orders" in out["permissionDecisionReason"]
+        assert "couldn't check" not in out["permissionDecisionReason"]
+
+    @pytest.mark.parametrize("cmd", ["command -v apply_patch", "command -V apply_patch"])
+    def test_lookup_is_not_a_call(self, project, capsys, cmd):
+        assert _run_pre(cmd, project, capsys) is None
+
+
+# --- Paths with a trailing slash ---
+
+class TestTrailingSlashPaths:
+    @pytest.mark.parametrize("path", ["models/orders.sql/", "models/orders.sql/."])
+    def test_unrecognised_call_denied(self, project, capsys, path):
+        out = _run_pre(_shell(_patch(*_update(path)), prefix="env "), project, capsys)
+        assert _denied(out) and "couldn't check" in out["permissionDecisionReason"]
+
+    @pytest.mark.parametrize("path", ["models/orders.sql/", "models/orders.sql/."])
+    def test_unknown_directory_denied(self, project, capsys, path):
+        out = _run_pre(_shell(_patch(*_update(path)), prefix="cd dbt; "), project, capsys)
+        assert _denied(out) and "can't be known" in out["permissionDecisionReason"]
+
+    @pytest.mark.parametrize("path", ["models/orders.sql/", "models/orders.sql/."])
+    def test_recognised_call_gates_the_model(self, project, capsys, path):
+        assert _checked_paths(_shell(_patch(*_update(path))), project, capsys) == [
+            str(project / "models" / "orders.sql")
+        ]
+
+    @pytest.mark.parametrize("path", ["models/orders.sql/", "models/orders.sql/."])
+    def test_native_call_gates_the_model(self, project, capsys, path):
+        out = _run_pre(_patch(*_update(path)), project, capsys, tool_name="apply_patch")
+        assert _denied(out) and "orders" in out["permissionDecisionReason"]
+
+    def test_native_post_tracks_the_model(self, project, capsys):
+        cache.mark_impact_check_verified(SESSION, "orders")
+        text = _patch(*_update("models/orders.sql/"))
+        assert _run_pre(text, project, capsys, tool_name="apply_patch") is None
+        _run_post(text, project)
+        assert _edited() == ["orders"]
+
+    @pytest.mark.parametrize("path", ["models/", "notes.md", "notes.md/"])
+    def test_non_dbt_paths_allowed(self, project, capsys, path):
+        assert _run_pre(_shell(_patch(*_update(path)), prefix="env "), project, capsys) is None
+
+
+# --- A patch inside Codex's `<<EOF` wrapper ---
+
+def _wrapped(text, delim="EOF"):
+    return f"<<{delim}\n{text}\nEOF"
+
+
+class TestCodexWrapperInShell:
+    @pytest.mark.parametrize("delim", ["EOF", '"EOF"'])
+    def test_argument_allowed_after_assessment(self, project, capsys, delim):
+        cache.mark_impact_check_verified(SESSION, "orders")
+        cmd = f"apply_patch '{_wrapped(_patch(*_update('models/orders.sql', 'a', 'b')), delim)}'"
+        assert _run_pre(cmd, project, capsys) is None
+        assert _edited() == ["orders"]
+
+    def test_argument_denied_before_assessment(self, project, capsys):
+        cmd = f"apply_patch '{_wrapped(_patch(*_update('models/orders.sql', 'a', 'b')))}'"
+        out = _run_pre(cmd, project, capsys)
+        assert _denied(out) and "orders" in out["permissionDecisionReason"]
+        assert "couldn't check" not in out["permissionDecisionReason"]
+
+    @pytest.mark.parametrize("delim", ["EOF", "'EOF'", '"EOF"'])
+    def test_heredoc_allowed_after_assessment(self, project, capsys, delim):
+        cache.mark_impact_check_verified(SESSION, "orders")
+        cmd = f"apply_patch <<'X'\n{_wrapped(_patch(*_update('models/orders.sql')), delim)}\nX\n"
+        assert _run_pre(cmd, project, capsys) is None
+        assert _edited() == ["orders"]
+
+    def test_scanned_heredoc_allowed_after_assessment(self, project, capsys):
+        cache.mark_impact_check_verified(SESSION, "orders")
+        cmd = f"FOO=1 apply_patch <<'X'\n{_wrapped(_patch(*_update('models/orders.sql')))}\nX\n"
+        assert _run_pre(cmd, project, capsys) is None
+        assert _edited() == ["orders"]
+
+    def test_heredoc_denied_before_assessment(self, project, capsys):
+        cmd = f"apply_patch <<'X'\n{_wrapped(_patch(*_update('models/orders.sql')))}\nX\n"
+        out = _run_pre(cmd, project, capsys)
+        assert _denied(out) and "orders" in out["permissionDecisionReason"]
+        assert "couldn't check" not in out["permissionDecisionReason"]
+
+    def test_text_other_than_the_wrapper_before_the_patch_still_unchecked(self):
+        from shell_patch import find_invocations, unchecked_patch_paths
+        cmd = f"apply_patch '<<END\n{_DELETE_ORDERS}\nEND'"
+        assert unchecked_patch_paths(cmd, find_invocations(cmd)) == ["models/orders.sql"]
+
+
+# --- Behaviours of the shell gate as a whole ---
+
+class TestShellGateContract:
+    def test_mixed_command_blocked_and_nothing_tracked(self, project, capsys):
+        cache.mark_impact_check_verified(SESSION, "orders")
+        cmd = _shell(_patch(*_update("models/orders.sql"))) + "apply_patch < f.patch\n"
+        out = _run_pre(cmd, project, capsys)
+        assert _denied(out) and "couldn't check" in out["permissionDecisionReason"]
+        assert _edited() == []
+
+    def test_mixed_command_keeps_the_assessment_instructions(self, project, capsys):
+        cmd = _shell(_patch(*_update("models/orders.sql"))) + "apply_patch < f.patch\n"
+        reason = _run_pre(cmd, project, capsys)["permissionDecisionReason"]
+        assert "couldn't check" in reason
+        assert "run the change impact assessment for orders" in reason
+
+    @pytest.mark.parametrize("prefix", [
+        "eval cd models; ",
+        "if cd models; then :; fi; ",
+        "while cd models; do break; done; ",
+        "if true; then cd models; fi; ",
+        "if false; then :; else cd models; fi; ",
+        "if false; then :; elif cd models; then :; fi; ",
+        "while true; do cd models; break; done; ",
+        "until cd models; do :; done; ",
+        "{ cd models; }; ",
+        "! cd models; ",
+        "time cd models; ",
+    ])
+    def test_directory_change_in_a_compound_command(self, project, capsys, prefix):
+        out = _run_pre(_shell(_patch(*_update("orders.sql")), prefix=prefix), project, capsys)
+        assert _denied(out) and "can't be known" in out["permissionDecisionReason"]
+
+    @pytest.mark.parametrize("tool_name,command", [
+        ("Bash", _shell(_patch(*_update("models/orders.sql")))),
+        ("apply_patch", _patch(*_update("models/orders.sql"))),
+    ])
+    def test_transcript_path_reaches_the_gate(self, project, capsys, tool_name, command):
+        import bash_hook
+        seen = []
+        real = bash_hook.evaluate_pre_edit
+
+        def spy(inp):
+            seen.append(inp.transcript_path)
+            return real(inp)
+
+        with patch.object(bash_hook, "evaluate_pre_edit", side_effect=spy):
+            _run_pre(command, project, capsys, tool_name, transcript_path="/tmp/rollout.jsonl")
+        assert seen and set(seen) == {"/tmp/rollout.jsonl"}
+
+    def test_commit_message_naming_apply_patch_gets_the_commit_check(self, project, capsys):
+        from lib.protocol import HookOutput
+        with patch("bash_hook.evaluate_pre_commit", return_value=HookOutput(action="context", context="ctx")):
+            out = _run_pre('git commit -m "use apply_patch"', project, capsys)
+        assert out == {"hookEventName": "PreToolUse", "additionalContext": "ctx"}
+
+    @pytest.mark.parametrize("cmd", [
+        _shell(_patch(*_update("models/orders.sql"))),
+        "apply_patch < f.patch",
+    ])
+    def test_deny_names_the_event(self, project, capsys, cmd):
+        out = _run_pre(cmd, project, capsys)
+        assert _denied(out) and out["hookEventName"] == "PreToolUse"
+
+    def test_native_deny_names_the_event(self, project, capsys):
+        out = _run_pre(_patch(*_update("models/orders.sql")), project, capsys, tool_name="apply_patch")
+        assert _denied(out) and out["hookEventName"] == "PreToolUse"
+
+    def test_here_string_is_not_a_heredoc(self, project, capsys):
+        """A `<<<` word doesn't start a heredoc, so the lines after it are still commands."""
+        out = _run_pre("cat <<< hi\n" + _shell(_DELETE_ORDERS), project, capsys)
+        assert _denied(out) and "orders" in out["permissionDecisionReason"]
+        assert "couldn't check" not in out["permissionDecisionReason"]
+
+    def test_here_string_body_is_not_read(self, project, capsys):
+        out = _run_pre(f"apply_patch <<< '{_DOCS_ONLY}'", project, capsys)
+        assert _denied(out) and "isn't written out" in out["permissionDecisionReason"]

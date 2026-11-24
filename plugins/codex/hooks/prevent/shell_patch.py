@@ -35,16 +35,27 @@ import re
 from dataclasses import dataclass
 from typing import NamedTuple
 
-from lib.apply_patch import BEGIN, END, op_paths, parse_operations
+from lib.apply_patch import BEGIN, END, op_paths, parse_operations, strip_codex_wrapper
 from lib.detect import may_be_dbt_file
 
 _NAMES = ("apply_patch", "applypatch")
 # Commands that change directory, run other shell text that may, or make a later word do so.
 _MAY_CHANGE_DIR = ("cd", "pushd", "popd", "chdir", "source", ".", "eval", "trap", "alias", "function")
-# Words after which the next word is still in command position.
+# Words after which the next word is still in command position. `noglob`, `nocorrect` and
+# `-` are zsh's precommand modifiers.
 _PREFIX_WORDS = (
-    "command", "builtin", "exec", "{", "!", "then", "do", "else", "elif", "if", "while", "until", "time",
+    "command", "builtin", "exec", "noglob", "nocorrect", "-",
+    "{", "!", "then", "do", "else", "elif", "if", "while", "until", "time",
 )
+# The single-letter options each prefix word takes before the command it runs, and the
+# ones that take the next word as their value. `--` ends them for any of these words.
+_PREFIX_OPTIONS = {"command": "pvV", "builtin": "", "exec": "cla", "time": "p"}
+_OPTIONS_WITH_VALUE = {"exec": "a"}
+# `command -v` and `-V` only print what the word would run.
+_LOOKUP_ONLY = {"command": "vV"}
+_OPTION_RE = re.compile(r"-[A-Za-z]+")
+# Each level of `"$(` nests a function call in the scan; past this the command is unread.
+_MAX_NESTING = 64
 _ASSIGNMENT_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*=")
 _EXPANSION_CHARS = ("$", "`", "\\")
 # In an unquoted heredoc the shell drops the backslash before these, and a backslash-newline.
@@ -61,6 +72,10 @@ _INTERCEPT_HEAD_RE = re.compile(
     re.VERBOSE,
 )
 _SAFE_BARE_DIR_RE = re.compile(r"[A-Za-z0-9_./@%+:,=][A-Za-z0-9_./@%+:,=-]*")
+
+
+class UnreadableCommand(Exception):
+    """The scan gave up on the command, so its calls and their folders are unknown."""
 
 
 class Invocation(NamedTuple):
@@ -171,8 +186,10 @@ class _Command:
         self.stdin: list[_Stdin] = []  # in order, the last one winning
 
 
-def _read_balanced(text: str, i: int, open_c: str, close_c: str) -> int:
+def _read_balanced(text: str, i: int, open_c: str, close_c: str, nesting: int = 0) -> int:
     """Index after the `close_c` matching the `open_c` just before `i`, skipping quotes."""
+    if nesting > _MAX_NESTING:
+        raise UnreadableCommand("nested too deeply")
     depth = 1
     while i < len(text):
         c = text[i]
@@ -184,7 +201,7 @@ def _read_balanced(text: str, i: int, open_c: str, close_c: str) -> int:
             i = len(text) if end == -1 else end + 1
             continue
         if c == '"':
-            i = _read_double_quoted(text, i + 1)[1]
+            i = _read_double_quoted(text, i + 1, nesting + 1)[1]
             continue
         if c == open_c:
             depth += 1
@@ -196,9 +213,11 @@ def _read_balanced(text: str, i: int, open_c: str, close_c: str) -> int:
     return i
 
 
-def _read_double_quoted(text: str, i: int) -> tuple[str, int, bool]:
+def _read_double_quoted(text: str, i: int, nesting: int = 0) -> tuple[str, int, bool]:
     """Content of a "..." string starting after its quote, the index after it, and
     whether it expands."""
+    if nesting > _MAX_NESTING:
+        raise UnreadableCommand("nested too deeply")
     out = []
     dynamic = False
     while i < len(text):
@@ -212,7 +231,7 @@ def _read_double_quoted(text: str, i: int) -> tuple[str, int, bool]:
         if c in "$`":
             dynamic = True
             if text.startswith("$(", i):
-                i = _read_balanced(text, i + 2, "(", ")")
+                i = _read_balanced(text, i + 2, "(", ")", nesting + 1)
                 continue
             if c == "`":
                 end = text.find("`", i + 1)
@@ -414,27 +433,52 @@ def _scan(command: str) -> tuple[list[_Command], bool]:
     changes_dir = defines_function
     for cmd in commands:
         name = _command_name(cmd)
-        if name is not None and (name.dynamic or name.text in _MAY_CHANGE_DIR):
+        # A name starting with `-` is an option of a prefix word the scan doesn't know,
+        # so the command it runs is unknown.
+        if name is not None and (name.dynamic or name.text in _MAY_CHANGE_DIR or name.text.startswith("-")):
             changes_dir = True
     return commands, changes_dir
 
 
-def _command_name(cmd: _Command) -> _Word | None:
-    for word in cmd.words:
+def _name_index(cmd: _Command) -> int | None:
+    """Where the command's name is in its words. For `command -v`, it is `command` itself,
+    which runs nothing."""
+    words = cmd.words
+    i = 0
+    while i < len(words):
+        word = words[i]
         if word.assignment:
-            continue  # whatever its value expands to, it isn't the command
-        if word.dynamic:
-            return word
-        if word.text in _PREFIX_WORDS:
+            i += 1  # whatever its value expands to, it isn't the command
             continue
-        return word
+        if word.dynamic or word.text not in _PREFIX_WORDS:
+            return i
+        prefix, prefix_index, i = word.text, i, i + 1
+        if prefix not in _PREFIX_OPTIONS:
+            continue
+        while i < len(words) and not words[i].dynamic:
+            option = words[i].text
+            if option == "--":
+                i += 1
+                break
+            if not _OPTION_RE.fullmatch(option) or not set(option[1:]) <= set(_PREFIX_OPTIONS[prefix]):
+                break  # an unknown option is left as the name, which the scan treats as unknown
+            if set(option[1:]) & set(_LOOKUP_ONLY.get(prefix, "")):
+                return prefix_index
+            with_value = _OPTIONS_WITH_VALUE.get(prefix, "")
+            if set(option[1:-1]) & set(with_value):
+                return i  # the value is glued to the option in a way the scan doesn't split
+            i += 2 if option[-1] in with_value else 1
     return None
+
+
+def _command_name(cmd: _Command) -> _Word | None:
+    index = _name_index(cmd)
+    return None if index is None else cmd.words[index]
 
 
 def _body(cmd: _Command) -> tuple[str, tuple[int, int] | None] | None:
     """The patch a call reads, and where it is written in the command."""
-    name_index = cmd.words.index(_command_name(cmd))
-    args = cmd.words[name_index + 1:]
+    args = cmd.words[_name_index(cmd) + 1:]
     if args:
         # The executable takes the patch from its first argument and ignores stdin.
         return (args[0].text, args[0].quoted_span) if args[0].single_quoted else None
@@ -455,14 +499,22 @@ def _without_continuations(command: str) -> tuple[str, list[int]]:
     return command.replace(_CONTINUATION, ""), [m.start() for m in re.finditer(re.escape(_CONTINUATION), command)]
 
 
-def _names_apply_patch(command: str) -> bool:
-    joined = _without_continuations(command)[0]
+_QUOTE_CHARS_RE = re.compile(r"[\\'\"]")
+
+
+def names_apply_patch(command: str) -> bool:
+    """Whether the command may name `apply_patch`. Quotes and backslashes are dropped first,
+    as the shell drops them from a plain word, so `ap''ply_patch` and `apply\\_patch` count.
+    A name built by expansion (`ap${x}ply_patch`) doesn't."""
+    if not isinstance(command, str):
+        return False
+    joined = _QUOTE_CHARS_RE.sub("", _without_continuations(command)[0])
     return any(name in joined for name in _NAMES)
 
 
 def find_invocations(command) -> list[Invocation]:
     """Every `apply_patch` call in a shell command, in order."""
-    if not isinstance(command, str) or not _names_apply_patch(command):
+    if not names_apply_patch(command):
         return []
     intercepted = _intercepted(command)
     if intercepted:
@@ -485,10 +537,11 @@ def unchecked_patch_paths(command, invocations: list[Invocation]) -> list[str]:
     In a command that names `apply_patch`, every `*** Begin Patch` up to the next
     `*** End Patch` is a patch something may apply, unless it is the body of a call found
     with a known base, which is gated as written. Only a patch that starts the body counts
-    as that body: one further in may be text the scan wrongly took for part of it. Each is
+    as that body (after the `<<EOF` line Codex's parser skips): one further in may be text
+    the scan wrongly took for part of it. Each is
     read twice, as written and with backslash-newlines removed, since the shell removes them
     in some places and not in others."""
-    if not isinstance(command, str) or not _names_apply_patch(command):
+    if not names_apply_patch(command):
         return []
     joined, cuts = _without_continuations(command)
 
@@ -505,7 +558,8 @@ def unchecked_patch_paths(command, invocations: list[Invocation]) -> list[str]:
         while start != -1:
             end = text.find(END, start)
             end = len(text) if end == -1 else end + len(END)
-            if not any(a <= start and not text[a:start].strip() and end <= b for a, b in accounted):
+            if not any(a <= start and end <= b and b - a - len(strip_codex_wrapper(text[a:b])) == start - a
+                       for a, b in accounted):
                 paths += [p for p in op_paths(parse_operations(text[start:], "codex")) if may_be_dbt_file(p)]
             start = text.find(BEGIN, start + 1)
     return list(dict.fromkeys(paths))

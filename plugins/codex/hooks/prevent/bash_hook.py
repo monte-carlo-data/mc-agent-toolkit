@@ -11,7 +11,8 @@ Every file a patch adds, deletes, updates or moves (both paths) is checked befor
 runs, and the patch is denied as a whole when any of them needs an impact assessment.
 A shell command whose call can't be resolved (the folder it runs in, or the patch it
 reads, is unknown), or that names `apply_patch` and holds patch text no recognised call
-reads, is denied when that patch may change a dbt file: Prevent couldn't check it.
+reads, is denied when that patch may change a dbt file: Prevent couldn't check it. So is
+one that names `apply_patch` and that the scan can't read at all.
 
 Bash commands with `git commit` get the pre-commit validation checkpoint.
 """
@@ -29,7 +30,7 @@ from lib.protocol import (
     HookInput, _prevent_hooks_disabled, evaluate_pre_commit, evaluate_pre_edit, evaluate_post_edit,
 )
 from lib.detect import may_be_dbt_file
-from shell_patch import find_invocations, unchecked_patch_paths
+from shell_patch import find_invocations, names_apply_patch, unchecked_patch_paths
 
 
 def _deny(reason: str) -> None:
@@ -121,10 +122,16 @@ def main():
         _gate_native(raw, command)
         return
 
-    invocations = find_invocations(command)
-    # Patch text no recognised call gates (`env apply_patch`, a script's heredoc, a pipe) is
-    # checked by path alone, and denied in the same reply as the calls' own gate.
-    unchecked = unchecked_patch_paths(command, invocations)
+    try:
+        invocations = find_invocations(command)
+        # Patch text no recognised call gates (`env apply_patch`, a script's heredoc, a pipe)
+        # is checked by path alone, and denied in the same reply as the calls' own gate.
+        unchecked = unchecked_patch_paths(command, invocations)
+    except Exception:
+        # safe_run would allow it, and with it any patch the command applies.
+        if names_apply_patch(command) and not _prevent_hooks_disabled():
+            _deny(_unresolved_reason(["Prevent couldn't read the command"]))
+        return
     if invocations or unchecked:
         _gate_shell(raw, invocations, unchecked)
         return
