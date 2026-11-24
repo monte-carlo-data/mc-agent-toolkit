@@ -5,9 +5,9 @@ import json
 import pytest
 
 import lib.cache as cache
-
 from lib.cache import (
-    CACHE_DIR,
+    claim_commit_checkpoint,
+    is_valid_session_id,
     IC_PREFIX,
     TURN_PREFIX,
     PENDING_PREFIX,
@@ -134,29 +134,29 @@ class TestSessionIdValidation:
 
 
 class TestTableNameSanitization:
-    """table_name flows into /tmp filenames; it must not be able to traverse
+    """table_name flows into cache filenames; it must not be able to traverse
     out of CACHE_DIR (unlike session_id, it isn't otherwise validated)."""
 
     def _parent(self, path):
         return os.path.dirname(os.path.realpath(path))
 
     def test_w4_path_traversal_stays_in_cache_dir(self):
-        assert self._parent(_w4_path("s1", "../../etc/passwd")) == os.path.realpath(CACHE_DIR)
+        assert self._parent(_w4_path("s1", "../../etc/passwd")) == os.path.realpath(cache.CACHE_DIR)
 
     def test_mg_path_traversal_stays_in_cache_dir(self):
-        assert self._parent(_mg_path("s1", "../../etc/passwd")) == os.path.realpath(CACHE_DIR)
+        assert self._parent(_mg_path("s1", "../../etc/passwd")) == os.path.realpath(cache.CACHE_DIR)
 
     def test_path_separators_neutralized(self):
-        assert self._parent(_w4_path("s1", "a/b/c")) == os.path.realpath(CACHE_DIR)
+        assert self._parent(_w4_path("s1", "a/b/c")) == os.path.realpath(cache.CACHE_DIR)
 
     def test_normal_table_name_unchanged(self):
         # Sanitizer must be a no-op for ordinary dbt names.
         assert _w4_path("s1", "client_hub_master") == \
-            os.path.join(CACHE_DIR, f"{IC_PREFIX}s1_client_hub_master")
+            os.path.join(cache.CACHE_DIR, f"{IC_PREFIX}s1_client_hub_master")
 
     def test_macro_prefix_preserved(self):
         assert _w4_path("s1", "macro:helper") == \
-            os.path.join(CACHE_DIR, f"{IC_PREFIX}s1_macro:helper")
+            os.path.join(cache.CACHE_DIR, f"{IC_PREFIX}s1_macro:helper")
 
 
 class TestClearMonitorGap:
@@ -185,18 +185,18 @@ class TestFilePermissions:
 
     def test_impact_check_file_is_owner_only(self):
         mark_impact_check_injected("test_session", "perm_test_table")
-        path = os.path.join(CACHE_DIR, f"{IC_PREFIX}test_session_perm_test_table")
+        path = os.path.join(cache.CACHE_DIR, f"{IC_PREFIX}test_session_perm_test_table")
         assert self._get_perms(path) == 0o600
 
     def test_turn_file_is_owner_only(self):
         add_edited_table("perm_test_session", "orders")
-        path = os.path.join(CACHE_DIR, f"{TURN_PREFIX}perm_test_session")
+        path = os.path.join(cache.CACHE_DIR, f"{TURN_PREFIX}perm_test_session")
         assert self._get_perms(path) == 0o600
 
     def test_pending_file_is_owner_only(self):
         add_edited_table("perm_test_session2", "orders")
         move_to_pending_validation("perm_test_session2")
-        path = os.path.join(CACHE_DIR, f"{PENDING_PREFIX}perm_test_session2")
+        path = os.path.join(cache.CACHE_DIR, f"{PENDING_PREFIX}perm_test_session2")
         assert self._get_perms(path) == 0o600
 
 
@@ -215,7 +215,7 @@ class TestHeadSnapshot:
 
     def test_file_is_owner_only(self):
         cache.save_head_snapshot("perm_head", "/repo", "abc123")
-        path = os.path.join(CACHE_DIR, f"{cache.HEAD_PREFIX}perm_head")
+        path = os.path.join(cache.CACHE_DIR, f"{cache.HEAD_PREFIX}perm_head")
         assert oct(os.stat(path).st_mode & 0o777) == oct(0o600)
 
 
@@ -231,3 +231,88 @@ class TestBayesOffer:
     def test_cleanup_covers_new_prefixes(self):
         assert cache.HEAD_PREFIX in cache.ALL_PREFIXES
         assert cache.BAYES_OFFERED_PREFIX in cache.ALL_PREFIXES
+
+
+class TestHasVerifiedImpactCheck:
+    def test_none(self):
+        assert cache.has_verified_impact_check("s1") is False
+
+    def test_injected_only(self):
+        cache.mark_impact_check_injected("s1", "orders")
+        assert cache.has_verified_impact_check("s1") is False
+
+    def test_verified(self):
+        cache.mark_impact_check_injected("s1", "orders")
+        cache.mark_impact_check_injected("s1", "customers")
+        cache.mark_impact_check_verified("s1", "customers")
+        assert cache.has_verified_impact_check("s1") is True
+
+    def test_other_session(self):
+        cache.mark_impact_check_injected("s2", "orders")
+        cache.mark_impact_check_verified("s2", "orders")
+        assert cache.has_verified_impact_check("s1") is False
+
+    @pytest.mark.parametrize("content", ["not json", "[]"])
+    def test_unreadable_file_is_skipped(self, content):
+        with open(os.path.join(cache.CACHE_DIR, cache.IC_PREFIX + "s1_bad"), "w") as f:
+            f.write(content)
+        cache.mark_impact_check_injected("s1", "orders")
+        assert cache.has_verified_impact_check("s1") is False
+
+    def test_missing_cache_dir(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(cache, "CACHE_DIR", str(tmp_path / "gone"))
+        assert cache.has_verified_impact_check("s1") is False
+
+
+class TestRemoveEditedTables:
+    def test_removes_only_the_named_tables_in_order(self):
+        for t in ("a", "b", "c"):
+            cache.add_edited_table("s1", t)
+        cache.remove_edited_tables("s1", ["b", "zzz"])
+        assert cache.get_edited_tables("s1") == ["a", "c"]
+
+    def test_removing_all_leaves_none(self):
+        cache.add_edited_table("s1", "a")
+        cache.remove_edited_tables("s1", ["a"])
+        assert cache.get_edited_tables("s1") == []
+
+    def test_no_file_is_fine(self):
+        cache.remove_edited_tables("s1", ["a"])
+        assert cache.get_edited_tables("s1") == []
+
+    def test_other_sessions_untouched(self):
+        cache.add_edited_table("s1", "a")
+        cache.add_edited_table("s2", "a")
+        cache.remove_edited_tables("s1", ["a"])
+        assert cache.get_edited_tables("s2") == ["a"]
+
+
+class TestCommitCheckpointClaim:
+    DIGEST = "a" * 64
+
+    def test_first_claim_wins(self):
+        assert claim_commit_checkpoint("s1", self.DIGEST) is True
+        assert claim_commit_checkpoint("s1", self.DIGEST) is False
+
+    def test_claims_are_per_session_and_digest(self):
+        assert claim_commit_checkpoint("s1", self.DIGEST) is True
+        assert claim_commit_checkpoint("s2", self.DIGEST) is True
+        assert claim_commit_checkpoint("s1", "b" * 64) is True
+
+    @pytest.mark.parametrize("digest", ["", "a" * 63, "A" * 64, "../" + "a" * 61, "a" * 64 + "x"])
+    def test_rejects_anything_but_a_sha256_hex_digest(self, digest):
+        with pytest.raises(ValueError):
+            claim_commit_checkpoint("s1", digest)
+
+    @pytest.mark.parametrize("session", ["", "../etc", "a b", "a/b"])
+    def test_rejects_invalid_session(self, session):
+        with pytest.raises(ValueError):
+            claim_commit_checkpoint(session, self.DIGEST)
+        assert os.listdir(cache.CACHE_DIR) == []
+
+    @pytest.mark.parametrize("session,valid", [
+        ("s1", True), ("abc-DEF_123", True), ("", False), (None, False),
+        ("a/b", False), ("a b", False), (123, False),
+    ])
+    def test_is_valid_session_id(self, session, valid):
+        assert is_valid_session_id(session) is valid

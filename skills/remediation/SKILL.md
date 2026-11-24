@@ -329,7 +329,8 @@ get_remediation_instructions(
 
 Act on its `status` when there is no plan:
 
-- `plan_in_progress` → wait a few seconds and call again.
+- `plan_in_progress` → the plan is still being built. A plan is usually ready within a few
+  minutes and can take up to ten. Wait about a minute and call again.
 - `troubleshooting_required` / `troubleshooting_in_progress` → finish Step 3 of Workflow 1 first.
 - `plan_unavailable` → use the fallback table below.
 

@@ -1,6 +1,5 @@
 import sys
 import os
-import glob
 import pytest
 
 _hooks_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "hooks", "prevent"))
@@ -9,13 +8,15 @@ sys.path.insert(0, _hooks_dir)
 
 
 @pytest.fixture(autouse=True)
-def clean_cache():
-    """Clean up mc_prevent temp files before/after each test."""
-    for f in glob.glob("/tmp/mc_prevent_*"):
-        os.remove(f)
+def clean_cache(tmp_path, monkeypatch):
+    """Give each test its own empty cache directory.
+
+    Deleting /tmp/mc_prevent_* instead would wipe the live Prevent state of any
+    agent session running on the same machine.
+    """
+    import lib.cache as cache
+    monkeypatch.setattr(cache, "CACHE_DIR", str(tmp_path))
     yield
-    for f in glob.glob("/tmp/mc_prevent_*"):
-        os.remove(f)
 
 
 @pytest.fixture(autouse=True)

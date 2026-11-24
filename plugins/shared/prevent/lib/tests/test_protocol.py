@@ -640,3 +640,41 @@ class TestEvaluatePostCommit:
             result = _pre(dbt_repo)
         assert result.action == "context"
         assert "validation" in result.context.lower()
+
+
+class TestEvaluatePreCommitOutputIsUnchanged:
+    """Claude Code, Codex, Cursor and Copilot show this text verbatim."""
+
+    def test_exact_text_without_gap(self, monkeypatch):
+        import lib.protocol as protocol
+        cache.mark_impact_check_verified("s1", "orders")
+        cache.mark_impact_check_verified("s1", "customers")
+        monkeypatch.setattr(protocol, "_get_staged_model_tables", lambda cwd: ["orders", "customers"])
+        result = evaluate_pre_commit(HookInput(session_id="s1", command="git commit -m x", cwd="."))
+        assert result.action == "context"
+        assert result.context == (
+            "Committing changes to orders, customers. "
+            "Run validation queries before committing? (yes / no)"
+        )
+
+    def test_exact_text_with_gap(self, monkeypatch):
+        import lib.protocol as protocol
+        cache.mark_impact_check_verified("s1", "orders")
+        cache.mark_impact_check_verified("s1", "customers")
+        cache.mark_monitor_gap("s1", "customers")
+        monkeypatch.setattr(protocol, "_get_staged_model_tables", lambda cwd: ["orders", "customers"])
+        result = evaluate_pre_commit(HookInput(session_id="s1", command="git commit -m x", cwd="."))
+        assert result.context == (
+            "Committing changes to orders, customers. "
+            "Run validation queries before committing? (yes / no)"
+            "\n\nMonitor coverage: the impact assessment found no custom monitors "
+            "on customers. Generate monitor definitions before committing? (yes / no)"
+        )
+        assert cache.has_monitor_gap("s1", "customers") is False
+
+    def test_duplicate_names_are_listed_as_before(self, monkeypatch):
+        import lib.protocol as protocol
+        cache.mark_impact_check_verified("s1", "orders")
+        monkeypatch.setattr(protocol, "_get_staged_model_tables", lambda cwd: ["orders", "orders"])
+        result = evaluate_pre_commit(HookInput(session_id="s1", command="git commit -m x", cwd="."))
+        assert result.context.startswith("Committing changes to orders, orders. ")

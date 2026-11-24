@@ -5,11 +5,30 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Cursor will be d
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.33.0] - 2026-11-23
+## [1.33.0] - 2026-11-24
 
 ### Added
 
 - Prevent (Claude Code and Cursor): after a commit that changes a dbt model, the agent offers a Bayes follow-up: "Do you want Bayes to check orders and its downstream tables after this deploys?" Bayes, Monte Carlo's AI teammate, then checks at the time the user picks and answers in a Slack direct message. The hook only asks the agent to offer; nothing is scheduled unless the user says yes, and the Monte Carlo MCP tool `schedule_agent_task` asks the user to confirm again. The offer appears only when that tool is available, only after a commit actually lands (a failed commit offers nothing, and `git commit -a` is covered), and at most once per table per session. Turn it off with `MC_BAYES_FOLLOWUP_DISABLED=1`; `MC_PREVENT_HOOKS_DISABLED=1` turns it off too. Claude Code uses a `PostToolUse` hook on Bash and Cursor a `postToolUse` hook on Shell.
+
+## [1.32.6] - 2026-11-24
+
+### Changed
+
+- remediation, incident-response: `plan_in_progress` wait guidance now says a plan is usually ready within a few minutes and can take up to ten (was "a few seconds").
+
+## [1.32.5] - 2026-11-23
+
+### Fixed
+
+- Cortex Code: Prevent's pre-commit checkpoint now reaches the agent in CoCo Desktop and the `cortex` CLI. Neither passes a pre-tool hook's added context to the model, so the hook now pauses a `git commit` once, with the validation and monitor-coverage questions as the reason. Running the same commit again goes through; changing the staged models pauses again. The end-of-turn validation question isn't repeated for models the pause already asked about. It applies to a `git commit` of what is staged, including after `cd <dir>`, a `git add` of named files or a new branch (`git checkout -b`, `git switch -c`) in the same command. It stays silent for `-a`, commits that name files, `git add` of a folder, a glob or with options, and commits chained after any other command. Commands chained after the commit, such as `&& git status`, are fine.
+- Prevent: the pre-commit hook read staged files from the wrong place when the agent ran from a subdirectory of the repository, so any `.sql` file under a models folder counted as a dbt model. It now reads them from the repository root.
+
+## [1.32.4] - 2026-11-23
+
+### Fixed
+
+- Cortex Code: the docs no longer say the Cortex Code CLI sends the toolkit's MCP headers. Neither CoCo Desktop 2.0.0 nor Cortex Code CLI 1.2.46 runs the plugin's headers helper, so Cortex Code requests to the Monte Carlo MCP server carry no install id, session id or toolkit version. The plugin keeps the helper in place for when a Cortex Code release runs it.
 
 ## [1.32.3] - 2026-11-19
 

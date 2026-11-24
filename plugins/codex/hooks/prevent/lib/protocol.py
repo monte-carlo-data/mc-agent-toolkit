@@ -4,14 +4,17 @@ All business logic for the prevent hooks lives here.
 Platform adapters (Claude Code, Cursor) call these functions
 and translate the result to their platform's JSON format.
 """
+import hashlib
 import json
 import os
 import re
 import subprocess
+from typing import NamedTuple
 
 from lib.cache import (
     add_bayes_offered_tables,
     add_edited_table,
+    claim_commit_checkpoint,
     cleanup_stale_cache,
     clear_head_snapshot,
     clear_monitor_gap,
@@ -22,12 +25,16 @@ from lib.cache import (
     get_impact_check_state,
     get_pending_validation_tables,
     has_monitor_gap,
+    has_verified_impact_check,
+    is_valid_session_id,
     mark_impact_check_injected,
     mark_impact_check_verified,
     mark_monitor_gap,
     move_to_pending_validation,
+    remove_edited_tables,
     save_head_snapshot,
 )
+from lib.commit_command import parse_commit_command
 from lib.detect import extract_table_name, is_dbt_model, is_dbt_schema_file
 
 
@@ -207,51 +214,232 @@ def _scan_markers(inp: "HookInput", table_name: str) -> dict:
     return no_markers  # unknown format → fail closed
 
 
-def _get_staged_model_tables(cwd: str) -> list[str]:
-    """Get table names from staged dbt SQL files using the detect library."""
-    try:
-        result = subprocess.run(
-            ["git", "diff", "--cached", "--name-only"],
-            capture_output=True, text=True, cwd=cwd, timeout=10,
-        )
-        tables = []
-        for line in result.stdout.strip().split("\n"):
-            line = line.strip()
-            if not line:
-                continue
-            full_path = os.path.join(cwd, line)
-            if is_dbt_model(full_path):
-                tables.append(extract_table_name(full_path))
-        return tables
-    except (subprocess.SubprocessError, OSError):
-        return []
+_GIT_TIMEOUT_SECONDS = 10
 
 
-def _git_out(cwd: str, *args: str) -> str | None:
-    """stdout of a git command, or None when it fails or git can't run."""
+def _git(args: list[str], cwd: str, text: bool = True, input=None):
+    """Run git in cwd. Return stdout, or None if git fails or can't run."""
     try:
         result = subprocess.run(
-            ["git", *args], capture_output=True, text=True, cwd=cwd, timeout=10,
+            ["git", *args], capture_output=True, text=text, cwd=cwd, input=input,
+            timeout=_GIT_TIMEOUT_SECONDS,
+            **({"encoding": "utf-8", "errors": "surrogateescape"} if text else {}),
         )
     except (subprocess.SubprocessError, OSError):
         return None
-    return result.stdout.strip() if result.returncode == 0 else None
+    if result.returncode != 0:
+        return None
+    return result.stdout
+
+
+def _git_toplevel(cwd: str) -> str | None:
+    """Root of the work tree containing cwd (git resolves symlinks), or None."""
+    out = _git(["rev-parse", "--show-toplevel"], cwd)
+    if not out or not out.strip():
+        return None
+    return out.strip()
+
+
+def _get_staged_model_tables(cwd: str) -> list[str]:
+    """Get table names from staged dbt SQL files using the detect library.
+
+    git prints staged paths relative to the repository root, so they are joined
+    to the root, not to cwd (which may be a subdirectory).
+    """
+    toplevel = _git_toplevel(cwd)
+    if toplevel is None:
+        return []
+    out = _git(["diff", "--cached", "--name-only"], toplevel)
+    if out is None:
+        return []
+    tables = []
+    for line in out.strip().split("\n"):
+        line = line.strip()
+        if not line:
+            continue
+        full_path = os.path.join(toplevel, line)
+        if is_dbt_model(full_path):
+            tables.append(extract_table_name(full_path))
+    return tables
+
+
+class StagedModel(NamedTuple):
+    """A dbt model in the git index: repo-relative path, staged blob ID, table name.
+
+    A staged deletion has an all-zero blob ID.
+    """
+    path: str
+    blob: str
+    table: str
+
+
+def _parse_raw_diff(out: str):
+    """Yield (status, path, old_blob, new_blob) from `git diff --raw -z --no-abbrev`.
+
+    Each record is ":<mode> <mode> <old> <new> <status>" then one path, or two
+    (source, destination) for renames and copies.
+    """
+    fields = out.split("\0")
+    i = 0
+    while i < len(fields):
+        meta = fields[i]
+        if not meta.startswith(":"):
+            i += 1
+            continue
+        parts = meta[1:].split()
+        if len(parts) < 5:
+            return
+        old_blob, new_blob, status = parts[2], parts[3], parts[4][:1]
+        if status in ("R", "C"):
+            if i + 2 >= len(fields):
+                return
+            path = fields[i + 2]
+            i += 3
+        else:
+            if i + 1 >= len(fields):
+                return
+            path = fields[i + 1]
+            i += 2
+        yield status, path, old_blob, new_blob
+
+
+def _read_staged_models(cwd: str) -> tuple[str, list[StagedModel]] | None:
+    """Return (toplevel, staged dbt models) for the repo containing cwd.
+
+    Each file is classified from its staged blob, not the work tree, so the
+    answer matches what `git commit` records. A staged deletion is classified
+    from the blob being deleted. Returns None if cwd isn't in a git work tree or
+    git fails.
+    """
+    toplevel = _git_toplevel(cwd)
+    if toplevel is None:
+        return None
+    out = _git(["diff", "--cached", "--raw", "-z", "--no-abbrev"], toplevel)
+    if out is None:
+        return None
+    entries = []
+    for status, path, old_blob, new_blob in _parse_raw_diff(out):
+        if os.path.splitext(path)[1].lower() != ".sql":
+            continue
+        content_blob = old_blob if status == "D" else new_blob
+        entries.append((path, new_blob, content_blob))
+    contents = _read_blobs([e[2] for e in entries], toplevel)
+    if contents is None:
+        return None
+    models = []
+    for (path, new_blob, _), content in zip(entries, contents):
+        full_path = os.path.join(toplevel, path)
+        if not is_dbt_model(full_path, content=content.decode("utf-8", errors="replace")):
+            continue
+        models.append(StagedModel(path=path, blob=new_blob, table=extract_table_name(full_path)))
+    return toplevel, models
+
+
+def _read_blobs(blob_ids: list[str], toplevel: str) -> list[bytes] | None:
+    """Contents of each blob, in order, from one `git cat-file --batch`. None on failure."""
+    if not blob_ids:
+        return []
+    out = _git(["cat-file", "--batch"], toplevel, text=False,
+               input="".join(b + "\n" for b in blob_ids).encode("ascii"))
+    if out is None:
+        return None
+    contents = []
+    pos = 0
+    for _ in blob_ids:
+        end = out.find(b"\n", pos)
+        if end == -1:
+            return None
+        header = out[pos:end].split()
+        if len(header) != 3 or header[1] != b"blob" or not header[2].isdigit():
+            return None
+        size = int(header[2])
+        start = end + 1
+        if start + size > len(out):
+            return None
+        contents.append(out[start:start + size])
+        pos = start + size + 1  # skip the newline after each object
+    return contents
+
+
+def _rev_blob(rev: str, toplevel: str) -> str | None:
+    """Blob ID of `<rev>:<path>` or `:<path>`, or None if it doesn't exist."""
+    out = _git(["rev-parse", "--verify", "--quiet", rev], toplevel)
+    return out.strip() if out and out.strip() else None
+
+
+def _read_commit_models(repo_dir: str, add_paths=()) -> tuple[str, list[StagedModel]] | None:
+    """Return (toplevel, dbt models the commit will record) for `git add <add_paths> && git commit`.
+
+    Starts from the staged models and replaces each added path with what git add
+    will stage: the work-tree file's blob (hashed the way git add hashes it, with
+    nothing written), or a deletion when a tracked file is gone. A path that ends
+    up matching HEAD drops out. Returns None, so the checkpoint stays silent, if
+    a path is a directory, a symlink or outside the repository, or if git add
+    would fail because the path is neither on disk nor tracked.
+    """
+    staged = _read_staged_models(repo_dir)
+    if staged is None:
+        return None
+    toplevel, models = staged
+    for path in add_paths:
+        full = os.path.join(os.path.realpath(os.path.dirname(path)), os.path.basename(path))
+        # toplevel is already free of symlinks; resolve the path's directory to match.
+        rel = os.path.relpath(full, toplevel)
+        if rel == ".." or rel.startswith(".." + os.sep) or os.path.isabs(rel):
+            return None
+        rel = rel.replace(os.sep, "/")
+        models = [m for m in models if m.path != rel]
+        if os.path.islink(full) or os.path.isdir(full):
+            return None
+        head_blob = _rev_blob(f"HEAD:{rel}", toplevel)
+        if os.path.isfile(full):
+            out = _git(["hash-object", "--", rel], toplevel)
+            if not out or not out.strip():
+                return None
+            new_blob = out.strip()
+            if new_blob == head_blob or os.path.splitext(rel)[1].lower() != ".sql":
+                continue
+            try:
+                with open(full, encoding="utf-8", errors="replace") as f:
+                    content = f.read()
+            except OSError:
+                return None
+        else:
+            if _rev_blob(f":{rel}", toplevel) is None:
+                return None  # git add fails, so the commit never runs
+            if head_blob is None or os.path.splitext(rel)[1].lower() != ".sql":
+                continue
+            new_blob = "0" * len(head_blob)
+            head_content = _git(["cat-file", "blob", head_blob], toplevel, text=False)
+            if head_content is None:
+                return None
+            content = head_content.decode("utf-8", errors="replace")
+        full_path = os.path.join(toplevel, rel)
+        if is_dbt_model(full_path, content=content):
+            models.append(StagedModel(path=rel, blob=new_blob, table=extract_table_name(full_path)))
+    return toplevel, models
 
 
 def _get_head_sha(cwd: str) -> str | None:
     """HEAD's sha; "" when the repo has no commits yet; None outside a repo."""
-    sha = _git_out(cwd, "rev-parse", "--verify", "--quiet", "HEAD")
+    sha = _git(["rev-parse", "--verify", "--quiet", "HEAD"], cwd)
     if sha is not None:
-        return sha
-    return "" if _git_out(cwd, "rev-parse", "--is-inside-work-tree") is not None else None
+        return sha.strip()
+    return "" if _git(["rev-parse", "--is-inside-work-tree"], cwd) is not None else None
 
 
 def _get_committed_model_tables(cwd: str) -> list[str]:
     """Model tables changed by the HEAD commit. Macros are left out: the offer is
-    about a table and what reads from it."""
-    root = _git_out(cwd, "rev-parse", "--show-toplevel")
-    files = _git_out(cwd, "diff-tree", "--root", "--no-commit-id", "--name-only", "-r", "HEAD")
-    if not root or files is None:
+    about a table and what reads from it.
+
+    diff-tree prints paths relative to the repository root, so they are joined
+    to the root, not to cwd.
+    """
+    root = _git_toplevel(cwd)
+    if root is None:
+        return []
+    files = _git(["diff-tree", "--root", "--no-commit-id", "--name-only", "-r", "HEAD"], root)
+    if files is None:
         return []
     tables = []
     for line in files.splitlines():
@@ -400,6 +588,17 @@ def evaluate_post_edit(inp: HookInput) -> HookOutput:
     return HookOutput()
 
 
+def _checkpoint_tables(session_id: str, staged_tables: list[str]) -> tuple[list[str], list[str]]:
+    """Split staged tables into (verified tables, verified tables with a monitor gap).
+
+    Reads state only. Callers clear the gaps they actually show.
+    """
+    verified = [t for t in staged_tables
+                if get_impact_check_state(session_id, t) == "verified"]
+    gaps = [t for t in verified if has_monitor_gap(session_id, t)]
+    return verified, gaps
+
+
 def evaluate_pre_commit(inp: HookInput) -> HookOutput:
     """Commit checkpoint: prompt for validation if dbt models are staged."""
     if _prevent_hooks_disabled():
@@ -420,14 +619,11 @@ def evaluate_pre_commit(inp: HookInput) -> HookOutput:
     if not staged_tables:
         return HookOutput()
 
-    w4_tables = [t for t in staged_tables
-                 if get_impact_check_state(inp.session_id, t) == "verified"]
+    w4_tables, gap_tables = _checkpoint_tables(inp.session_id, staged_tables)
     if not w4_tables:
         return HookOutput()
 
     table_list = ", ".join(w4_tables)
-    gap_tables = [t for t in w4_tables if has_monitor_gap(inp.session_id, t)]
-
     message = (
         f"Committing changes to {table_list}. "
         f"Run validation queries before committing? (yes / no)"
@@ -442,6 +638,109 @@ def evaluate_pre_commit(inp: HookInput) -> HookOutput:
             clear_monitor_gap(inp.session_id, t)
 
     return HookOutput(action="context", context=message)
+
+
+_MARKER_TOKENS = ("MC_IMPACT_CHECK_COMPLETE", "MC_MONITOR_GAP")
+
+
+def _display_table(name: str) -> str:
+    """A table name as shown in a deny reason, unable to spell a completion marker.
+
+    Table names come from file names, which can hold anything. A harness that
+    writes the reason back into the scanned transcript would otherwise let a file
+    named after a marker unlock the pre-edit gate.
+    """
+    for token in _MARKER_TOKENS:
+        name = name.replace(token, token.replace("_", "-"))
+    return name
+
+
+def _pause_reason(tables: list[str], gap_tables: list[str], stages_files: bool = False) -> str:
+    table_list = ", ".join(_display_table(t) for t in tables)
+    validation = (
+        f"run validation queries for {table_list} before committing? (yes / no)"
+    )
+    if gap_tables:
+        gap_list = ", ".join(_display_table(t) for t in gap_tables)
+        ask = (
+            f"Before committing changes to {table_list}, ask the user and wait for "
+            f"their answers:\n\n"
+            f"1. Validation: {validation}\n"
+            f"2. Monitors: the impact assessment found no custom monitors on "
+            f"{gap_list}. Generate monitor definitions before committing? (yes / no)"
+        )
+        done = "and any validation or monitors they asked for are done"
+    else:
+        ask = (
+            f"Before committing changes to {table_list}, ask the user and wait for "
+            f"their answer:\n\n"
+            f"Validation: {validation}"
+        )
+        done = "and any validation they asked for is done"
+    if stages_files:
+        # Agents read a paused `git add ... && git commit` as having staged the files.
+        opening = ("Monte Carlo Prevent paused this command once. "
+                   "Git did not run, so nothing was staged or committed.")
+    else:
+        opening = "Monte Carlo Prevent paused this commit once. Git did not run."
+    return (
+        f"{opening}\n\n"
+        f"{ask}\n\n"
+        f"When the user has answered, {done}, run the same commit command again. "
+        "It will go through, because this pause happens once for these staged "
+        "changes. If the user doesn't want to commit, don't. Don't use another "
+        "command to get around this pause."
+    )
+
+
+def evaluate_pre_commit_once(inp: HookInput) -> HookOutput:
+    """Commit checkpoint delivered as a one-time deny, for harnesses that drop
+    a PreToolUse hook's added context.
+
+    Pauses a `git commit` of the current index, or of the index plus files named
+    in a `git add` chained before it, when that holds verified dbt models, with
+    the checkpoint as the deny reason. The pause is keyed to this session and a
+    digest of the repository and the committed models' blobs, so
+    retrying the same staged change goes through and changing it pauses again.
+    It is advisory: the retry is approved when the pause is shown, not when the
+    user answers. Anything it can't pin down stays silent rather than blocking.
+    """
+    if _prevent_hooks_disabled() or not is_valid_session_id(inp.session_id):
+        return HookOutput()
+    target = parse_commit_command(inp.command or "", os.path.abspath(inp.cwd or "."))
+    if target is None:
+        return HookOutput()
+    # Reading the commit runs git; skip it in sessions where Prevent hasn't verified anything.
+    if not has_verified_impact_check(inp.session_id):
+        return HookOutput()
+    staged = _read_commit_models(target.repo_dir, target.add_paths)
+    if staged is None:
+        return HookOutput()
+    toplevel, models = staged
+    tables, gap_tables = _checkpoint_tables(
+        inp.session_id, list(dict.fromkeys(m.table for m in models)))
+    if not tables:
+        return HookOutput()
+
+    eligible = sorted((m.path, m.blob) for m in models if m.table in tables)
+    digest = hashlib.sha256(
+        json.dumps([toplevel, eligible], separators=(",", ":")).encode("utf-8", "surrogateescape")
+    ).hexdigest()
+
+    cleanup_stale_cache()
+    # The claim is taken before the deny reaches the model, so if the harness
+    # drops the deny, the retry commits without the question. The pause is
+    # advisory, and claiming first is what keeps concurrent attempts to one pause.
+    if not claim_commit_checkpoint(inp.session_id, digest):
+        return HookOutput()
+
+    for t in gap_tables:
+        clear_monitor_gap(inp.session_id, t)
+    # The pause asks the validation question, so the Stop hook needn't ask it
+    # again for these tables. Editing one again puts it back.
+    remove_edited_tables(inp.session_id, tables)
+    return HookOutput(action="deny", reason=_pause_reason(
+        tables, gap_tables, stages_files=bool(target.add_paths)))
 
 
 def evaluate_turn_end(inp: HookInput) -> HookOutput:
