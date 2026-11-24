@@ -29,6 +29,15 @@
                         "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/prevent/post_edit_hook.py"
                     }
                 ]
+            },
+            {
+                "matcher": "Bash",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/prevent/post_commit_hook.py"
+                    }
+                ]
             }
         ],
         "Stop": [

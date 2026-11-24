@@ -22,9 +22,14 @@ TURN_PREFIX = "mc_prevent_turn_"
 PENDING_PREFIX = "mc_prevent_pending_"
 DBT_CONFIG_PREFIX = "mc_prevent_dbt_config_"
 COMMITCP_PREFIX = "mc_prevent_commitcp_"
+HEAD_PREFIX = "mc_prevent_head_"
+BAYES_OFFERED_PREFIX = "mc_prevent_bayes_offered_"
 CLEANUP_MARKER = "mc_prevent_last_cleanup"
 
-ALL_PREFIXES = (IC_PREFIX, MG_PREFIX, TURN_PREFIX, PENDING_PREFIX, DBT_CONFIG_PREFIX, COMMITCP_PREFIX)
+ALL_PREFIXES = (
+    IC_PREFIX, MG_PREFIX, TURN_PREFIX, PENDING_PREFIX, DBT_CONFIG_PREFIX,
+    COMMITCP_PREFIX, HEAD_PREFIX, BAYES_OFFERED_PREFIX,
+)
 STALE_THRESHOLD_SECONDS = 6 * 3600  # 6 hours — covers long sessions, cleans between days
 
 # dbt_project.yml defaults per https://docs.getdbt.com/reference/project-configs
@@ -270,6 +275,58 @@ def clear_pending_validation(session_id: str) -> None:
     path = _pending_path(session_id)
     if os.path.exists(path):
         os.remove(path)
+
+
+# --- HEAD snapshot (taken before `git commit`, read after it) ---
+
+def _head_path(session_id: str) -> str:
+    return os.path.join(CACHE_DIR, f"{HEAD_PREFIX}{_validate_session_id(session_id)}")
+
+
+def save_head_snapshot(session_id: str, cwd: str, sha: str) -> None:
+    """Remember where HEAD was before a commit, and the directory it ran in.
+
+    ``sha`` is empty when the repo has no commits yet.
+    """
+    _write_secure(_head_path(session_id), json.dumps({"cwd": cwd, "sha": sha}))
+
+
+def get_head_snapshot(session_id: str) -> dict | None:
+    try:
+        with open(_head_path(session_id), "r") as f:
+            data = json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return None
+    if not isinstance(data, dict) or "cwd" not in data or "sha" not in data:
+        return None
+    return data
+
+
+def clear_head_snapshot(session_id: str) -> None:
+    try:
+        os.remove(_head_path(session_id))
+    except FileNotFoundError:
+        pass
+
+
+# --- Bayes follow-up offer ---
+
+def _bayes_offered_path(session_id: str) -> str:
+    return os.path.join(CACHE_DIR, f"{BAYES_OFFERED_PREFIX}{_validate_session_id(session_id)}")
+
+
+def get_bayes_offered_tables(session_id: str) -> list[str]:
+    """Tables the Bayes follow-up was already offered for in this session."""
+    try:
+        with open(_bayes_offered_path(session_id), "r") as f:
+            return [line.strip() for line in f if line.strip()]
+    except OSError:
+        return []
+
+
+def add_bayes_offered_tables(session_id: str, tables: list[str]) -> None:
+    merged = list(dict.fromkeys(get_bayes_offered_tables(session_id) + tables))
+    _write_secure(_bayes_offered_path(session_id), "".join(t + "\n" for t in merged))
 
 
 # --- dbt project config cache ---

@@ -5,6 +5,12 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for OpenCode will be
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.33.0] - 2026-11-24
+
+### Added
+
+- Prevent (Claude Code and Cursor): after a commit that changes a dbt model, the agent offers a Bayes follow-up: "Do you want Bayes to check orders and its downstream tables after this deploys?" Bayes, Monte Carlo's AI teammate, then checks at the time the user picks and answers in Slack, as a direct message or in the domain's Teammate channel, whichever the user picks. The hook only asks the agent to offer; nothing is scheduled unless the user says yes, and, where the editor supports it, `schedule_agent_task` asks the user to confirm the time, destination and request before storing it. The offer appears only when that tool is available, only after a commit actually lands (a failed commit offers nothing, and `git commit -a` is covered), and at most once per table per session. Turn it off with `MC_BAYES_FOLLOWUP_DISABLED=1`; `MC_PREVENT_HOOKS_DISABLED=1` turns it off too. Claude Code uses a `PostToolUse` hook on Bash and Cursor a `postToolUse` hook on Shell.
+
 ## [1.32.6] - 2026-11-24
 
 ### Changed

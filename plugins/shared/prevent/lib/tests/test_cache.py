@@ -200,6 +200,54 @@ class TestFilePermissions:
         assert self._get_perms(path) == 0o600
 
 
+class TestHeadSnapshot:
+    def test_missing_returns_none(self):
+        assert cache.get_head_snapshot("s1") is None
+
+    def test_save_and_get(self):
+        cache.save_head_snapshot("s1", "/repo", "abc123")
+        assert cache.get_head_snapshot("s1") == {"cwd": "/repo", "sha": "abc123"}
+
+    def test_clear(self):
+        cache.save_head_snapshot("s1", "/repo", "abc123")
+        cache.clear_head_snapshot("s1")
+        assert cache.get_head_snapshot("s1") is None
+
+    def test_file_is_owner_only(self):
+        cache.save_head_snapshot("perm_head", "/repo", "abc123")
+        path = os.path.join(cache.CACHE_DIR, f"{cache.HEAD_PREFIX}perm_head")
+        assert oct(os.stat(path).st_mode & 0o777) == oct(0o600)
+
+
+class TestBayesOffer:
+    def test_offered_tables_empty(self):
+        assert cache.get_bayes_offered_tables("s1") == []
+
+    def test_add_offered_tables_dedupes(self):
+        cache.add_bayes_offered_tables("s1", ["orders", "customers"])
+        cache.add_bayes_offered_tables("s1", ["orders", "payments"])
+        assert cache.get_bayes_offered_tables("s1") == ["orders", "customers", "payments"]
+
+    def test_stale_head_and_offered_files_are_swept(self):
+        cache.save_head_snapshot("s1", "/repo", "abc123")
+        cache.add_bayes_offered_tables("s1", ["orders"])
+        paths = [
+            os.path.join(cache.CACHE_DIR, f"{cache.HEAD_PREFIX}s1"),
+            os.path.join(cache.CACHE_DIR, f"{cache.BAYES_OFFERED_PREFIX}s1"),
+        ]
+        for path in paths:
+            assert os.path.exists(path)
+        old = time.time() - cache.STALE_THRESHOLD_SECONDS - 60
+        for path in paths:
+            os.utime(path, (old, old))
+        marker = os.path.join(cache.CACHE_DIR, cache.CLEANUP_MARKER)
+        if os.path.exists(marker):
+            os.remove(marker)
+        cache.cleanup_stale_cache()
+        for path in paths:
+            assert not os.path.exists(path)
+
+
 class TestHasVerifiedImpactCheck:
     def test_none(self):
         assert cache.has_verified_impact_check("s1") is False

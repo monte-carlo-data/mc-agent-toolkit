@@ -39,6 +39,10 @@ bash <(curl -fsSL https://raw.githubusercontent.com/monte-carlo-data/mc-agent-to
 
 4. The Monte Carlo MCP server will prompt for OAuth authentication on first use.
 
+## Prevent
+
+**Bayes follow-up after a commit.** After a commit that changes a dbt model, the agent asks whether you want Bayes, Monte Carlo's AI teammate, to check those tables and their downstream tables after the change deploys. The answer arrives in Slack, as a direct message or in the domain's Teammate channel, whichever you pick. Nothing is scheduled unless you say yes, each table is offered once per session, and the offer only appears when the Monte Carlo MCP server offers `schedule_agent_task`. **To turn it off**, set `MC_BAYES_FOLLOWUP_DISABLED=1`; `MC_PREVENT_HOOKS_DISABLED=1` turns it off too.
+
 ## Known Issues
 
 - **Hook denials may not be enforced.** Cursor's `beforeReadFile` (and potentially other `before*` hooks) may fail to block the operation even when the hook exits with a deny response. This means Prevent hooks can detect and warn about breaking changes but cannot guarantee the edit is stopped. See [Cursor forum discussion](https://forum.cursor.com/t/hook-beforereadfile-does-not-work-in-the-agent/150520) for details.
