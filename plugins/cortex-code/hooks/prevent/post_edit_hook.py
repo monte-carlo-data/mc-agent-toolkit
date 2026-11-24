@@ -23,8 +23,9 @@ def main():
     raw = json.load(sys.stdin)
     session_id = raw.get("session_id", "unknown")
     if raw.get("tool_name") == "apply_patch":
-        track_patch((raw.get("tool_input") or {}).get("input"), "cortex", raw,
-                    lambda ops: applied_operations(ops, raw.get("tool_response")))
+        track_patch((raw.get("tool_input") or {}).get("input"), "cortex", cwd=raw.get("cwd"),
+                    session_id=session_id, call_id=raw.get("tool_use_id"),
+                    keep_ops=lambda ops: applied_operations(ops, raw.get("tool_response")))
         return
     evaluate_post_edit(HookInput(session_id=session_id, file_path=raw.get("tool_input", {}).get("file_path", "")))
 

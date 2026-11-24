@@ -6,9 +6,10 @@ letters, digits, `_` and `|` matches a tool name exactly (`codex-rs/hooks/src/en
 
 Two configs register the hooks: the plugin's `hooks/prevent/hooks.json`, and the
 project-level `.codex/hooks.json` that `scripts/install.sh` writes. Both are checked, and
-each registered command is run through a shell with the env vars Codex gives plugin hooks
-(`PLUGIN_ROOT`, `CLAUDE_PLUGIN_ROOT`; never `CODEX_PLUGIN_ROOT`), from a copy of the plugin
-whose path contains a space, to prove it starts, reads an apply_patch payload, denies, and tracks.
+the PreToolUse, PostToolUse and Stop commands are run through a shell with the env vars Codex
+gives plugin hooks (`PLUGIN_ROOT`, `CLAUDE_PLUGIN_ROOT`; never `CODEX_PLUGIN_ROOT`), from a copy
+of the plugin whose path contains a space, to prove each starts, and that the apply_patch ones
+read a payload, deny, and track. The installer's SessionStart telemetry command is not run.
 
 Stdlib only, so CI can run it with plain ``python3``.
 """
@@ -139,6 +140,19 @@ class HookConfigTests(unittest.TestCase):
                                      f"{command!r} exited {result.returncode}: {result.stderr}")
                     return result.stdout
 
+                def stop():
+                    (command,) = handlers(config, "Stop", None)
+                    payload = {"session_id": session_id, "transcript_path": "", "cwd": str(project),
+                               "hook_event_name": "Stop", "stop_hook_active": False,
+                               "last_assistant_message": ""}
+                    result = subprocess.run(command, shell=True, env=env, input=json.dumps(payload),
+                                            capture_output=True, text=True)
+                    # A path that doesn't resolve makes python3 exit 2 with "No such file".
+                    self.assertEqual(result.returncode, 0,
+                                     f"{command!r} exited {result.returncode}: {result.stderr}")
+                    self.assertNotIn("No such file", result.stderr)
+                    return result.stdout
+
                 def decision(out):
                     return json.loads(out)["hookSpecificOutput"]["permissionDecision"] if out.strip() else None
 
@@ -160,6 +174,8 @@ class HookConfigTests(unittest.TestCase):
                 tables = subprocess.run([sys.executable, "-c", read_tables, str(hooks_dir), session_id],
                                         capture_output=True, text=True, check=True).stdout
                 self.assertEqual(json.loads(tables), ["brand_new"])
+
+                stop()
 
 
 if __name__ == "__main__":

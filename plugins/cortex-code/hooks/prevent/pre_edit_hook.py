@@ -50,8 +50,11 @@ def _hook_input(raw: dict, file_path: str) -> HookInput:
 
 def _gate_patch(raw: dict) -> None:
     tool_input = raw.get("tool_input") or {}
-    reason = gate_and_remember(tool_input.get("input"), "cortex", raw,
-                               lambda path: _hook_input(raw, path), evaluate_pre_edit)
+    reason = gate_and_remember(
+        tool_input.get("input"), "cortex", cwd=raw.get("cwd"),
+        session_id=raw.get("session_id", "unknown"), call_id=raw.get("tool_use_id"),
+        make_input=lambda path: _hook_input(raw, path), evaluate=evaluate_pre_edit,
+    )
     if reason:
         _deny(reason)
 

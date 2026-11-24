@@ -9,6 +9,9 @@ Codex edits files with `apply_patch`, sent two ways:
     the files itself once the whole command is allowed.
 Every file a patch adds, deletes, updates or moves (both paths) is checked before it
 runs, and the patch is denied as a whole when any of them needs an impact assessment.
+A shell command whose call can't be resolved (the folder it runs in, or the patch it
+reads, is unknown), or that names `apply_patch` and holds patch text no recognised call
+reads, is denied when that patch may change a dbt file: Prevent couldn't check it.
 
 Bash commands with `git commit` get the pre-commit validation checkpoint.
 """
@@ -26,7 +29,7 @@ from lib.protocol import (
     HookInput, _prevent_hooks_disabled, evaluate_pre_commit, evaluate_pre_edit, evaluate_post_edit,
 )
 from lib.detect import may_be_dbt_file
-from shell_patch import find_invocations, text_outside_data
+from shell_patch import find_invocations, unchecked_patch_paths
 
 
 def _deny(reason: str) -> None:
@@ -59,15 +62,21 @@ def _unresolved_reason(problems: list[str]) -> str:
 
 
 def _gate_native(raw: dict, command: str) -> None:
-    reason = gate_and_remember(command, "codex", raw, _make_input(raw), evaluate_pre_edit)
+    reason = gate_and_remember(
+        command, "codex", cwd=raw.get("cwd"), session_id=raw.get("session_id", "unknown"),
+        call_id=raw.get("tool_use_id"), make_input=_make_input(raw), evaluate=evaluate_pre_edit,
+    )
     if reason:
         _deny(reason)
 
 
-def _gate_shell(raw: dict, invocations) -> None:
+def _gate_shell(raw: dict, invocations, unchecked: list[str]) -> None:
+    """Gate the calls found in a shell command, and deny patch text none of them gates
+    (`unchecked`, its paths that may be dbt files)."""
     cwd = raw.get("cwd")
     groups: list[list[str]] = []
     problems: list[str] = []
+    unknown_base_paths: set[str] = set()
     for inv in invocations:
         if inv.body is None:
             problem = "the patch isn't written out in the command"
@@ -76,11 +85,19 @@ def _gate_shell(raw: dict, invocations) -> None:
             if inv.base is not None:
                 groups += op_groups(ops, resolve_path(inv.base, cwd) if inv.base else cwd)
                 continue
-            if not any(may_be_dbt_file(p) for p in op_paths(ops)):
+            paths = op_paths(ops)
+            if not any(may_be_dbt_file(p) for p in paths):
                 continue
+            unknown_base_paths.update(paths)
             problem = "the directory it runs in can't be known before it runs"
         if problem not in problems:
             problems.append(problem)
+    # A call found without a known base leaves its body unchecked too; it already has a reason.
+    unrecognised = [p for p in unchecked if p not in unknown_base_paths]
+    if unrecognised:
+        problems.append(
+            f"Prevent doesn't recognise how apply_patch is called for {', '.join(unrecognised)}"
+        )
 
     reason = gate_patch(groups, _make_input(raw), evaluate_pre_edit)
     if problems and not _prevent_hooks_disabled():
@@ -105,22 +122,12 @@ def main():
         return
 
     invocations = find_invocations(command)
-    if invocations:
-        _gate_shell(raw, invocations)
+    # Patch text no recognised call gates (`env apply_patch`, a script's heredoc, a pipe) is
+    # checked by path alone, and denied in the same reply as the calls' own gate.
+    unchecked = unchecked_patch_paths(command, invocations)
+    if invocations or unchecked:
+        _gate_shell(raw, invocations, unchecked)
         return
-
-    # The scanner missed a call (a wrapper, `$(...)`, `bash -c '...'`). A patch written out in
-    # the text still shows which files it would touch, though not where it would run.
-    # Heredocs feeding other commands (`cat > notes.md <<'EOF'`) are data, not calls.
-    start = -1
-    if "apply_patch" in command or "applypatch" in command:
-        command_text = text_outside_data(command)
-        start = command_text.find("*** Begin Patch")
-    if start != -1:
-        ops = parse_operations(command_text[start:], "codex")
-        if any(may_be_dbt_file(p) for p in op_paths(ops)) and not _prevent_hooks_disabled():
-            _deny(_unresolved_reason(["Prevent doesn't recognise how apply_patch is called in this command"]))
-            return
 
     if "git commit" in command:
         inp = HookInput(

@@ -14,27 +14,42 @@ argument, or from stdin when it has none, relative to wherever the shell is by t
 
 So each call found here has a body (the patch text, or None when it isn't written out in
 the command) and a base (a directory relative to the command's working directory, or None
-when the hook can't know it). Only the two forms above, and calls in a command with no
-`cd`, `pushd`, `popd`, `source`, `.` or `eval` (a sourced file or evaluated string can
-change directory) and outside a subshell, get a base. The scan understands quotes,
-comments, heredocs, line continuations and command positions; it doesn't evaluate
-anything. A call it doesn't recognise as one (`bash -c "apply_patch ..."`,
-`xargs apply_patch`) isn't found, like `git apply` or `sed`.
+when the hook can't know it). Only the two forms above, and calls outside a subshell in a
+command where nothing else may change directory, get a base. A command may change
+directory when its name is dynamic (`$C`), names a builtin that moves or runs other shell
+text (`cd`, `pushd`, `source`, `eval`, `trap`, ...), or defines a function. The scan
+understands quotes, comments, heredocs, line continuations and command positions; it
+doesn't evaluate anything.
+
+A call it doesn't recognise (`env apply_patch`, `bash -c "apply_patch ..."`, a patch piped
+in or fed through a script's heredoc) still leaves its patch text in the command.
+`unchecked_patch_paths` reads every `*** Begin Patch` in a command that names
+`apply_patch` and returns the paths that may be dbt files in each patch that isn't the
+body of a call found with a known base, so the hook can deny it rather than let it
+through. A patch never written out in the command (`git apply`, a patch file made
+earlier) isn't seen.
 """
+import bisect
 import os
 import re
+from dataclasses import dataclass
 from typing import NamedTuple
 
+from lib.apply_patch import BEGIN, END, op_paths, parse_operations
+from lib.detect import may_be_dbt_file
+
 _NAMES = ("apply_patch", "applypatch")
-_DIR_CHANGERS = ("cd", "pushd", "popd")
-# Commands that run other shell text, which may itself change directory.
-_MAY_CHANGE_DIR = ("source", ".", "eval")
+# Commands that change directory, run other shell text that may, or make a later word do so.
+_MAY_CHANGE_DIR = ("cd", "pushd", "popd", "chdir", "source", ".", "eval", "trap", "alias", "function")
 # Words after which the next word is still in command position.
 _PREFIX_WORDS = (
     "command", "builtin", "exec", "{", "!", "then", "do", "else", "elif", "if", "while", "until", "time",
 )
 _ASSIGNMENT_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*=")
 _EXPANSION_CHARS = ("$", "`", "\\")
+# In an unquoted heredoc the shell drops the backslash before these, and a backslash-newline.
+_HEREDOC_ESCAPE_RE = re.compile(r"\\([\\$`\n])")
+_CONTINUATION = "\\\n"
 
 # Codex's parser sees through a backslash-newline, where the shell removes it.
 _WS = r"(?:[ \t]|\\\n)"
@@ -51,6 +66,7 @@ _SAFE_BARE_DIR_RE = re.compile(r"[A-Za-z0-9_./@%+:,=][A-Za-z0-9_./@%+:,=-]*")
 class Invocation(NamedTuple):
     body: str | None  # the patch text, or None when the command doesn't spell it out
     base: str | None  # directory relative to the command's cwd ("" = the cwd), or None
+    span: tuple[int, int] | None = None  # where the body is written in the command
 
 
 def _has_expansion(text: str) -> bool:
@@ -58,27 +74,41 @@ def _has_expansion(text: str) -> bool:
 
 
 def _headers_literal(body: str) -> bool:
-    """Whether expanding an unquoted heredoc can't change its header lines. Any line starting
-    with `*` counts, since a backslash-newline can join `**\\` and `* Delete File:` into one."""
-    return not any(_has_expansion(line) for line in body.split("\n") if line.lstrip().startswith("*"))
+    """Whether expanding an unquoted heredoc can't change which files its patch touches. Any
+    line starting with `*` counts, since a backslash-newline can join `**\\` and
+    `* Delete File:` into one, and the shell's backslash handling must leave the headers as
+    they are: a backslash-newline after a hunk line can swallow the `*** End Patch` below it."""
+    if any(_has_expansion(line) for line in body.split("\n") if line.lstrip().startswith("*")):
+        return False
+    expanded = _HEREDOC_ESCAPE_RE.sub(lambda m: "" if m.group(1) == "\n" else m.group(1), body)
+    return parse_operations(body, "codex") == parse_operations(expanded, "codex")
 
 
-def _heredoc_body(text: str, start: int, delim: str, dash: bool) -> tuple[str, int] | None:
-    """The body of a heredoc starting at `start`, and the index after its delimiter line."""
-    lines = []
+def _heredoc_body(text: str, start: int, delim: str, dash: bool, quoted: bool) -> tuple[str, int, int] | None:
+    """The body of a heredoc starting at `start`, the index where it ends, and the index after
+    its delimiter line. With an unquoted delimiter the shell joins a line ending in an odd
+    number of backslashes to the next before looking for the delimiter."""
+    lines: list[str] = []
     pos = start
-    while pos <= len(text):
+    logical_start, logical_lines, logical = start, 0, ""
+    while True:
         end = text.find("\n", pos)
         line = text[pos:] if end == -1 else text[pos:end]
         if dash:
             line = line.lstrip("\t")
-        if line == delim:
-            return "\n".join(lines), (len(text) if end == -1 else end + 1)
+        continues = not quoted and end != -1 and (len(line) - len(line.rstrip("\\"))) % 2 == 1
+        logical += line
+        if not continues and logical == delim:
+            body_end = max(start, logical_start - 1)
+            return "\n".join(lines[:logical_lines]), body_end, (len(text) if end == -1 else end + 1)
         lines.append(line)
         if end == -1:
             return None
         pos = end + 1
-    return None
+        if continues:
+            logical = logical[:-1]
+        else:
+            logical_start, logical_lines, logical = pos, len(lines), ""
 
 
 def _intercepted(command: str) -> Invocation | None:
@@ -89,10 +119,10 @@ def _intercepted(command: str) -> Invocation | None:
     raw_delim = head.group("delim")
     quoted = raw_delim[0] in "'\""
     delim = raw_delim[1:-1] if quoted else raw_delim
-    found = _heredoc_body(command, head.end(), delim, bool(head.group("dash")))
-    if not found or command[found[1]:].strip():
+    found = _heredoc_body(command, head.end(), delim, bool(head.group("dash")), quoted)
+    if not found or command[found[2]:].strip():
         return None
-    body = found[0]
+    body, body_end, _ = found
 
     arg = head.group("arg")
     base = ""
@@ -109,12 +139,12 @@ def _intercepted(command: str) -> Invocation | None:
             return None
         if not base:
             return None
-    # Codex takes the body as written even with an unquoted delimiter, so `$` or `\\` in a
+    # Codex takes the body as written even with an unquoted delimiter, so `$` or `\` in a
     # hunk line is just content. Header lines that could expand are left to the general
     # scan, in case Codex's parser didn't match and a real shell runs the command.
     if not quoted and not _headers_literal(body):
         return None
-    return Invocation(body, base)
+    return Invocation(body, base, (head.end(), body_end))
 
 
 class _Word(NamedTuple):
@@ -122,18 +152,23 @@ class _Word(NamedTuple):
     dynamic: bool  # contains an expansion, so its value is unknown
     single_quoted: bool  # exactly one '...' segment
     assignment: bool  # starts with an unquoted NAME=, whatever follows
+    quoted_span: tuple[int, int] | None = None  # where the last '...' segment's content is
+
+
+@dataclass
+class _Stdin:
+    """A redirection of fd 0."""
+    kind: str  # "heredoc", or "other" for a here-string or a file
+    body: str | None = None  # a heredoc's text, once read; None if it can't be known
+    quoted: bool = False  # the heredoc's delimiter is quoted, so the shell doesn't expand it
+    span: tuple[int, int] | None = None  # where the heredoc's text is in the command
 
 
 class _Command:
     def __init__(self, depth: int):
         self.depth = depth
         self.words: list[_Word] = []
-        # Redirections of fd 0 in order, the last one winning: ["heredoc", body, quoted] or
-        # ["other"] for a here-string or a file.
-        self.stdin: list[list] = []
-        # Character ranges of heredoc bodies, on any fd, so the text they hold can be told
-        # apart from commands.
-        self.data_spans: list[tuple[int, int]] = []
+        self.stdin: list[_Stdin] = []  # in order, the last one winning
 
 
 def _read_balanced(text: str, i: int, open_c: str, close_c: str) -> int:
@@ -193,10 +228,11 @@ def _read_word(text: str, i: int) -> tuple[_Word, int]:
     dynamic = False
     segments = 0
     single = False
+    quoted_span = None
     assignment = _ASSIGNMENT_RE.match(text, i) is not None
     while i < len(text):
         c = text[i]
-        if text.startswith("\\\n", i):
+        if text.startswith(_CONTINUATION, i):
             i += 2  # the shell removes it, and the word goes on
             continue
         if c in " \t\n;&|()<>":
@@ -207,6 +243,7 @@ def _read_word(text: str, i: int) -> tuple[_Word, int]:
             end = len(text) if end == -1 else end
             out.append(text[i + 1:end])
             single = segments == 1
+            quoted_span = (i + 1, end)
             i = end + 1
         elif c == '"':
             content, i, expands = _read_double_quoted(text, i + 1)
@@ -230,15 +267,48 @@ def _read_word(text: str, i: int) -> tuple[_Word, int]:
         else:
             out.append(c)
             i += 1
-    return _Word("".join(out), dynamic, single and segments == 1, assignment), i
+    return _Word("".join(out), dynamic, single and segments == 1, assignment, quoted_span), i
+
+
+def _heredoc_delimiter(raw: str) -> str | None:
+    """The line that ends a heredoc whose delimiter word is `raw`: the shell removes quotes
+    from it but expands nothing, so `<<$X` ends at a line `$X`. None for `$'...'` and
+    `$"..."`, which shells quote differently."""
+    out = []
+    i = 0
+    while i < len(raw):
+        c = raw[i]
+        if c == "$" and raw[i + 1:i + 2] in ("'", '"'):
+            return None
+        if c == "'":
+            end = raw.find("'", i + 1)
+            end = len(raw) if end == -1 else end
+            out.append(raw[i + 1:end])
+            i = end + 1
+        elif c == '"':
+            i += 1
+            while i < len(raw) and raw[i] != '"':
+                if raw[i] == "\\" and raw[i + 1:i + 2] in ("\\", "$", "`", '"'):
+                    i += 1
+                out.append(raw[i:i + 1])
+                i += 1
+            i += 1
+        elif c == "\\":
+            out.append(raw[i + 1:i + 2])
+            i += 2
+        else:
+            out.append(c)
+            i += 1
+    return "".join(out)
 
 
 def _scan(command: str) -> tuple[list[_Command], bool]:
     """The simple commands in `command`, and whether any of them may change directory."""
     commands: list[_Command] = []
-    # (command, delimiter, quoted, dash, its stdin entry when it's on fd 0)
-    pending: list[tuple[_Command, str, bool, bool, list | None]] = []
+    # (delimiter, or None when it can't be known; quoted; dash; its stdin entry when on fd 0)
+    pending: list[tuple[str | None, bool, bool, _Stdin | None]] = []
     depth = 0
+    defines_function = False
     current = _Command(depth)
     commands.append(current)
 
@@ -247,23 +317,32 @@ def _scan(command: str) -> tuple[list[_Command], bool]:
         commands.append(cmd)
         return cmd
 
+    def skip_blanks(i: int) -> int:
+        while i < n and (command[i] in " \t" or command.startswith(_CONTINUATION, i)):
+            i += 2 if command[i] == "\\" else 1
+        return i
+
     i = 0
     n = len(command)
     while i < n:
         c = command[i]
         if c in " \t":
             i += 1
-        elif command.startswith("\\\n", i):
+        elif command.startswith(_CONTINUATION, i):
             i += 2
         elif c == "\n":
             i += 1
-            for cmd, delim, quoted, dash, entry in pending:
+            for delim, quoted, dash, entry in pending:
                 body_start = i
-                found = _heredoc_body(command, i, delim, dash)
-                body, i = found if found else (command[i:], n)
+                found = None if delim is None else _heredoc_body(command, i, delim, dash, quoted)
+                if found:
+                    body, body_end, i = found
+                else:
+                    # The shell reads an unterminated heredoc to the end of the command, and
+                    # one whose delimiter can't be known may end anywhere.
+                    body, body_end, i = (None if delim is None else command[i:]), n, n
                 if entry is not None:
-                    entry[1] = body
-                cmd.data_spans.append((body_start, i))
+                    entry.body, entry.span = body, (body_start, body_end)
             pending = []
             current = start()
         elif c == "#":
@@ -277,6 +356,9 @@ def _scan(command: str) -> tuple[list[_Command], bool]:
                 i += 1
             current = start()
         elif c == "(":
+            last = current.words[-1] if current.words else None
+            if last is not None and not last.assignment and last.text not in _PREFIX_WORDS:
+                defines_function = True  # `name() ...`, which could later run anything
             depth += 1
             i += 1
             current = start()
@@ -284,6 +366,10 @@ def _scan(command: str) -> tuple[list[_Command], bool]:
             depth = max(depth - 1, 0)
             i += 1
             current = start()
+        elif c in "<>" and command.startswith("(", i + 1):
+            # `<(...)` or `>(...)` stands for a file name argument, not a redirection.
+            i = _read_balanced(command, i + 2, "(", ")")
+            current.words.append(_Word("", True, False, False))
         elif c in "<>":
             fd = None
             if (current.words and current.words[-1].text.isdigit() and not current.words[-1].dynamic
@@ -293,24 +379,26 @@ def _scan(command: str) -> tuple[list[_Command], bool]:
             if command.startswith("<<<", i):
                 i += 3
                 if on_stdin:
-                    current.stdin.append(["other"])
+                    current.stdin.append(_Stdin("other"))
             elif command.startswith("<<", i):
                 i += 2
+                while command.startswith(_CONTINUATION, i):
+                    i += 2
                 dash = command.startswith("-", i)
-                i += 1 if dash else 0
-                while i < n and command[i] in " \t":
-                    i += 1
+                i = skip_blanks(i + 1 if dash else i)
                 raw_start = i
-                word, i = _read_word(command, i)
-                quoted = any(q in command[raw_start:i] for q in "'\"\\")
-                entry = ["heredoc", None, quoted] if on_stdin else None
+                _, i = _read_word(command, i)
+                # The shell removes backslash-newlines before it reads the delimiter word.
+                raw = command[raw_start:i].replace(_CONTINUATION, "")
+                quoted = any(q in raw for q in "'\"\\")
+                entry = _Stdin("heredoc", quoted=quoted) if on_stdin else None
                 if entry is not None:
                     current.stdin.append(entry)
-                pending.append((current, word.text, quoted, dash, entry))
+                pending.append((_heredoc_delimiter(raw), quoted, dash, entry))
                 continue
             else:
                 if on_stdin:
-                    current.stdin.append(["other"])
+                    current.stdin.append(_Stdin("other"))
                 i += 1
                 while i < n and command[i] in "<>&|":
                     i += 1
@@ -321,10 +409,12 @@ def _scan(command: str) -> tuple[list[_Command], bool]:
             word, i = _read_word(command, i)
             current.words.append(word)
 
-    changes_dir = False
+    # A wrong base would check the wrong files, so any command that might move the shell
+    # makes every base unknown.
+    changes_dir = defines_function
     for cmd in commands:
         name = _command_name(cmd)
-        if name is not None and not name.dynamic and name.text in _DIR_CHANGERS + _MAY_CHANGE_DIR:
+        if name is not None and (name.dynamic or name.text in _MAY_CHANGE_DIR):
             changes_dir = True
     return commands, changes_dir
 
@@ -341,40 +431,38 @@ def _command_name(cmd: _Command) -> _Word | None:
     return None
 
 
-def _calls_apply_patch(cmd: _Command) -> bool:
-    return any(not w.dynamic and os.path.basename(w.text) in _NAMES for w in cmd.words)
-
-
-def text_outside_data(command: str) -> str:
-    """`command` without the heredoc bodies of commands that don't mention `apply_patch`
-    (`cat > notes.md <<'EOF'`), which hold text rather than run it."""
-    spans = sorted(s for cmd in _scan(command)[0] if not _calls_apply_patch(cmd) for s in cmd.data_spans)
-    for start, end in reversed(spans):
-        command = command[:start] + command[end:]
-    return command
-
-
-def _body(cmd: _Command) -> str | None:
+def _body(cmd: _Command) -> tuple[str, tuple[int, int] | None] | None:
+    """The patch a call reads, and where it is written in the command."""
     name_index = cmd.words.index(_command_name(cmd))
     args = cmd.words[name_index + 1:]
     if args:
         # The executable takes the patch from its first argument and ignores stdin.
-        return args[0].text if args[0].single_quoted else None
-    if not cmd.stdin or cmd.stdin[-1][0] != "heredoc":
+        return (args[0].text, args[0].quoted_span) if args[0].single_quoted else None
+    if not cmd.stdin or cmd.stdin[-1].kind != "heredoc":
         return None  # stdin from a pipe, a file, a here-string or nothing at all
-    _, body, quoted = cmd.stdin[-1]
-    if body is None or quoted:
-        return body
-    # A real shell expands this body. A backslash can only join lines, but `$` or a backtick
-    # could write new header lines.
-    if "$" in body or "`" in body or not _headers_literal(body):
+    stdin = cmd.stdin[-1]
+    if stdin.body is None:
         return None
-    return body
+    # A real shell expands an unquoted body. A backslash can only join lines, but `$` or a
+    # backtick could write new header lines.
+    if not stdin.quoted and ("$" in stdin.body or "`" in stdin.body or not _headers_literal(stdin.body)):
+        return None
+    return stdin.body, stdin.span
+
+
+def _without_continuations(command: str) -> tuple[str, list[int]]:
+    """`command` with every backslash-newline removed, and where each one was."""
+    return command.replace(_CONTINUATION, ""), [m.start() for m in re.finditer(re.escape(_CONTINUATION), command)]
+
+
+def _names_apply_patch(command: str) -> bool:
+    joined = _without_continuations(command)[0]
+    return any(name in joined for name in _NAMES)
 
 
 def find_invocations(command) -> list[Invocation]:
     """Every `apply_patch` call in a shell command, in order."""
-    if not isinstance(command, str) or not any(name in command for name in _NAMES):
+    if not isinstance(command, str) or not _names_apply_patch(command):
         return []
     intercepted = _intercepted(command)
     if intercepted:
@@ -386,5 +474,38 @@ def find_invocations(command) -> list[Invocation]:
         if name is None or name.dynamic or os.path.basename(name.text) not in _NAMES:
             continue
         known_base = not changes_dir and cmd.depth == 0
-        found.append(Invocation(_body(cmd), "" if known_base else None))
+        body, span = _body(cmd) or (None, None)
+        found.append(Invocation(body, "" if known_base else None, span))
     return found
+
+
+def unchecked_patch_paths(command, invocations: list[Invocation]) -> list[str]:
+    """Paths that may be dbt files in patch text that no call in `invocations` gates.
+
+    In a command that names `apply_patch`, every `*** Begin Patch` up to the next
+    `*** End Patch` is a patch something may apply, unless it is the body of a call found
+    with a known base, which is gated as written. Only a patch that starts the body counts
+    as that body: one further in may be text the scan wrongly took for part of it. Each is
+    read twice, as written and with backslash-newlines removed, since the shell removes them
+    in some places and not in others."""
+    if not isinstance(command, str) or not _names_apply_patch(command):
+        return []
+    joined, cuts = _without_continuations(command)
+
+    def in_joined(i: int) -> int:
+        return i - 2 * bisect.bisect_right(cuts, i - 2)
+
+    spans = [inv.span for inv in invocations if inv.base is not None and inv.span is not None]
+    views = [(command, spans)]
+    if cuts:
+        views.append((joined, [(in_joined(a), in_joined(b)) for a, b in spans]))
+    paths: list[str] = []
+    for text, accounted in views:
+        start = text.find(BEGIN)
+        while start != -1:
+            end = text.find(END, start)
+            end = len(text) if end == -1 else end + len(END)
+            if not any(a <= start and not text[a:start].strip() and end <= b for a, b in accounted):
+                paths += [p for p in op_paths(parse_operations(text[start:], "codex")) if may_be_dbt_file(p)]
+            start = text.find(BEGIN, start + 1)
+    return list(dict.fromkeys(paths))

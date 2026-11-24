@@ -278,32 +278,34 @@ def patched_tables(paths: list[str], were_models: set[str]) -> list[str]:
     return tables
 
 
-def gate_and_remember(patch_text, dialect: str, raw: dict, make_input: Callable, evaluate: Callable) -> str | None:
+def gate_and_remember(patch_text, dialect: str, *, cwd: str | None, session_id: str, call_id,
+                      make_input: Callable, evaluate: Callable) -> str | None:
     """PreToolUse for an `apply_patch` tool call: the deny reason, or None after recording.
 
     On allow, records which of the patch's paths are models now, for the call's PostToolUse.
-    `raw` is the hook payload; `cwd`, `session_id` and `tool_use_id` are read from it.
+    `cwd` resolves relative patch paths; `session_id` and `call_id` key the record that
+    `track_patch` reads back, so the PostToolUse call must pass the same pair.
     """
-    groups = op_groups(parse_operations(patch_text, dialect), raw.get("cwd"))
+    groups = op_groups(parse_operations(patch_text, dialect), cwd)
     reason = gate_patch(groups, make_input, evaluate)
     if reason:
         return reason
-    remember_existing_models(raw.get("session_id", "unknown"), raw.get("tool_use_id"),
-                             [p for files in groups for p in files])
+    remember_existing_models(session_id, call_id, [p for files in groups for p in files])
     return None
 
 
-def track_patch(patch_text, dialect: str, raw: dict, keep_ops: Callable | None = None) -> None:
+def track_patch(patch_text, dialect: str, *, cwd: str | None, session_id: str, call_id,
+                keep_ops: Callable | None = None) -> None:
     """PostToolUse for an `apply_patch` tool call: add the tables it changed to the session.
 
-    `keep_ops`, when given, filters the parsed operations (e.g. to those that may have run).
+    `cwd`, `session_id` and `call_id` are the values `gate_and_remember` was given for the same
+    call. `keep_ops`, when given, filters the parsed operations (e.g. to those that may have run).
     """
-    session_id = raw.get("session_id", "unknown")
-    were_models = recall_existing_models(session_id, raw.get("tool_use_id"))
+    were_models = recall_existing_models(session_id, call_id)
     ops = parse_operations(patch_text, dialect)
     if keep_ops:
         ops = keep_ops(ops)
-    paths = [resolve_path(p, raw.get("cwd")) for p in op_paths(ops)]
+    paths = [resolve_path(p, cwd) for p in op_paths(ops)]
     for table in patched_tables(paths, were_models):
         add_edited_table(session_id, table)
 

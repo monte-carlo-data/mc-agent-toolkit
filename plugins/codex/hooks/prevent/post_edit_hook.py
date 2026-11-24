@@ -22,7 +22,8 @@ def main():
     raw = json.load(sys.stdin)
     session_id = raw.get("session_id", "unknown")
     if raw.get("tool_name") == "apply_patch":
-        track_patch((raw.get("tool_input") or {}).get("command"), "codex", raw)
+        track_patch((raw.get("tool_input") or {}).get("command"), "codex", cwd=raw.get("cwd"),
+                    session_id=session_id, call_id=raw.get("tool_use_id"))
         return
     evaluate_post_edit(HookInput(session_id=session_id, file_path=raw.get("tool_input", {}).get("file_path", "")))
 
