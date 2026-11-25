@@ -3,7 +3,7 @@
  * test_pre_commit_hook.py, test_turn_end_hook.py
  */
 import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
-import { mkdtempSync, writeFileSync, readFileSync } from "fs";
+import { mkdtempSync, writeFileSync, readFileSync, unlinkSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import { cleanCache, createDbtProject, createMockClient } from "./helpers";
@@ -28,13 +28,21 @@ beforeEach(() => {
 });
 afterEach(() => cleanCache());
 
+/** An apply_patch body inside the Begin/End envelope OpenCode requires. */
+function patch(...lines: string[]): string {
+  return ["*** Begin Patch", ...lines, "*** End Patch"].join("\n");
+}
+
 // Helper to initialize the plugin and get hooks
-async function getHooks(clientOptions: Parameters<typeof createMockClient>[0] = {}) {
+async function getHooks(
+  clientOptions: Parameters<typeof createMockClient>[0] = {},
+  dirs: { directory?: string; worktree?: string } = {}
+) {
   const client = createMockClient(clientOptions);
   const hooks = await McPrevent({
     client,
-    directory: tmpDir,
-    worktree: tmpDir,
+    directory: dirs.directory ?? tmpDir,
+    worktree: dirs.worktree ?? tmpDir,
     project: {} as any,
     serverUrl: new URL("http://localhost"),
     $: {} as any,
@@ -251,7 +259,7 @@ describe("PreEditGate (tool.execute.before on edit tools)", () => {
         { tool: "apply_patch", sessionID: "s1", callID: "c1" },
         {
           args: {
-            patchText: `*** Update File: ${join(projectDir, "models/orders.sql")}\n--- old\n+++ new\n@@ -1 +1 @@\n-SELECT *\n+SELECT id`,
+            patchText: patch(`*** Update File: ${join(projectDir, "models/orders.sql")}`, "@@", "-SELECT *", "+SELECT id"),
           },
         }
       )
@@ -265,7 +273,7 @@ describe("PreEditGate (tool.execute.before on edit tools)", () => {
       { tool: "apply_patch", sessionID: "s1", callID: "c1" },
       {
         args: {
-          patchText: `*** Update File: /project/readme.md\n--- old\n+++ new\n@@ -1 +1 @@\n-old\n+new`,
+          patchText: patch("*** Update File: /project/readme.md", "@@", "-old", "+new"),
         },
       }
     );
@@ -343,6 +351,245 @@ describe("PostEditTracking (tool.execute.after on edit tools)", () => {
     await hooks["tool.execute.after"]!(input, { title: "", output: "", metadata: {} });
 
     expect(getEditedTables("s1")).toEqual(["orders"]);
+  });
+});
+
+describe("apply_patch moves and paths", () => {
+  const MODEL = "SELECT * FROM {{ ref('raw') }}";
+  const PLAIN = "SELECT 1";
+
+  function verify(table: string) {
+    markImpactCheckInjected("s1", table);
+    markImpactCheckVerified("s1", table);
+  }
+
+  async function before(hooks: any, patchText: string) {
+    await hooks["tool.execute.before"]!(
+      { tool: "apply_patch", sessionID: "s1", callID: "c1" },
+      { args: { patchText } }
+    );
+  }
+
+  async function after(hooks: any, patchText: string, metadata: any = {}) {
+    await hooks["tool.execute.after"]!(
+      { tool: "apply_patch", sessionID: "s1", callID: "c1", args: { patchText } },
+      { title: "", output: "", metadata }
+    );
+  }
+
+  it("gates and tracks a model moved to a new name", async () => {
+    const { projectDir } = createDbtProject(tmpDir, { models: { "orders.sql": MODEL } });
+    const { hooks } = await getHooks({}, { directory: projectDir });
+    const text = patch(
+      "*** Update File: models/orders.sql",
+      "*** Move to: models/orders_v2.sql",
+      "@@",
+      "-SELECT * FROM {{ ref('raw') }}",
+      "+SELECT id FROM {{ ref('raw') }}"
+    );
+
+    await expect(before(hooks, text)).rejects.toThrow("for orders ");
+    verify("orders");
+    await before(hooks, text);
+
+    writeFileSync(join(projectDir, "models/orders_v2.sql"), "SELECT id FROM {{ ref('raw') }}");
+    unlinkSync(join(projectDir, "models/orders.sql"));
+    await after(hooks, text);
+
+    expect(getEditedTables("s1").sort()).toEqual(["orders", "orders_v2"]);
+  });
+
+  it("gates a file moved onto an existing model, and tracks the overwritten model", async () => {
+    const { projectDir } = createDbtProject(tmpDir, {
+      models: { "orders.sql": MODEL, "scratch.sql": PLAIN },
+    });
+    const { hooks } = await getHooks({}, { directory: projectDir });
+    const text = patch(
+      "*** Update File: models/scratch.sql",
+      "*** Move to: models/orders.sql",
+      "@@",
+      "-SELECT 1",
+      "+SELECT 2"
+    );
+
+    await expect(before(hooks, text)).rejects.toThrow("for orders ");
+    verify("orders");
+    await before(hooks, text);
+
+    // The destination's new bytes no longer look like a dbt model.
+    writeFileSync(join(projectDir, "models/orders.sql"), "SELECT 2");
+    unlinkSync(join(projectDir, "models/scratch.sql"));
+    await after(hooks, text);
+
+    expect(getEditedTables("s1")).toEqual(["orders"]);
+  });
+
+  it("lets a move onto a verified model through", async () => {
+    const { projectDir } = createDbtProject(tmpDir, {
+      models: { "orders.sql": MODEL, "scratch.sql": PLAIN },
+    });
+    const { hooks } = await getHooks({}, { directory: projectDir });
+    verify("orders");
+
+    await before(
+      hooks,
+      patch("*** Update File: models/scratch.sql", "*** Move to: models/orders.sql", "@@", "-SELECT 1", "+SELECT 2")
+    );
+  });
+
+  it("resolves relative paths against the session directory, not the process cwd", async () => {
+    const { projectDir } = createDbtProject(tmpDir, { models: { "orders.sql": MODEL } });
+    expect(process.cwd()).not.toBe(projectDir);
+    const { hooks } = await getHooks({}, { directory: projectDir, worktree: tmpDir });
+
+    await expect(
+      before(hooks, patch("*** Update File: models/orders.sql", "@@", "-SELECT *", "+SELECT id"))
+    ).rejects.toThrow("impact assessment");
+  });
+
+  it("ignores headers outside the Begin/End envelope", async () => {
+    const { projectDir } = createDbtProject(tmpDir, { models: { "orders.sql": MODEL } });
+    const { hooks } = await getHooks({}, { directory: projectDir });
+
+    await before(
+      hooks,
+      [
+        `*** Update File: ${join(projectDir, "models/orders.sql")}`,
+        patch("*** Update File: notes.md", "@@", "-a", "+b"),
+        `*** Update File: ${join(projectDir, "models/orders.sql")}`,
+      ].join("\n")
+    );
+  });
+
+  it("treats a Move line that doesn't follow its Update header as content", async () => {
+    const { projectDir } = createDbtProject(tmpDir, {
+      models: { "orders.sql": MODEL, "scratch.sql": PLAIN },
+    });
+    const { hooks } = await getHooks({}, { directory: projectDir });
+
+    await before(
+      hooks,
+      patch("*** Update File: models/scratch.sql", "@@", "-SELECT 1", "+SELECT 2", "*** Move to: models/orders.sql")
+    );
+  });
+
+  it("treats an empty Move as a plain update", async () => {
+    const { projectDir } = createDbtProject(tmpDir, { models: { "scratch.sql": PLAIN } });
+    const { hooks } = await getHooks({}, { directory: projectDir });
+    const text = patch("*** Update File: models/scratch.sql", "*** Move to:   ", "@@", "-SELECT 1", "+SELECT 2");
+
+    await before(hooks, text);
+    await after(hooks, text);
+
+    expect(getEditedTables("s1")).toEqual([]);
+  });
+
+  it("doesn't track a deleted .sql file that wasn't a model", async () => {
+    const { projectDir } = createDbtProject(tmpDir, { models: { "scratch.sql": PLAIN } });
+    const { hooks } = await getHooks({}, { directory: projectDir });
+    const text = patch("*** Delete File: models/scratch.sql");
+
+    await before(hooks, text);
+    unlinkSync(join(projectDir, "models/scratch.sql"));
+    await after(hooks, text);
+
+    expect(getEditedTables("s1")).toEqual([]);
+  });
+
+  it("tracks a deleted model the gate saw", async () => {
+    const { projectDir } = createDbtProject(tmpDir, { models: { "orders.sql": MODEL } });
+    const { hooks } = await getHooks({}, { directory: projectDir });
+    const text = patch("*** Delete File: models/orders.sql");
+    verify("orders");
+
+    await before(hooks, text);
+    unlinkSync(join(projectDir, "models/orders.sql"));
+    await after(hooks, text);
+
+    expect(getEditedTables("s1")).toEqual(["orders"]);
+  });
+
+  it("doesn't track a .sql file outside the dbt folders that shares a gated table's name", async () => {
+    const { projectDir } = createDbtProject(tmpDir, { models: { "orders.sql": MODEL } });
+    require("fs").mkdirSync(join(projectDir, "scripts"), { recursive: true });
+    writeFileSync(join(projectDir, "scripts/orders.sql"), PLAIN);
+    const { hooks } = await getHooks({}, { directory: projectDir });
+    verify("orders");
+
+    await after(hooks, patch("*** Update File: scripts/orders.sql", "@@", "-SELECT 1", "+SELECT 2"));
+
+    expect(getEditedTables("s1")).toEqual([]);
+  });
+
+  it("doesn't track a deleted non-model file whose name matches a gated model", async () => {
+    const { projectDir } = createDbtProject(tmpDir, {
+      models: { "orders.sql": MODEL, "legacy/orders.sql": PLAIN },
+    });
+    const { hooks } = await getHooks({}, { directory: projectDir });
+    verify("orders");
+    const text = patch("*** Delete File: models/legacy/orders.sql");
+
+    await before(hooks, text);
+    unlinkSync(join(projectDir, "models/legacy/orders.sql"));
+    await after(hooks, text);
+
+    expect(getEditedTables("s1")).toEqual([]);
+  });
+
+  it("doesn't track a new plain .sql file added under models", async () => {
+    const { projectDir } = createDbtProject(tmpDir, { models: { "orders.sql": MODEL } });
+    const { hooks } = await getHooks({}, { directory: projectDir });
+    const text = patch("*** Add File: models/notes.sql", "+SELECT 1");
+
+    await before(hooks, text);
+    writeFileSync(join(projectDir, "models/notes.sql"), PLAIN);
+    await after(hooks, text);
+
+    expect(getEditedTables("s1")).toEqual([]);
+  });
+
+  it("forgets a call's models when the session goes idle", async () => {
+    const { projectDir } = createDbtProject(tmpDir, { models: { "orders.sql": MODEL } });
+    const { hooks } = await getHooks({}, { directory: projectDir });
+    const text = patch("*** Delete File: models/orders.sql");
+    verify("orders");
+
+    await before(hooks, text);
+    await hooks.event!({ event: { type: "session.idle", properties: { sessionID: "s1" } } as any });
+    unlinkSync(join(projectDir, "models/orders.sql"));
+    await after(hooks, text);
+
+    expect(getEditedTables("s1")).toEqual([]);
+  });
+
+  it("tracks a deleted schema file", async () => {
+    const { projectDir } = createDbtProject(tmpDir, {
+      models: { "schema.yml": "version: 2\nmodels:\n  - name: foo" },
+    });
+    const { hooks } = await getHooks({}, { directory: projectDir });
+    const text = patch("*** Delete File: models/schema.yml");
+
+    unlinkSync(join(projectDir, "models/schema.yml"));
+    await after(hooks, text);
+
+    expect(getEditedTables("s1")).toEqual(["schema"]);
+  });
+
+  it("tracks the files the tool reports it changed", async () => {
+    const { projectDir } = createDbtProject(tmpDir, { models: { "orders_v2.sql": MODEL } });
+    const { hooks } = await getHooks({}, { directory: projectDir });
+
+    await after(hooks, "", {
+      files: [
+        {
+          filePath: join(projectDir, "models/orders.sql"),
+          movePath: join(projectDir, "models/orders_v2.sql"),
+          type: "move",
+        },
+      ],
+    });
+
+    expect(getEditedTables("s1")).toEqual(["orders_v2"]);
   });
 });
 

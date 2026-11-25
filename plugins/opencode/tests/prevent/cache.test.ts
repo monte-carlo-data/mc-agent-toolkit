@@ -2,7 +2,7 @@
  * Cache unit tests — port of plugins/claude-code/prevent/tests/test_cache.py
  */
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { statSync, writeFileSync, readFileSync } from "fs";
+import { statSync, writeFileSync, readFileSync, utimesSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import { mkdtempSync } from "fs";
@@ -247,6 +247,9 @@ describe("DbtConfigCache", () => {
       join(projectDir, "dbt_project.yml"),
       "name: test\nmodel-paths: ['new_models']\n"
     );
+    // A rewrite in the same millisecond keeps the mtime; move it so the change is visible.
+    const later = new Date(Date.now() + 5_000);
+    utimesSync(join(projectDir, "dbt_project.yml"), later, later);
 
     // Second call should pick up the change
     paths = getDbtPaths(filePath);

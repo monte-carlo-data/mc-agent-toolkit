@@ -13,6 +13,7 @@ import type { Plugin } from "@opencode-ai/plugin";
 import { existsSync } from "fs";
 import { ensureToolkitIdsAndBeacon, buildToolkitHeaders } from "../telemetry/install-beacon";
 import { isDbtModel, isDbtSchemaFile, extractTableName } from "./detect";
+import { parsePatchOps, patchPaths, reportedPaths } from "./apply-patch";
 import {
   cleanupStaleCache,
   getImpactCheckState,
@@ -78,31 +79,27 @@ function getFilePath(args: any): string {
 }
 
 /**
- * Extract all file paths from apply_patch patchText.
- * Parses markers like `*** Update File: path/to/file.sql`
+ * Files a tool call will touch. apply_patch paths are resolved against the session
+ * directory, as OpenCode does; other tools' paths are used as given.
  */
-function getFilePathsFromPatch(args: any): string[] {
-  const patchText: string = args?.patchText ?? "";
-  if (!patchText) return [];
-  const paths: string[] = [];
-  const pattern = /^\*\*\*\s+(?:Update|Add|Delete)\s+File:\s*(.+)$/gm;
-  let match;
-  while ((match = pattern.exec(patchText)) !== null) {
-    const p = match[1].trim();
-    if (p) paths.push(p);
-  }
-  return paths;
-}
-
-/**
- * Get all file paths from tool args, handling both regular tools and apply_patch.
- */
-function getAllFilePaths(tool: string, args: any): string[] {
+function getAllFilePaths(tool: string, args: any, directory: string): string[] {
   if (tool === "apply_patch") {
-    return getFilePathsFromPatch(args);
+    return patchPaths(parsePatchOps(args?.patchText), directory);
   }
   const fp = getFilePath(args);
   return fp ? [fp] : [];
+}
+
+/**
+ * Whether an edited file counts toward the validation prompt. `wasModel` holds the
+ * paths that were existing dbt models just before this call ran: a file that is now
+ * gone (deleted or moved away), or whose new content no longer looks like a model,
+ * can't be classified any more.
+ */
+function shouldTrack(filePath: string, wasModel: Set<string> | undefined): boolean {
+  if (isDbtSchemaFile(filePath)) return true;
+  if (existsSync(filePath) && isDbtModel(filePath)) return true;
+  return wasModel?.has(filePath) ?? false;
 }
 
 /**
@@ -113,6 +110,13 @@ function getCommand(args: any): string {
 }
 
 export const McPrevent: Plugin = async ({ client, directory, worktree }) => {
+  // Per tool call (session + call id): the paths that were existing dbt models when
+  // the pre-edit gate let the call through. The post-edit hook takes its entry; a
+  // call that fails never reaches that hook, so the session's leftovers are dropped
+  // when it goes idle.
+  const wasModelByCall = new Map<string, Set<string>>();
+  const callKey = (sessionID: string, callID: string) => `${sessionID}\0${callID}`;
+
   return {
     // Inject toolkit telemetry headers onto the monte-carlo-mcp server at
     // config-load time so install_id (+ version) ride authed MCP traffic and the
@@ -139,7 +143,10 @@ export const McPrevent: Plugin = async ({ client, directory, worktree }) => {
         if (EDIT_TOOLS.has(tool)) {
           cleanupStaleCache();
 
-          const filePaths = getAllFilePaths(tool, output.args);
+          const filePaths = getAllFilePaths(tool, output.args, directory);
+          const key = callKey(sessionID, input.callID);
+          wasModelByCall.delete(key);
+          const wasModel = new Set(filePaths.filter((p) => existsSync(p) && isDbtModel(p)));
           // Check each file in the tool call (apply_patch may touch multiple)
           for (const filePath of filePaths) {
             if (!isDbtModel(filePath)) continue;
@@ -232,6 +239,7 @@ export const McPrevent: Plugin = async ({ client, directory, worktree }) => {
               );
             }
           }
+          wasModelByCall.set(key, wasModel);
         }
 
         // --- Pre-commit gate ---
@@ -281,14 +289,18 @@ export const McPrevent: Plugin = async ({ client, directory, worktree }) => {
 
     "tool.execute.after": async (input, output) => {
       try {
-        const { tool, sessionID, args } = input;
+        const { tool, sessionID, callID, args } = input;
         if (!EDIT_TOOLS.has(tool)) return;
+        const key = callKey(sessionID, callID);
+        const wasModel = wasModelByCall.get(key);
+        wasModelByCall.delete(key);
 
-        const filePaths = getAllFilePaths(tool, args);
+        // apply_patch reports the files it changed; parse the patch only when it doesn't.
+        const reported = tool === "apply_patch" ? reportedPaths(output?.metadata) : null;
+        const filePaths = reported ?? getAllFilePaths(tool, args, directory);
         for (const filePath of filePaths) {
-          if (!isDbtModel(filePath) && !isDbtSchemaFile(filePath)) continue;
-          const tableName = extractTableName(filePath);
-          addEditedTable(sessionID, tableName);
+          if (!shouldTrack(filePath, wasModel)) continue;
+          addEditedTable(sessionID, extractTableName(filePath));
         }
       } catch {
         // Never block on error
@@ -308,6 +320,10 @@ export const McPrevent: Plugin = async ({ client, directory, worktree }) => {
         if (event.type !== "session.idle") return;
         const sessionID = (event as any).properties?.sessionID;
         if (!sessionID) return;
+        const prefix = callKey(sessionID, "");
+        for (const key of wasModelByCall.keys()) {
+          if (key.startsWith(prefix)) wasModelByCall.delete(key);
+        }
 
         const tables = getEditedTables(sessionID);
         if (tables.length === 0) return;

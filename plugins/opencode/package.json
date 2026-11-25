@@ -19,7 +19,7 @@
   "license": "Apache-2.0",
   "scripts": {
     "test": "bun test",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "bunx -p typescript@5.6.3 tsc --noEmit"
   },
   "keywords": [
     "opencode",

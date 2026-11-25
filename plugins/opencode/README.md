@@ -16,7 +16,7 @@ For detailed workflow descriptions, activation rules, and synthesis guidelines, 
 
 ## Prerequisites
 
-- [OpenCode](https://opencode.ai) installed
+- [OpenCode](https://opencode.ai) 1.x installed. OpenCode 2 doesn't load plugins written for 1.x, so this plugin doesn't run there yet.
 - [Bun](https://bun.sh) installed
 - A Monte Carlo account with API access
 
@@ -124,6 +124,8 @@ State is managed via temp files under `$TMPDIR/mc_prevent_*` with a three-state 
 - `absent` → `injected` (instruction sent, waiting for completion)
 - `injected` → `verified` (completion marker found in session messages)
 
+An `apply_patch` call can touch several files. The pre-edit gate checks every file the patch adds, updates, deletes or moves, including the destination of a `*** Move to:`, so moving a file onto an existing model is gated for that model. Patch paths are resolved against the session directory, as OpenCode does. After the patch runs, the edit tracker counts the files OpenCode reports it changed. A file the patch deleted, moved away or overwrote with plain SQL counts only if it was a dbt model just before the patch ran.
+
 All hooks are wrapped in error handling — failures never block the engineer.
 
 ## Differences from Claude Code plugin
@@ -166,6 +168,16 @@ The data is stored in Mixpanel and Datadog and is used only for product-developm
 ## Architecture
 
 See the [plugins README](../README.md) for the overall plugin architecture and editor support comparison.
+
+## Development
+
+From `plugins/opencode/`, the same checks CI runs:
+
+```bash
+bun install
+bun run typecheck   # fetches TypeScript 5.6.3 with bunx, so user installs don't download it
+bun test
+```
 
 ## Changelog
 
