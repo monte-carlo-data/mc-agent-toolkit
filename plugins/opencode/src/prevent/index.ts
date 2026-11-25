@@ -171,7 +171,10 @@ export const McPrevent: Plugin = async ({ client, directory, worktree }) => {
               if (age < GRACE_PERIOD_SECONDS) {
                 throw new Error(
                   `Monte Carlo Prevent: the impact assessment for ${tableName} ` +
-                    `has not completed yet. Complete the assessment before editing this file.`
+                    `has not completed yet. If you already wrote the completion marker, ` +
+                    `check that it is on its own line in your visible reply text, not only ` +
+                    `in your reasoning or a tool call; otherwise complete the assessment ` +
+                    `before editing this file.`
                 );
               }
               // Grace period expired — re-inject below
@@ -235,7 +238,7 @@ export const McPrevent: Plugin = async ({ client, directory, worktree }) => {
               throw new Error(
                 `Monte Carlo Prevent: run the change impact assessment ` +
                   `for ${tableName} before editing this file. Present the full ` +
-                  `impact report and synthesis step before retrying the edit. ` +
+                  `impact report and synthesis step, then ask the user whether to proceed before retrying the edit. ` +
                   workflowOrderNote +
                   " " +
                   hookTriggeredNote

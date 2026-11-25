@@ -112,11 +112,8 @@ class TestDenyReasonSelfBypass:
 class TestDenyReasonMarkerPlacement:
     """The deny reason says where and when to write the completion marker.
 
-    CoCo Desktop saves an assistant message only after its edit's PreToolUse hook
-    has run, so a marker in the same message as the retried edit isn't on disk when
-    the gate scans. And a marker kept in the model's reasoning or inside a tool call
-    is never scanned. The reason must steer the model to visible reply text, written
-    only once the edit is going ahead, with the retry in a later step.
+    Why (CoCo Desktop's save order, unscanned reasoning): see the plugin-only note
+    in skills/prevent/SKILL.md § Impact check complete.
     """
 
     CASES = [
@@ -169,6 +166,40 @@ class TestDenyReasonMarkerPlacement:
     def test_model_reason_keeps_the_explicit_ask(self, tmp_path):
         reason = self._reason(tmp_path, *self.CASES[0])
         assert "ask the user whether to proceed before retrying the edit" in reason
+
+
+class TestGracePeriodDenyReason:
+    """A retry inside the grace period gets a short reason; it must still point at
+    the marker's placement and must not unlock the gate by quoting the marker."""
+
+    CASES = [
+        ("models", "orders.sql", "SELECT * FROM {{ ref('raw') }}", "orders"),
+        ("macros", "helper.sql", "{% macro helper() %} SELECT 1 {% endmacro %}", "macro:helper"),
+    ]
+
+    @pytest.mark.parametrize("dirname,filename,body,table", CASES)
+    def test_short_reason_checks_marker_placement(self, tmp_path, dirname, filename, body, table):
+        d = tmp_path / dirname
+        d.mkdir()
+        sql_file = d / filename
+        sql_file.write_text(body)
+        inp = HookInput(
+            session_id=f"grace-{dirname}", file_path=str(sql_file), transcript_path=""
+        )
+        first = evaluate_pre_edit(inp)
+        assert first.action == "deny"
+        assert cache.get_impact_check_state(inp.session_id, table) == "injected"
+
+        second = evaluate_pre_edit(inp)
+        assert second.action == "deny"
+        assert second.reason != first.reason, "expected the short grace-period reason"
+        assert "has not completed yet" in second.reason
+        assert "If you already wrote the completion marker" in second.reason
+        assert "visible reply text" in second.reason
+
+        transcript = tmp_path / "t.jsonl"
+        transcript.write_text(second.reason + "\n")
+        assert scan_transcript_for_markers(str(transcript), table)["impact_check"] is False
 
 
 class TestEvaluatePreEdit:

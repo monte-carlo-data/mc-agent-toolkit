@@ -153,7 +153,7 @@ jobs:
           grep -Eq '^Ran [1-9][0-9]* tests?' test.log
 
   prevent-skill-markers:
-    name: Prevent skill says where and when to write its markers
+    name: Prevent skill and deny reasons say where and when to write markers
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -163,7 +163,7 @@ jobs:
       - name: Run the marker tests
         run: |
           set -euo pipefail
-          python3 -m unittest discover -s scripts/tests -p 'test_prevent_skill_markers.py' -v 2>&1 | tee test.log
+          python3 -m unittest discover -s scripts/tests -p 'test_prevent_*.py' -v 2>&1 | tee test.log
           # discover exits 0 when it finds no tests; require that they ran.
           grep -Eq '^Ran [1-9][0-9]* tests?' test.log
 

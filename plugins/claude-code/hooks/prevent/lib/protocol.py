@@ -510,7 +510,10 @@ def evaluate_pre_edit(inp: HookInput) -> HookOutput:
         if age < GRACE_PERIOD_SECONDS:
             reason = (
                 f"Monte Carlo Prevent: the impact assessment for {table_name} "
-                f"has not completed yet. Complete the assessment before editing this file."
+                f"has not completed yet. If you already wrote the completion marker, "
+                f"check that it is on its own line in your visible reply text, not only "
+                f"in your reasoning or a tool call; otherwise complete the assessment "
+                f"before editing this file."
             )
             return HookOutput(action="deny", reason=reason)
         # Grace period expired and no marker — re-inject full instruction below

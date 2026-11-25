@@ -203,6 +203,39 @@ describe("PreEditGate (tool.execute.before on edit tools)", () => {
       });
     }
 
+    it("models: the reason keeps the explicit ask", async () => {
+      const { reason } = await denyReason("models", "orders.sql", "SELECT * FROM {{ ref('raw') }}");
+      expect(reason).toContain("then ask the user whether to proceed before retrying the edit");
+    });
+
+    for (const [dir, file, body, table] of cases) {
+      it(`${dir}: a retry within the grace period checks the marker placement and doesn't unlock`, async () => {
+        const { projectDir } = await denyReason(dir, file, body);
+        const { hooks } = await getHooks();
+        let shortReason = "";
+        try {
+          await hooks["tool.execute.before"]!(
+            { tool: "edit", sessionID: "s1", callID: "c2" },
+            { args: { filePath: join(projectDir, dir, file) } }
+          );
+        } catch (e) {
+          shortReason = (e as Error).message;
+        }
+        expect(shortReason).toContain("If you already wrote the completion marker");
+        expect(shortReason).toContain("visible reply text");
+        const { hooks: fedBack } = await getHooks({
+          messages: [{ parts: [{ type: "text", text: shortReason }] }],
+        });
+        await expect(
+          fedBack["tool.execute.before"]!(
+            { tool: "edit", sessionID: "s1", callID: "c3" },
+            { args: { filePath: join(projectDir, dir, file) } }
+          )
+        ).rejects.toThrow("not completed yet");
+        expect(getImpactCheckState("s1", table)).toBe("injected");
+      });
+    }
+
     for (const [dir, file, body, table] of cases) {
       it(`${dir}: the rendered reason fed back as a message doesn't unlock`, async () => {
         const { reason, projectDir } = await denyReason(dir, file, body);
