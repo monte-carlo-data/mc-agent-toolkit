@@ -5,11 +5,22 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Claude Code will
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.33.1] - 2026-11-24
+## [1.33.2] - 2026-11-25
 
 ### Fixed
 
 - Prevent: in CoCo Desktop, the first edit after an impact assessment was denied even when the agent had marked the assessment complete. Desktop saves the agent's message only after the edit's check runs, so a completion marker written in the same message as the edit isn't seen in time. The Prevent skill and the edit gate's message now tell the agent to write the marker only once the edit is going ahead (after your yes, whenever it asked you), as its own line in its visible reply (not only in its reasoning or inside a question to you), to re-read the file in that same message, and to make the edit in the next step. The engineer's yes is still required before editing at High or Medium risk, and a declined assessment still leaves no marker. The gate's message also names the `monte-carlo-asset-health` skill to load first. If an edit is still denied after the marker, the agent is told to check that the marker line is in its reply before retrying. A voluntary assessment no longer writes a marker unless an edit goes ahead, and the monitor-gap marker gets the same placement rule as the completion marker. Other editors read the marker as before.
+
+## [1.33.1] - 2026-11-24
+
+### Fixed
+
+- OpenCode: Prevent checks where an `apply_patch` moves a file. A patch that moved a file onto an existing dbt model with `*** Move to:` wasn't gated for that model, and a moved model wasn't tracked under its new name. The pre-edit gate now checks both ends of a move, and the files a patch changed are tracked from what OpenCode reports. A SQL file that any edit tool deleted, moved away or overwrote with plain SQL counts for the validation prompt only if it was a dbt model just before the edit ran, so a deleted `.sql` file that wasn't a model no longer counts.
+- OpenCode: relative `apply_patch` paths are resolved against the session directory, as OpenCode resolves them. Before, they were resolved against the OpenCode process's working directory, so a relative edit to a dbt model could skip the gate when the two differed.
+- OpenCode: Prevent reads only the operations inside a patch's `*** Begin Patch` / `*** End Patch` envelope, and treats `*** Move to:` as a move only on the line right after its `*** Update File:`, matching OpenCode.
+- OpenCode: CI runs the plugin's tests and typecheck.
+
+These fixes apply to OpenCode 1.x. OpenCode 2 doesn't load plugins written for 1.x, so the plugin doesn't run there yet.
 
 ## [1.33.0] - 2026-11-24
 

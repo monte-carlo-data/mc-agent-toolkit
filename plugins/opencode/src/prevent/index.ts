@@ -13,6 +13,7 @@ import type { Plugin } from "@opencode-ai/plugin";
 import { existsSync } from "fs";
 import { ensureToolkitIdsAndBeacon, buildToolkitHeaders } from "../telemetry/install-beacon";
 import { isDbtModel, isDbtSchemaFile, extractTableName } from "./detect";
+import { parsePatchOps, patchPaths, reportedPaths } from "./apply-patch";
 import {
   cleanupStaleCache,
   getImpactCheckState,
@@ -29,6 +30,11 @@ import {
 } from "./cache";
 
 const GRACE_PERIOD_SECONDS = 120;
+
+// A call that passes the gate but fails, is denied or is aborted never reaches the
+// post-edit hook, so its record lingers. The records are capped by count, not age,
+// because a call can wait on OpenCode's edit-permission prompt for any length of time.
+export const MAX_CALL_RECORDS = 500;
 
 /** Tools that modify files — the names OpenCode uses for its built-in tools. */
 const EDIT_TOOLS = new Set(["edit", "write", "apply_patch", "multiedit"]);
@@ -78,31 +84,27 @@ function getFilePath(args: any): string {
 }
 
 /**
- * Extract all file paths from apply_patch patchText.
- * Parses markers like `*** Update File: path/to/file.sql`
+ * Files a tool call will touch. apply_patch paths are resolved against the session
+ * directory, as OpenCode does; other tools' paths are used as given.
  */
-function getFilePathsFromPatch(args: any): string[] {
-  const patchText: string = args?.patchText ?? "";
-  if (!patchText) return [];
-  const paths: string[] = [];
-  const pattern = /^\*\*\*\s+(?:Update|Add|Delete)\s+File:\s*(.+)$/gm;
-  let match;
-  while ((match = pattern.exec(patchText)) !== null) {
-    const p = match[1].trim();
-    if (p) paths.push(p);
-  }
-  return paths;
-}
-
-/**
- * Get all file paths from tool args, handling both regular tools and apply_patch.
- */
-function getAllFilePaths(tool: string, args: any): string[] {
+function getAllFilePaths(tool: string, args: any, directory: string): string[] {
   if (tool === "apply_patch") {
-    return getFilePathsFromPatch(args);
+    return patchPaths(parsePatchOps(args?.patchText), directory);
   }
   const fp = getFilePath(args);
   return fp ? [fp] : [];
+}
+
+/**
+ * The table an edited file counts toward in the validation prompt, or null if none.
+ * `wasModel` maps the paths that were existing dbt models just before this call ran to
+ * their table names: a file that is now gone (deleted or moved away), or whose new
+ * content no longer looks like a model, can't be classified any more.
+ */
+function trackedTable(filePath: string, wasModel: Map<string, string> | undefined): string | null {
+  if (isDbtSchemaFile(filePath)) return extractTableName(filePath);
+  if (existsSync(filePath) && isDbtModel(filePath)) return extractTableName(filePath);
+  return wasModel?.get(filePath) ?? null;
 }
 
 /**
@@ -113,6 +115,14 @@ function getCommand(args: any): string {
 }
 
 export const McPrevent: Plugin = async ({ client, directory, worktree }) => {
+  // Per tool call (session + call id) that touches existing dbt models: those models
+  // (path -> table name). Set before the gate runs, dropped when the gate blocks the
+  // call, and taken by the post-edit hook. Idle isn't used for cleanup: OpenCode marks
+  // a session idle on abort while the aborted tool can still finish and reach the
+  // post-edit hook.
+  const wasModelByCall = new Map<string, Map<string, string>>();
+  const callKey = (sessionID: string, callID: string) => `${sessionID}\0${callID}`;
+
   return {
     // Inject toolkit telemetry headers onto the monte-carlo-mcp server at
     // config-load time so install_id (+ version) ride authed MCP traffic and the
@@ -139,15 +149,22 @@ export const McPrevent: Plugin = async ({ client, directory, worktree }) => {
         if (EDIT_TOOLS.has(tool)) {
           cleanupStaleCache();
 
-          const filePaths = getAllFilePaths(tool, output.args);
+          const filePaths = getAllFilePaths(tool, output.args, directory);
+          const key = callKey(sessionID, input.callID);
+          // New models have no blast radius — let SKILL.md handle Workflow 1
+          const tables = new Map<string, string>();
+          for (const p of filePaths) {
+            if (existsSync(p) && isDbtModel(p)) tables.set(p, extractTableName(p));
+          }
+          if (tables.size > 0) {
+            wasModelByCall.set(key, tables);
+            for (const k of wasModelByCall.keys()) {
+              if (wasModelByCall.size <= MAX_CALL_RECORDS) break;
+              wasModelByCall.delete(k);
+            }
+          }
           // Check each file in the tool call (apply_patch may touch multiple)
-          for (const filePath of filePaths) {
-            if (!isDbtModel(filePath)) continue;
-
-            // New models have no blast radius — let SKILL.md handle Workflow 1
-            if (!existsSync(filePath)) continue;
-
-            const tableName = extractTableName(filePath);
+          for (const [filePath, tableName] of tables) {
             const state = getImpactCheckState(sessionID, tableName);
 
             if (state === "verified") continue;
@@ -286,6 +303,8 @@ export const McPrevent: Plugin = async ({ client, directory, worktree }) => {
       } catch (e) {
         // Re-throw intentional blocks (our own errors)
         if (e instanceof Error && e.message.startsWith("Monte Carlo Prevent:")) {
+          // A blocked call never runs, so it has nothing to track.
+          wasModelByCall.delete(callKey(input.sessionID, input.callID));
           throw e;
         }
         // Swallow unexpected errors — never block the engineer
@@ -294,14 +313,18 @@ export const McPrevent: Plugin = async ({ client, directory, worktree }) => {
 
     "tool.execute.after": async (input, output) => {
       try {
-        const { tool, sessionID, args } = input;
+        const { tool, sessionID, callID, args } = input;
         if (!EDIT_TOOLS.has(tool)) return;
+        const key = callKey(sessionID, callID);
+        const wasModel = wasModelByCall.get(key);
+        wasModelByCall.delete(key);
 
-        const filePaths = getAllFilePaths(tool, args);
+        // apply_patch reports the files it changed; parse the patch only when it doesn't.
+        const reported = tool === "apply_patch" ? reportedPaths(output?.metadata) : null;
+        const filePaths = reported ?? getAllFilePaths(tool, args, directory);
         for (const filePath of filePaths) {
-          if (!isDbtModel(filePath) && !isDbtSchemaFile(filePath)) continue;
-          const tableName = extractTableName(filePath);
-          addEditedTable(sessionID, tableName);
+          const table = trackedTable(filePath, wasModel);
+          if (table !== null) addEditedTable(sessionID, table);
         }
       } catch {
         // Never block on error
