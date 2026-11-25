@@ -367,6 +367,30 @@ _OTHER_FORMS = [
                  id="continuation-hiding-end-of-patch"),
     pytest.param("X=$'*** Begin Patch\\n*** Delete File: models/orders.sql\\n*** End Patch'\n"
                  "apply_patch <<EOF\n$X\nEOF\n", id="heredoc-from-a-variable"),
+    # A delimiter that isn't a plain word, which Codex's parser may not match.
+    pytest.param(f'apply_patch <<"E\\\\"\n{_patch("*** Add File: docs/a.md", "+x")}\nE\\\n'
+                 "apply_patch < p.txt\nE\\\\\n", id="backslash-in-quoted-delimiter"),
+    pytest.param(f"apply_patch <<'E$'\n{_DOCS_ONLY}\nE$\n", id="dollar-in-quoted-delimiter"),
+    pytest.param(f"apply_patch <<'E OF'\n{_DOCS_ONLY}\nE OF\n", id="space-in-quoted-delimiter"),
+    pytest.param(f"apply_patch <<\"E'\"\n{_DOCS_ONLY}\nE'\n", id="quote-in-quoted-delimiter"),
+    pytest.param(f"apply_patch <<1EOF\n{_DOCS_ONLY}\n1EOF\n", id="delimiter-starting-with-digit"),
+    # `$`, a backtick or a backslash anywhere in an unquoted body, which a real shell expands.
+    pytest.param(_shell(_patch("*** Add File: docs/a.md", "+$(apply_patch < p.txt)"), delim="EOF"),
+                 id="unquoted-substitution-in-hunk"),
+    pytest.param(_shell(_patch("*** Add File: docs/a.md", "+`apply_patch < p.txt`"), delim="EOF"),
+                 id="unquoted-backtick-in-hunk"),
+    pytest.param(_shell(_patch("*** Update File: src/app.js", "@@", "-a", '+print("a\\n")'), delim="EOF"),
+                 id="unquoted-backslash-in-hunk"),
+    pytest.param(_shell(_patch(*_update("models/orders.sql", new="SELECT '$1' FROM {{ ref('raw') }}")),
+                        prefix="cd . && ", delim="EOF"), id="unquoted-dollar-in-model-hunk"),
+    pytest.param("apply_patch <<EOF\n*** Begin Patch\n*** Add File: docs/a.md\n+$(apply_patch < p.txt)\n"
+                 "EOFX\n*** End Patch\nEOF\n", id="unquoted-substitution-and-delimiter-prefix"),
+    # A body line another heredoc reader may take for the delimiter line.
+    pytest.param(_shell(_patch("*** Add File: docs/a.md", "+x", "EOFX", "+y")), id="line-starting-with-delimiter"),
+    pytest.param(_shell(_patch("*** Add File: docs/a.md", "+x", "EOF ", "+y")), id="delimiter-then-space"),
+    pytest.param(_shell(_patch("*** Add File: docs/a.md", "+x", "EOF\t", "+y")), id="delimiter-then-tab"),
+    pytest.param(_shell(_patch("*** Add File: docs/a.md", "+x", "  EOF", "+y")), id="indented-delimiter"),
+    pytest.param(_shell(_DOCS_ONLY).replace("\nEOF\n", "\nEOF \n"), id="terminator-with-trailing-space"),
     # A second patch in a recognised body, which a real shell may apply on its own.
     pytest.param(_shell(_patch(*_update("models/orders.sql"), "+*** Begin Patch",
                                "*** Delete File: models/customers.sql")), id="patch-further-into-body"),
@@ -448,16 +472,15 @@ class TestShellRecognised:
         assert "couldn't check" not in out["permissionDecisionReason"]
 
     def test_backslash_at_end_of_unquoted_heredoc_line(self, project, capsys):
-        """In an unquoted heredoc a trailing backslash joins the next line, so the
-        `EOF` after it is body text and the heredoc runs on to the final `EOF`."""
+        """In an unquoted heredoc a trailing backslash joins the next line, so a shell reads
+        the `EOF` after it as body text. An unquoted body with a backslash isn't recognised."""
         text = "\n".join([
             "*** Begin Patch", "*** Add File: notes.txt", "+hi\\", "EOF",
             "*** Delete File: models/orders.sql", "*** End Patch",
         ])
         assert "+hi\\\nEOF\n" in text
-        out = _run_pre(f"apply_patch <<EOF\n{text}\nEOF\n", project, capsys)
-        assert _denied(out) and "orders" in out["permissionDecisionReason"]
-        assert "couldn't check" not in out["permissionDecisionReason"]
+        _unchecked_deny(_run_pre(f"apply_patch <<EOF\n{text}\nEOF\n", project, capsys))
+        assert _edited() == []
 
     @pytest.mark.parametrize("cmd", [
         f"apply_patch <<'X'\n<<EOF\n{_DELETE_ORDERS}\nEOF\nX\n",
@@ -468,16 +491,16 @@ class TestShellRecognised:
         assert _run_pre(cmd, project, capsys) is None
         assert _edited() == ["orders"]
 
-    # Codex applies an intercepted heredoc as written, even with an unquoted delimiter, so
-    # `$`, backticks and backslashes in hunk lines don't make it unreadable.
-    def test_unquoted_expansions_in_hunk_allowed(self, project, capsys):
+    # A quoted delimiter keeps `$`, backticks and backslashes in hunk lines as written.
+    @pytest.mark.parametrize("delim", ["'EOF'", '"EOF"'])
+    def test_quoted_expansions_in_hunk_allowed(self, project, capsys, delim):
         text = _patch("*** Update File: src/app.js", "@@", "-const s = 'a';",
                       "+const s = `${name}`;", "+print(\"a\\n\")")
-        assert _run_pre(_shell(text, delim="EOF"), project, capsys) is None
+        assert _run_pre(_shell(text, delim=delim), project, capsys) is None
 
-    def test_unquoted_expansions_in_hunk_still_gate_models(self, project, capsys):
+    def test_quoted_expansions_in_hunk_still_gate_models(self, project, capsys):
         text = _patch(*_update("models/orders.sql", new="SELECT '$1' FROM {{ ref('raw') }}"))
-        out = _run_pre(_shell(text, prefix="cd . && ", delim="EOF"), project, capsys)
+        out = _run_pre(_shell(text, prefix="cd . && "), project, capsys)
         assert _denied(out)
         assert "orders" in out["permissionDecisionReason"]
         assert "couldn't check" not in out["permissionDecisionReason"]

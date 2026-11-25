@@ -11,6 +11,12 @@ It takes the heredoc body and `<dir>` as written, with no expansion, relative to
 command's working directory. `applypatch` works too. `find_invocation` recognises these
 two forms, and only these, so the hook can gate the patch against the right folder.
 
+When Codex's parser doesn't match, a real shell runs the command, so `find_invocation`
+recognises only commands both read the same way: a plain-word delimiter, bare or quoted
+with nothing else inside; an unquoted body with no `$`, backtick or backslash, which a shell
+would expand; and no body line that starts with the delimiter, which another heredoc reader
+could take for the end.
+
 The rule is closed: the hook doesn't read any other command. Any command that
 `names_apply_patch` but isn't recognised may run apply_patch in a real shell, from a folder
 or with a patch the hook can't know, so the hook denies it as one it couldn't check.
@@ -18,12 +24,10 @@ or with a patch the hook can't know, so the hook denies it as one it couldn't ch
 import re
 from typing import NamedTuple
 
-from lib.apply_patch import BEGIN, parse_operations, strip_codex_wrapper
+from lib.apply_patch import BEGIN, strip_codex_wrapper
 
 _NAMES = ("apply_patch", "applypatch")
 _EXPANSION_CHARS = ("$", "`", "\\")
-# In an unquoted heredoc the shell drops the backslash before these, and a backslash-newline.
-_HEREDOC_ESCAPE_RE = re.compile(r"\\([\\$`\n])")
 _CONTINUATION = "\\\n"
 
 # Codex's parser sees through a backslash-newline, where the shell removes it. `<<-` isn't
@@ -34,7 +38,7 @@ _INTERCEPT_HEAD_RE = re.compile(
     rf"""\A\s*
     (?:cd{_WS}+(?P<arg>"[^"\n]*"|'[^'\n]*'|[^\s;&|<>()'"]+){_WS}*&&{_WS}*)?
     (?:apply_patch|applypatch){_WS}*<<[ \t]*
-    (?P<delim>'[^'\n]+'|"[^"\n]+"|[A-Za-z_][A-Za-z0-9_]*)[ \t]*\n""",
+    (?P<delim>'[A-Za-z_][A-Za-z0-9_]*'|"[A-Za-z_][A-Za-z0-9_]*"|[A-Za-z_][A-Za-z0-9_]*)[ \t]*\n""",
     re.VERBOSE,
 )
 _SAFE_BARE_DIR_RE = re.compile(r"[A-Za-z0-9_./@%+:,=][A-Za-z0-9_./@%+:,=-]*")
@@ -50,17 +54,6 @@ def _has_expansion(text: str) -> bool:
     return any(c in text for c in _EXPANSION_CHARS)
 
 
-def _headers_literal(body: str) -> bool:
-    """Whether expanding an unquoted heredoc can't change which files its patch touches. Any
-    line starting with `*` counts, since a backslash-newline can join `**\\` and
-    `* Delete File:` into one, and the shell's backslash handling must leave the headers as
-    they are: a backslash-newline after a hunk line can swallow the `*** End Patch` below it."""
-    if any(_has_expansion(line) for line in body.split("\n") if line.lstrip().startswith("*")):
-        return False
-    expanded = _HEREDOC_ESCAPE_RE.sub(lambda m: "" if m.group(1) == "\n" else m.group(1), body)
-    return parse_operations(body, "codex") == parse_operations(expanded, "codex")
-
-
 def _one_patch(body: str) -> bool:
     """Whether the body holds at most one `*** Begin Patch`, where Codex reads it: at the
     start, past blank lines and a `<<EOF` wrapper line. One further in is text a real shell
@@ -72,28 +65,21 @@ def _one_patch(body: str) -> bool:
     return count == 0 or strip_codex_wrapper(body).startswith(BEGIN)
 
 
-def _heredoc_body(text: str, start: int, delim: str, quoted: bool) -> tuple[str, int] | None:
+def _heredoc_body(text: str, start: int, delim: str) -> tuple[str, int] | None:
     """The body of a heredoc starting at `start`, and the index after its delimiter line.
-    With an unquoted delimiter the shell joins a line ending in an odd number of
-    backslashes to the next before looking for the delimiter."""
+    None when a body line starts with the delimiter (`EOFX`, `EOF `, `  EOF`), which a
+    heredoc reader other than bash's may take for the end."""
     lines: list[str] = []
     pos = start
-    logical_lines, logical = 0, ""
     while True:
         end = text.find("\n", pos)
         line = text[pos:] if end == -1 else text[pos:end]
-        continues = not quoted and end != -1 and (len(line) - len(line.rstrip("\\"))) % 2 == 1
-        logical += line
-        if not continues and logical == delim:
-            return "\n".join(lines[:logical_lines]), (len(text) if end == -1 else end + 1)
-        lines.append(line)
-        if end == -1:
+        if line == delim:
+            return "\n".join(lines), (len(text) if end == -1 else end + 1)
+        if end == -1 or line.lstrip(" \t").startswith(delim):
             return None
+        lines.append(line)
         pos = end + 1
-        if continues:
-            logical = logical[:-1]
-        else:
-            logical_lines, logical = len(lines), ""
 
 
 def find_invocation(command) -> Invocation | None:
@@ -106,7 +92,7 @@ def find_invocation(command) -> Invocation | None:
     raw_delim = head.group("delim")
     quoted = raw_delim[0] in "'\""
     delim = raw_delim[1:-1] if quoted else raw_delim
-    found = _heredoc_body(command, head.end(), delim, quoted)
+    found = _heredoc_body(command, head.end(), delim)
     if not found or command[found[1]:].strip():
         return None
     body = found[0]
@@ -128,10 +114,9 @@ def find_invocation(command) -> Invocation | None:
             return None
     if not _one_patch(body):
         return None
-    # Codex takes the body as written even with an unquoted delimiter, so `$` or `\` in a
-    # hunk line is just content. A header line that could expand isn't recognised, in case
-    # Codex's parser didn't match and a real shell runs the command.
-    if not quoted and not _headers_literal(body):
+    # Codex takes an unquoted body as written, but a real shell expands it if Codex's
+    # parser didn't match, so the two may apply different patches.
+    if not quoted and _has_expansion(body):
         return None
     return Invocation(body, base)
 
