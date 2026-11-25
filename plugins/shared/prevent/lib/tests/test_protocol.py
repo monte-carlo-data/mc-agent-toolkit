@@ -109,6 +109,68 @@ class TestDenyReasonSelfBypass:
         assert scan_history_jsonl_for_markers(str(at), "macro:helper")["impact_check"] is False
 
 
+class TestDenyReasonMarkerPlacement:
+    """The deny reason says where and when to write the completion marker.
+
+    CoCo Desktop saves an assistant message only after its edit's PreToolUse hook
+    has run, so a marker in the same message as the retried edit isn't on disk when
+    the gate scans. And a marker kept in the model's reasoning or inside a tool call
+    is never scanned. The reason must steer the model to visible reply text, written
+    only once the edit is going ahead, with the retry in a later step.
+    """
+
+    CASES = [
+        ("models", "orders.sql", "SELECT * FROM {{ ref('raw') }}"),
+        ("macros", "helper.sql", "{% macro helper() %} SELECT 1 {% endmacro %}"),
+    ]
+
+    def _reason(self, tmp_path, dirname, filename, body):
+        d = tmp_path / dirname
+        d.mkdir()
+        sql_file = d / filename
+        sql_file.write_text(body)
+        result = evaluate_pre_edit(
+            HookInput(session_id="s1", file_path=str(sql_file), transcript_path="")
+        )
+        assert result.action == "deny"
+        return result.reason
+
+    @pytest.mark.parametrize("dirname,filename,body", CASES)
+    def test_marker_only_once_the_edit_goes_ahead(self, tmp_path, dirname, filename, body):
+        reason = self._reason(tmp_path, dirname, filename, body)
+        assert "only once the edit is going ahead" in reason
+        assert "only after they say yes" in reason
+
+    @pytest.mark.parametrize("dirname,filename,body", CASES)
+    def test_denied_retry_checks_the_marker_is_in_reply_text(self, tmp_path, dirname, filename, body):
+        reason = self._reason(tmp_path, dirname, filename, body)
+        assert "check that the marker line is in your reply text" in reason
+        # An editor-timing excuse gave a model a reason to retry blindly.
+        assert "save a message only after" not in reason
+
+    @pytest.mark.parametrize("dirname,filename,body", CASES)
+    def test_workflow_note_names_the_asset_health_skill(self, tmp_path, dirname, filename, body):
+        reason = self._reason(tmp_path, dirname, filename, body)
+        assert "`monte-carlo-asset-health` skill" in reason
+
+    @pytest.mark.parametrize("dirname,filename,body", CASES)
+    def test_marker_in_visible_reply_text(self, tmp_path, dirname, filename, body):
+        reason = self._reason(tmp_path, dirname, filename, body)
+        assert "visible reply text" in reason
+        assert "not only in your reasoning" in reason
+        assert "not inside a tool call" in reason
+
+    @pytest.mark.parametrize("dirname,filename,body", CASES)
+    def test_retry_in_a_later_step_after_a_reread(self, tmp_path, dirname, filename, body):
+        reason = self._reason(tmp_path, dirname, filename, body)
+        assert "re-read the file" in reason
+        assert "in a later step, not in the same batch" in reason
+
+    def test_model_reason_keeps_the_explicit_ask(self, tmp_path):
+        reason = self._reason(tmp_path, *self.CASES[0])
+        assert "ask the user whether to proceed before retrying the edit" in reason
+
+
 class TestEvaluatePreEdit:
     def test_non_dbt_file_noop(self):
         inp = HookInput(session_id="s1", file_path="/project/scripts/hello.py")

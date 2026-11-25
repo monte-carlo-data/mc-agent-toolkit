@@ -167,6 +167,57 @@ describe("PreEditGate (tool.execute.before on edit tools)", () => {
     ).rejects.toThrow("macro");
   });
 
+  describe("deny reason says where and when to write the marker", () => {
+    async function denyReason(dir: "models" | "macros", file: string, body: string) {
+      const { hooks } = await getHooks();
+      const { projectDir } = createDbtProject(tmpDir, { [dir]: { [file]: body } });
+      try {
+        await hooks["tool.execute.before"]!(
+          { tool: "edit", sessionID: "s1", callID: "c1" },
+          { args: { filePath: join(projectDir, dir, file) } }
+        );
+      } catch (e) {
+        return { reason: (e as Error).message, projectDir };
+      }
+      throw new Error("expected the edit to be denied");
+    }
+    const cases: Array<["models" | "macros", string, string, string]> = [
+      ["models", "orders.sql", "SELECT * FROM {{ ref('raw') }}", "orders"],
+      ["macros", "helper.sql", "{% macro helper() %} SELECT 1 {% endmacro %}", "macro:helper"],
+    ];
+
+    for (const [dir, file, body] of cases) {
+      it(`${dir}: once the edit is going ahead, in visible reply text, retry later`, async () => {
+        const { reason } = await denyReason(dir, file, body);
+        expect(reason).toContain("only once the edit is going ahead");
+        expect(reason).toContain("only after they say yes");
+        expect(reason).toContain("check that the marker line is in your reply text");
+        expect(reason).not.toContain("save a message only after");
+        expect(reason).toContain("`monte-carlo-asset-health` skill");
+        expect(reason).toContain("visible reply text");
+        expect(reason).toContain("not only in your reasoning");
+        expect(reason).toContain("not inside a tool call");
+        expect(reason).toContain("`MC_IMPACT_CHECK_COMPLETE: <table>`");
+        expect(reason).toContain("re-read the file");
+        expect(reason).toContain("in a later step, not in the same batch");
+      });
+    }
+
+    for (const [dir, file, body, table] of cases) {
+      it(`${dir}: the rendered reason fed back as a message doesn't unlock`, async () => {
+        const { reason, projectDir } = await denyReason(dir, file, body);
+        const { hooks } = await getHooks({ messages: [{ parts: [{ type: "text", text: reason }] }] });
+        await expect(
+          hooks["tool.execute.before"]!(
+            { tool: "edit", sessionID: "s1", callID: "c2" },
+            { args: { filePath: join(projectDir, dir, file) } }
+          )
+        ).rejects.toThrow("not completed yet");
+        expect(getImpactCheckState("s1", table)).toBe("injected");
+      });
+    }
+  });
+
   it("passes through new files (do not exist on disk)", async () => {
     const { hooks } = await getHooks();
 

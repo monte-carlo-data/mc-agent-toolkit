@@ -5,6 +5,12 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Copilot CLI will
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.33.1] - 2026-11-24
+
+### Fixed
+
+- Prevent: in CoCo Desktop, the first edit after an impact assessment was denied even when the agent had marked the assessment complete. Desktop saves the agent's message only after the edit's check runs, so a completion marker written in the same message as the edit isn't seen in time. The Prevent skill and the edit gate's message now tell the agent to write the marker only once the edit is going ahead (after your yes, whenever it asked you), as its own line in its visible reply (not only in its reasoning or inside a question to you), to re-read the file in that same message, and to make the edit in the next step. The engineer's yes is still required before editing at High or Medium risk, and a declined assessment still leaves no marker. The gate's message also names the `monte-carlo-asset-health` skill to load first. If an edit is still denied after the marker, the agent is told to check that the marker line is in its reply rather than retry. Other editors read the marker as before.
+
 ## [1.33.0] - 2026-11-24
 
 ### Added
