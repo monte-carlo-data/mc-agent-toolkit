@@ -5,7 +5,7 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Cursor will be d
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.33.1] - 2026-11-24
+## [1.33.2] - 2026-11-25
 
 ### Fixed
 
@@ -19,6 +19,17 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Codex: the plugin's bundled `hooks/prevent/hooks.json` uses `${PLUGIN_ROOT}`, quoted. It used `${CODEX_PLUGIN_ROOT}`, which Codex doesn't set, so every hook failed in a plugin-bundled install. Installs through `scripts/install.sh` weren't affected.
 - Codex: removed `pre_edit_hook.py` and `pre_commit_hook.py`, which no hook registration ran; `bash_hook.py` gates edits and commits.
 - Codex: CI runs the Prevent hook tests.
+
+## [1.33.1] - 2026-11-24
+
+### Fixed
+
+- OpenCode: Prevent checks where an `apply_patch` moves a file. A patch that moved a file onto an existing dbt model with `*** Move to:` wasn't gated for that model, and a moved model wasn't tracked under its new name. The pre-edit gate now checks both ends of a move, and the files a patch changed are tracked from what OpenCode reports. A SQL file that any edit tool deleted, moved away or overwrote with plain SQL counts for the validation prompt only if it was a dbt model just before the edit ran, so a deleted `.sql` file that wasn't a model no longer counts.
+- OpenCode: relative `apply_patch` paths are resolved against the session directory, as OpenCode resolves them. Before, they were resolved against the OpenCode process's working directory, so a relative edit to a dbt model could skip the gate when the two differed.
+- OpenCode: Prevent reads only the operations inside a patch's `*** Begin Patch` / `*** End Patch` envelope, and treats `*** Move to:` as a move only on the line right after its `*** Update File:`, matching OpenCode.
+- OpenCode: CI runs the plugin's tests and typecheck.
+
+These fixes apply to OpenCode 1.x. OpenCode 2 doesn't load plugins written for 1.x, so the plugin doesn't run there yet.
 
 ## [1.33.0] - 2026-11-24
 

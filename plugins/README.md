@@ -10,10 +10,12 @@ For the user-facing feature list and installation instructions, see the [main RE
 |---|---|---|---|---|
 | **Claude Code** | Full | All 21 | OAuth | [Setup guide](claude-code/README.md) |
 | **Cursor** | Full | All 21 | OAuth | [Setup guide](cursor/README.md) |
-| **OpenCode** | Full | All 21 | OAuth | [Setup guide](opencode/README.md) |
+| **OpenCode** (1.x) | Full | All 21 | OAuth | [Setup guide](opencode/README.md) |
 | **Cortex Code** | Full | All 21 | OAuth | [Setup guide](cortex-code/README.md) |
 | **Copilot CLI** | Preliminary | All 21 | OAuth | [Setup guide](copilot/README.md) |
 | **Codex** | Preliminary | All 21 | OAuth | [Setup guide](codex/README.md) |
+
+OpenCode 2 doesn't load plugins written for 1.x, so the OpenCode plugin runs on OpenCode 1.x only for now.
 
 Currently, only the **Prevent** skill leverages hooks for *enforcement*; the other skills are instruction-only. (Telemetry also uses a lightweight `SessionStart` hook to fire an anonymous install beacon — see each plugin's README and the Telemetry section in the root README.)
 
