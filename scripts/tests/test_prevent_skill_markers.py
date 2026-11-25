@@ -22,11 +22,17 @@ REQUIRED = {
     "denied retry": "check that the marker line is in your reply text",
     "open question": "wait for its answer first",
     "decline": "don't write the marker",
-    "visible text": "visible reply text",
+    "visible text": "on its own line in your visible reply text",
+    "comment form is reply text": "it's still reply text",
     "not reasoning": "not only in your reasoning",
     "not a tool call": "not inside a tool call",
     "re-read": "re-read the file",
     "later step": "in a later step, not in the same batch",
+    # The gate can't take a marker back, so a voluntary assessment with no edit coming and a stop
+    # after the re-read must not leave a marker that unlocks a later, unconfirmed edit.
+    "voluntary": "A voluntary assessment follows the same rule",
+    "stop after marker": "the marker you already wrote doesn't cover it",
+    "voluntary scope": "once an edit to that table is going ahead",
 }
 
 
@@ -54,6 +60,8 @@ def marker_errors(body: str) -> list[str]:
         errors.append("plain fenced example")
     if "After the engineer confirms (High/Medium) or after presenting the synthesis (Low)" in flat:
         errors.append("old timing line")
+    if "write the markers after the synthesis and stop" in flat:
+        errors.append("voluntary exception")
     return errors
 
 
@@ -84,6 +92,12 @@ class ImpactCheckMarkerRule(unittest.TestCase):
         self.assertNotIn("denied once", note)
         self.assertIn("don't retry as if the denial were a timing glitch", note)
         self.assertIn("didn't find the marker in your saved reply text", note)
+
+    def test_session_markers_intro_covers_every_marker(self):
+        # The monitor-gap marker is read by the same scanners, so it has the same placement rule.
+        intro = section(self.text, "## Session markers")
+        intro = intro[: intro.index("### ")]
+        self.assertIn("not only in your reasoning or a tool call", flatten(intro))
 
     def test_no_old_confirmation_wording(self):
         # "Any required confirmation" read as "none needed" on Low risk, even after asking.
@@ -121,6 +135,10 @@ class MarkerCheckCanFail(unittest.TestCase):
             "<!-- MC_IMPACT_CHECK_COMPLETE: <table_name> -->",
         )
         self.assertIn("plain fenced example", marker_errors(mutated))
+
+    def test_voluntary_exception(self):
+        mutated = self.body + "\nIf no edit is coming, write the markers after the synthesis and stop.\n"
+        self.assertIn("voluntary exception", marker_errors(mutated))
 
     def test_old_timing_line(self):
         mutated = self.body + (

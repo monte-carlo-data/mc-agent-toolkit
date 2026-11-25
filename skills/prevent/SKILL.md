@@ -276,7 +276,8 @@ proceed. If anything is surprising or worth flagging, ask before editing.
 ## Session markers
 
 These markers coordinate between the skill and the plugin's hooks. Output each
-on its own line when the condition is met.
+on its own line when the condition is met, in your reply text, not only in your
+reasoning or a tool call.
 
 ### Impact check complete
 
@@ -287,7 +288,8 @@ MC_IMPACT_CHECK_COMPLETE: <table_name>
 ```
 
 (Use the model filename without .sql extension — NOT "acme.analytics.orders" or "prod.public.client_hub".
-The HTML-comment form `<!-- MC_IMPACT_CHECK_COMPLETE: <table_name> -->` also works.)
+The HTML-comment form `<!-- MC_IMPACT_CHECK_COMPLETE: <table_name> -->` also works: it's
+still reply text, just hidden when rendered.)
 
 **When:** only once the edit is going ahead. If you ask the engineer whether to
 proceed (always for High or Medium risk, and whenever the pre-edit hook told you to
@@ -304,9 +306,12 @@ only in your reasoning, before retrying.
 
 **Before the edit:** when you're about to make the edit, re-read the file you'll
 edit in the same message as the marker, then make the edit in a later step, not in
-the same batch. If the re-read shows the change no longer fits, stop and tell the
-engineer. The one exception to the timing above: if no edit is coming (a voluntary
-assessment), write the markers after the synthesis and stop.
+the same batch. If the re-read shows the change no longer fits, don't make the edit:
+tell the engineer, and treat any further change to that table as a new request that
+needs its own synthesis and yes; the marker you already wrote doesn't cover it.
+
+A voluntary assessment follows the same rule: if no edit is going ahead, don't write
+the marker. Write it later, when an edit to that table goes ahead under the rule above.
 
 <!-- plugin-only:start -->
 The pre-edit hook unlocks only on a marker it can read in the saved conversation,
@@ -329,7 +334,8 @@ prompt for their own Workflow 2 runs.
 
 **Voluntarily invoked** (the engineer proactively asked for an impact assessment):
 Be looser — emit markers for all tables the assessment meaningfully covered, even
-if some were assessed via lineage context rather than direct MC tool calls. The
+if some were assessed via lineage context rather than direct MC tool calls, each
+once an edit to that table is going ahead. The
 engineer is already safety-conscious; don't force redundant assessments for tables
 they clearly considered.
 

@@ -19,19 +19,22 @@ PYTHON_COPY = REPO / "plugins" / "shared" / "prevent" / "lib" / "protocol.py"
 TS_COPY = REPO / "plugins" / "opencode" / "src" / "prevent" / "index.ts"
 
 # Instruction phrases both copies of the deny reasons must contain.
+# Each phrase occurs in only one message, so a copy can't drop it from one message and still
+# pass on the other; that is why the placement phrases are long.
 SHARED_PHRASES = [
     "only once the edit is going ahead",
     "only after they say yes",
-    "visible reply text",
-    "not only in your reasoning",
-    "not inside a tool call",
+    # Full reason.
+    "on its own line in your visible reply text (not only in your reasoning, and not inside a "
+    "tool call)",
     "re-read the file",
     "in a later step, not in the same batch",
     "check that the marker line is in your reply text",
     "load the `monte-carlo-asset-health` skill",
     "then ask the user whether to proceed before retrying the edit",
-    "If you already wrote the completion marker",
-    "has not completed yet",
+    # Grace-period reason.
+    "has not completed yet. If you already wrote the completion marker, check that it is on its "
+    "own line in your visible reply text, not only in your reasoning or a tool call",
 ]
 
 # Messages are written as one string literal per line, joined with "+" in TypeScript and by
