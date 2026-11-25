@@ -1,4 +1,4 @@
-"""Read `apply_patch` calls in a shell command Codex is about to run.
+"""Recognise the `apply_patch` shell commands Codex applies itself.
 
 Codex (0.171.0) applies a patch itself, without a shell, when the whole command is one of
 two forms (`intercept_apply_patch`, `codex-rs/apply-patch/src/invocation.rs`):
@@ -11,26 +11,14 @@ It takes the heredoc body and `<dir>` as written, with no expansion, relative to
 command's working directory. `applypatch` works too. `find_invocation` recognises these
 two forms, and only these, so the hook can gate the patch against the right folder.
 
-Any other command runs in a real shell, where Codex's standalone `apply_patch` executable
-reads the patch from its first argument, or from stdin when it has none, relative to
-wherever the shell is by then. The hook doesn't work out where that is. Instead, in a
-command that names `apply_patch`, it reads every `*** Begin Patch` up to the next
-`*** End Patch` that isn't the body of a recognised call, both as written and as the
-shell may join it (quoted pieces that touch, backslash-newlines), and reports:
-  - `unchecked_patch_paths`: the paths in that patch text that may be dbt files;
-  - `patch_may_expand`: whether that text holds `$` or a backtick, which the shell may
-    expand into other headers;
-  - `reads_unwritten_patch`: whether a call reads its patch from somewhere the command
-    doesn't spell out (a file, a pipe, a variable, an expanding heredoc).
-The hook denies on any of these, since it couldn't check what the command changes.
+The rule is closed: the hook doesn't read any other command. Any command that
+`names_apply_patch` but isn't recognised may run apply_patch in a real shell, from a folder
+or with a patch the hook can't know, so the hook denies it as one it couldn't check.
 """
-import bisect
-import os
 import re
 from typing import NamedTuple
 
-from lib.apply_patch import BEGIN, END, op_paths, parse_operations, strip_codex_wrapper
-from lib.detect import may_be_dbt_file
+from lib.apply_patch import BEGIN, parse_operations, strip_codex_wrapper
 
 _NAMES = ("apply_patch", "applypatch")
 _EXPANSION_CHARS = ("$", "`", "\\")
@@ -38,41 +26,24 @@ _EXPANSION_CHARS = ("$", "`", "\\")
 _HEREDOC_ESCAPE_RE = re.compile(r"\\([\\$`\n])")
 _CONTINUATION = "\\\n"
 
-# Codex's parser sees through a backslash-newline, where the shell removes it.
+# Codex's parser sees through a backslash-newline, where the shell removes it. `<<-` isn't
+# recognised: Codex keeps the leading tabs a shell strips, so the two may read different
+# headers.
 _WS = r"(?:[ \t]|\\\n)"
 _INTERCEPT_HEAD_RE = re.compile(
     rf"""\A\s*
     (?:cd{_WS}+(?P<arg>"[^"\n]*"|'[^'\n]*'|[^\s;&|<>()'"]+){_WS}*&&{_WS}*)?
-    (?:apply_patch|applypatch){_WS}*<<(?P<dash>-?)[ \t]*
+    (?:apply_patch|applypatch){_WS}*<<[ \t]*
     (?P<delim>'[^'\n]+'|"[^"\n]+"|[A-Za-z_][A-Za-z0-9_]*)[ \t]*\n""",
     re.VERBOSE,
 )
 _SAFE_BARE_DIR_RE = re.compile(r"[A-Za-z0-9_./@%+:,=][A-Za-z0-9_./@%+:,=-]*")
-
 _QUOTE_CHARS_RE = re.compile(r"[\\'\"]")
-# A rough split of shell text into operators, redirections and words, for finding calls.
-_TOKEN_RE = re.compile(r"\d*(?:>\||[<>]+&?)|[;&|()`\n]|[^\s;&|()<>`]+")
-# Commands that run a later word as a command, after options and option values the hook
-# doesn't parse.
-_WRAPPER_WORDS = (
-    "env", "command", "builtin", "exec", "nohup", "time", "sudo", "xargs", "noglob", "nocorrect", "-",
-)
-# Reserved words after which the next word is a command.
-_KEYWORD_WORDS = ("{", "!", "if", "then", "else", "elif", "do", "while", "until")
-# Words after which a later word may still run as a command.
-_CALL_PREFIX_WORDS = _WRAPPER_WORDS + _KEYWORD_WORDS
-_ASSIGNMENT_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*=")
-# `command -v` and `-V` look a name up without running it.
-_LOOKUP_OPTION_RE = re.compile(r"-[A-Za-z]*[vV][A-Za-z]*")
-_CONTROL_CHARS = ";&|)\n"
-_SINGLE_QUOTED_RE = re.compile(r"(?:'[^']*')+")
-_HEREDOC_OP_RE = re.compile(r"<<(?!<)-?[ \t]*(?P<delim>[^\s;&|()<>]+)")
 
 
 class Invocation(NamedTuple):
     body: str  # the patch text, as Codex reads it
     base: str  # directory relative to the command's cwd ("" = the cwd)
-    span: tuple[int, int]  # where the body is written in the command
 
 
 def _has_expansion(text: str) -> bool:
@@ -90,23 +61,31 @@ def _headers_literal(body: str) -> bool:
     return parse_operations(body, "codex") == parse_operations(expanded, "codex")
 
 
-def _heredoc_body(text: str, start: int, delim: str, dash: bool, quoted: bool) -> tuple[str, int, int] | None:
-    """The body of a heredoc starting at `start`, the index where it ends, and the index after
-    its delimiter line. With an unquoted delimiter the shell joins a line ending in an odd
-    number of backslashes to the next before looking for the delimiter."""
+def _one_patch(body: str) -> bool:
+    """Whether the body holds at most one `*** Begin Patch`, where Codex reads it: at the
+    start, past blank lines and a `<<EOF` wrapper line. One further in is text a real shell
+    may hand apply_patch on its own, if Codex's parser didn't match. Read as written and
+    with backslash-newlines removed, as the shell may join them."""
+    count = body.count(BEGIN)
+    if count != body.replace(_CONTINUATION, "").count(BEGIN) or count > 1:
+        return False
+    return count == 0 or strip_codex_wrapper(body).startswith(BEGIN)
+
+
+def _heredoc_body(text: str, start: int, delim: str, quoted: bool) -> tuple[str, int] | None:
+    """The body of a heredoc starting at `start`, and the index after its delimiter line.
+    With an unquoted delimiter the shell joins a line ending in an odd number of
+    backslashes to the next before looking for the delimiter."""
     lines: list[str] = []
     pos = start
-    logical_start, logical_lines, logical = start, 0, ""
+    logical_lines, logical = 0, ""
     while True:
         end = text.find("\n", pos)
         line = text[pos:] if end == -1 else text[pos:end]
-        if dash:
-            line = line.lstrip("\t")
         continues = not quoted and end != -1 and (len(line) - len(line.rstrip("\\"))) % 2 == 1
         logical += line
         if not continues and logical == delim:
-            body_end = max(start, logical_start - 1)
-            return "\n".join(lines[:logical_lines]), body_end, (len(text) if end == -1 else end + 1)
+            return "\n".join(lines[:logical_lines]), (len(text) if end == -1 else end + 1)
         lines.append(line)
         if end == -1:
             return None
@@ -114,12 +93,12 @@ def _heredoc_body(text: str, start: int, delim: str, dash: bool, quoted: bool) -
         if continues:
             logical = logical[:-1]
         else:
-            logical_start, logical_lines, logical = pos, len(lines), ""
+            logical_lines, logical = len(lines), ""
 
 
 def find_invocation(command) -> Invocation | None:
     """The call, when the whole command is one of the two forms Codex applies itself."""
-    if not names_apply_patch(command):
+    if not isinstance(command, str):
         return None
     head = _INTERCEPT_HEAD_RE.match(command)
     if not head:
@@ -127,10 +106,10 @@ def find_invocation(command) -> Invocation | None:
     raw_delim = head.group("delim")
     quoted = raw_delim[0] in "'\""
     delim = raw_delim[1:-1] if quoted else raw_delim
-    found = _heredoc_body(command, head.end(), delim, bool(head.group("dash")), quoted)
-    if not found or command[found[2]:].strip():
+    found = _heredoc_body(command, head.end(), delim, quoted)
+    if not found or command[found[1]:].strip():
         return None
-    body, body_end, _ = found
+    body = found[0]
 
     arg = head.group("arg")
     base = ""
@@ -147,156 +126,22 @@ def find_invocation(command) -> Invocation | None:
             return None
         if not base:
             return None
+    if not _one_patch(body):
+        return None
     # Codex takes the body as written even with an unquoted delimiter, so `$` or `\` in a
     # hunk line is just content. A header line that could expand isn't recognised, in case
-    # Codex's parser didn't match and a real shell runs the command; it is then read like
-    # any other form.
+    # Codex's parser didn't match and a real shell runs the command.
     if not quoted and not _headers_literal(body):
         return None
-    return Invocation(body, base, (head.end(), body_end))
-
-
-def _without_continuations(command: str) -> tuple[str, list[int]]:
-    """`command` with every backslash-newline removed, and where each one was."""
-    return command.replace(_CONTINUATION, ""), [m.start() for m in re.finditer(re.escape(_CONTINUATION), command)]
+    return Invocation(body, base)
 
 
 def names_apply_patch(command) -> bool:
-    """Whether the command may name `apply_patch`. Quotes and backslashes are dropped first,
-    as the shell drops them from a plain word, so `ap''ply_patch` and `apply\\_patch` count.
-    A name built by expansion (`ap${x}ply_patch`) doesn't."""
+    """Whether the command may name `apply_patch`, anywhere, even as a mention. Quotes,
+    backslashes and backslash-newlines are dropped first, as the shell drops them from a
+    word, so `ap''ply_patch`, `apply\\_patch` and `$'apply_patch'` count. A name built by
+    expansion (`ap${x}ply_patch`) doesn't."""
     if not isinstance(command, str):
         return False
-    joined = _QUOTE_CHARS_RE.sub("", _without_continuations(command)[0])
+    joined = _QUOTE_CHARS_RE.sub("", command.replace(_CONTINUATION, ""))
     return any(name in joined for name in _NAMES)
-
-
-def _unaccounted_patches(command: str, invocation: Invocation | None) -> list[str]:
-    """The text of every patch in `command` that isn't the body of `invocation`, each from
-    its `*** Begin Patch` to the end of the command.
-
-    Only a patch that starts the body counts as that body (after the `<<EOF` line Codex's
-    parser skips): one further in may be text a real shell would apply on its own. Each is
-    read as written and with backslash-newlines removed, since the shell removes them in
-    some places and not in others.
-
-    With no recognised call, each is also read with quotes and backslashes removed, since
-    the shell joins quoted pieces that touch: `'*** Begin'' Patch'` reaches apply_patch as
-    `*** Begin Patch`. A recognised command needs no such view: it is the whole command,
-    Codex reads its body as written, and a real shell doesn't remove quotes from a heredoc
-    body either, so patch text nested in it is already read as the shell would pass it."""
-    joined, cuts = _without_continuations(command)
-
-    def in_joined(i: int) -> int:
-        return i - 2 * bisect.bisect_right(cuts, i - 2)
-
-    spans = [invocation.span] if invocation else []
-    views = [(command, spans)]
-    if cuts:
-        views.append((joined, [(in_joined(a), in_joined(b)) for a, b in spans]))
-    if invocation is None:
-        views += [(_QUOTE_CHARS_RE.sub("", text), []) for text in dict.fromkeys([command, joined])]
-    found: list[str] = []
-    for text, accounted in views:
-        start = text.find(BEGIN)
-        while start != -1:
-            end = text.find(END, start)
-            end = len(text) if end == -1 else end + len(END)
-            if not any(a <= start and end <= b and b - a - len(strip_codex_wrapper(text[a:b])) == start - a
-                       for a, b in accounted):
-                found.append(text[start:])
-            start = text.find(BEGIN, start + 1)
-    return found
-
-
-def unchecked_patch_paths(command, invocation: Invocation | None) -> list[str]:
-    """Paths that may be dbt files in patch text that `invocation` doesn't gate."""
-    if not names_apply_patch(command):
-        return []
-    paths = [p for text in _unaccounted_patches(command, invocation)
-             for p in op_paths(parse_operations(text, "codex")) if may_be_dbt_file(p)]
-    return list(dict.fromkeys(paths))
-
-
-def patch_may_expand(command, invocation: Invocation | None) -> bool:
-    """Whether patch text that `invocation` doesn't gate holds `$` or a backtick, up to its
-    `*** End Patch`. In an unquoted heredoc or a double-quoted word the shell expands them,
-    and `$(...)` or a variable can write header lines the hook never sees."""
-    if not names_apply_patch(command):
-        return False
-    for text in _unaccounted_patches(command, invocation):
-        end = text.find(END)
-        if any(c in text[:None if end == -1 else end] for c in "$`"):
-            return True
-    return False
-
-
-def _calls(text: str) -> list[tuple[bool, str]]:
-    """For each word in `text` that runs `apply_patch`: whether its simple command redirects
-    stdin before it, and the text after it. A word runs it when it is the first of a command
-    (after an operator, a newline, assignments, redirections or a reserved word such as
-    `then`) and, without quotes and leading folders, is the name. After a wrapper such as
-    `env` or `xargs` any later word with the name counts, so options and their values
-    (`-u FOO`, `-I {}`) can't hide a call; `xargs grep apply_patch` counts too. This is a
-    rough reading: it doesn't know quotes, so `echo "x; apply_patch"` counts."""
-    found = []
-    at_start, wrapper, stdin_before, redirect_target = True, None, False, False
-    for m in _TOKEN_RE.finditer(text):
-        token = m.group()
-        if token in ";&|()`\n":
-            at_start, wrapper, stdin_before, redirect_target = True, None, False, False
-            continue
-        if token.lstrip("0123456789")[:1] in ("<", ">"):
-            stdin_before = stdin_before or "<" in token
-            redirect_target = True
-            continue
-        if redirect_target:
-            # The file a redirection names; the word after it keeps its place.
-            redirect_target = False
-            continue
-        word = _QUOTE_CHARS_RE.sub("", token)
-        if (at_start or wrapper) and os.path.basename(word) in _NAMES:
-            found.append((stdin_before, text[m.end():]))
-            at_start = False
-            continue
-        if wrapper == "command" and _LOOKUP_OPTION_RE.fullmatch(word):
-            wrapper = None
-        elif at_start and wrapper is None and word in _WRAPPER_WORDS:
-            wrapper = word
-        at_start = at_start and (word in _CALL_PREFIX_WORDS or _ASSIGNMENT_RE.match(token) is not None)
-    return found
-
-
-def _ends_simple_command(rest: str) -> bool:
-    """Whether `rest` holds nothing more for the current simple command."""
-    rest = rest.lstrip(" \t")
-    return not rest or rest[0] in _CONTROL_CHARS
-
-
-def _written_out(rest: str, expands: bool) -> bool:
-    """Whether what follows a call is exactly one literal argument or one heredoc. Any other
-    word, redirection or here-string may hand apply_patch a patch the command doesn't show:
-    the executable reads an argument before stdin, and a later `<` replaces a heredoc."""
-    rest = rest.lstrip(" \t")
-    quoted = _SINGLE_QUOTED_RE.match(rest)
-    if quoted:
-        return _ends_simple_command(rest[quoted.end():])
-    heredoc = _HEREDOC_OP_RE.match(rest)
-    if not heredoc or not _ends_simple_command(rest[heredoc.end():]):
-        return False
-    # With an unquoted delimiter the shell expands the body, which may then be any text.
-    return not expands or any(q in heredoc.group("delim") for q in "'\"\\")
-
-
-def reads_unwritten_patch(command) -> bool:
-    """Whether a call to `apply_patch` in the command may read a patch the command doesn't
-    spell out. A call is written out only when nothing redirects stdin before it and what
-    follows it, up to the next control operator, is exactly one single-quoted argument (its
-    pieces may touch: `'a''b'`) or exactly one heredoc whose delimiter is quoted or whose
-    command holds no `$` or backtick. A pipe, a file, a here-string, a variable, an extra
-    argument or a heredoc on another fd all hand it text the hook can't see."""
-    if not names_apply_patch(command):
-        return False
-    joined = _without_continuations(command)[0]
-    expands = "$" in joined or "`" in joined
-    return any(stdin_before or not _written_out(rest, expands) for stdin_before, rest in _calls(joined))

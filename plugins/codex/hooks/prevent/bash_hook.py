@@ -6,15 +6,14 @@ Codex edits files with `apply_patch`, sent two ways:
     Codex sends PostToolUse after a successful patch, and post_edit_hook.py tracks it.
   - a shell command (`tool_name` "Bash") such as `cd <dir> && apply_patch <<'EOF'`.
     No PostToolUse follows a patch Codex applies from the shell, so this hook tracks
-    the files itself once the whole command is allowed.
+    the files itself once the command is allowed.
 Every file a patch adds, deletes, updates or moves (both paths) is checked before it
 runs, and the patch is denied as a whole when any of them needs an impact assessment.
-Only the two shell forms Codex applies itself are gated this way. Any other command that
-names `apply_patch` is denied as one Prevent couldn't check when its patch text may change
-a dbt file (a `.sql`, `.yml` or `.yaml` path), may be expanded by the shell, or isn't
-written out in the command at all; otherwise it is allowed and nothing is tracked.
+Only the two shell forms Codex applies itself are gated this way (see shell_patch.py).
+Any other shell command that names `apply_patch`, even only as a mention, is denied as
+one Prevent couldn't check, whatever it holds; `MC_PREVENT_HOOKS_DISABLED=1` lifts that.
 
-Bash commands with `git commit` get the pre-commit validation checkpoint.
+Other Bash commands with `git commit` get the pre-commit validation checkpoint.
 """
 import json
 import os
@@ -29,9 +28,7 @@ from lib.apply_patch import (
 from lib.protocol import (
     HookInput, _prevent_hooks_disabled, evaluate_pre_commit, evaluate_pre_edit, evaluate_post_edit,
 )
-from shell_patch import (
-    find_invocation, names_apply_patch, patch_may_expand, reads_unwritten_patch, unchecked_patch_paths,
-)
+from shell_patch import find_invocation, names_apply_patch
 
 
 def _deny(reason: str) -> None:
@@ -54,13 +51,14 @@ def _make_input(raw: dict):
     return make
 
 
-def _unresolved_reason(problems: list[str]) -> str:
-    return (
-        f"Monte Carlo Prevent: couldn't check this apply_patch command: {'; '.join(problems)}. "
-        "It may change dbt models, which need a change impact assessment first. Retry with "
-        "the apply_patch tool, or with the patch written out as `apply_patch <<'EOF'` "
-        "(optionally after one `cd <dir> &&`)."
-    )
+_UNCHECKED_REASON = (
+    "Monte Carlo Prevent: couldn't check this apply_patch command. Prevent only checks "
+    "apply_patch written as `apply_patch <<'EOF'` with the patch written out, optionally "
+    "after one `cd <dir> &&`, or Codex's apply_patch tool. Retry in one of those forms. "
+    "If the command only mentions the name (a search, a file name, a commit message), "
+    "reword it so the name isn't spelled out, e.g. `apply_patc[h]` in a search pattern, "
+    "or `git commit -F <file>` for a message."
+)
 
 
 def _gate_native(raw: dict, command: str) -> None:
@@ -72,34 +70,12 @@ def _gate_native(raw: dict, command: str) -> None:
         _deny(reason)
 
 
-def _unchecked_problems(command: str, invocation) -> list[str]:
-    """Why Prevent couldn't check what the command applies, beyond the recognised call."""
-    problems = []
-    # Fail closed on a call whose patch the hook can't read. Whether to deny this when the
-    # patch may change no dbt file is a product choice; this branch is the place to change it.
-    if invocation is None and reads_unwritten_patch(command):
-        problems.append("the patch isn't written out in the command")
-    if patch_may_expand(command, invocation):
-        problems.append("the shell may expand `$` or a backtick in the patch")
-    paths = unchecked_patch_paths(command, invocation)
-    if paths:
-        problems.append(
-            f"it applies a patch to {', '.join(paths)} in a form Prevent doesn't check"
-        )
-    return problems
-
-
-def _gate_shell(raw: dict, invocation, problems: list[str]) -> None:
-    """Gate the recognised call, if any, and deny for `problems`, in one reply. Track the
-    call's files once the whole command is allowed."""
+def _gate_shell(raw: dict, invocation) -> None:
+    """Gate the recognised call, and track its files once it is allowed."""
     cwd = raw.get("cwd")
-    groups: list[list[str]] = []
-    if invocation is not None:
-        base = resolve_path(invocation.base, cwd) if invocation.base else cwd
-        groups = op_groups(parse_operations(invocation.body, "codex"), base)
+    base = resolve_path(invocation.base, cwd) if invocation.base else cwd
+    groups = op_groups(parse_operations(invocation.body, "codex"), base)
     reason = gate_patch(groups, _make_input(raw), evaluate_pre_edit)
-    if problems:
-        reason = "\n\n".join(filter(None, [_unresolved_reason(problems), reason]))
     if reason:
         _deny(reason)
         return
@@ -119,19 +95,18 @@ def main():
         _gate_native(raw, command)
         return
 
-    try:
-        invocation = find_invocation(command)
-        problems = _unchecked_problems(command, invocation)
-    except Exception:
-        # safe_run would allow it, and with it any patch the command applies.
-        if names_apply_patch(command) and not _prevent_hooks_disabled():
-            _deny(_unresolved_reason(["Prevent couldn't read the command"]))
-        return
-    if _prevent_hooks_disabled():
-        problems = []
-    if invocation or problems:
-        _gate_shell(raw, invocation, problems)
-        return
+    if names_apply_patch(command):
+        try:
+            invocation = find_invocation(command)
+        except Exception:
+            # safe_run would allow it, and with it any patch the command applies.
+            invocation = None
+        if invocation is not None:
+            _gate_shell(raw, invocation)
+            return
+        if not _prevent_hooks_disabled():
+            _deny(_UNCHECKED_REASON)
+            return
 
     if "git commit" in command:
         inp = HookInput(
