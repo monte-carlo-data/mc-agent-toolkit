@@ -31,6 +31,10 @@ import {
 
 const GRACE_PERIOD_SECONDS = 120;
 
+// A call that fails never reaches the after-hook, so its record would linger;
+// no real tool call runs this long.
+const RECORD_TTL_MS = 60 * 60 * 1000;
+
 /** Tools that modify files — the names OpenCode uses for its built-in tools. */
 const EDIT_TOOLS = new Set(["edit", "write", "apply_patch", "multiedit"]);
 
@@ -91,15 +95,15 @@ function getAllFilePaths(tool: string, args: any, directory: string): string[] {
 }
 
 /**
- * Whether an edited file counts toward the validation prompt. `wasModel` holds the
- * paths that were existing dbt models just before this call ran: a file that is now
- * gone (deleted or moved away), or whose new content no longer looks like a model,
- * can't be classified any more.
+ * The table an edited file counts toward in the validation prompt, or null if none.
+ * `wasModel` maps the paths that were existing dbt models just before this call ran to
+ * their table names: a file that is now gone (deleted or moved away), or whose new
+ * content no longer looks like a model, can't be classified any more.
  */
-function shouldTrack(filePath: string, wasModel: Set<string> | undefined): boolean {
-  if (isDbtSchemaFile(filePath)) return true;
-  if (existsSync(filePath) && isDbtModel(filePath)) return true;
-  return wasModel?.has(filePath) ?? false;
+function trackedTable(filePath: string, wasModel: Map<string, string> | undefined): string | null {
+  if (isDbtSchemaFile(filePath)) return extractTableName(filePath);
+  if (existsSync(filePath) && isDbtModel(filePath)) return extractTableName(filePath);
+  return wasModel?.get(filePath) ?? null;
 }
 
 /**
@@ -110,11 +114,12 @@ function getCommand(args: any): string {
 }
 
 export const McPrevent: Plugin = async ({ client, directory, worktree }) => {
-  // Per tool call (session + call id): the paths that were existing dbt models when
-  // the pre-edit gate let the call through. The post-edit hook takes its entry; a
-  // call that fails never reaches that hook, so the session's leftovers are dropped
-  // when it goes idle.
-  const wasModelByCall = new Map<string, Set<string>>();
+  // Per tool call (session + call id): the existing dbt models (path -> table name)
+  // the call is about to touch. Set before the gate runs and taken by the post-edit
+  // hook; a call that is blocked or fails never reaches that hook, so records older
+  // than an hour are swept. Idle isn't used: OpenCode marks a session idle on abort
+  // while the aborted tool can still finish and reach the post-edit hook.
+  const wasModelByCall = new Map<string, { tables: Map<string, string>; at: number }>();
   const callKey = (sessionID: string, callID: string) => `${sessionID}\0${callID}`;
 
   return {
@@ -142,19 +147,21 @@ export const McPrevent: Plugin = async ({ client, directory, worktree }) => {
         // --- Pre-edit gate ---
         if (EDIT_TOOLS.has(tool)) {
           cleanupStaleCache();
+          const now = Date.now();
+          for (const [k, rec] of wasModelByCall) {
+            if (now - rec.at > RECORD_TTL_MS) wasModelByCall.delete(k);
+          }
 
           const filePaths = getAllFilePaths(tool, output.args, directory);
           const key = callKey(sessionID, input.callID);
-          wasModelByCall.delete(key);
-          const wasModel = new Set(filePaths.filter((p) => existsSync(p) && isDbtModel(p)));
+          // New models have no blast radius — let SKILL.md handle Workflow 1
+          const tables = new Map<string, string>();
+          for (const p of filePaths) {
+            if (existsSync(p) && isDbtModel(p)) tables.set(p, extractTableName(p));
+          }
+          wasModelByCall.set(key, { tables, at: now });
           // Check each file in the tool call (apply_patch may touch multiple)
-          for (const filePath of filePaths) {
-            if (!isDbtModel(filePath)) continue;
-
-            // New models have no blast radius — let SKILL.md handle Workflow 1
-            if (!existsSync(filePath)) continue;
-
-            const tableName = extractTableName(filePath);
+          for (const [filePath, tableName] of tables) {
             const state = getImpactCheckState(sessionID, tableName);
 
             if (state === "verified") continue;
@@ -239,7 +246,6 @@ export const McPrevent: Plugin = async ({ client, directory, worktree }) => {
               );
             }
           }
-          wasModelByCall.set(key, wasModel);
         }
 
         // --- Pre-commit gate ---
@@ -292,15 +298,15 @@ export const McPrevent: Plugin = async ({ client, directory, worktree }) => {
         const { tool, sessionID, callID, args } = input;
         if (!EDIT_TOOLS.has(tool)) return;
         const key = callKey(sessionID, callID);
-        const wasModel = wasModelByCall.get(key);
+        const wasModel = wasModelByCall.get(key)?.tables;
         wasModelByCall.delete(key);
 
         // apply_patch reports the files it changed; parse the patch only when it doesn't.
         const reported = tool === "apply_patch" ? reportedPaths(output?.metadata) : null;
         const filePaths = reported ?? getAllFilePaths(tool, args, directory);
         for (const filePath of filePaths) {
-          if (!shouldTrack(filePath, wasModel)) continue;
-          addEditedTable(sessionID, extractTableName(filePath));
+          const table = trackedTable(filePath, wasModel);
+          if (table !== null) addEditedTable(sessionID, table);
         }
       } catch {
         // Never block on error
@@ -320,10 +326,6 @@ export const McPrevent: Plugin = async ({ client, directory, worktree }) => {
         if (event.type !== "session.idle") return;
         const sessionID = (event as any).properties?.sessionID;
         if (!sessionID) return;
-        const prefix = callKey(sessionID, "");
-        for (const key of wasModelByCall.keys()) {
-          if (key.startsWith(prefix)) wasModelByCall.delete(key);
-        }
 
         const tables = getEditedTables(sessionID);
         if (tables.length === 0) return;

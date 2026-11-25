@@ -548,7 +548,7 @@ describe("apply_patch moves and paths", () => {
     expect(getEditedTables("s1")).toEqual([]);
   });
 
-  it("forgets a call's models when the session goes idle", async () => {
+  it("keeps a call's record when the session goes idle", async () => {
     const { projectDir } = createDbtProject(tmpDir, { models: { "orders.sql": MODEL } });
     const { hooks } = await getHooks({}, { directory: projectDir });
     const text = patch("*** Delete File: models/orders.sql");
@@ -559,7 +559,111 @@ describe("apply_patch moves and paths", () => {
     unlinkSync(join(projectDir, "models/orders.sql"));
     await after(hooks, text);
 
+    expect(getEditedTables("s1")).toEqual(["orders"]);
+  });
+
+  it("drops a call's record after an hour", async () => {
+    const { projectDir } = createDbtProject(tmpDir, { models: { "orders.sql": MODEL } });
+    const { hooks } = await getHooks({}, { directory: projectDir });
+    const text = patch("*** Delete File: models/orders.sql");
+    verify("orders");
+
+    const realNow = Date.now;
+    let now = 1_000_000;
+    Date.now = () => now;
+    try {
+      await before(hooks, text);
+      now += 60 * 60 * 1000 + 1;
+      await hooks["tool.execute.before"]!(
+        { tool: "edit", sessionID: "s1", callID: "c2" },
+        { args: { filePath: join(projectDir, "notes.md") } }
+      );
+    } finally {
+      Date.now = realNow;
+    }
+    unlinkSync(join(projectDir, "models/orders.sql"));
+    await after(hooks, text);
+
     expect(getEditedTables("s1")).toEqual([]);
+  });
+
+  it("tracks a model moved away when OpenCode reports the files", async () => {
+    const { projectDir } = createDbtProject(tmpDir, {
+      models: { "orders.sql": MODEL, "scratch.sql": PLAIN },
+    });
+    const { hooks } = await getHooks({}, { directory: projectDir });
+    const text = patch(
+      "*** Update File: models/scratch.sql",
+      "*** Move to: models/orders.sql",
+      "@@",
+      "-SELECT 1",
+      "+SELECT 2"
+    );
+
+    await expect(before(hooks, text)).rejects.toThrow("for orders ");
+    verify("orders");
+    await before(hooks, text);
+
+    writeFileSync(join(projectDir, "models/orders.sql"), "SELECT 2");
+    unlinkSync(join(projectDir, "models/scratch.sql"));
+    await after(hooks, text, {
+      files: [
+        {
+          filePath: join(projectDir, "models/scratch.sql"),
+          movePath: join(projectDir, "models/orders.sql"),
+          type: "move",
+        },
+      ],
+    });
+
+    expect(getEditedTables("s1")).toEqual(["orders"]);
+  });
+
+  it("tracks a deleted model when OpenCode reports the files", async () => {
+    const { projectDir } = createDbtProject(tmpDir, { models: { "orders.sql": MODEL } });
+    const { hooks } = await getHooks({}, { directory: projectDir });
+    const text = patch("*** Delete File: models/orders.sql");
+    verify("orders");
+
+    await before(hooks, text);
+    unlinkSync(join(projectDir, "models/orders.sql"));
+    await after(hooks, text, {
+      files: [{ filePath: join(projectDir, "models/orders.sql"), type: "delete" }],
+    });
+
+    expect(getEditedTables("s1")).toEqual(["orders"]);
+  });
+
+  it("prefers the files OpenCode reports over the patch text", async () => {
+    const { projectDir } = createDbtProject(tmpDir, {
+      models: { "orders.sql": MODEL, "customers.sql": MODEL },
+    });
+    const { hooks } = await getHooks({}, { directory: projectDir });
+
+    await after(hooks, patch("*** Update File: models/customers.sql", "@@", "-a", "+b"), {
+      files: [{ filePath: join(projectDir, "models/orders.sql"), type: "update" }],
+    });
+
+    expect(getEditedTables("s1")).toEqual(["orders"]);
+  });
+
+  it("tracks a model that a write turns into plain SQL", async () => {
+    const { projectDir } = createDbtProject(tmpDir, { models: { "orders.sql": MODEL } });
+    const { hooks } = await getHooks({}, { directory: projectDir });
+    const args = { filePath: join(projectDir, "models/orders.sql") };
+    verify("orders");
+
+    await hooks["tool.execute.before"]!(
+      { tool: "write", sessionID: "s1", callID: "c1" },
+      { args }
+    );
+    writeFileSync(join(projectDir, "models/orders.sql"), "SELECT 2");
+    await hooks["tool.execute.after"]!(
+      { tool: "write", sessionID: "s1", callID: "c1", args },
+      { title: "", output: "", metadata: {} }
+    );
+
+    expect(getEditedTables("s1")).toEqual(["orders"]);
   });
 
   it("tracks a deleted schema file", async () => {
