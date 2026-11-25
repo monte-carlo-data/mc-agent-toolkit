@@ -3,7 +3,7 @@
  * test_pre_commit_hook.py, test_turn_end_hook.py
  */
 import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
-import { mkdtempSync, writeFileSync, readFileSync, unlinkSync } from "fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, unlinkSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import { cleanCache, createDbtProject, createMockClient } from "./helpers";
@@ -18,7 +18,7 @@ import {
   moveToPendingValidation,
   markMonitorGap,
 } from "../../src/prevent/cache";
-import { McPrevent } from "../../src/prevent/index";
+import { McPrevent, MAX_CALL_RECORDS } from "../../src/prevent/index";
 
 let tmpDir: string;
 
@@ -562,24 +562,88 @@ describe("apply_patch moves and paths", () => {
     expect(getEditedTables("s1")).toEqual(["orders"]);
   });
 
-  it("drops a call's record after an hour", async () => {
-    const { projectDir } = createDbtProject(tmpDir, { models: { "orders.sql": MODEL } });
+  async function beforeEdit(hooks: any, callID: string, filePath: string) {
+    await hooks["tool.execute.before"]!(
+      { tool: "edit", sessionID: "s1", callID },
+      { args: { filePath } }
+    );
+  }
+
+  it("keeps a call's record however long it waits for edit permission", async () => {
+    const { projectDir } = createDbtProject(tmpDir, {
+      models: { "orders.sql": MODEL, "customers.sql": MODEL },
+    });
     const { hooks } = await getHooks({}, { directory: projectDir });
     const text = patch("*** Delete File: models/orders.sql");
     verify("orders");
+    verify("customers");
 
     const realNow = Date.now;
     let now = 1_000_000;
     Date.now = () => now;
     try {
       await before(hooks, text);
-      now += 60 * 60 * 1000 + 1;
-      await hooks["tool.execute.before"]!(
-        { tool: "edit", sessionID: "s1", callID: "c2" },
-        { args: { filePath: join(projectDir, "notes.md") } }
-      );
+      now += 2 * 60 * 60 * 1000;
+      await beforeEdit(hooks, "c2", join(projectDir, "models/customers.sql"));
     } finally {
       Date.now = realNow;
+    }
+    unlinkSync(join(projectDir, "models/orders.sql"));
+    await after(hooks, text);
+
+    expect(getEditedTables("s1")).toEqual(["orders"]);
+  });
+
+  it("keeps each call's record separate within a session", async () => {
+    const { projectDir } = createDbtProject(tmpDir, {
+      models: { "orders.sql": MODEL, "customers.sql": MODEL },
+    });
+    const { hooks } = await getHooks({}, { directory: projectDir });
+    const text = patch("*** Delete File: models/orders.sql");
+    verify("orders");
+    verify("customers");
+
+    await before(hooks, text);
+    await beforeEdit(hooks, "c2", join(projectDir, "models/customers.sql"));
+    unlinkSync(join(projectDir, "models/orders.sql"));
+    await after(hooks, text);
+
+    expect(getEditedTables("s1")).toEqual(["orders"]);
+  });
+
+  it("doesn't let calls without models or blocked calls push a record out", async () => {
+    const { projectDir } = createDbtProject(tmpDir, {
+      models: { "orders.sql": MODEL, "customers.sql": MODEL },
+    });
+    const { hooks } = await getHooks({}, { directory: projectDir });
+    const text = patch("*** Delete File: models/orders.sql");
+    verify("orders");
+
+    await before(hooks, text);
+    for (let i = 0; i <= MAX_CALL_RECORDS; i++) {
+      await beforeEdit(hooks, `plain${i}`, join(projectDir, "notes.md"));
+      await expect(
+        beforeEdit(hooks, `blocked${i}`, join(projectDir, "models/customers.sql"))
+      ).rejects.toThrow("for customers ");
+    }
+    unlinkSync(join(projectDir, "models/orders.sql"));
+    await after(hooks, text);
+
+    expect(getEditedTables("s1")).toEqual(["orders"]);
+  });
+
+  it("drops the oldest record once too many calls never finish", async () => {
+    const { projectDir } = createDbtProject(tmpDir, {
+      models: { "orders.sql": MODEL, "customers.sql": MODEL },
+    });
+    const { hooks } = await getHooks({}, { directory: projectDir });
+    const text = patch("*** Delete File: models/orders.sql");
+    verify("orders");
+    verify("customers");
+
+    await before(hooks, text);
+    for (let i = 0; i < MAX_CALL_RECORDS; i++) {
+      await beforeEdit(hooks, `failed${i}`, join(projectDir, "models/customers.sql"));
     }
     unlinkSync(join(projectDir, "models/orders.sql"));
     await after(hooks, text);
@@ -588,6 +652,35 @@ describe("apply_patch moves and paths", () => {
   });
 
   it("tracks a model moved away when OpenCode reports the files", async () => {
+    const { projectDir } = createDbtProject(tmpDir, { models: { "orders.sql": MODEL } });
+    const { hooks } = await getHooks({}, { directory: projectDir });
+    const text = patch(
+      "*** Update File: models/orders.sql",
+      "*** Move to: scratch/orders.sql",
+      "@@",
+      "-SELECT * FROM {{ ref('raw') }}",
+      "+SELECT 1"
+    );
+    verify("orders");
+
+    await before(hooks, text);
+    mkdirSync(join(projectDir, "scratch"));
+    writeFileSync(join(projectDir, "scratch/orders.sql"), PLAIN);
+    unlinkSync(join(projectDir, "models/orders.sql"));
+    await after(hooks, text, {
+      files: [
+        {
+          filePath: join(projectDir, "models/orders.sql"),
+          movePath: join(projectDir, "scratch/orders.sql"),
+          type: "move",
+        },
+      ],
+    });
+
+    expect(getEditedTables("s1")).toEqual(["orders"]);
+  });
+
+  it("tracks the model a reported move overwrites", async () => {
     const { projectDir } = createDbtProject(tmpDir, {
       models: { "orders.sql": MODEL, "scratch.sql": PLAIN },
     });

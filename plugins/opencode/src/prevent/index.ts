@@ -31,9 +31,10 @@ import {
 
 const GRACE_PERIOD_SECONDS = 120;
 
-// A call that fails never reaches the after-hook, so its record would linger;
-// no real tool call runs this long.
-const RECORD_TTL_MS = 60 * 60 * 1000;
+// A call that passes the gate but fails, is denied or is aborted never reaches the
+// post-edit hook, so its record lingers. The records are capped by count, not age,
+// because a call can wait on OpenCode's edit-permission prompt for any length of time.
+export const MAX_CALL_RECORDS = 500;
 
 /** Tools that modify files — the names OpenCode uses for its built-in tools. */
 const EDIT_TOOLS = new Set(["edit", "write", "apply_patch", "multiedit"]);
@@ -114,12 +115,12 @@ function getCommand(args: any): string {
 }
 
 export const McPrevent: Plugin = async ({ client, directory, worktree }) => {
-  // Per tool call (session + call id): the existing dbt models (path -> table name)
-  // the call is about to touch. Set before the gate runs and taken by the post-edit
-  // hook; a call that is blocked or fails never reaches that hook, so records older
-  // than an hour are swept. Idle isn't used: OpenCode marks a session idle on abort
-  // while the aborted tool can still finish and reach the post-edit hook.
-  const wasModelByCall = new Map<string, { tables: Map<string, string>; at: number }>();
+  // Per tool call (session + call id) that touches existing dbt models: those models
+  // (path -> table name). Set before the gate runs, dropped when the gate blocks the
+  // call, and taken by the post-edit hook. Idle isn't used for cleanup: OpenCode marks
+  // a session idle on abort while the aborted tool can still finish and reach the
+  // post-edit hook.
+  const wasModelByCall = new Map<string, Map<string, string>>();
   const callKey = (sessionID: string, callID: string) => `${sessionID}\0${callID}`;
 
   return {
@@ -147,10 +148,6 @@ export const McPrevent: Plugin = async ({ client, directory, worktree }) => {
         // --- Pre-edit gate ---
         if (EDIT_TOOLS.has(tool)) {
           cleanupStaleCache();
-          const now = Date.now();
-          for (const [k, rec] of wasModelByCall) {
-            if (now - rec.at > RECORD_TTL_MS) wasModelByCall.delete(k);
-          }
 
           const filePaths = getAllFilePaths(tool, output.args, directory);
           const key = callKey(sessionID, input.callID);
@@ -159,7 +156,13 @@ export const McPrevent: Plugin = async ({ client, directory, worktree }) => {
           for (const p of filePaths) {
             if (existsSync(p) && isDbtModel(p)) tables.set(p, extractTableName(p));
           }
-          wasModelByCall.set(key, { tables, at: now });
+          if (tables.size > 0) {
+            wasModelByCall.set(key, tables);
+            for (const k of wasModelByCall.keys()) {
+              if (wasModelByCall.size <= MAX_CALL_RECORDS) break;
+              wasModelByCall.delete(k);
+            }
+          }
           // Check each file in the tool call (apply_patch may touch multiple)
           for (const [filePath, tableName] of tables) {
             const state = getImpactCheckState(sessionID, tableName);
@@ -287,6 +290,8 @@ export const McPrevent: Plugin = async ({ client, directory, worktree }) => {
       } catch (e) {
         // Re-throw intentional blocks (our own errors)
         if (e instanceof Error && e.message.startsWith("Monte Carlo Prevent:")) {
+          // A blocked call never runs, so it has nothing to track.
+          wasModelByCall.delete(callKey(input.sessionID, input.callID));
           throw e;
         }
         // Swallow unexpected errors — never block the engineer
@@ -298,7 +303,7 @@ export const McPrevent: Plugin = async ({ client, directory, worktree }) => {
         const { tool, sessionID, callID, args } = input;
         if (!EDIT_TOOLS.has(tool)) return;
         const key = callKey(sessionID, callID);
-        const wasModel = wasModelByCall.get(key)?.tables;
+        const wasModel = wasModelByCall.get(key);
         wasModelByCall.delete(key);
 
         // apply_patch reports the files it changed; parse the patch only when it doesn't.

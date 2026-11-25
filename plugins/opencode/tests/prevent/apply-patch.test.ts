@@ -1,6 +1,6 @@
 /**
- * apply_patch parsing — mirrors OpenCode v1's `parsePatch`
- * (anomalyco/opencode packages/opencode/src/patch/index.ts).
+ * apply_patch parsing — mirrors OpenCode 1.x's `parsePatch`
+ * (anomalyco/opencode v1.19.6, packages/opencode/src/patch/index.ts).
  */
 import { describe, it, expect } from "bun:test";
 import { parsePatchOps, patchPaths, reportedPaths } from "../../src/prevent/apply-patch";

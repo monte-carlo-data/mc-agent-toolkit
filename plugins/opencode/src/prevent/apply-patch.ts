@@ -11,7 +11,7 @@
  *     @@ ...                        (hunks)
  *     *** End Patch
  *
- * The parser follows OpenCode v1's own (`parsePatch` in anomalyco/opencode
+ * The parser follows OpenCode 1.x's own (`parsePatch` in anomalyco/opencode v1.19.6,
  * packages/opencode/src/patch/index.ts), so it reports the files OpenCode would
  * change: headers only between the Begin and End markers and only at the start of
  * a line, and a Move only when it directly follows its Update header. Markers are
