@@ -270,6 +270,13 @@ class TestPreEditApplyPatch:
         reason = _run_pre(_pre_stdin(mixed, str(project), _session_files(tmp_path)), capsys)["permissionDecisionReason"]
         assert "split out the changes to other files" in reason
 
+    def test_multi_file_retry_waits_for_confirmation(self, project, tmp_path, capsys):
+        for extra in ("models/customers.sql", "README.md"):
+            text = _patch(*_update("models/orders.sql"), *_update(extra))
+            reason = _run_pre(_pre_stdin(text, str(project), _session_files(tmp_path)),
+                              capsys)["permissionDecisionReason"]
+            assert "Retry the patch after the assessment (and the user's yes, if you asked)" in reason
+
     def test_indented_patch_still_gated(self, project, tmp_path, capsys):
         text = "  *** Begin Patch\n  *** Delete File: models/orders.sql\n  *** End Patch\n"
         assert _run_pre(_pre_stdin(text, str(project), _session_files(tmp_path)), capsys)["permissionDecision"] == "deny"

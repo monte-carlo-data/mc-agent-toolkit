@@ -101,7 +101,7 @@ Re-run the install script to update all components. It will overwrite existing f
 ### Automatic behavior (via hooks)
 
 - **Edit a dbt model** — the plugin blocks the edit and asks you to run an impact assessment first
-- **Complete the assessment** — emit `MC_IMPACT_CHECK_COMPLETE: <table_name>` markers and the edit is unblocked
+- **Complete the assessment** — once the edit is going ahead (after the engineer's yes, if the agent asked), the agent writes `MC_IMPACT_CHECK_COMPLETE: <table_name>` in its reply, and the next edit to that model is unblocked
 - **Commit dbt changes** — the plugin prompts about validation queries and monitor coverage
 
 ### Slash command

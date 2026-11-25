@@ -188,7 +188,10 @@ export const McPrevent: Plugin = async ({ client, directory, worktree }) => {
               if (age < GRACE_PERIOD_SECONDS) {
                 throw new Error(
                   `Monte Carlo Prevent: the impact assessment for ${tableName} ` +
-                    `has not completed yet. Complete the assessment before editing this file.`
+                    `has not completed yet. If you already wrote the completion marker, ` +
+                    `check that it is on its own line in your visible reply text, not only ` +
+                    `in your reasoning or a tool call; otherwise complete the assessment ` +
+                    `before editing this file.`
                 );
               }
               // Grace period expired — re-inject below
@@ -214,11 +217,21 @@ export const McPrevent: Plugin = async ({ client, directory, worktree }) => {
             const hookTriggeredNote =
               "This assessment is hook-triggered — only emit MC_IMPACT_CHECK_COMPLETE " +
               "markers for tables whose lineage and monitor coverage were fetched " +
-              "directly via Monte Carlo tools.";
+              "directly via Monte Carlo tools. Write the completion marker only once the " +
+              "edit is going ahead (if you ask the user whether to proceed, only after they " +
+              "say yes), on its own line in your visible reply text (not only in your " +
+              "reasoning, and not inside a tool call), in the form " +
+              "`MC_IMPACT_CHECK_COMPLETE: <table>`, replacing <table> with the bare table " +
+              `name ${tableName}. In that same message, re-read the file, then retry the ` +
+              "edit in a later step, not in the same batch. If an edit is denied after you " +
+              "wrote the marker, check that the marker line is in your reply text, not only " +
+              "in your reasoning, before retrying.";
 
             const workflowOrderNote =
               "If Workflow 1 (asset-health pre-fetch) has not yet run for this table " +
-              "this session, run it first via the Skill tool to gather lineage / alerts " +
+              "this session, run it first: load the `monte-carlo-asset-health` skill via " +
+              "the Skill tool (its full name may carry a plugin prefix, e.g. " +
+              "`mc-agent-toolkit:monte-carlo-asset-health`) to gather lineage / alerts " +
               "/ monitors as data for the impact assessment. Read W1's report as data " +
               "and do NOT relay it to the engineer — only surface a disambiguation " +
               "prompt (if asset-health asks which match to use) or a one-line " +
@@ -242,7 +255,7 @@ export const McPrevent: Plugin = async ({ client, directory, worktree }) => {
               throw new Error(
                 `Monte Carlo Prevent: run the change impact assessment ` +
                   `for ${tableName} before editing this file. Present the full ` +
-                  `impact report and synthesis step, then retry the edit. ` +
+                  `impact report and synthesis step, then ask the user whether to proceed before retrying the edit. ` +
                   workflowOrderNote +
                   " " +
                   hookTriggeredNote

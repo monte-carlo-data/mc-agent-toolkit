@@ -250,6 +250,8 @@ Explicitly connect each key finding to a specific recommendation:
     to generate a monitor for it? I can add a null check, range
     validation, or custom SQL rule."
   → Wait for the user's response before proceeding with the edit
+  → The answer to the monitor offer is not approval to edit. Edit approval
+    and the completion marker follow SKILL.md § Impact check complete
 
 - High read volume (>50 reads/day):
   → Recommend extra caution around column renames or removals

@@ -154,7 +154,8 @@ file, you MUST check:**
 
 1. Has the synthesis step been run for THIS SPECIFIC CHANGE in the
    current prompt?
-2. **If YES** → proceed with the edit
+2. **If YES** → proceed with the edit, writing the completion marker first, and only
+   once the edit is going ahead (see [Impact check complete](#impact-check-complete))
 3. **If NO** → stop immediately, run Workflow 2, present the full
    report with synthesis connected to this specific change.
    **If risk is High or Medium:** ask "Do you want me to proceed
@@ -263,6 +264,8 @@ any file. You must ask the engineer and receive an explicit "yes", "go ahead",
 "proceed", or similar confirmation before making code changes.
 Say: "Do you want me to proceed with the edit?"
 Do NOT say: "Proceeding with the edit." — that skips the engineer's decision.
+When the engineer says yes, write the completion marker and re-read the file before
+editing (see [Impact check complete](#impact-check-complete)).
 
 **If the risk is Low:** Use your judgment based on the synthesis findings. If
 the change is straightforward and the synthesis found no concerns, you may
@@ -273,16 +276,52 @@ proceed. If anything is surprising or worth flagging, ask before editing.
 ## Session markers
 
 These markers coordinate between the skill and the plugin's hooks. Output each
-on its own line when the condition is met.
+on its own line when the condition is met, in your reply text, not only in your
+reasoning or a tool call.
 
 ### Impact check complete
 
-After the engineer confirms (High/Medium) or after presenting the synthesis (Low),
-output one marker per assessed table. **IMPORTANT: use only the table/model name, not the full MCON:**
+Output one marker per assessed table. **IMPORTANT: use only the table/model name, not the full MCON:**
 
-<!-- MC_IMPACT_CHECK_COMPLETE: <table_name> -->
+```
+MC_IMPACT_CHECK_COMPLETE: <table_name>
+```
 
-(Use the model filename without .sql extension — NOT "acme.analytics.orders" or "prod.public.client_hub")
+(Use the model filename without .sql extension — NOT "acme.analytics.orders" or "prod.public.client_hub".
+The HTML-comment form `<!-- MC_IMPACT_CHECK_COMPLETE: <table_name> -->` also works: it's
+still reply text, just hidden when rendered.)
+
+**When:** only once the edit is going ahead. If you ask the engineer whether to
+proceed (always for High or Medium risk, and whenever the pre-edit hook told you to
+ask), write it only after they say yes, whatever the risk level. If you proceed on
+Low risk without asking, write it after the synthesis. If a question to the engineer
+is still open (for example the monitor offer), wait for its answer first. If the
+engineer declines, holds or changes the request, don't write the marker; a changed
+request needs its own synthesis.
+
+**Where:** on its own line in your visible reply text, not only in your reasoning
+and not inside a tool call such as a question to the engineer. If an edit is denied
+after you wrote the marker, check that the marker line is in your reply text, not
+only in your reasoning, before retrying.
+
+**Before the edit:** when you're about to make the edit, re-read the file you'll
+edit in the same message as the marker, then make the edit in a later step, not in
+the same batch. If the re-read shows the change no longer fits, don't make the edit:
+tell the engineer, and treat any further change to that table as a new request that
+needs its own synthesis and yes; the marker you already wrote doesn't cover it.
+
+A voluntary assessment follows the same rule: if no edit is going ahead, don't write
+the marker. Write it later, when an edit to that table goes ahead under the rule above.
+
+<!-- plugin-only:start -->
+The pre-edit hook unlocks only on a marker it can read in the saved conversation,
+and some editors (CoCo Desktop) save a message only after its edit has been checked.
+That's why the marker and the re-read go in one message and the edit in the next:
+done that way, the edit isn't denied. If an edit is denied after you wrote the
+marker, don't retry as if the denial were a timing glitch: the hook didn't find the
+marker in your saved reply text. Check that the marker line is there, not only in
+your reasoning, and that the engineer said yes if you asked.
+<!-- plugin-only:end -->
 
 How many markers to emit depends on how the assessment was triggered:
 
@@ -295,7 +334,8 @@ prompt for their own Workflow 2 runs.
 
 **Voluntarily invoked** (the engineer proactively asked for an impact assessment):
 Be looser — emit markers for all tables the assessment meaningfully covered, even
-if some were assessed via lineage context rather than direct MC tool calls. The
+if some were assessed via lineage context rather than direct MC tool calls, each
+once an edit to that table is going ahead. The
 engineer is already safety-conscious; don't force redundant assessments for tables
 they clearly considered.
 
