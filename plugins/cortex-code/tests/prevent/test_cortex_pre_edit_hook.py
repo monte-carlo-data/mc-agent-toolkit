@@ -115,3 +115,69 @@ class TestPreEditCortexIntegration:
             main()
         out = json.loads(capsys.readouterr().out)
         assert out["hookSpecificOutput"]["permissionDecision"] == "deny"
+
+
+def _write_history(path, messages):
+    path.write_text("".join(json.dumps(m) + "\n" for m in messages))
+
+
+class TestPreEditCortexDesktopShapes:
+    """Marker placement as CoCo Desktop saves it in `<id>.history.jsonl`.
+
+    Guards (they pass on the current scanner): a marker kept in a thinking block or
+    inside a tool call's input is not reply text and must not unlock. The transition
+    test covers the flow the Prevent skill asks for: after the first deny, the model
+    writes the marker in reply text next to a read of the file, and the first retry,
+    in a later message, is allowed.
+    """
+
+    def _setup(self, tmp_path):
+        models = tmp_path / "models"
+        models.mkdir()
+        sql = models / "orders.sql"
+        sql.write_text("SELECT * FROM {{ ref('raw') }}")
+        meta = tmp_path / "sess.json"
+        meta.write_text('{"session_id": "test_session"}')
+        return str(sql), str(meta), tmp_path / "sess.history.jsonl"
+
+    def _run(self, sql, meta, capsys):
+        with patch("sys.stdin", StringIO(_stdin(sql, meta))):
+            from pre_edit_hook import main
+            main()
+        out = capsys.readouterr().out
+        return json.loads(out)["hookSpecificOutput"]["permissionDecision"] if out else "allow"
+
+    def test_marker_only_in_thinking_denies(self, tmp_path, capsys):
+        sql, meta, hist = self._setup(tmp_path)
+        _write_history(hist, [{"role": "assistant", "content": [
+            {"type": "thinking", "thinking": {"text": "MC_IMPACT_CHECK_COMPLETE: orders"}},
+        ]}])
+        assert self._run(sql, meta, capsys) == "deny"
+
+    def test_marker_only_in_question_tool_input_denies(self, tmp_path, capsys):
+        sql, meta, hist = self._setup(tmp_path)
+        _write_history(hist, [{"role": "assistant", "content": [
+            {"type": "tool_use", "tool_use": {"name": "ask_user_question", "input": {
+                "questions": [{"question": "MC_IMPACT_CHECK_COMPLETE: orders. Proceed?"}]}}},
+        ]}])
+        assert self._run(sql, meta, capsys) == "deny"
+
+    def test_marker_with_read_then_first_retry_allowed(self, tmp_path, capsys):
+        sql, meta, hist = self._setup(tmp_path)
+        _write_history(hist, [])
+        assert self._run(sql, meta, capsys) == "deny"
+        assert cache.get_impact_check_state("test_session", "orders") == "injected"
+
+        _write_history(hist, [
+            {"role": "user", "content": [{"type": "tool_result", "tool_result": {
+                "name": "ask_user_question",
+                "content": [{"type": "text", "text": "User has answered: proceed"}]}}]},
+            {"role": "assistant", "content": [
+                {"type": "text", "text": "Proceeding.\n\nMC_IMPACT_CHECK_COMPLETE: orders"},
+                {"type": "tool_use", "tool_use": {"name": "read", "input": {"file_path": sql}}},
+            ]},
+            {"role": "user", "content": [{"type": "tool_result", "tool_result": {
+                "name": "read", "content": [{"type": "text", "text": "SELECT ..."}]}}]},
+        ])
+        assert self._run(sql, meta, capsys) == "allow"
+        assert cache.get_impact_check_state("test_session", "orders") == "verified"

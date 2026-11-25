@@ -510,7 +510,10 @@ def evaluate_pre_edit(inp: HookInput) -> HookOutput:
         if age < GRACE_PERIOD_SECONDS:
             reason = (
                 f"Monte Carlo Prevent: the impact assessment for {table_name} "
-                f"has not completed yet. Complete the assessment before editing this file."
+                f"has not completed yet. If you already wrote the completion marker, "
+                f"check that it is on its own line in your visible reply text, not only "
+                f"in your reasoning or a tool call; otherwise complete the assessment "
+                f"before editing this file."
             )
             return HookOutput(action="deny", reason=reason)
         # Grace period expired and no marker — re-inject full instruction below
@@ -534,9 +537,15 @@ def evaluate_pre_edit(inp: HookInput) -> HookOutput:
     hook_triggered_note = (
         "This assessment is hook-triggered — only emit MC_IMPACT_CHECK_COMPLETE "
         "markers for tables whose lineage and monitor coverage were fetched "
-        "directly via Monte Carlo tools. When complete, emit the completion marker "
-        "on its own line in the form `MC_IMPACT_CHECK_COMPLETE: <table>`, replacing "
-        f"<table> with the bare table name {table_name}."
+        "directly via Monte Carlo tools. Write the completion marker only once the "
+        "edit is going ahead (if you ask the user whether to proceed, only after they "
+        "say yes), on its own line in your visible reply text (not only in your "
+        "reasoning, and not inside a tool call), in the form "
+        "`MC_IMPACT_CHECK_COMPLETE: <table>`, replacing <table> with the bare table "
+        f"name {table_name}. In that same message, re-read the file, then retry the "
+        "edit in a later step, not in the same batch. If an edit is denied after you "
+        "wrote the marker, check that the marker line is in your reply text, not only "
+        "in your reasoning, before retrying."
     )
 
     no_bypass_note = (
@@ -548,7 +557,9 @@ def evaluate_pre_edit(inp: HookInput) -> HookOutput:
 
     workflow_order_note = (
         "If Workflow 1 (asset-health pre-fetch) has not yet run for this table "
-        "this session, run it first via the Skill tool to gather lineage / alerts "
+        "this session, run it first: load the `monte-carlo-asset-health` skill via "
+        "the Skill tool (its full name may carry a plugin prefix, e.g. "
+        "`mc-agent-toolkit:monte-carlo-asset-health`) to gather lineage / alerts "
         "/ monitors as data for the impact assessment. Read W1's report as data "
         "and do NOT relay it to the engineer — only surface a disambiguation "
         "prompt (if asset-health asks which match to use) or a one-line "

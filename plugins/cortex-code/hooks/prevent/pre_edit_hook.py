@@ -59,8 +59,9 @@ def _patch_deny_reason(denied: dict[str, str], file_count: int, other_files: boo
         return next(iter(denied.values()))
     names = ", ".join(denied)
     retry = (
-        "Retry the patch after the assessment, or split out the changes to other files."
-        if other_files else "Retry the patch after the assessment."
+        "Retry the patch after the assessment (and the user's yes, if you asked), or "
+        "split out the changes to other files."
+        if other_files else "Retry the patch after the assessment (and the user's yes, if you asked)."
     )
     lead = (
         f"Monte Carlo Prevent: this patch touches {file_count} files. Run the change "
