@@ -1,6 +1,6 @@
 {
   "name": "@montecarlo/mc-agent-toolkit",
-  "version": "1.33.0",
+  "version": "1.33.1",
   "description": "Monte Carlo Agent Toolkit — data observability skills and enforcement hooks for AI coding agents.",
   "type": "module",
   "main": "src/index.ts",
@@ -19,7 +19,7 @@
   "license": "Apache-2.0",
   "scripts": {
     "test": "bun test",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "bunx -p typescript@5.6.3 tsc --noEmit"
   },
   "keywords": [
     "opencode",
