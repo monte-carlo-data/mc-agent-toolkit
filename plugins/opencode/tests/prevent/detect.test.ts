@@ -189,3 +189,33 @@ describe("extractTableName", () => {
     expect(extractTableName("/a/b/c/models/staging/finance/orders.sql")).toBe("orders");
   });
 });
+
+// A folder named like a dbt path but in another case is the same folder on a
+// case-insensitive filesystem (macOS, Windows), so it is gated as one. On a
+// case-sensitive filesystem that costs at most an extra assessment.
+describe("folder name case", () => {
+  it("gates a new file under an upper-case models folder", () => {
+    expect(isDbtModel(join(tmpDir, "MODELS", "orders.sql"))).toBe(true);
+    expect(isDbtModel(join(tmpDir, "Models", "staging", "Orders.Sql"))).toBe(true);
+  });
+
+  it("matches a custom model path in another case", () => {
+    require("fs").writeFileSync(join(tmpDir, "dbt_project.yml"), "model-paths: ['Transformations']\n");
+    expect(isDbtModel(join(tmpDir, "transformations", "orders.sql"))).toBe(true);
+  });
+
+  it("keeps exclusions exact, so a differently cased seeds folder stays gated", () => {
+    expect(isDbtModel(join(tmpDir, "models", "SEEDS", "orders.sql"))).toBe(true);
+  });
+
+  it("names a file under an upper-case macros folder as a macro", () => {
+    const path = join(tmpDir, "MACROS", "helper.sql");
+    expect(isDbtModel(path)).toBe(true);
+    expect(isMacroFile(path)).toBe(true);
+    expect(extractTableName(path)).toBe("macro:helper");
+  });
+
+  it("counts a schema file under an upper-case models folder", () => {
+    expect(isDbtSchemaFile(join(tmpDir, "MODELS", "schema.yml"))).toBe(true);
+  });
+});

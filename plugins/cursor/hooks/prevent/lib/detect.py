@@ -35,6 +35,16 @@ def _get_macro_dirs(file_path: str) -> set[str]:
     return {p.rstrip("/").rsplit("/", 1)[-1] for p in paths.get("macro-paths", [])}
 
 
+def _in_dirs(file_path: str, dirs: set[str]) -> bool:
+    """True if a folder of file_path is named in dirs, ignoring case.
+
+    On a case-insensitive filesystem (macOS, Windows) `MODELS/` is `models/`; on a
+    case-sensitive one the match costs at most an extra assessment.
+    """
+    parts = {p.casefold() for p in file_path.replace("\\", "/").split("/")}
+    return not parts.isdisjoint(d.casefold() for d in dirs)
+
+
 def _has_dbt_patterns(lines) -> bool:
     """True if any of the first MAX_SCAN_LINES lines holds a dbt ref/source or block."""
     for i, line in enumerate(lines):
@@ -73,8 +83,8 @@ def is_dbt_model(file_path: str, content: str | None = None) -> bool:
 
     Rules:
     - Extension is .sql
-    - NOT in seed or analysis directories
-    - IS in a model, macro, or snapshot directory
+    - NOT in seed or analysis directories (exact folder name)
+    - IS in a model, macro, or snapshot directory (folder name in any case)
     - Contains dbt patterns in first 50 lines, OR file doesn't exist yet
 
     When content is given (for example a staged blob), it is scanned instead of
@@ -92,9 +102,9 @@ def is_dbt_model(file_path: str, content: str | None = None) -> bool:
     if parts & excluded:
         return False
 
-    # Must be inside a gated directory (models, macros, snapshots)
-    gated = _get_gated_dirs(file_path)
-    if not (parts & gated):
+    # Must be inside a gated directory (models, macros, snapshots). Exclusions match
+    # exactly and gated folders ignore case, so a difference in case only adds gating.
+    if not _in_dirs(file_path, _get_gated_dirs(file_path)):
         return False
 
     if content is not None:
@@ -130,15 +140,12 @@ def is_dbt_schema_file(file_path: str) -> bool:
 
     paths = get_dbt_paths(file_path)
     model_dirs = {p.rstrip("/").rsplit("/", 1)[-1] for p in paths.get("model-paths", [])}
-    return bool(parts & model_dirs)
+    return _in_dirs(file_path, model_dirs)
 
 
 def is_macro_file(file_path: str) -> bool:
-    """Check if file_path is under a macro directory."""
-    normalized = file_path.replace("\\", "/")
-    parts = set(normalized.split("/"))
-    macro_dirs = _get_macro_dirs(file_path)
-    return bool(parts & macro_dirs)
+    """Check if file_path is under a macro directory, matched like the gated ones."""
+    return _in_dirs(file_path, _get_macro_dirs(file_path))
 
 
 def extract_table_name(file_path: str) -> str:

@@ -298,6 +298,13 @@ class TestPreEditApplyPatch:
                                   _session_files(tmp_path)), capsys)
         assert out["permissionDecision"] == "deny"
 
+    def test_models_folder_in_another_case_gated(self, project, tmp_path, capsys):
+        """On a case-insensitive filesystem MODELS/orders.sql is models/orders.sql. Gated
+        either way: a new file under MODELS/ is gated too, so this holds on any filesystem."""
+        out = _run_pre(_pre_stdin(_patch(*_update("MODELS/orders.sql")), str(project),
+                                  _session_files(tmp_path)), capsys)
+        assert out["permissionDecision"] == "deny"
+
     def test_absolute_path_gated(self, project, tmp_path, capsys):
         out = _run_pre(_pre_stdin(_patch(*_update(str(project / "models" / "orders.sql"))), str(tmp_path),
                                   _session_files(tmp_path)), capsys)

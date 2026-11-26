@@ -1,6 +1,6 @@
 import os
 import pytest
-from lib.detect import is_dbt_model, extract_table_name
+from lib.detect import extract_table_name, is_dbt_model, is_dbt_schema_file, is_macro_file
 
 
 class TestIsDbtModel:
@@ -119,3 +119,46 @@ class TestExtractTableName:
 
     def test_nested_path(self):
         assert extract_table_name("/a/b/c/models/staging/finance/orders.sql") == "orders"
+
+
+def _case_insensitive_fs(path) -> bool:
+    probe = path / "CaseProbe"
+    probe.write_text("")
+    try:
+        return os.path.exists(path / "caseprobe")
+    finally:
+        probe.unlink()
+
+
+class TestFolderNameCase:
+    """A folder named like a dbt path but in another case is the same folder on a
+    case-insensitive filesystem (macOS, Windows), so it is gated as one. On a case-sensitive
+    filesystem that costs at most an extra assessment, which is the safe side."""
+
+    def test_new_file_under_upper_case_models_dir(self, tmp_path):
+        assert is_dbt_model(str(tmp_path / "MODELS" / "orders.sql")) is True
+        assert is_dbt_model(str(tmp_path / "Models" / "staging" / "Orders.Sql")) is True
+
+    def test_custom_model_path_in_another_case(self, tmp_path):
+        (tmp_path / "dbt_project.yml").write_text("model-paths: ['Transformations']\n")
+        assert is_dbt_model(str(tmp_path / "transformations" / "orders.sql")) is True
+
+    def test_existing_model_reached_through_another_case(self, tmp_path):
+        if not _case_insensitive_fs(tmp_path):
+            pytest.skip("needs a case-insensitive filesystem")
+        (tmp_path / "models").mkdir()
+        (tmp_path / "models" / "orders.sql").write_text("SELECT * FROM {{ ref('raw') }}")
+        assert is_dbt_model(str(tmp_path / "MODELS" / "orders.sql")) is True
+
+    def test_excluded_dir_in_another_case_does_not_ungate(self, tmp_path):
+        """Seeds/analyses still match exactly: widening an exclusion would let a model through."""
+        assert is_dbt_model(str(tmp_path / "models" / "SEEDS" / "orders.sql")) is True
+
+    def test_macro_dir_in_another_case_named_as_macro(self, tmp_path):
+        path = str(tmp_path / "MACROS" / "helper.sql")
+        assert is_dbt_model(path) is True
+        assert is_macro_file(path) is True
+        assert extract_table_name(path) == "macro:helper"
+
+    def test_schema_file_under_upper_case_models_dir(self, tmp_path):
+        assert is_dbt_schema_file(str(tmp_path / "MODELS" / "schema.yml")) is True

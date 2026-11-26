@@ -53,8 +53,10 @@ def _make_input(raw: dict):
 
 _UNCHECKED_REASON = (
     "Monte Carlo Prevent: couldn't check this apply_patch command. Prevent only checks "
-    "apply_patch written as `apply_patch <<'EOF'` with the patch written out, optionally "
-    "after one `cd <dir> &&`, or Codex's apply_patch tool. Retry in one of those forms. "
+    "Codex's apply_patch tool, or a command that is just `apply_patch <<'EOF'` with one "
+    "patch written out, optionally after one `cd <dir> &&`. Write the folder out plainly "
+    "(not `~`, a variable, a bare number, or a name starting with `-`, `+` or `=`), and "
+    "pick a delimiter no patch line starts with. Retry in one of those forms. "
     "If the command only mentions the name (a search, a file name, a commit message), "
     "reword it so the name isn't spelled out, e.g. `apply_patc[h]` in a search pattern, "
     "or `git commit -F <file>` for a message."

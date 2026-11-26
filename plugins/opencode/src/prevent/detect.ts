@@ -53,6 +53,19 @@ function setsIntersect(a: Set<string>, b: Set<string>): boolean {
 }
 
 /**
+ * True if a folder of filePath is named in dirs, ignoring case. On a
+ * case-insensitive filesystem (macOS, Windows) `MODELS/` is `models/`; on a
+ * case-sensitive one the match costs at most an extra assessment.
+ */
+function inDirs(filePath: string, dirs: Set<string>): boolean {
+  const parts = new Set(filePath.replace(/\\/g, "/").split("/").map((p) => p.toLowerCase()));
+  for (const d of dirs) {
+    if (parts.has(d.toLowerCase())) return true;
+  }
+  return false;
+}
+
+/**
  * Check if filePath is a dbt SQL file that could affect data.
  *
  * Gates any .sql file in a dbt project (models, macros, snapshots) since
@@ -68,8 +81,9 @@ export function isDbtModel(filePath: string): boolean {
   const excluded = getExcludedDirs(filePath);
   if (setsIntersect(parts, excluded)) return false;
 
-  const gated = getGatedDirs(filePath);
-  if (!setsIntersect(parts, gated)) return false;
+  // Exclusions match exactly and gated folders ignore case, so a difference in
+  // case only adds gating.
+  if (!inDirs(filePath, getGatedDirs(filePath))) return false;
 
   // New file being created — treat as dbt SQL
   if (!existsSync(filePath)) return true;
@@ -113,16 +127,14 @@ export function isDbtSchemaFile(filePath: string): boolean {
       p.replace(/\/+$/, "").split("/").pop()!
     )
   );
-  return setsIntersect(parts, modelDirs);
+  return inDirs(filePath, modelDirs);
 }
 
 /**
- * Check if filePath is under a macro directory.
+ * Check if filePath is under a macro directory, matched like the gated ones.
  */
 export function isMacroFile(filePath: string): boolean {
-  const normalized = filePath.replace(/\\/g, "/");
-  const parts = new Set(normalized.split("/"));
-  return setsIntersect(parts, getMacroDirs(filePath));
+  return inDirs(filePath, getMacroDirs(filePath));
 }
 
 /**

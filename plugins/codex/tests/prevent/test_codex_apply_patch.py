@@ -152,7 +152,13 @@ class TestShellOperations:
 
     def test_applypatch_spelling(self, project, capsys):
         cmd = _shell(_patch(*_update("models/orders.sql"))).replace("apply_patch", "applypatch", 1)
-        assert _denied(_run_pre(cmd, project, capsys))
+        out = _run_pre(cmd, project, capsys)
+        assert _denied(out) and "orders" in out["permissionDecisionReason"]
+        assert "couldn't check" not in out["permissionDecisionReason"]
+
+    def test_applypatch_spelling_docs_only_allowed(self, project, capsys):
+        cmd = _shell(_patch("*** Update File: README.md", "@@", "-hello", "+hi")).replace("apply_patch", "applypatch", 1)
+        assert _run_pre(cmd, project, capsys) is None
 
     def test_unquoted_delimiter_without_expansions(self, project, capsys):
         assert _denied(_run_pre(_shell(_patch("*** Delete File: models/orders.sql"), delim="EOF"), project, capsys))
@@ -222,6 +228,15 @@ class TestShellDirectory:
     def test_cd_prefix_resolved(self, nested, capsys, arg, sub):
         cmd = _shell(_patch(*_update("models/orders.sql")), prefix=f"cd {arg} && ")
         assert _checked_paths(cmd, nested, capsys) == [str(nested / sub / "models" / "orders.sql")]
+
+    # Folder names close to ones Codex's parser or a shell reads differently, still recognised.
+    @pytest.mark.parametrize("arg,sub", [
+        ("'2024'", "2024"), ('"2024"', "2024"), ("2024a", "2024a"), ("v1.5", "v1.5"), ("a=b", "a=b"),
+        ("'a b'", "a b"), ("x-1", "x-1"), ("'0x1'", "0x1"),
+    ])
+    def test_cd_folder_names_still_recognised(self, tmp_path, capsys, arg, sub):
+        cmd = _shell(_patch(*_update("models/orders.sql")), prefix=f"cd {arg} && ")
+        assert _checked_paths(cmd, tmp_path, capsys) == [str(tmp_path / sub / "models" / "orders.sql")]
 
     def test_absolute_cd(self, project, nested, capsys):
         cmd = _shell(_patch(*_update("models/orders.sql")), prefix=f"cd {project} && ")
@@ -374,6 +389,30 @@ _OTHER_FORMS = [
     pytest.param(f"apply_patch <<'E OF'\n{_DOCS_ONLY}\nE OF\n", id="space-in-quoted-delimiter"),
     pytest.param(f"apply_patch <<\"E'\"\n{_DOCS_ONLY}\nE'\n", id="quote-in-quoted-delimiter"),
     pytest.param(f"apply_patch <<1EOF\n{_DOCS_ONLY}\n1EOF\n", id="delimiter-starting-with-digit"),
+    # Whitespace Codex's parser doesn't read as a shell does.
+    pytest.param(f"cd +0 && apply_patch\\\n<<'EOF'\n{_DELETE_ORDERS}\nEOF\n", id="continuation-between-cd-call-and-heredoc"),
+    pytest.param(f"apply_patch\\\n<<'EOF'\n{_DELETE_ORDERS}\nEOF\n", id="continuation-between-name-and-heredoc"),
+    pytest.param(_shell(_DOCS_ONLY) + "\u00a0", id="unicode-space-after-the-heredoc"),
+    pytest.param(_shell(_DOCS_ONLY) + "\u00a0\n", id="unicode-space-line-after-the-heredoc"),
+    pytest.param("\u00a0" + _shell(_DOCS_ONLY), id="unicode-space-before-the-call"),
+    pytest.param(_shell(_patch("*** Add File: docs/a.md", "+x", " \rEOF", "+y")), id="space-cr-then-delimiter"),
+    pytest.param(_shell(_patch("*** Add File: docs/a.md", "+x", "\fEOF", "+y")), id="form-feed-then-delimiter"),
+    pytest.param(_shell(_patch("*** Add File: docs/a.md", "+x", "\u00a0EOF", "+y")), id="unicode-space-then-delimiter"),
+    # A folder Codex's parser doesn't read as a word, or a shell reads as an option or
+    # a stack entry, not a folder.
+    *[pytest.param(_shell(_DELETE_ORDERS, prefix=f"cd {d} && "), id=f"cd-folder:{d}")
+      for d in ["==", "=models", "2024", "0x1", "0X1", "08", "'-P'", '"-P"', "+0", "'+0'", "-", "-L"]],
+    # A quoted folder Codex's parser reads in part, or not at all (so it applies the patch
+    # in the working directory).
+    *[pytest.param(_shell(_DELETE_ORDERS, prefix=f"cd {d} && "), id=f"cd-folder:{d!r}")
+      for d in ['"a\rb"', '"\rb"', '" "', '"\t"', '"\x0b"', "' '", '"a\x00b"', "'a\x00b'"]],
+    pytest.param(_shell(_patch("*** Add File: docs/a.md", "+x", "\x00EOF", "+y")), id="nul-then-delimiter"),
+    # An empty folder.
+    pytest.param(_shell(_DOCS_ONLY, prefix="cd '' && "), id="cd-empty-single-quoted"),
+    pytest.param(_shell(_DOCS_ONLY, prefix='cd "" && '), id="cd-empty-double-quoted"),
+    # No closing delimiter line.
+    pytest.param(f"apply_patch <<'EOF'\n{_DOCS_ONLY}\n", id="unterminated-heredoc"),
+    pytest.param(f"apply_patch <<'EOF'\n{_DOCS_ONLY}", id="unterminated-heredoc-no-newline"),
     # `$`, a backtick or a backslash anywhere in an unquoted body, which a real shell expands.
     pytest.param(_shell(_patch("*** Add File: docs/a.md", "+$(apply_patch < p.txt)"), delim="EOF"),
                  id="unquoted-substitution-in-hunk"),
@@ -422,7 +461,8 @@ _OTHER_FORMS = [
     pytest.param("$'apply_patch' < p.txt", id="ansi-c-quoted-name"),
     *[pytest.param(_shell(_DELETE_ORDERS, delim="'PATCH'").replace("apply_patch", name, 1), id=f"name:{name}")
       for name in ["ap''ply_patch", 'ap""ply_patch', "apply\\_patch", "'apply_patch'", '"apply"_patch',
-                   "apply\\\n_patch"]],
+                   "apply\\\n_patch",
+                   "apply_pa$''tch", "apply_$'patch'", 'apply_pa$""tch', '$"apply_patch"']],
     # Docs-only and non-dbt patches, in forms Prevent doesn't check.
     pytest.param(_shell(_DOCS_ONLY, prefix="env "), id="docs-only-env"),
     pytest.param(f"env apply_patch <<'EOF'\n{_DOCS_ONLY}\nEOF\necho \"$HOME\"\n", id="docs-only-then-expansion"),
