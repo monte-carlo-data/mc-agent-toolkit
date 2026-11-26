@@ -299,8 +299,13 @@ class TestPreEditApplyPatch:
         assert out["permissionDecision"] == "deny"
 
     def test_models_folder_in_another_case_gated(self, project, tmp_path, capsys):
-        """On a case-insensitive filesystem MODELS/orders.sql is models/orders.sql. Gated
-        either way: a new file under MODELS/ is gated too, so this holds on any filesystem."""
+        """On a case-insensitive filesystem MODELS/orders.sql is the model models/orders.sql.
+        On a case-sensitive one it is a new file, which the gate allows like any new model."""
+        (project / "CaseProbe").write_text("")
+        case_insensitive = (project / "caseprobe").exists()
+        (project / "CaseProbe").unlink()
+        if not case_insensitive:
+            pytest.skip("needs a case-insensitive filesystem")
         out = _run_pre(_pre_stdin(_patch(*_update("MODELS/orders.sql")), str(project),
                                   _session_files(tmp_path)), capsys)
         assert out["permissionDecision"] == "deny"
