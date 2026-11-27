@@ -106,12 +106,15 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git fetch --tags --force origin
-          # Only tags already on main qualify, for this run's tag and for the releases it backfills.
-          ARGS=(--backfill --require-ancestor origin/main --summary "$GITHUB_STEP_SUMMARY")
+          # Only tags on the checked-out main qualify, for this run's tag and the releases it
+          # backfills. Not origin/main: the fetch above can move it past the checkout, to a release
+          # newer than this builder. That release's own run, queued behind this one, publishes it.
+          # The tag goes after -- so an input like --help reaches the tag check, not argparse.
+          ARGS=(--backfill --require-ancestor HEAD --summary "$GITHUB_STEP_SUMMARY")
           if [[ "$EVENT" == "push" ]]; then
-            python3 scripts/publish_coco_desktop.py "$TAG" --expect-sha "$GITHUB_SHA" "${ARGS[@]}"
+            python3 scripts/publish_coco_desktop.py --expect-sha "$GITHUB_SHA" "${ARGS[@]}" -- "$TAG"
           else
-            python3 scripts/publish_coco_desktop.py "$TAG" "${ARGS[@]}"
+            python3 scripts/publish_coco_desktop.py "${ARGS[@]}" -- "$TAG"
           fi
         env:
           EVENT: ${{ github.event_name }}

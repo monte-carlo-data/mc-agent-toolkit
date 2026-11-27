@@ -517,7 +517,9 @@ class BackfillTest(RepoFixture):
         self.git("tag", "-f", "-a", "-m", "annotated", "v9.9.10")
         self.git("push", "-q", "origin", "main", "refs/tags/v9.9.10")
         result = self.backfill("v9.9.10", expect_sha=self.git("rev-parse", "HEAD"))
-        self.assertEqual(self.processed(result), ["v9.9.10"])
+        self.assertEqual(result["failed"], [])
+        self.assertEqual([r["source"] for r in result["results"]], ["v9.9.10"])
+        self.assertEqual(self.dist_tag("9.9.10"), self.dist_head())
 
     def test_cli_preflight_failure_writes_the_summary(self):
         summary = self.tmp / "summary.md"
@@ -588,7 +590,12 @@ class BackfillTest(RepoFixture):
         self.ship("9.9.11")
         before = self.remote_refs()
         result = self.backfill("v9.9.11", dry_run=True)
-        self.assertEqual(self.processed(result), ["v9.9.10", "v9.9.11"])
+        self.assertEqual(result["failed"], [])
+        self.assertEqual([(r["source"], r["action"], r["dry_run"]) for r in result["results"]],
+                         [("v9.9.10", "published", True), ("v9.9.11", "published", True)])
+        for r in result["results"]:
+            self.assertEqual([spec.split(":")[1] for spec in r["refspecs"]],
+                             ["refs/heads/coco-desktop", f"refs/tags/coco-desktop-v{r['source'][1:]}"])
         self.assertEqual(self.remote_refs(), before)
 
     def test_a_gap_is_taken_from_the_remote_not_the_local_tag(self):
@@ -605,9 +612,136 @@ class BackfillTest(RepoFixture):
         self.assertIn("differs", result["failed"][0]["error"])
         self.assertEqual(self.pins(), ["9.9.10", "9.9.12", "9.9.9"])
 
+    def test_a_gap_whose_tag_object_is_not_here_is_fetched(self):
+        self.ship("9.9.9")
+        self.publish("v9.9.9")
+        other = self.tmp / "other"
+        self.git("clone", "-q", "-b", "main", str(self.remote), str(other), cwd=self.tmp)
+        manifest = other / "plugins/cortex-code/.cortex-plugin/plugin.json"
+        data = json.loads(manifest.read_text())
+        data["version"] = "9.9.10"
+        manifest.write_text(json.dumps(data, indent=2) + "\n")
+        self.git("commit", "-qam", "release 9.9.10", cwd=other)
+        self.git("tag", "-a", "-m", "annotated", "v9.9.10", cwd=other)
+        self.git("push", "-q", "origin", "main", "refs/tags/v9.9.10", cwd=other)
+        tag_object = self.git("rev-parse", "refs/tags/v9.9.10", cwd=other)
+        self.git("pull", "-q", "--no-tags", "--ff-only", "origin", "main")
+        missing = subprocess.run(["git", "cat-file", "-e", tag_object], cwd=self.repo, check=False)
+        self.assertNotEqual(missing.returncode, 0)
+        self.ship("9.9.11")
+        result = self.backfill("v9.9.11")
+        self.assertEqual(result["failed"], [])
+        self.assertEqual(self.processed(result), ["v9.9.10", "v9.9.11"])
+        self.assertEqual(self.chain(), ["9.9.11", "9.9.10", "9.9.9"])
+
+    def test_a_release_on_main_after_the_checkout_is_left_to_its_own_run(self):
+        # The workflow's boundary is the checked-out commit, whose builder this run uses.
+        self.ship("9.9.9")
+        self.publish("v9.9.9")
+        self.ship("9.9.10")
+        self.git("branch", "checkout-at-9.9.10")
+        self.ship("9.9.11")
+        result = self.backfill("v9.9.10", require_ancestor="checkout-at-9.9.10")
+        self.assertEqual(self.processed(result), ["v9.9.10"])
+        self.assertEqual(self.pins(), ["9.9.10", "9.9.9"])
+
+    def test_a_gap_whose_tag_moves_during_the_run_is_not_pinned(self):
+        self.ship("9.9.9")
+        self.publish("v9.9.9")
+        self.ship("9.9.10")
+        old = self.git("rev-parse", "v9.9.10")
+        (self.plugin / "README.md").write_text("# Fixture, corrected\n")
+        self.git("commit", "-qam", "correct 9.9.10")
+        self.git("tag", "-f", "v9.9.10")
+        self.git("push", "-q", "origin", "main")
+        self.git("tag", "-f", "v9.9.10", old)
+        self.ship("9.9.11")
+        listing = publish_mod.remote_tag_listing
+
+        def listing_then_move(repo, remote):
+            listed = listing(repo, remote)
+            corrected = self.git("rev-parse", "main~1")
+            self.remote_git("tag", "-f", "v9.9.10", corrected)
+            return listed
+
+        publish_mod.remote_tag_listing = listing_then_move
+        try:
+            result = self.backfill("v9.9.11")
+        finally:
+            publish_mod.remote_tag_listing = listing
+        self.assertEqual([f["source"] for f in result["failed"]], ["v9.9.10"])
+        self.assertIn("moved", result["failed"][0]["error"])
+        self.assertEqual(self.pins(), ["9.9.11", "9.9.9"])
+
+    def test_a_gap_tag_that_is_not_a_commit_does_not_stop_the_run(self):
+        self.ship("9.9.9")
+        self.publish("v9.9.9")
+        blob = self.git("hash-object", "-w", "LICENSE")
+        self.git("tag", "v9.9.10", blob)
+        self.git("push", "-q", "origin", "refs/tags/v9.9.10")
+        self.ship("9.9.11")
+        result = self.backfill("v9.9.11")
+        self.assertEqual([f["source"] for f in result["failed"]], ["v9.9.10"])
+        self.assertEqual([r["source"] for r in result["results"]], ["v9.9.11"])
+        self.assertEqual(self.pins(), ["9.9.11", "9.9.9"])
+
+    def test_an_own_release_with_the_wrong_plugin_version_does_not_stop_the_gaps(self):
+        self.ship("9.9.9")
+        self.publish("v9.9.9")
+        self.ship("9.9.10")
+        (self.plugin / "README.md").write_text("# Fixture, still 9.9.10\n")
+        self.git("commit", "-qam", "tagged 9.9.11 but declares 9.9.10")
+        self.git("tag", "v9.9.11")
+        self.git("push", "-q", "origin", "main", "refs/tags/v9.9.11")
+        result = self.backfill("v9.9.11")
+        self.assertEqual([r["source"] for r in result["results"]], ["v9.9.10"])
+        self.assertEqual([(f["source"], f["own"]) for f in result["failed"]], [("v9.9.11", True)])
+        self.assertIn("plugin version 9.9.10", result["failed"][0]["error"])
+
+    def test_unrelated_tags_with_odd_names_are_ignored(self):
+        self.ship("9.9.9")
+        self.publish("v9.9.9")
+        self.git("tag", "notes/release\u00a0candidate\u2028two")
+        self.git("push", "-q", "origin", "--tags")
+        self.ship("9.9.10")
+        result = self.backfill("v9.9.10")
+        self.assertEqual(result["failed"], [])
+        self.assertEqual(self.processed(result), ["v9.9.10"])
+
+    def test_a_manifest_that_is_not_utf8_is_reported_in_the_summary(self):
+        self.ship("9.9.9")
+        self.publish("v9.9.9")
+        self.ship("9.9.10")
+        self.release("9.9.11")
+        manifest = self.plugin / ".cortex-plugin/plugin.json"
+        manifest.write_bytes(manifest.read_bytes().replace(b'"name": "fixture-toolkit"', b'"name": "fixture-\xff"'))
+        self.git("commit", "-qam", "manifest that isn't UTF-8")
+        self.git("tag", "-f", "v9.9.11")
+        self.git("push", "-q", "origin", "main", "refs/tags/v9.9.11")
+        summary = self.tmp / "summary.md"
+        code, out, _ = self.run_cli("v9.9.11", "--backfill", "--require-ancestor", "main", "--summary", str(summary))
+        self.assertEqual(code, 1)
+        report = json.loads(out)
+        self.assertEqual([r["source"] for r in report["results"]], ["v9.9.10"])
+        self.assertEqual([f["source"] for f in report["failed"]], ["v9.9.11"])
+        self.assertIn("v9.9.11", summary.read_text())
+
     def test_a_git_error_is_not_read_as_off_main(self):
         with self.assertRaisesRegex(publish_mod.PublishError, "merge-base"):
             publish_mod.is_ancestor(self.repo, "0" * 40, "main")
+
+    def test_the_workflow_bounds_the_backfill_by_its_checkout(self):
+        # origin/main moves with the workflow's later fetch; HEAD is the commit whose builder runs.
+        # The tag goes after --, so an input like --help reaches the tag check instead of argparse.
+        workflow = (REPO_ROOT / ".github/workflows/release-on-tag.yml").read_text()
+        step = workflow[workflow.index("- name: Publish CoCo Desktop build"):]
+        step = "\n".join(line for line in step.splitlines() if not line.strip().startswith("#"))
+        self.assertIn("--require-ancestor HEAD", step)
+        self.assertNotIn("origin/main", step)
+        calls = [line.strip() for line in step.splitlines() if "publish_coco_desktop.py" in line]
+        self.assertEqual(len(calls), 2)
+        for call in calls:
+            self.assertTrue(call.endswith('-- "$TAG"'), call)
 
     def test_annotations_escape_newlines_and_percent(self):
         self.assertEqual(publish_mod.annotation("warning", "50% done\r\nnext"), "::warning::50%25 done%0D%0Anext")

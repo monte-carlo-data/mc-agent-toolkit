@@ -83,8 +83,11 @@ def remote_tag_listing(repo: Path, remote: str) -> tuple[dict[str, str], set[tup
     """The remote's release tags (name -> tag object id) and pinned versions. --refs leaves out the
     peeled ^{} lines, so an annotated tag maps to its tag object, as `rev-parse refs/tags/<tag>` does."""
     releases, pinned = {}, set()
-    for line in git(repo, "ls-remote", "--refs", "--tags", remote).splitlines():
-        oid, ref = line.split()
+    # Split on git's own separators only: other tags' names can hold Unicode whitespace or line breaks.
+    for line in git(repo, "ls-remote", "--refs", "--tags", remote).split("\n"):
+        if not line:
+            continue
+        oid, ref = line.split("\t", 1)
         if match := RELEASE_REF.fullmatch(ref):
             releases[match.group(1)] = oid
         elif match := PIN_REF.fullmatch(ref):
@@ -138,9 +141,10 @@ def build_tree(repo: Path, tag: str, commit: str, work: Path) -> str:
 
 def check_source(tag: str, repo: Path, remote: str, expect_sha: str | None = None,
                  require_ancestor: str | None = None, remote_oid: str | None = None,
-                 check_remote: bool = False) -> str:
+                 check_remote: bool = False, check_manifest: bool = True) -> str:
     """Check that tag is a release this run may publish and return its commit. With check_remote,
-    the local tag must be the remote's (remote_oid, None if the remote has no such tag)."""
+    the local tag must be the remote's (remote_oid, None if the remote has no such tag). Without
+    check_manifest, the plugin version is left for publish() to check."""
     if not SOURCE_TAG.match(tag):
         raise PublishError(f"source tag {tag!r} is not v<major>.<minor>.<patch>")
     version = tag[1:]
@@ -163,6 +167,8 @@ def check_source(tag: str, repo: Path, remote: str, expect_sha: str | None = Non
             raise PublishError(f"no {require_ancestor} in {repo}")
         if not is_ancestor(repo, source_sha, require_ancestor):
             raise PublishError(f"{tag} is not on {require_ancestor}")
+    if not check_manifest:
+        return source_sha
     try:
         manifest = json.loads(git(repo, "show", f"{source_sha}:{PLUGIN}/.cortex-plugin/plugin.json"))
     except json.JSONDecodeError as exc:
@@ -231,48 +237,67 @@ def publish(tag: str, repo: Path = Path("."), remote: str = "origin", expect_sha
             "refspecs": refspecs, "dry_run": dry_run}
 
 
+def _failure(name: str, own: bool, exc: Exception) -> dict:
+    error = str(exc) if isinstance(exc, PublishError) else f"{type(exc).__name__}: {exc}"
+    return {"source": name, "tag": f"{TAG_PREFIX}{name[1:]}", "own": own, "error": error}
+
+
+def _prepare_candidate(repo: Path, remote: str, name: str, oid: str, boundary: str) -> bool:
+    """Fetch a release the remote lists and say whether it is on boundary. Raises PublishError if the
+    remote's tag changed since it was listed: the build would otherwise use the listed object."""
+    git(repo, "fetch", "-q", "--no-tags", remote, f"refs/tags/{name}")
+    fetched = git(repo, "rev-parse", "FETCH_HEAD")
+    if fetched != oid:
+        raise PublishError(f"{name} moved on {remote} during this run (listed {oid}, now {fetched}); "
+                           "the next run publishes it")
+    if not is_ancestor(repo, git(repo, "rev-parse", f"{oid}^{{commit}}"), boundary):
+        return False
+    if not git(repo, "rev-parse", "-q", "--verify", f"refs/tags/{name}", check=False):
+        git(repo, "update-ref", f"refs/tags/{name}", oid, "")
+    return True
+
+
 def publish_all(tag: str, repo: Path = Path("."), remote: str = "origin", expect_sha: str | None = None,
                 require_ancestor: str | None = None, dry_run: bool = False) -> dict:
     """Publish tag and every release the remote is missing a pin for, oldest first.
 
     A release qualifies if its v<X.Y.Z> tag is on the remote, its commit is on require_ancestor,
     its version is newer than the oldest pin and it has no pin. With no pins yet, only tag is
-    published. Problems with tag itself, or with listing the releases, raise PublishError before
-    anything is pushed. After that, a version that fails is recorded under "failed" and the rest
-    still run.
+    published. If tag itself isn't a valid release on the remote and on require_ancestor, or the
+    remote's tags can't be listed, this raises PublishError before anything is pushed. After that,
+    a release that fails, the run's own included, is recorded under "failed" and the rest still run.
     """
     if not require_ancestor:
         raise PublishError("backfill needs require_ancestor, the branch releases must be on")
     repo = Path(repo).resolve()
     releases, pinned = remote_tag_listing(repo, remote)
-    check_source(tag, repo, remote, expect_sha, require_ancestor, releases.get(tag), check_remote=True)
+    check_source(tag, repo, remote, expect_sha, require_ancestor, releases.get(tag), check_remote=True,
+                 check_manifest=False)
     boundary = git(repo, "rev-parse", f"{require_ancestor}^{{commit}}")
 
-    sources = [tag]
+    sources, failed = [tag], []
     floor = min(pinned, default=None)
     for name, oid in releases.items():
         version = version_tuple(name[1:])
         if floor is None or version <= floor or version in pinned or name == tag:
             continue
-        git(repo, "fetch", "-q", "--no-tags", remote, f"refs/tags/{name}")
-        if not is_ancestor(repo, git(repo, "rev-parse", f"{oid}^{{commit}}"), boundary):
-            continue
-        if not git(repo, "rev-parse", "-q", "--verify", f"refs/tags/{name}", check=False):
-            git(repo, "update-ref", f"refs/tags/{name}", oid, "")
-        sources.append(name)
+        # One old release must not stop the others, or the release this run is for.
+        try:
+            if _prepare_candidate(repo, remote, name, oid, boundary):
+                sources.append(name)
+        except Exception as exc:  # noqa: BLE001
+            failed.append(_failure(name, False, exc))
     sources.sort(key=lambda name: version_tuple(name[1:]))
 
-    results, failed = [], []
+    results = []
     for name in sources:
         own = name == tag
         try:
             result = publish(name, repo, remote, expect_sha=expect_sha if own else None,
                              require_ancestor=require_ancestor if own else boundary, dry_run=dry_run,
                              remote_oid=releases[name])
-        # One old release must not stop the others, or the release this run is for.
         except Exception as exc:  # noqa: BLE001
-            error = str(exc) if isinstance(exc, PublishError) else f"{type(exc).__name__}: {exc}"
-            failed.append({"source": name, "tag": f"{TAG_PREFIX}{name[1:]}", "own": own, "error": error})
+            failed.append(_failure(name, own, exc))
             continue
         results.append({"source": name, **result})
     return {"results": results, "failed": failed}
