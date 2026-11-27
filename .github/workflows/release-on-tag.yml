@@ -5,7 +5,9 @@ on:
     branches: [main]
     paths:
       - 'plugins/claude-code/.claude-plugin/plugin.json'
-  # Re-publish the CoCo Desktop build of an existing release tag (retry after a failure).
+  # Re-publish the CoCo Desktop build of an existing release tag (retry after a failure). Run it
+  # from main: the job checks out main either way, but a run from another branch uses that
+  # branch's copy of this file.
   workflow_dispatch:
     inputs:
       tag:
@@ -73,6 +75,10 @@ jobs:
   # Publishes plugins/cortex-code in CoCo Desktop's format to the coco-desktop branch and
   # tags it coco-desktop-v<version>. This must be a job here: the tag pushed above uses
   # GITHUB_TOKEN, which does not trigger other workflows.
+  #
+  # GitHub keeps only the newest waiting job in the concurrency group, so a release's publish
+  # can be cancelled. Each run therefore also publishes every release on main that is newer
+  # than the oldest pin and has no pin yet (--backfill), including releases newer than its own.
   publish-coco-desktop:
     needs: release
     if: >-
@@ -84,8 +90,11 @@ jobs:
       group: coco-desktop-publish
       cancel-in-progress: false
     steps:
+      # main, not the release commit: a run can publish releases newer than its own, and must
+      # build them with a builder at least as new as they are.
       - uses: actions/checkout@v4
         with:
+          ref: main
           fetch-depth: 0
 
       - uses: actions/setup-python@v5
@@ -97,11 +106,12 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git fetch --tags --force origin
+          # Only tags already on main qualify, for this run's tag and for the releases it backfills.
+          ARGS=(--backfill --require-ancestor origin/main --summary "$GITHUB_STEP_SUMMARY")
           if [[ "$EVENT" == "push" ]]; then
-            python3 scripts/publish_coco_desktop.py "$TAG" --expect-sha "$GITHUB_SHA"
+            python3 scripts/publish_coco_desktop.py "$TAG" --expect-sha "$GITHUB_SHA" "${ARGS[@]}"
           else
-            # A manual run publishes any tag it's given; only tags already on main qualify.
-            python3 scripts/publish_coco_desktop.py "$TAG" --require-ancestor origin/main
+            python3 scripts/publish_coco_desktop.py "$TAG" "${ARGS[@]}"
           fi
         env:
           EVENT: ${{ github.event_name }}
