@@ -308,7 +308,7 @@ For skills that need hooks, follow the two-layer pattern:
 1. **Shared logic** (`plugins/shared/<skill>/lib/`): Platform-agnostic Python. All decision-making. No editor-specific I/O.
 2. **Editor adapters** (`plugins/<editor>/hooks/<skill>/`): Thin scripts that read editor-specific JSON, call shared logic, and format output.
 
-OpenCode is an exception — it ports hook logic to TypeScript since the `@opencode-ai/plugin` SDK requires it. See `plugins/opencode/src/prevent/` for a complete example.
+OpenCode is an exception — it ports hook logic to TypeScript since OpenCode plugins are TypeScript modules. One module serves OpenCode 1.x (`@opencode-ai/plugin`) and 2.x (`@opencode/plugin`): `src/prevent/core.ts` holds the decisions, `v1.ts` and `v2.ts` the per-version wiring. See `plugins/opencode/src/prevent/` for a complete example.
 
 If a harness exposes the session transcript in a format the line-based marker scanner can't read, add a reader to the shared lib rather than special-casing the adapter. **Cortex Code** is the worked example: its hook `transcript_path` is a metadata file with the messages in a sibling `<id>.history.jsonl`, so `plugins/shared/prevent/lib/protocol.py` provides `scan_history_jsonl_for_markers` (selected via `HookInput.transcript_format`) and the Cortex `pre_edit_hook.py` rewrites the path to that sibling. **Invariant:** prevent deny reasons must never contain a string the marker scanner would match — a harness that persists hook output back into the scanned transcript would otherwise let the impact-check gate unlock itself.
 

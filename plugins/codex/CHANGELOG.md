@@ -5,6 +5,21 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Codex will be do
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.34.0] - 2026-11-27
+
+### Added
+
+- OpenCode: the plugin now loads on OpenCode 2.x as well as 1.x, from the same files, so Prevent's edit gate, edit tracking, commit checkpoint, end-of-turn reminder and the toolkit MCP headers work on both. It is tested on OpenCode 1.19.6 and 2.4.1. On 2.x the gate covers the `edit`, `write` and `patch` tools, and the commit checkpoint covers `shell`. The end-of-turn reminder behaves differently on 2.x: the agent takes one more step and asks you about validation, as in Claude Code, where 1.x adds the question without a reply. On 2.x a completion marker counts only in the agent's own reply, and one written before the session was compacted still counts.
+
+### Changed
+
+- OpenCode: the installer and the `opencode.json` template register the plugin as `"./.opencode/plugins/mc-agent-toolkit"`. OpenCode 2.x reads the old entry, `".opencode/plugins/mc-agent-toolkit"`, as a package name and loads a second, duplicate copy; the installer now says how to fix an existing entry. OpenCode 1.x accepts both. The installer skips the plugin's dev dependencies.
+- OpenCode: the commit checkpoint finds staged models from the repository root when the commit runs in a subdirectory, and it runs `git` through Node's `child_process` instead of `Bun.spawn`, so it works when OpenCode runs plugins under Node.
+
+### Fixed
+
+- OpenCode: the plugin's tests no longer write to your real OpenCode config or send the install beacon to Monte Carlo. A hook test that created a session ran the real beacon.
+
 ## [1.33.2] - 2026-11-25
 
 ### Fixed

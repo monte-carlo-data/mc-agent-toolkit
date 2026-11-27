@@ -1,7 +1,7 @@
 """The OpenCode copy of Prevent's deny reasons carries the same instructions as the Python copy.
 
-plugins/opencode/src/prevent/index.ts is maintained by hand next to plugins/shared/prevent/lib/protocol.py,
-and CI doesn't run the OpenCode bun tests, so wording added to one copy could silently miss the other.
+plugins/opencode/src/prevent/core.ts (shared by the OpenCode 1.x and 2.x entries) is maintained by hand
+next to plugins/shared/prevent/lib/protocol.py, so wording added to one copy could silently miss the other.
 This compares the text of the string literals in both files, so it only catches a phrase missing from a
 copy, not wording that differs around it.
 
@@ -16,7 +16,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
 PYTHON_COPY = REPO / "plugins" / "shared" / "prevent" / "lib" / "protocol.py"
-TS_COPY = REPO / "plugins" / "opencode" / "src" / "prevent" / "index.ts"
+TS_COPY = REPO / "plugins" / "opencode" / "src" / "prevent" / "core.ts"
 
 # Instruction phrases both copies of the deny reasons must contain.
 # Each phrase occurs in only one message, so a copy can't drop it from one message and still

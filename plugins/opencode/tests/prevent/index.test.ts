@@ -5,6 +5,7 @@
 import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, unlinkSync } from "fs";
 import { join } from "path";
+import { execFileSync } from "child_process";
 import { tmpdir } from "os";
 import { cleanCache, createDbtProject, createMockClient } from "./helpers";
 import {
@@ -891,6 +892,23 @@ describe("PreCommitGate (tool.execute.before on bash)", () => {
       { tool: "bash", sessionID: "s1", callID: "c1" },
       { args: { command: "git commit -m 'test'" } }
     );
+  });
+
+  it("asks before committing a staged model whose assessment ran", async () => {
+    const { projectDir } = createDbtProject(tmpDir, {
+      models: { "orders.sql": "SELECT * FROM {{ ref('raw') }}" },
+    });
+    execFileSync("git", ["init", "-q"], { cwd: projectDir });
+    execFileSync("git", ["add", "models/orders.sql"], { cwd: projectDir });
+    markImpactCheckInjected("s1", "orders");
+    markImpactCheckVerified("s1", "orders");
+    const { hooks } = await getHooks({}, { directory: projectDir, worktree: projectDir });
+    await expect(
+      hooks["tool.execute.before"]!(
+        { tool: "bash", sessionID: "s1", callID: "c1" },
+        { args: { command: "git commit -m 'test'" } }
+      )
+    ).rejects.toThrow("Committing changes to orders");
   });
 
   it("passes through git commit when W4 not ran", async () => {

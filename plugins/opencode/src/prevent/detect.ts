@@ -6,7 +6,7 @@
  */
 import { readFileSync, existsSync, statSync } from "fs";
 import { basename, extname, dirname, join, resolve } from "path";
-import { getDbtPaths } from "./cache";
+import { getDbtPaths } from "./cache.ts";
 
 const REF_PATTERNS = ["{{ ref(", "{{ source("];
 const DBT_BLOCK_PATTERNS = ["{% macro", "{% snapshot"];

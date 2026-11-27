@@ -35,3 +35,12 @@ jobs:
 
       - name: Tests
         run: bun test
+
+      # OpenCode v2 can run plugins under Node, which loads the TypeScript sources
+      # natively (explicit .ts imports, no Bun-only APIs).
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Node smoke test
+        run: bun run test:node

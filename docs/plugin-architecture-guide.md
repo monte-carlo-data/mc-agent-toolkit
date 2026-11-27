@@ -51,7 +51,7 @@ All editors (Claude Code, Cursor, OpenCode, Copilot CLI, Codex, Cortex Code) fol
 |--------|--------------|---------------|-------|------------|
 | **Claude Code** | `.claude-plugin/plugin.json` + marketplace | `skills/` dir in plugin | `hooks.json` → Python scripts | `.mcp.json` |
 | **Cursor** | `.cursor-plugin/plugin.json` | Symlinked from `skills/` | `hooks.json` → Python scripts | `mcp.json` |
-| **OpenCode** | `@opencode-ai/plugin` SDK (TypeScript) | Copied to `.opencode/skills/` | Event handlers in `index.ts` | `opencode.json` |
+| **OpenCode** | TypeScript module: `@opencode-ai/plugin` (1.x) and `@opencode/plugin` (2.x) from one entry | Copied to `.opencode/skills/` | 1.x hook handlers and 2.x `setup` registrations in `src/prevent/` | `opencode.json` |
 | **Copilot CLI** | `plugin.json` + `hooks.json` (version 1) | `skills/` dir in plugin | `hooks.json` → Python scripts | `.mcp.json` |
 | **Codex** | `AGENTS.md` + config files | Copied to project | N/A (instruction-only) | Config file |
 | **Cortex Code** | `.cortex-plugin/plugin.json` (wraps Claude Code) | `skills/` dir in plugin | `hooks/hooks.json` (plugin root) → Python scripts | `.mcp.json` |
@@ -218,4 +218,4 @@ For skills that need hooks, follow the existing two-layer pattern:
 1. **Shared logic** (`plugins/shared/<skill>/lib/`): Platform-agnostic Python. Contains all decision-making. No editor-specific I/O.
 2. **Editor adapters** (`plugins/<editor>/hooks/<skill>/`): Thin scripts that read editor-specific JSON input, call shared logic, and format editor-specific output.
 
-This ensures business logic is written and tested once, with only I/O adapters varying per editor. OpenCode is an exception — it ports the logic to TypeScript since the plugin SDK requires it.
+This ensures business logic is written and tested once, with only I/O adapters varying per editor. OpenCode is an exception — it ports the logic to TypeScript since OpenCode plugins are TypeScript modules.

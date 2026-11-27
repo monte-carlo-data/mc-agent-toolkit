@@ -15,6 +15,7 @@ import { mkdirSync, readFileSync, writeFileSync, chmodSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
 import { randomUUID } from "node:crypto";
+import { fileURLToPath } from "node:url";
 
 const HARNESS = "opencode";
 const BEACON_TIMEOUT_MS = 2000;
@@ -45,11 +46,14 @@ function readId(path: string): string {
   }
 }
 
-/** Resolve the toolkit version from the plugin's package.json (../../ from here). */
+/**
+ * Resolve the toolkit version from the plugin's package.json (../../ from here). Uses
+ * import.meta.url rather than Bun's import.meta.dir so it also works under Node.
+ */
 function toolkitVersion(): string {
   try {
     const pkg = JSON.parse(
-      readFileSync(join(import.meta.dir, "..", "..", "package.json"), "utf8")
+      readFileSync(fileURLToPath(new URL("../../package.json", import.meta.url)), "utf8")
     );
     return typeof pkg.version === "string" && pkg.version ? pkg.version : "unknown";
   } catch {
@@ -124,7 +128,8 @@ export function ensureInstallId(): string {
 
 /**
  * Build the toolkit telemetry headers for the monte-carlo-mcp server, injected
- * at config-load time by the plugin's `config` hook (see ../prevent/index.ts).
+ * by the plugin: the `config` hook on OpenCode 1.x (../prevent/v1.ts), the MCP
+ * transform on OpenCode 2.x (../prevent/v2.ts).
  *
  * Returns ``x-mcd-toolkit-install-id`` (stable, the join key) and
  * ``x-mcd-toolkit-version``. session_id is intentionally NOT carried: the config
