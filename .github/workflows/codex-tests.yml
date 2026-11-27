@@ -1,0 +1,40 @@
+name: Codex Plugin Tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'plugins/codex/**'
+      - 'plugins/shared/prevent/**'
+      - '.github/workflows/codex-tests.yml'
+  pull_request:
+    paths:
+      - 'plugins/codex/**'
+      - 'plugins/shared/prevent/**'
+      - '.github/workflows/codex-tests.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # Stdlib only, except the prevent adapter tests, which need pytest.
+      - name: Hook config matches how Codex loads and matches hooks
+        run: python3 plugins/codex/tests/test_hooks_config.py
+
+      - name: Install pytest
+        run: python3 -m pip install pytest==8.3.5
+
+      # Codex's tests only: the shared lib and other adapters' tests each import a
+      # different "lib" package, so they can't share this pytest run (the shared
+      # lib tests run in cortex-code-tests.yml).
+      - name: Prevent hook adapters
+        run: python3 -m pytest -q plugins/codex/tests/prevent

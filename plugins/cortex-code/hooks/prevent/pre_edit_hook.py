@@ -18,9 +18,8 @@ import os
 sys.path.insert(0, os.path.dirname(__file__))
 
 from lib.safe_run import safe_run
-from lib.detect import extract_table_name
+from lib.apply_patch import gate_and_remember
 from lib.protocol import HookInput, evaluate_pre_edit
-from apply_patch import parse_operations, resolve_path
 
 
 def _history_path(transcript_path: str) -> str:
@@ -49,56 +48,15 @@ def _hook_input(raw: dict, file_path: str) -> HookInput:
     )
 
 
-def _patch_deny_reason(denied: dict[str, str], file_count: int, other_files: bool) -> str:
-    """One reason for a denied patch: the tables, then each table's own instructions.
-
-    Names tables bare (never after a marker token), so the reason can't unlock the gate
-    when Cortex records it in the transcript.
-    """
-    if len(denied) == 1 and not other_files:
-        return next(iter(denied.values()))
-    names = ", ".join(denied)
-    retry = (
-        "Retry the patch after the assessment (and the user's yes, if you asked), or "
-        "split out the changes to other files."
-        if other_files else "Retry the patch after the assessment (and the user's yes, if you asked)."
-    )
-    lead = (
-        f"Monte Carlo Prevent: this patch touches {file_count} files. Run the change "
-        f"impact assessment first for: {names}. The whole patch was blocked and no "
-        f"file in it was changed. {retry}"
-    )
-    return "\n\n".join([lead, *denied.values()])
-
-
 def _gate_patch(raw: dict) -> None:
     tool_input = raw.get("tool_input") or {}
-    cwd = raw.get("cwd")
-    ops = parse_operations(tool_input.get("input"))
-    op_files = [[resolve_path(p, cwd) for p in (op.path, op.move_to) if p] for op in ops]
-
-    denied: dict[str, str] = {}
-    denied_paths: set[str] = set()
-    checked: set[str] = set()
-    for files in op_files:
-        for path in files:
-            if path in checked:
-                continue
-            checked.add(path)
-            # One file's error must not drop denials already found for others.
-            try:
-                result = evaluate_pre_edit(_hook_input(raw, path))
-                if result.action == "deny":
-                    # Keep the first file's reason: it carries the assessment instructions
-                    # and starts the grace period, so a later file of the same table only
-                    # gets the short "not completed yet" text.
-                    denied.setdefault(extract_table_name(path), result.reason)
-                    denied_paths.add(path)
-            except Exception:
-                continue
-    if denied:
-        other_files = any(denied_paths.isdisjoint(files) for files in op_files)
-        _deny(_patch_deny_reason(denied, len(checked), other_files))
+    reason = gate_and_remember(
+        tool_input.get("input"), "cortex", cwd=raw.get("cwd"),
+        session_id=raw.get("session_id", "unknown"), call_id=raw.get("tool_use_id"),
+        make_input=lambda path: _hook_input(raw, path), evaluate=evaluate_pre_edit,
+    )
+    if reason:
+        _deny(reason)
 
 
 @safe_run

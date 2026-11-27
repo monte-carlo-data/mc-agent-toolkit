@@ -26,7 +26,7 @@ def clean_cache(tmp_path, monkeypatch):
 def isolate_hook_modules():
     """Ensure Cortex hook modules are loaded from Cortex's hooks dir (not another plugin's
     identically-named module)."""
-    hook_modules = ["pre_edit_hook", "post_edit_hook", "pre_commit_hook", "turn_end_hook", "apply_patch"]
+    hook_modules = ["pre_edit_hook", "post_edit_hook", "pre_commit_hook", "turn_end_hook", "patch_result"]
     for mod_name in hook_modules:
         sys.modules.pop(mod_name, None)
     if _hooks_dir in sys.path:

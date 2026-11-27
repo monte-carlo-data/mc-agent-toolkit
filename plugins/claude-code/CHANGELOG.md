@@ -5,6 +5,22 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Claude Code will
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.33.3] - 2026-11-25
+
+### Fixed
+
+- Codex: Prevent gates edits made with Codex's own `apply_patch` tool. Since Codex 0.124.0 that tool sends hook events, but the plugin only listened for shell commands, so those edits to dbt models weren't gated. The plugin and the installer now register `apply_patch` for PreToolUse and PostToolUse.
+- Codex: Prevent checks every file in an `apply_patch`, not only updated ones. A patch that added a file over a dbt model, deleted one, or moved a file onto or away from one wasn't gated. Every file a patch adds, deletes, updates or moves (both paths) is now checked before the patch runs, and the whole patch is blocked with one message naming every table. A blocked patch no longer counts as an edit.
+- Codex: Prevent checks a shell `apply_patch` only in the two forms Codex applies itself: the whole command is `apply_patch <<'EOF'` or `cd <dir> && apply_patch <<'EOF'`. The delimiter must be a plain word, unquoted only if the body has no `$`, backtick or `\`, and no body line may start with it. `<dir>` must be written out plainly, not a bare number, and not start with `-`, `+` or `=`. It gates the patch against the working directory or `<dir>`, and tracks it once allowed. Codex 0.166.0 or later is needed for the working directory to be the shell command's own folder; older versions report the session's folder. Any other command that names `apply_patch` (quotes and backslashes removed) is blocked as one Prevent couldn't check, whatever it does: a wrapper, a pipe, a file, another heredoc form, or a command that only mentions the name, like `rg apply_patch`. Codex's hidden `codex --codex-run-as-apply-patch <patch>` option is blocked the same way. The block says to retry with Codex's `apply_patch` tool or the plain form, or to reword a mention. `MC_PREVENT_HOOKS_DISABLED=1` turns this off.
+- Cortex Code: plain SQL written over a dbt model with `apply_patch` is tracked as an edit of that model. A file that only shares a model's name is no longer tracked.
+- Codex and Cortex Code: a patch path through a symlink is also checked as the file it reaches. A patch to `link/orders.sql`, where `link` points at the models folder, wasn't gated, because Prevent reads folder names in the path.
+- Prevent (every editor): a dbt folder written in another case, like `MODELS/orders.sql`, is gated as the model folder. On macOS and Windows that path is the model, but the gate compared folder names exactly and let it through. Seed and analysis exclusions still match exactly. A file is also checked against every `dbt_project.yml` above it, each with its own folder settings, so a project under a folder named `seeds` or `analyses` is gated, and a second `dbt_project.yml` inside a project, or a configured path like `../models` or `src/models`, doesn't hide its models. A file is named as a macro only where it was before, so no model drops out of the post-commit follow-up.
+- Codex: `scripts/install.sh` registers the Prevent hooks once. It writes them to `.codex/hooks.json` and no longer leaves them declared in its copy of the plugin, which made Codex run each hook twice once the plugin was installed.
+- Codex: `scripts/install.sh` installs into a target folder whose path goes through a symlink, such as one under macOS's `/var`. It used to copy only the skills there, because `cpio` won't extract through a symlink, and still report success. It now copies to the real path, and stops with an error if the plugin files weren't copied.
+- Codex: the plugin's bundled `hooks/prevent/hooks.json` uses `${PLUGIN_ROOT}`, quoted. It used `${CODEX_PLUGIN_ROOT}`, which Codex doesn't set, so every hook failed in a plugin-bundled install. Installs through `scripts/install.sh` weren't affected.
+- Codex: removed `pre_edit_hook.py` and `pre_commit_hook.py`, which no hook registration ran; `bash_hook.py` gates edits and commits.
+- Codex: CI runs the Prevent hook tests.
+
 ## [1.33.2] - 2026-11-25
 
 ### Fixed

@@ -47,7 +47,12 @@ mc-agent-toolkit/
 │   │   └── .mcp.json
 │   │
 │   ├── codex/                           # Unified mc-agent-toolkit plugin
-│   │   └── skills/prevent → symlink
+│   │   ├── .codex-plugin/plugin.json
+│   │   ├── hooks/prevent/              # Hook adapters (thin, call shared lib)
+│   │   ├── hooks/telemetry/
+│   │   ├── skills/ (one symlink per skill)
+│   │   ├── scripts/install.sh          # Project-level install: skills, hooks, MCP config
+│   │   └── .mcp.json
 │   │
 │   └── cortex-code/                     # Snowflake Cortex Code — wraps Claude Code (6th editor)
 │       ├── .cortex-plugin/plugin.json
@@ -314,7 +319,9 @@ If a harness exposes the session transcript in a format the line-based marker sc
 
 **Cortex command bodies must not contain a `---` sequence** — Cortex truncates an injected slash-command body at the first `---`, silently dropping everything after it. A Markdown table's separator row (`|---|---|`) is the usual offender, so use bulleted lists instead of tables in `plugins/cortex-code/commands/*.md`. (Other harnesses tolerate tables; this constraint is Cortex-specific.)
 
-**Cortex hooks live in one file, `plugins/cortex-code/hooks/hooks.json`.** CoCo Desktop 2.0.0 loaded hooks from that file and ignored the manifest's list of hook files, so don't add a `hooks` field to the manifest. Desktop matches each matcher as a case-sensitive, unanchored regular expression against lowercase tool IDs (`bash`, `edit`, `write`, `multi_edit`, `apply_patch`, `skill`), so anchor lowercase IDs: `^bash$`, `^(edit|write|multi_edit|apply_patch)$`. Cortex Code gives GPT and OpenAI models `apply_patch` in place of the edit tools; its patch can touch several files, so the Cortex edit adapters parse it with `hooks/prevent/apply_patch.py`. A PascalCase matcher like `Bash` never fires in Desktop, and an unanchored `bash` also matches `bash_output`. Snowflake documents the Cortex Code CLI as matching case-sensitively against lowercase names too (CLI 1.2.46 also fired PascalCase matchers in our probe), so the same file works there. Quote the plugin root in commands (`"${CORTEX_PLUGIN_ROOT}/hooks/…"`), because install paths can contain spaces. `plugins/cortex-code/tests/test_hooks_config.py` lists every expected handler; update it when you add one.
+**Cortex hooks live in one file, `plugins/cortex-code/hooks/hooks.json`.** CoCo Desktop 2.0.0 loaded hooks from that file and ignored the manifest's list of hook files, so don't add a `hooks` field to the manifest. Desktop matches each matcher as a case-sensitive, unanchored regular expression against lowercase tool IDs (`bash`, `edit`, `write`, `multi_edit`, `apply_patch`, `skill`), so anchor lowercase IDs: `^bash$`, `^(edit|write|multi_edit|apply_patch)$`. Cortex Code gives GPT and OpenAI models `apply_patch` in place of the edit tools; its patch can touch several files, so the Cortex edit adapters parse it with the shared `lib/apply_patch.py` (edit `plugins/shared/prevent/lib/apply_patch.py`; Codex uses the same parser and gate). A PascalCase matcher like `Bash` never fires in Desktop, and an unanchored `bash` also matches `bash_output`. Snowflake documents the Cortex Code CLI as matching case-sensitively against lowercase names too (CLI 1.2.46 also fired PascalCase matchers in our probe), so the same file works there. Quote the plugin root in commands (`"${CORTEX_PLUGIN_ROOT}/hooks/…"`), because install paths can contain spaces. `plugins/cortex-code/tests/test_hooks_config.py` lists every expected handler; update it when you add one.
+
+**Codex hooks are registered in two places**: `plugins/codex/hooks/prevent/hooks.json`, which the plugin manifest points at, and the project-level `.codex/hooks.json` that `plugins/codex/scripts/install.sh` writes. Change both together. Codex runs each command through a shell with `PLUGIN_ROOT` set to the plugin directory (it doesn't set `CODEX_PLUGIN_ROOT`), so write `python3 "${PLUGIN_ROOT}/hooks/prevent/…"`, quoted, because install paths can contain spaces. A matcher made only of letters, digits, `_` and `|` matches tool names exactly: Codex sends `Bash` for shell commands and `apply_patch` for its own patch tool. `bash_hook.py` handles both PreToolUse matchers, and `post_edit_hook.py` handles PostToolUse `apply_patch`. `plugins/codex/tests/test_hooks_config.py` runs the registered PreToolUse, PostToolUse and Stop commands the way Codex does (not the installer's SessionStart telemetry command); update its `EXPECTED` list when you add one.
 
 **Cortex commands become skills in the CoCo Desktop build**, because Desktop has no commands. The builder:
 - converts only the command paths the manifest's `commands` lists, and names each skill after the command's `name` frontmatter, or its filename when there is none;

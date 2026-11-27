@@ -31,14 +31,24 @@ After installation, restart Codex in your project. You should see "Installed mc-
 
 ## How It Works
 
-The plugin uses two hooks to enforce the Monte Carlo Prevent workflow:
+The plugin registers these hooks to enforce the Monte Carlo Prevent workflow:
 
 | Hook | Event | Matcher | Purpose |
 |------|-------|---------|---------|
-| pre_commit | PreToolUse | Bash | Prompt for validation before git commit |
+| bash_hook | PreToolUse | `Bash` | Gate `apply_patch` sent through the shell; prompt for validation before `git commit` |
+| bash_hook | PreToolUse | `apply_patch` | Gate edits made with Codex's own `apply_patch` tool |
+| post_edit | PostToolUse | `apply_patch` | Track the dbt models a successful `apply_patch` changed |
 | turn_end | Stop | — | Suggest validation queries for pending tables |
 
-**Note:** Codex currently only emits PreToolUse/PostToolUse for the Bash tool. Pre-edit and post-edit hooks (Edit|Write) are included in the plugin for forward compatibility but are not registered until Codex expands tool coverage.
+Every file a patch adds, deletes, updates or moves (both paths of a move) is checked before the patch runs. If any of them is a dbt model without an impact assessment, the whole patch is blocked with one message naming every table.
+
+**Codex versions.** Codex 0.124.0 and later send hook events for the `apply_patch` tool, so edits made with it are gated. Older versions only send them for shell commands, so only `apply_patch` run through the shell is gated there.
+
+**Hook review.** Codex runs a new or changed hook only after you review it. After you install or update the plugin, Codex lists the hooks as "New hook - review required" or "Modified since last trusted - review required" in its hooks browser. Until you trust them they don't run, so edits aren't gated. Review and trust the Monte Carlo hooks after each install or update.
+
+**Hooks load once.** `scripts/install.sh` registers the hooks in `.codex/hooks.json` and removes them from its copy of the plugin (`hooks/prevent/hooks.json` and the manifest's `hooks` entry), so Codex loads them once. Don't also install the plugin from another source in the same project: its own `hooks/prevent/hooks.json` would load next to `.codex/hooks.json`, Codex doesn't remove duplicates, and every Prevent hook would run twice (the Stop hook could ask about validation twice, and each copy needs its own review).
+
+**`apply_patch` in the shell.** Codex applies a shell patch itself, without a shell, only in two forms: the whole command is `apply_patch <<'EOF' ... EOF`, or `cd <dir> && apply_patch <<'EOF' ... EOF` (`applypatch` works too). Prevent checks a shell `apply_patch` only in these two forms. It gates the patch against the command's working directory, or against `<dir>`, and tracks it once it is allowed. Codex 0.166.0 and later tell the hook the folder the shell command runs in. Older versions tell it the session's folder, even when the command runs in another one. The delimiter must be a plain word (`EOF`, `'EOF'` or `"EOF"`). It may be unquoted only if the body has no `$`, backtick or `\`. No body line may start with the delimiter (after any whitespace), the heredoc must end with its delimiter line, `<<-` isn't accepted, and the body must hold one patch. Words are separated by spaces and tabs only. `<dir>` must be written out plainly, quoted or bare, with no `~`, `$`, backtick or `\`. It can't be a bare number (`2024`, `0x1`) or a bare name starting with `=`, start with `-` or `+`, or be blank. Any other command that names `apply_patch` or Codex's hidden `--codex-run-as-apply-patch` option (after removing quotes, a `$` before a quote, and backslashes) runs in a real shell, so Prevent can't tell what it changes. It blocks the command as one it couldn't check, in every repo, whatever the command does. That includes wrappers, pipes, patch files, other heredoc forms, and commands that only mention the name, such as `rg apply_patch`, `cat lib/apply_patch.py` or a commit message. The block asks you to retry with Codex's `apply_patch` tool or the plain form, with one patch, the folder written out plainly (not `~`, a variable, a bare number, or a name starting with `-`, `+` or `=`) and a delimiter no patch line starts with, or to reword a mention (`apply_patc[h]` in a search pattern, `git commit -F <file>` for a message). `MC_PREVENT_HOOKS_DISABLED=1` turns this block off along with the rest of the gate.
 
 ## Skills
 
@@ -55,13 +65,11 @@ Codex activates skills automatically when you work with dbt models or SQL files.
 
 ## Known Issues
 
-Codex hook coverage is incomplete, which may cause hooks to not fire consistently:
+Known limits:
 
-- [openai/codex#16732](https://github.com/openai/codex/issues/16732): `ApplyPatchHandler` doesn't emit PreToolUse/PostToolUse hook events — hooks only fire for the Bash tool. When Codex uses its native edit path (`• Edited`), our pre-edit gate is bypassed entirely. We work around this by parsing `apply_patch` commands within the Bash hook, but native edits remain ungated.
-- [openai/codex#14754](https://github.com/openai/codex/issues/14754): Add PreToolUse and PostToolUse hook events for code quality enforcement — tracks the broader request for non-Bash hook parity.
-- [openai/codex#16246](https://github.com/openai/codex/issues/16246): PostToolUse is missing for tools that complete via exec session / polling path — prevents reliable post-edit tracking.
+- `apply_patch` limits. The checks assume the patch runs on this machine: a patch for a remote environment is checked against local paths. A path through a symlink is checked both as written and as the file it reaches, so deleting a link to a model asks for that model's assessment too. A patch that fails partway may have changed files without being tracked, because Codex sends PostToolUse only after a successful patch. Another hook that rewrites the patch after Prevent checked it isn't seen. Before Codex 0.166.0, a shell `apply_patch` whose command runs in a folder other than the session's is checked against the session's folder, so relative paths can point at the wrong files; update Codex to 0.166.0 or later. A change whose patch isn't in the command at all, like `git apply`, `sed` or a script, isn't seen. Prevent finds `apply_patch` in a shell command by its name, after removing quotes, a `$` before a quote, and backslashes, so `ap''ply_patch` and `apply_pa$''tch` count. A name the shell builds at run time (`ap${x}ply_patch`, a variable, an escape inside `$'...'` such as `apply_pa$'\x74'ch`) isn't seen.
 
-The skill-based impact assessment (via `SKILL.md`) works reliably regardless of these hook limitations.
+The skill-based impact assessment (via `SKILL.md`) works reliably regardless of these limits.
 
 ## Telemetry
 
@@ -75,4 +83,4 @@ The data is stored in Mixpanel and Datadog and is used only for product-developm
 
 ## Architecture
 
-This plugin uses the shared core library at `hooks/prevent/lib/` (symlinked). All business logic lives in the shared library; the hooks in this plugin are thin adapters (~20 lines each) that translate Codex JSON to/from the platform-agnostic interface.
+This plugin uses the shared core library at `hooks/prevent/lib/`, a copy of `plugins/shared/prevent/lib/` kept in sync by `./scripts/bump-version.sh --sync-only` (CI rejects symlinks there). The gate, the `apply_patch` parser and edit tracking live in the shared library; the hooks in this plugin are adapters that translate Codex JSON to and from it. `shell_patch.py` is Codex-only: it recognises the two shell `apply_patch` forms Codex applies itself, and flags any other command that names `apply_patch` as one Prevent couldn't check.

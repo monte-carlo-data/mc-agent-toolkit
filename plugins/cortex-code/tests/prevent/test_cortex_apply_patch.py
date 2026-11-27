@@ -1,5 +1,6 @@
-"""CoCo Desktop `apply_patch` support: the patch parser, the pre-edit gate over every
-file a patch touches, and post-edit tracking driven by the tool's result.
+"""CoCo Desktop `apply_patch` support: the pre-edit gate over every file a patch touches,
+and post-edit tracking driven by the tool's result. The parser's own tests are in
+plugins/shared/prevent/lib/tests/test_apply_patch.py.
 
 Desktop gives GPT/OpenAI models `apply_patch` instead of edit/write. The hook payload
 carries the patch in `tool_input.input`, the session directory in `cwd`, and (for
@@ -92,162 +93,16 @@ def _run_post(stdin):
         main()
 
 
-# --- Parser ---
-
-class TestParseOperations:
-    def _ops(self, text):
-        from apply_patch import parse_operations
-        return [(op.kind, op.path, op.move_to) for op in parse_operations(text)]
-
-    def test_update(self):
-        assert self._ops(_patch(*_update("models/orders.sql"))) == [("update", "models/orders.sql", None)]
-
-    def test_add_and_delete(self):
-        text = _patch("*** Add File: models/new.sql", "+select 1", "*** Delete File: models/old.sql")
-        assert self._ops(text) == [("add", "models/new.sql", None), ("delete", "models/old.sql", None)]
-
-    def test_move_attaches_to_update(self):
-        text = _patch("*** Update File: models/a.sql", "*** Move to: models/b.sql", "@@", "-x", "+y")
-        assert self._ops(text) == [("update", "models/a.sql", "models/b.sql")]
-
-    def test_rename_without_hunks(self):
-        text = _patch("*** Update File: models/a.sql", "*** Move to: models/b.sql")
-        assert self._ops(text) == [("update", "models/a.sql", "models/b.sql")]
-
-    def test_move_after_a_hunk_still_counts(self):
-        """The clients reject this patch; reading the Move anyway only adds a file to check."""
-        text = _patch("*** Update File: models/a.sql", "@@", "-x", "+y", "*** Move to: models/b.sql")
-        assert self._ops(text) == [("update", "models/a.sql", "models/b.sql")]
-
-    def test_bom_after_header_inside_update_section(self):
-        text = _patch(*_update("README.md"), "*** Delete File: models/orders.sql\ufeff")
-        assert self._ops(text)[-1] == ("delete", "models/orders.sql", None)
-        # Trailing whitespace is stripped the JavaScript way (U+FEFF included), so a
-        # header with nothing after it is not an operation.
-        assert self._ops(_patch(*_update("README.md"), "*** Delete File: \ufeff")) == [("update", "README.md", None)]
-
-    @pytest.mark.parametrize("char", ["\x1c", "\x1d", "\x1e", "\x1f", "\x85"])
-    def test_python_only_whitespace_is_not_trimmed(self, char):
-        """JavaScript's trim keeps these five, which Python's isspace counts as whitespace."""
-        assert self._ops(_patch(*_update(f"{char}/../models/orders.sql"))) == [
-            ("update", f"{char}/../models/orders.sql", None)
-        ]
-        # The Add's path is the character itself, so the Update section ends and the
-        # indented header after it is read.
-        text = _patch(*_update("README.md"), f"*** Add File: {char}", "  *** Update File: models/orders.sql")
-        assert self._ops(text)[-1] == ("update", "models/orders.sql", None)
-
-    def test_first_move_kept(self):
-        text = _patch("*** Update File: models/a.sql", "*** Move to: models/b.sql", "*** Move to: models/c.sql")
-        assert self._ops(text) == [("update", "models/a.sql", "models/b.sql")]
-
-    def test_move_not_right_after_update_is_ignored(self):
-        text = _patch("*** Add File: models/a.sql", "*** Move to: models/b.sql", "+x")
-        assert self._ops(text) == [("add", "models/a.sql", None)]
-
-    def test_several_files_in_order(self):
-        text = _patch(*_update("README.md"), *_update("models/orders.sql"), "*** Delete File: x.txt")
-        assert [p for _, p, _ in self._ops(text)] == ["README.md", "models/orders.sql", "x.txt"]
-
-    def test_crlf(self):
-        text = (_patch(*_update("models/orders.sql")) + "*** Delete File: models/customers.sql\n").replace("\n", "\r\n")
-        assert self._ops(text) == [("update", "models/orders.sql", None)]
-
-    def test_leading_blank_lines_and_bom(self):
-        text = "\ufeff\n  \n" + _patch(*_update("models/orders.sql"))
-        assert self._ops(text) == [("update", "models/orders.sql", None)]
-
-    def test_path_with_spaces_kept(self):
-        assert self._ops(_patch(*_update("models/my model.sql"))) == [("update", "models/my model.sql", None)]
-
-    def test_path_is_trimmed(self):
-        assert self._ops(_patch("*** Delete File:   models/a.sql  ")) == [("delete", "models/a.sql", None)]
-
-    def test_path_trailing_bom_is_trimmed(self):
-        """JavaScript's trim, which the clients use on paths, also removes U+FEFF."""
-        assert self._ops(_patch("*** Delete File: models/orders.sql\ufeff")) == [("delete", "models/orders.sql", None)]
-
-    def test_indented_patch_outside_update_hunks(self):
-        """The Cortex Code CLI trims a line before matching a header outside an Update hunk."""
-        text = "  *** Begin Patch\n  *** Delete File: models/orders.sql\n  *** End Patch\n"
-        assert self._ops(text) == [("delete", "models/orders.sql", None)]
-
-    def test_indented_header_after_add_or_delete(self):
-        text = _patch("*** Add File: notes.txt", "+hi", "  *** Update File: models/orders.sql", "@@", "-a", "+b",
-                      "*** Delete File: x.txt", "\t*** Delete File: models/customers.sql")
-        assert [p for _, p, _ in self._ops(text)] == ["notes.txt", "models/orders.sql", "x.txt", "models/customers.sql"]
-
-    def test_indented_line_in_update_hunk_is_content(self):
-        """Inside an Update's hunks the CLI only strips trailing whitespace, so an indented
-        header there is a context line, not a new operation."""
-        text = _patch("*** Update File: README.md", "@@", "  *** Delete File: models/orders.sql", "-a", "+b")
-        assert self._ops(text) == [("update", "README.md", None)]
-
-    def test_update_header_on_last_line(self):
-        assert self._ops("*** Begin Patch\n*** Update File: models/orders.sql") == [("update", "models/orders.sql", None)]
-
-    def test_hunk_content_that_looks_like_a_header_is_not_one(self):
-        text = _patch("*** Update File: README.md", "@@", "-old", "+*** Update File: models/orders.sql",
-                      " *** Delete File: models/customers.sql")
-        assert self._ops(text) == [("update", "README.md", None)]
-
-    def test_stops_at_end_patch(self):
-        text = _patch(*_update("README.md")) + "*** Update File: models/orders.sql\n"
-        assert self._ops(text) == [("update", "README.md", None)]
-
-    def test_missing_end_patch_still_returns_headers(self):
-        text = "*** Begin Patch\n*** Update File: models/orders.sql\n@@\n-a\n+b\n"
-        assert self._ops(text) == [("update", "models/orders.sql", None)]
-
-    def test_empty_path_skipped(self):
-        assert self._ops(_patch("*** Delete File:   ")) == []
-
-    def test_not_a_patch(self):
-        assert self._ops("*** Update File: models/orders.sql\n") == []
-        assert self._ops("Here is the change:\n*** Update File: models/orders.sql\n@@\n-a\n+b\n") == []
-        assert self._ops("echo hi") == []
-        assert self._ops("") == []
-
-    def test_non_string(self):
-        assert self._ops(None) == []
-        assert self._ops({"input": "x"}) == []
-
-    def test_op_paths_dedupes_and_includes_move_destination(self):
-        from apply_patch import op_paths, parse_operations
-        text = _patch("*** Update File: a.sql", "*** Move to: b.sql", *_update("a.sql"), "*** Delete File: c.sql")
-        assert op_paths(parse_operations(text)) == ["a.sql", "b.sql", "c.sql"]
-
-
-class TestResolvePath:
-    def test_relative_joined_to_cwd(self):
-        from apply_patch import resolve_path
-        assert resolve_path("models/orders.sql", "/proj") == "/proj/models/orders.sql"
-
-    def test_absolute_kept(self):
-        from apply_patch import resolve_path
-        assert resolve_path("/other/models/orders.sql", "/proj") == "/other/models/orders.sql"
-
-    def test_normalized(self):
-        from apply_patch import resolve_path
-        assert resolve_path("seeds/../models/./orders.sql", "/proj") == "/proj/models/orders.sql"
-
-    def test_empty_cwd_is_filesystem_root(self):
-        """Desktop resolves a relative path with no working directory as /<path>."""
-        from apply_patch import resolve_path
-        assert resolve_path("models/orders.sql", "") == "/models/orders.sql"
-        assert resolve_path("models/orders.sql", None) == "/models/orders.sql"
-
-
 class TestAppliedOperations:
     def _ops(self):
-        from apply_patch import parse_operations
+        from lib.apply_patch import parse_operations
         return parse_operations(_patch(
             *_update("models/orders.sql"),
             "*** Update File: models/customers.sql", "*** Move to: models/clients.sql",
             "*** Delete File: README.md"))
 
     def _applied(self, response):
-        from apply_patch import applied_operations
+        from patch_result import applied_operations
         return [op.path for op in applied_operations(self._ops(), response)]
 
     def _resp(self, text):
@@ -443,10 +298,29 @@ class TestPreEditApplyPatch:
                                   _session_files(tmp_path)), capsys)
         assert out["permissionDecision"] == "deny"
 
+    def test_models_folder_in_another_case_gated(self, project, tmp_path, capsys):
+        """On a case-insensitive filesystem MODELS/orders.sql is the model models/orders.sql.
+        On a case-sensitive one it is a new file, which the gate allows like any new model."""
+        (project / "CaseProbe").write_text("")
+        case_insensitive = (project / "caseprobe").exists()
+        (project / "CaseProbe").unlink()
+        if not case_insensitive:
+            pytest.skip("needs a case-insensitive filesystem")
+        out = _run_pre(_pre_stdin(_patch(*_update("MODELS/orders.sql")), str(project),
+                                  _session_files(tmp_path)), capsys)
+        assert out["permissionDecision"] == "deny"
+
     def test_absolute_path_gated(self, project, tmp_path, capsys):
         out = _run_pre(_pre_stdin(_patch(*_update(str(project / "models" / "orders.sql"))), str(tmp_path),
                                   _session_files(tmp_path)), capsys)
         assert out["permissionDecision"] == "deny"
+
+    def test_path_through_linked_folder_gated(self, project, tmp_path, capsys):
+        (project / "dbtlink").symlink_to(project / "models", target_is_directory=True)
+        out = _run_pre(_pre_stdin(_patch(*_update("dbtlink/orders.sql")), str(project),
+                                  _session_files(tmp_path)), capsys)
+        assert out["permissionDecision"] == "deny"
+        assert out["permissionDecisionReason"].startswith("Monte Carlo Prevent: run the change impact assessment for orders")
 
     def test_add_new_model_allowed(self, project, tmp_path, capsys):
         text = _patch("*** Add File: models/brand_new.sql", "+select 1")
@@ -520,10 +394,11 @@ class TestPostEditApplyPatch:
                       "*** Update File: models/customers.sql", "*** Move to: models/clients.sql",
                       *_update("models/schema.yml"), *_update("README.md"))
 
-    def test_success_tracks_every_dbt_file(self, project):
-        # The gate allowed the move only after customers was assessed.
+    def test_success_tracks_every_dbt_file(self, project, tmp_path, capsys):
+        cache.mark_impact_check_verified(SESSION, "orders")
         cache.mark_impact_check_verified(SESSION, "customers")
         (project / "models" / "schema.yml").write_text("version: 2\n")
+        assert _run_pre(_pre_stdin(self._patch(), str(project), _session_files(tmp_path)), capsys) is None
         (project / "models" / "customers.sql").rename(project / "models" / "clients.sql")
         _run_post(_post_stdin(self._patch(), str(project), "Applied 4 operation(s) (3 added, 3 removed) across 5 file(s)."))
         assert sorted(cache.get_edited_tables(SESSION)) == ["clients", "customers", "orders", "schema"]
@@ -538,11 +413,68 @@ class TestPostEditApplyPatch:
                               "Applied 1 operation(s)."))
         assert cache.get_edited_tables(SESSION) == ["brand_new"]
 
-    def test_deleted_model_tracked(self, project):
+    def test_deleted_model_tracked(self, project, tmp_path, capsys):
+        cache.mark_impact_check_verified(SESSION, "orders")
+        text = _patch("*** Delete File: models/orders.sql")
+        assert _run_pre(_pre_stdin(text, str(project), _session_files(tmp_path)), capsys) is None
+        (project / "models" / "orders.sql").unlink()
+        _run_post(_post_stdin(text, str(project), "Applied 1 operation(s)."))
+        assert cache.get_edited_tables(SESSION) == ["orders"]
+
+    def test_deleted_model_without_a_pre_record_tracked_by_its_assessment(self, project):
+        """Without the pre hook's record, a gone file whose table was assessed this session
+        was gated as a model, so it still counts."""
         cache.mark_impact_check_verified(SESSION, "orders")
         (project / "models" / "orders.sql").unlink()
         _run_post(_post_stdin(_patch("*** Delete File: models/orders.sql"), str(project), "Applied 1 operation(s)."))
         assert cache.get_edited_tables(SESSION) == ["orders"]
+
+    def test_moved_model_with_an_unmatched_call_id_tracked_by_its_assessment(self, project, tmp_path, capsys):
+        cache.mark_impact_check_verified(SESSION, "orders")
+        text = _patch("*** Update File: models/orders.sql", "*** Move to: models/orders_v2.sql")
+        assert _run_pre(_pre_stdin(text, str(project), _session_files(tmp_path)), capsys) is None
+        (project / "models" / "orders.sql").rename(project / "models" / "orders_v2.sql")
+        stdin = json.loads(_post_stdin(text, str(project), "Applied 1 operation(s)."))
+        stdin["tool_use_id"] = "call_other"
+        _run_post(json.dumps(stdin))
+        assert sorted(cache.get_edited_tables(SESSION)) == ["orders", "orders_v2"]
+
+    def test_deleted_model_without_a_pre_record_or_assessment_not_tracked(self, project):
+        """Without the record or an assessment, a file that is gone can't be told from plain SQL."""
+        (project / "models" / "orders.sql").unlink()
+        _run_post(_post_stdin(_patch("*** Delete File: models/orders.sql"), str(project), "Applied 1 operation(s)."))
+        assert cache.get_edited_tables(SESSION) == []
+
+    def test_deleted_non_model_with_an_assessed_stem_not_tracked(self, project):
+        cache.mark_impact_check_verified(SESSION, "orders")
+        _run_post(_post_stdin(_patch("*** Delete File: docs/orders.sql"), str(project), "Applied 1 operation(s)."))
+        assert cache.get_edited_tables(SESSION) == []
+
+    def test_plain_sql_written_over_a_model_tracked(self, project, tmp_path, capsys):
+        cache.mark_impact_check_verified(SESSION, "orders")
+        text = _patch("*** Add File: models/orders.sql", "+select 1")
+        assert _run_pre(_pre_stdin(text, str(project), _session_files(tmp_path)), capsys) is None
+        (project / "models" / "orders.sql").write_text("select 1\n")
+        _run_post(_post_stdin(text, str(project), "Applied 1 operation(s)."))
+        assert cache.get_edited_tables(SESSION) == ["orders"]
+
+    def test_same_stem_file_with_old_state_not_tracked(self, project, tmp_path, capsys):
+        """Impact state is per table name; a non-model file sharing the stem doesn't count."""
+        cache.mark_impact_check_verified(SESSION, "orders")
+        (project / "docs").mkdir()
+        text = _patch("*** Add File: docs/orders.sql", "+select 1")
+        assert _run_pre(_pre_stdin(text, str(project), _session_files(tmp_path)), capsys) is None
+        (project / "docs" / "orders.sql").write_text("select 1\n")
+        _run_post(_post_stdin(text, str(project), "Applied 1 operation(s)."))
+        assert cache.get_edited_tables(SESSION) == []
+
+    def test_deleted_schema_yaml_tracked(self, project, tmp_path, capsys):
+        (project / "models" / "schema.yml").write_text("version: 2\n")
+        text = _patch("*** Delete File: models/schema.yml")
+        assert _run_pre(_pre_stdin(text, str(project), _session_files(tmp_path)), capsys) is None
+        (project / "models" / "schema.yml").unlink()
+        _run_post(_post_stdin(text, str(project), "Applied 1 operation(s)."))
+        assert cache.get_edited_tables(SESSION) == ["schema"]
 
     def test_deleted_plain_sql_not_tracked(self, project):
         """A .sql file with no dbt constructs isn't gated; once it's gone it must not be
@@ -559,8 +491,10 @@ class TestPostEditApplyPatch:
                               str(project), "Applied 1 operation(s)."))
         assert cache.get_edited_tables(SESSION) == []
 
-    def test_partial_failure_tracks_completed_operations(self, project):
+    def test_partial_failure_tracks_completed_operations(self, project, tmp_path, capsys):
+        cache.mark_impact_check_verified(SESSION, "orders")
         cache.mark_impact_check_verified(SESSION, "customers")
+        assert _run_pre(_pre_stdin(self._patch(), str(project), _session_files(tmp_path)), capsys) is None
         (project / "models" / "customers.sql").rename(project / "models" / "clients.sql")
         _run_post(_post_stdin(self._patch(), str(project),
                               "Error: Patch partially applied through operation 3/4: context not found"))
