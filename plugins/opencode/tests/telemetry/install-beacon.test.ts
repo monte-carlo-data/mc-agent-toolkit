@@ -32,6 +32,7 @@ const realFetch = globalThis.fetch;
 
 let tmp: string;
 let origXDG: string | undefined;
+let origBeaconUrl: string | undefined;
 
 function installIdPath(): string {
   return join(idsDir(), "install_id");
@@ -51,6 +52,7 @@ beforeEach(() => {
 
   tmp = mkdtempSync(join(tmpdir(), "mc-oc-tele-"));
   origXDG = process.env.XDG_CONFIG_HOME;
+  origBeaconUrl = process.env.MCD_TOOLKIT_BEACON_URL;
   process.env.XDG_CONFIG_HOME = tmp;
   delete process.env.MC_AGENT_TOOLKIT_TELEMETRY_DISABLED;
   delete process.env.MCD_TOOLKIT_BEACON_URL;
@@ -60,6 +62,9 @@ afterEach(() => {
   globalThis.fetch = realFetch;
   if (origXDG === undefined) delete process.env.XDG_CONFIG_HOME;
   else process.env.XDG_CONFIG_HOME = origXDG;
+  // The preload points the beacon at a local address; later test files rely on it.
+  if (origBeaconUrl === undefined) delete process.env.MCD_TOOLKIT_BEACON_URL;
+  else process.env.MCD_TOOLKIT_BEACON_URL = origBeaconUrl;
   rmSync(tmp, { recursive: true, force: true });
 });
 

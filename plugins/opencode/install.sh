@@ -50,7 +50,8 @@ done
 echo "  ✓ Plugin copied to .opencode/plugins/mc-agent-toolkit/"
 
 # Install dependencies
-(cd "$PLUGIN_DEST" && bun install --silent)
+# The plugin imports only types from its dependencies, so dev dependencies are skipped.
+(cd "$PLUGIN_DEST" && bun install --silent --production)
 echo "  ✓ Dependencies installed"
 
 # --- 2. Skill ---
@@ -74,13 +75,20 @@ OPENCODE_JSON="$TARGET_DIR/opencode.json"
 if [ -f "$OPENCODE_JSON" ]; then
   NEEDS_GUIDANCE=false
 
-  # Check plugin registration
-  if grep -q '"\.opencode/plugins/mc-agent-toolkit"' "$OPENCODE_JSON" 2>/dev/null; then
+  # Check plugin registration. OpenCode 1.x needs the entry; OpenCode 2.x finds the
+  # folder by itself but reads an entry without "./" as an npm package name.
+  if grep -q '"\./\.opencode/plugins/mc-agent-toolkit"' "$OPENCODE_JSON" 2>/dev/null; then
     echo "  ✓ Plugin already registered in opencode.json"
+  elif grep -q '"\.opencode/plugins/mc-agent-toolkit"' "$OPENCODE_JSON" 2>/dev/null; then
+    echo "  ⚠ opencode.json registers the plugin as \".opencode/plugins/mc-agent-toolkit\"."
+    echo "    OpenCode 2 reads that as a package name and loads a second, duplicate copy."
+    echo "    Change the entry to:"
+    echo '    "./.opencode/plugins/mc-agent-toolkit"'
+    NEEDS_GUIDANCE=true
   else
     echo "  ⚠ opencode.json exists but mc-agent-toolkit plugin is not registered."
     echo "    Add to your opencode.json:"
-    echo '    "plugin": [".opencode/plugins/mc-agent-toolkit"]'
+    echo '    "plugin": ["./.opencode/plugins/mc-agent-toolkit"]'
     NEEDS_GUIDANCE=true
   fi
 

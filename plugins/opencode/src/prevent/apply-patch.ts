@@ -18,7 +18,7 @@
  * found by trimmed line, so a patch wrapped in a heredoc parses the same way.
  * OpenCode resolves every path against the session directory.
  */
-import { resolve } from "path";
+import { resolve } from "node:path";
 
 export type PatchOp = {
   kind: "add" | "delete" | "update";
@@ -63,6 +63,50 @@ export function parsePatchOps(patchText: unknown): PatchOp[] {
       const movePath = lines[i + 1].slice(MOVE_TO.length).trim();
       if (movePath) op.movePath = movePath;
       i++;
+    }
+    ops.push(op);
+  }
+  return ops;
+}
+
+const END_OF_FILE = "*** End of File";
+
+/**
+ * Operations in a patch for OpenCode 2.x's `patch` tool, following its parser
+ * (`parse` in anomalyco/opencode v2.4.1, packages/util/src/patch.ts): headers match
+ * by trimmed line, `*** End of File` lines may sit between an Update header and its
+ * Move, and the Move line keeps its leading whitespace significant. Where 2.x would
+ * reject the patch the result may name more files than it would touch, which only
+ * gates a call that is going to fail anyway.
+ */
+export function parsePatchOpsV2(patchText: unknown): PatchOp[] {
+  if (typeof patchText !== "string") return [];
+  const lines = patchText.split("\n").map((line) => (line.endsWith("\r") ? line.slice(0, -1) : line));
+  const begin = lines.findIndex((line) => line.trim() === BEGIN);
+  let end = -1;
+  for (let i = lines.length - 1; i >= 0; i--) {
+    if (lines[i].trim() === END) {
+      end = i;
+      break;
+    }
+  }
+  if (begin === -1 || end === -1 || begin >= end) return [];
+
+  const ops: PatchOp[] = [];
+  for (let i = begin + 1; i < end; i++) {
+    const found = header(lines[i].trim());
+    if (!found) continue;
+    const [kind, path] = found;
+    const op: PatchOp = { kind, path };
+    if (kind === "update") {
+      let next = i + 1;
+      while (next < end && lines[next].trimEnd() === END_OF_FILE) next++;
+      const move = lines[next]?.trimEnd();
+      if (next < end && move?.startsWith(MOVE_TO)) {
+        const movePath = move.slice(MOVE_TO.length).trim();
+        if (movePath) op.movePath = movePath;
+        i = next;
+      }
     }
     ops.push(op);
   }

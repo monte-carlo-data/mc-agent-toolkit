@@ -16,7 +16,7 @@ For detailed workflow descriptions, activation rules, and synthesis guidelines, 
 
 ## Prerequisites
 
-- [OpenCode](https://opencode.ai) 1.x installed. OpenCode 2 doesn't load plugins written for 1.x, so this plugin doesn't run there yet.
+- [OpenCode](https://opencode.ai) installed. The plugin loads on both OpenCode 1.x and 2.x from the same files. It is tested on OpenCode 1.19.6 and 2.4.1. OpenCode documents the dual 1.x/2.x entry it uses as working on 1.18.29 and newer; older 1.x releases are untested.
 - [Bun](https://bun.sh) installed
 - A Monte Carlo account with API access
 
@@ -32,10 +32,10 @@ From the repo root, run the install script targeting your dbt project:
 
 This installs all three components and creates the MCP server config:
 
-- **Plugin** → `.opencode/plugins/mc-prevent/` (hooks that gate edits)
+- **Plugin** → `.opencode/plugins/mc-agent-toolkit/` (hooks that gate edits)
 - **Skill** → `.opencode/skills/prevent/` (workflow instructions for the LLM)
 - **Command** → `.opencode/commands/mc-validate.md` (slash command)
-- **Config** → `opencode.json` with Monte Carlo MCP server
+- **Config** → `opencode.json` with the plugin registration and the Monte Carlo MCP server
 
 Then authenticate:
 
@@ -50,9 +50,9 @@ If you prefer to install components individually:
 **1. Plugin** (hooks that gate edits and track changes):
 
 ```bash
-mkdir -p .opencode/plugins/mc-prevent
-cp -r plugins/opencode/{src,package.json,tsconfig.json} .opencode/plugins/mc-prevent/
-cd .opencode/plugins/mc-prevent && bun install
+mkdir -p .opencode/plugins/mc-agent-toolkit
+cp -r plugins/opencode/{src,package.json,tsconfig.json} .opencode/plugins/mc-agent-toolkit/
+cd .opencode/plugins/mc-agent-toolkit && bun install --production
 ```
 
 **2. Skill** (workflow instructions — required for impact assessments):
@@ -69,10 +69,11 @@ mkdir -p .opencode/commands
 cp plugins/opencode/commands/mc-validate.md .opencode/commands/
 ```
 
-**4. MCP server config** (add to your `opencode.json`):
+**4. Plugin registration and MCP server config** (add to your `opencode.json` at the project root):
 
 ```json
 {
+  "plugin": ["./.opencode/plugins/mc-agent-toolkit"],
   "mcp": {
     "monte-carlo-mcp": {
       "type": "remote",
@@ -82,11 +83,22 @@ cp plugins/opencode/commands/mc-validate.md .opencode/commands/
 }
 ```
 
+See [OpenCode 1.x and 2.x config](#opencode-1x-and-2x-config) for what the `plugin` entry does on each version.
+
 **5. Authenticate:**
 
 ```bash
 opencode mcp auth monte-carlo-mcp
 ```
+
+### OpenCode 1.x and 2.x config
+
+- OpenCode 1.x loads the plugin only from the `plugin` entry. It doesn't scan `.opencode/plugins/` for folders.
+- OpenCode 2.x finds the `.opencode/plugins/mc-agent-toolkit/` folder by itself. It also reads the 1.x `plugin` key (its own key is `plugins`), and an entry that names the same folder loads it once.
+- Write the entry with a leading `./`. OpenCode 2.x treats a path without `./` or `../` as a package name: with the entry `".opencode/plugins/mc-agent-toolkit"` that installs before 1.34.0 wrote, it installs a second copy through its package cache, reports it as a duplicate plugin ID, and logs a failed update check. The copy it found in the folder still runs. Change the entry to `"./.opencode/plugins/mc-agent-toolkit"`. OpenCode 1.x accepts both spellings.
+- In an `opencode.json` inside `.opencode/`, paths are relative to that folder: use `"./plugins/mc-agent-toolkit"`.
+- Install the plugin once, in the project or in your global OpenCode config, not both: OpenCode 2.x reports the second copy as a duplicate plugin ID.
+- To check that it loaded on OpenCode 2.x, run `opencode plugin list` and look for `mc-prevent`.
 
 ### Updating
 
@@ -110,21 +122,28 @@ Use `/mc-validate` to generate validation queries for all dbt models changed in 
 
 ## How it works
 
-The plugin registers three OpenCode hook events:
+One module serves both OpenCode versions: its default export carries `server` for OpenCode 1.x and `setup` for OpenCode 2.x, and each version ignores the other's key. The decisions are shared (`src/prevent/core.ts`); `src/prevent/v1.ts` and `src/prevent/v2.ts` connect them to each version's hooks.
 
-| Hook            | Event                                                    | Behavior                                                |
-| --------------- | -------------------------------------------------------- | ------------------------------------------------------- |
-| Pre-edit gate   | `tool.execute.before` (edit/write/apply_patch/multiedit) | Blocks dbt model edits until impact assessment verified |
-| Edit tracker    | `tool.execute.after` (edit/write/apply_patch/multiedit)  | Silently accumulates edited table names                 |
-| Pre-commit gate | `tool.execute.before` (bash with `git commit`)           | Prompts for validation on staged dbt files              |
-| Turn-end prompt | `session.idle` event                                     | Reminds about validation queries and monitor coverage   |
+| Hook            | OpenCode 1.x                                             | OpenCode 2.x                                            | Behavior                                                |
+| --------------- | -------------------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------- |
+| Pre-edit gate   | `tool.execute.before` (edit/write/apply_patch/multiedit) | `ctx.tool.hook("execute.before")` (edit/write/patch)    | Blocks dbt model edits until impact assessment verified |
+| Edit tracker    | `tool.execute.after` (edit/write/apply_patch/multiedit)  | `ctx.tool.hook("execute.after")`, completed calls only  | Silently accumulates edited table names                 |
+| Pre-commit gate | `tool.execute.before` (bash with `git commit`)           | `ctx.tool.hook("execute.before")` (shell with `git commit`) | Prompts for validation on staged dbt files          |
+| Turn-end prompt | `session.idle` event                                     | `ctx.session.hook("experimental.idle")`                 | Reminds about validation queries and monitor coverage   |
+| MCP headers     | `config` hook                                            | `ctx.mcp.transform`                                     | Adds the toolkit telemetry headers                      |
+
+The turn-end reminder behaves differently on the two versions. On OpenCode 1.x it is added to the session without a reply, and the agent sees it on your next message. On OpenCode 2.x it is added just before the session goes idle, so the agent takes one more step and asks you the question, as in Claude Code. OpenCode 2.x's idle hook is marked experimental. The reminder isn't sent to a subagent's session, and it waits while the session's own shell or subagent is still running.
+
+On OpenCode 2.x the completion marker counts only in the agent's own reply text, not in your messages. Markers are also remembered from the event stream, so one written before the session was compacted still counts.
+
+OpenCode 2.x can run plugins under Node instead of Bun. The plugin's sources load under Node (CI runs `bun run test:node`), but only the regular, Bun-based OpenCode 2.x build is tested end to end. Paths are checked on this machine: a session on a remote OpenCode workspace isn't gated.
 
 State is managed via temp files under `$TMPDIR/mc_prevent_*` with a three-state machine:
 
 - `absent` → `injected` (instruction sent, waiting for completion)
 - `injected` → `verified` (completion marker found in session messages)
 
-An `apply_patch` call can touch several files. The pre-edit gate checks every file the patch adds, updates, deletes or moves, including the destination of a `*** Move to:`, so moving a file onto an existing model is gated for that model. Patch paths are resolved against the session directory, as OpenCode does. After the patch runs, the edit tracker counts the files OpenCode reports it changed. This holds for every edit tool: a SQL file an edit deleted, moved away or overwrote with plain SQL counts only if it was a dbt model just before the edit ran.
+An `apply_patch` call (`patch` on OpenCode 2.x) can touch several files. The pre-edit gate checks every file the patch adds, updates, deletes or moves, including the destination of a `*** Move to:`, so moving a file onto an existing model is gated for that model. Patch paths are resolved against the session directory, as OpenCode does. After the patch runs, the edit tracker counts the files OpenCode 1.x reports it changed; OpenCode 2.x's `patch` reports none, so the tracker reads them from the patch. This holds for every edit tool: a SQL file an edit deleted, moved away or overwrote with plain SQL counts only if it was a dbt model just before the edit ran.
 
 All hooks are wrapped in error handling — failures never block the engineer.
 
@@ -134,10 +153,10 @@ All hooks are wrapped in error handling — failures never block the engineer.
 | ------------------- | ------------------------------------ | ---------------------------------------- |
 | Hook language       | Python                               | TypeScript                               |
 | Packaging           | Marketplace plugin                   | `.opencode/plugins/` directory           |
-| Pre-edit gate       | `PreToolUse` hook with deny decision | `tool.execute.before` with thrown error  |
-| Transcript scanning | Reads transcript file                | Uses SDK client to read session messages |
-| Turn-end prompt     | `Stop` hook with block decision      | `session.idle` event with SDK message    |
-| Git staged files    | `subprocess.run(["git", ...])`       | `Bun.spawn(["git", ...])`                |
+| Pre-edit gate       | `PreToolUse` hook with deny decision | Tool `execute.before` hook with thrown error |
+| Transcript scanning | Reads transcript file                | Reads session messages through OpenCode's API |
+| Turn-end prompt     | `Stop` hook with block decision      | 1.x: message without a reply; 2.x: message the agent answers |
+| Git staged files    | `subprocess.run(["git", ...])`       | `execFile("git", ...)` from `node:child_process` |
 
 ## Troubleshooting
 
