@@ -2,7 +2,7 @@
  * dbt file detection tests — port of plugins/claude-code/prevent/tests/test_detect.py
  */
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { mkdtempSync } from "fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import { cleanCache, createDbtProject } from "./helpers";
@@ -217,5 +217,64 @@ describe("folder name case", () => {
 
   it("counts a schema file under an upper-case models folder", () => {
     expect(isDbtSchemaFile(join(tmpDir, "MODELS", "schema.yml"))).toBe(true);
+  });
+});
+
+// With a dbt_project.yml, only the folders below the project count: a folder
+// above it that shares a dbt folder name says nothing about the file.
+describe("folders above the project", () => {
+  function projectUnder(...ancestors: string[]): string {
+    const project = join(tmpDir, ...ancestors, "proj");
+    mkdirSync(project, { recursive: true });
+    writeFileSync(join(project, "dbt_project.yml"), "name: proj\n");
+    return project;
+  }
+
+  for (const ancestor of ["Macros", "macros"]) {
+    it(`does not name a model a macro under a ${ancestor} ancestor`, () => {
+      const path = join(projectUnder(ancestor), "models", "orders.sql");
+      expect(isDbtModel(path)).toBe(true);
+      expect(isMacroFile(path)).toBe(false);
+      expect(extractTableName(path)).toBe("orders");
+    });
+  }
+
+  for (const ancestor of ["seeds", "analyses"]) {
+    it(`keeps models gated under a ${ancestor} ancestor`, () => {
+      const project = projectUnder(ancestor);
+      expect(isDbtModel(join(project, "models", "orders.sql"))).toBe(true);
+      expect(isDbtSchemaFile(join(project, "models", "schema.yml"))).toBe(true);
+    });
+  }
+
+  it("does not gate other folders under a models ancestor", () => {
+    const project = projectUnder("models");
+    expect(isDbtModel(join(project, "scripts", "x.sql"))).toBe(false);
+    expect(isDbtSchemaFile(join(project, "scripts", "x.yml"))).toBe(false);
+  });
+
+  it("still counts folders below the project", () => {
+    const project = projectUnder("models");
+    expect(isDbtModel(join(project, "seeds", "x.sql"))).toBe(false);
+    expect(extractTableName(join(project, "macros", "helper.sql"))).toBe("macro:helper");
+  });
+
+  it("resolves a relative path against the project", () => {
+    const project = projectUnder("seeds", "Macros");
+    const cwd = process.cwd();
+    process.chdir(project);
+    try {
+      expect(isDbtModel("models/orders.sql")).toBe(true);
+      expect(extractTableName("models/orders.sql")).toBe("orders");
+      expect(isDbtModel("scripts/x.sql")).toBe(false);
+    } finally {
+      process.chdir(cwd);
+    }
+  });
+
+  it("matches every folder of a backslash path without a project", () => {
+    expect(isDbtModel("C:\\no_such_dir\\models\\orders.sql")).toBe(true);
+    expect(isDbtModel("C:\\no_such_dir\\seeds\\orders.sql")).toBe(false);
+    expect(isMacroFile("C:\\no_such_dir\\macros\\helper.sql")).toBe(true);
   });
 });

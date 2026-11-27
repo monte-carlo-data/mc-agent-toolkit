@@ -1,7 +1,7 @@
 """dbt SQL file detection. Reads dbt_project.yml paths (cached) instead of hardcoding folder names."""
 import os
 
-from lib.cache import get_dbt_paths
+from lib.cache import find_dbt_project_dir, get_dbt_paths
 
 REF_PATTERNS = ["{{ ref(", "{{ source("]
 DBT_BLOCK_PATTERNS = ["{% macro", "{% snapshot"]
@@ -35,14 +35,26 @@ def _get_macro_dirs(file_path: str) -> set[str]:
     return {p.rstrip("/").rsplit("/", 1)[-1] for p in paths.get("macro-paths", [])}
 
 
-def _in_dirs(file_path: str, dirs: set[str]) -> bool:
-    """True if a folder of file_path is named in dirs, ignoring case.
+def _folder_parts(file_path: str) -> list[str]:
+    """The components of file_path that can name a dbt folder.
+
+    With a dbt_project.yml above the file, only those below the project folder count: a
+    folder above the project named `seeds` or `Macros` says nothing about the file. Without
+    one, every component counts.
+    """
+    project_dir = find_dbt_project_dir(file_path)
+    if project_dir:
+        file_path = os.path.relpath(file_path, project_dir)
+    return file_path.replace("\\", "/").split("/")
+
+
+def _in_dirs(parts: list[str], dirs: set[str]) -> bool:
+    """True if one of parts (from _folder_parts) is named in dirs, ignoring case.
 
     On a case-insensitive filesystem (macOS, Windows) `MODELS/` is `models/`; on a
     case-sensitive one the match costs at most an extra assessment.
     """
-    parts = {p.casefold() for p in file_path.replace("\\", "/").split("/")}
-    return not parts.isdisjoint(d.casefold() for d in dirs)
+    return not {p.casefold() for p in parts}.isdisjoint(d.casefold() for d in dirs)
 
 
 def _has_dbt_patterns(lines) -> bool:
@@ -85,6 +97,7 @@ def is_dbt_model(file_path: str, content: str | None = None) -> bool:
     - Extension is .sql
     - NOT in seed or analysis directories (exact folder name)
     - IS in a model, macro, or snapshot directory (folder name in any case)
+    - Folders count only below the dbt_project.yml folder, when there is one
     - Contains dbt patterns in first 50 lines, OR file doesn't exist yet
 
     When content is given (for example a staged blob), it is scanned instead of
@@ -94,17 +107,15 @@ def is_dbt_model(file_path: str, content: str | None = None) -> bool:
     if ext not in MODEL_EXTENSIONS:
         return False
 
-    normalized = file_path.replace("\\", "/")
-    parts = set(normalized.split("/"))
+    parts = _folder_parts(file_path)
 
     # Check excluded directories (seeds, analyses)
-    excluded = _get_excluded_dirs(file_path)
-    if parts & excluded:
+    if set(parts) & _get_excluded_dirs(file_path):
         return False
 
     # Must be inside a gated directory (models, macros, snapshots). Exclusions match
     # exactly and gated folders ignore case, so a difference in case only adds gating.
-    if not _in_dirs(file_path, _get_gated_dirs(file_path)):
+    if not _in_dirs(parts, _get_gated_dirs(file_path)):
         return False
 
     if content is not None:
@@ -131,21 +142,19 @@ def is_dbt_schema_file(file_path: str) -> bool:
     if ext not in SCHEMA_EXTENSIONS:
         return False
 
-    normalized = file_path.replace("\\", "/")
-    parts = set(normalized.split("/"))
+    parts = _folder_parts(file_path)
 
-    excluded = _get_excluded_dirs(file_path)
-    if parts & excluded:
+    if set(parts) & _get_excluded_dirs(file_path):
         return False
 
     paths = get_dbt_paths(file_path)
     model_dirs = {p.rstrip("/").rsplit("/", 1)[-1] for p in paths.get("model-paths", [])}
-    return _in_dirs(file_path, model_dirs)
+    return _in_dirs(parts, model_dirs)
 
 
 def is_macro_file(file_path: str) -> bool:
     """Check if file_path is under a macro directory, matched like the gated ones."""
-    return _in_dirs(file_path, _get_macro_dirs(file_path))
+    return _in_dirs(_folder_parts(file_path), _get_macro_dirs(file_path))
 
 
 def extract_table_name(file_path: str) -> str:

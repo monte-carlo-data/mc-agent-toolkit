@@ -463,6 +463,12 @@ _OTHER_FORMS = [
       for name in ["ap''ply_patch", 'ap""ply_patch', "apply\\_patch", "'apply_patch'", '"apply"_patch',
                    "apply\\\n_patch",
                    "apply_pa$''tch", "apply_$'patch'", 'apply_pa$""tch', '$"apply_patch"']],
+    # Codex's hidden option that applies a patch given as an argument.
+    pytest.param("codex --codex-run-as-apply-patch \"$(cat p.txt)\"", id="codex-run-as-apply-patch"),
+    pytest.param("cd proj && /usr/local/bin/codex '--codex-run-as-apply-patch' \"$(cat p.txt)\"",
+                 id="codex-run-as-apply-patch-cd-full-path-quoted"),
+    pytest.param("codex --codex-run-as-'apply'-patch \"$(cat p.txt)\"", id="codex-run-as-apply-patch-split"),
+    pytest.param("rg codex-run-as-apply-patch", id="codex-run-as-apply-patch-mention"),
     # Docs-only and non-dbt patches, in forms Prevent doesn't check.
     pytest.param(_shell(_DOCS_ONLY, prefix="env "), id="docs-only-env"),
     pytest.param(f"env apply_patch <<'EOF'\n{_DOCS_ONLY}\nEOF\necho \"$HOME\"\n", id="docs-only-then-expansion"),
@@ -495,7 +501,8 @@ class TestShellUnrecognised:
         _unchecked_deny(_run_pre(_shell(_DELETE_ORDERS, prefix="FOO=1 "), project, capsys))
         assert _edited() == []
 
-    @pytest.mark.parametrize("cmd", ["rg apply_patc[h]", "ls", "git commit -F msg.txt", "ap${x}ply_patch"])
+    @pytest.mark.parametrize("cmd", ["rg apply_patc[h]", "ls", "git commit -F msg.txt", "ap${x}ply_patch",
+                                     "codex exec 'fix the tests'", "rg ApplyPatch", "git apply p.diff"])
     def test_command_not_naming_it_is_not_denied(self, project, capsys, cmd):
         assert _run_pre(cmd, project, capsys) is None
 

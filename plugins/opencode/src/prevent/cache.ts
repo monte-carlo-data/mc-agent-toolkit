@@ -257,6 +257,12 @@ function findDbtProjectYml(filePath: string): string | null {
   }
 }
 
+/** The folder holding the dbt_project.yml above filePath, or null. */
+export function findDbtProjectDir(filePath: string): string | null {
+  const projectYml = findDbtProjectYml(filePath);
+  return projectYml ? dirname(projectYml) : null;
+}
+
 function dbtConfigCachePath(projectYmlPath: string): string {
   const key = createHash("md5")
     .update(projectYmlPath)

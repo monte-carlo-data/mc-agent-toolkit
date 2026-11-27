@@ -5,8 +5,8 @@
  * Port of plugins/claude-code/prevent/hooks/lib/detect.py
  */
 import { readFileSync, existsSync, statSync } from "fs";
-import { basename, extname, dirname, join, resolve } from "path";
-import { getDbtPaths } from "./cache";
+import { basename, extname, dirname, join, relative, resolve } from "path";
+import { findDbtProjectDir, getDbtPaths } from "./cache";
 
 const REF_PATTERNS = ["{{ ref(", "{{ source("];
 const DBT_BLOCK_PATTERNS = ["{% macro", "{% snapshot"];
@@ -53,14 +53,26 @@ function setsIntersect(a: Set<string>, b: Set<string>): boolean {
 }
 
 /**
- * True if a folder of filePath is named in dirs, ignoring case. On a
+ * The components of filePath that can name a dbt folder. With a dbt_project.yml
+ * above the file, only those below the project folder count: a folder above the
+ * project named `seeds` or `Macros` says nothing about the file. Without one,
+ * every component counts.
+ */
+function folderParts(filePath: string): string[] {
+  const projectDir = findDbtProjectDir(filePath);
+  const path = projectDir ? relative(projectDir, filePath) : filePath;
+  return path.replace(/\\/g, "/").split("/");
+}
+
+/**
+ * True if one of parts (from folderParts) is named in dirs, ignoring case. On a
  * case-insensitive filesystem (macOS, Windows) `MODELS/` is `models/`; on a
  * case-sensitive one the match costs at most an extra assessment.
  */
-function inDirs(filePath: string, dirs: Set<string>): boolean {
-  const parts = new Set(filePath.replace(/\\/g, "/").split("/").map((p) => p.toLowerCase()));
+function inDirs(parts: string[], dirs: Set<string>): boolean {
+  const lower = new Set(parts.map((p) => p.toLowerCase()));
   for (const d of dirs) {
-    if (parts.has(d.toLowerCase())) return true;
+    if (lower.has(d.toLowerCase())) return true;
   }
   return false;
 }
@@ -75,15 +87,14 @@ function inDirs(filePath: string, dirs: Set<string>): boolean {
 export function isDbtModel(filePath: string): boolean {
   if (extname(filePath).toLowerCase() !== ".sql") return false;
 
-  const normalized = filePath.replace(/\\/g, "/");
-  const parts = new Set(normalized.split("/"));
+  const parts = folderParts(filePath);
 
   const excluded = getExcludedDirs(filePath);
-  if (setsIntersect(parts, excluded)) return false;
+  if (setsIntersect(new Set(parts), excluded)) return false;
 
   // Exclusions match exactly and gated folders ignore case, so a difference in
   // case only adds gating.
-  if (!inDirs(filePath, getGatedDirs(filePath))) return false;
+  if (!inDirs(parts, getGatedDirs(filePath))) return false;
 
   // New file being created — treat as dbt SQL
   if (!existsSync(filePath)) return true;
@@ -115,11 +126,10 @@ export function isDbtSchemaFile(filePath: string): boolean {
   const ext = extname(filePath).toLowerCase();
   if (ext !== ".yml" && ext !== ".yaml") return false;
 
-  const normalized = filePath.replace(/\\/g, "/");
-  const parts = new Set(normalized.split("/"));
+  const parts = folderParts(filePath);
 
   const excluded = getExcludedDirs(filePath);
-  if (setsIntersect(parts, excluded)) return false;
+  if (setsIntersect(new Set(parts), excluded)) return false;
 
   const paths = getDbtPaths(filePath);
   const modelDirs = new Set(
@@ -127,14 +137,14 @@ export function isDbtSchemaFile(filePath: string): boolean {
       p.replace(/\/+$/, "").split("/").pop()!
     )
   );
-  return inDirs(filePath, modelDirs);
+  return inDirs(parts, modelDirs);
 }
 
 /**
  * Check if filePath is under a macro directory, matched like the gated ones.
  */
 export function isMacroFile(filePath: string): boolean {
-  return inDirs(filePath, getMacroDirs(filePath));
+  return inDirs(folderParts(filePath), getMacroDirs(filePath));
 }
 
 /**

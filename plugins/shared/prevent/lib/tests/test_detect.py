@@ -162,3 +162,51 @@ class TestFolderNameCase:
 
     def test_schema_file_under_upper_case_models_dir(self, tmp_path):
         assert is_dbt_schema_file(str(tmp_path / "MODELS" / "schema.yml")) is True
+
+
+def _project_under(tmp_path, *ancestors):
+    """A dbt project whose folder sits below the given ancestor folders."""
+    project = tmp_path.joinpath(*ancestors, "proj")
+    project.mkdir(parents=True)
+    (project / "dbt_project.yml").write_text("name: proj\n")
+    return project
+
+
+class TestFoldersAboveTheProject:
+    """With a dbt_project.yml, only the folders below the project count: a folder above it
+    that happens to share a dbt folder name says nothing about the file."""
+
+    @pytest.mark.parametrize("ancestor", ["Macros", "macros"])
+    def test_macros_ancestor_does_not_make_a_model_a_macro(self, tmp_path, ancestor):
+        path = str(_project_under(tmp_path, ancestor) / "models" / "orders.sql")
+        assert is_dbt_model(path) is True
+        assert is_macro_file(path) is False
+        assert extract_table_name(path) == "orders"
+
+    @pytest.mark.parametrize("ancestor", ["seeds", "analyses"])
+    def test_excluded_ancestor_does_not_ungate_models(self, tmp_path, ancestor):
+        project = _project_under(tmp_path, ancestor)
+        assert is_dbt_model(str(project / "models" / "orders.sql")) is True
+        assert is_dbt_schema_file(str(project / "models" / "schema.yml")) is True
+
+    def test_models_ancestor_does_not_gate_other_folders(self, tmp_path):
+        project = _project_under(tmp_path, "models")
+        assert is_dbt_model(str(project / "scripts" / "x.sql")) is False
+        assert is_dbt_schema_file(str(project / "scripts" / "x.yml")) is False
+
+    def test_folders_below_the_project_still_count(self, tmp_path):
+        project = _project_under(tmp_path, "models")
+        assert is_dbt_model(str(project / "seeds" / "x.sql")) is False
+        assert extract_table_name(str(project / "macros" / "helper.sql")) == "macro:helper"
+
+    def test_relative_path_is_resolved_against_the_project(self, tmp_path, monkeypatch):
+        project = _project_under(tmp_path, "seeds", "Macros")
+        monkeypatch.chdir(project)
+        assert is_dbt_model("models/orders.sql") is True
+        assert extract_table_name("models/orders.sql") == "orders"
+        assert is_dbt_model("scripts/x.sql") is False
+
+    def test_backslash_path_without_a_project_matches_its_folders(self):
+        assert is_dbt_model("C:\\no_such_dir\\models\\orders.sql") is True
+        assert is_dbt_model("C:\\no_such_dir\\seeds\\orders.sql") is False
+        assert is_macro_file("C:\\no_such_dir\\macros\\helper.sql") is True

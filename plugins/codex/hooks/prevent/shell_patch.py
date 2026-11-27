@@ -28,7 +28,9 @@ from typing import NamedTuple
 
 from lib.apply_patch import BEGIN, strip_codex_wrapper
 
-_NAMES = ("apply_patch", "applypatch")
+# `codex --codex-run-as-apply-patch <patch>` is Codex's hidden option that applies a patch
+# given as an argument (codex-rs/arg0).
+_NAMES = ("apply_patch", "applypatch", "codex-run-as-apply-patch")
 _EXPANSION_CHARS = ("$", "`", "\\")
 _CONTINUATION = "\\\n"
 
@@ -139,8 +141,8 @@ def names_apply_patch(command) -> bool:
     """Whether the command may name `apply_patch`, anywhere, even as a mention. Quotes
     (with a `$` before one), backslashes and backslash-newlines are dropped first, as the
     shell drops them from a word, so `ap''ply_patch`, `apply\\_patch`, `$'apply_patch'` and
-    `apply_pa$''tch` count. A name built by expansion (`ap${x}ply_patch`, an escape inside
-    `$'...'`) doesn't."""
+    `apply_pa$''tch` count, as does Codex's `--codex-run-as-apply-patch` option. A name
+    built by expansion (`ap${x}ply_patch`, an escape inside `$'...'`) doesn't."""
     if not isinstance(command, str):
         return False
     joined = _QUOTE_CHARS_RE.sub("", command.replace(_CONTINUATION, ""))

@@ -374,6 +374,12 @@ def _find_dbt_project_yml(file_path: str) -> str | None:
         directory = parent
 
 
+def find_dbt_project_dir(file_path: str) -> str | None:
+    """The folder holding the dbt_project.yml above file_path, or None."""
+    project_yml = _find_dbt_project_yml(file_path)
+    return os.path.dirname(project_yml) if project_yml else None
+
+
 def _dbt_config_cache_path(project_yml_path: str) -> str:
     """Stable cache path for a given dbt_project.yml location."""
     key = hashlib.md5(project_yml_path.encode()).hexdigest()[:12]
