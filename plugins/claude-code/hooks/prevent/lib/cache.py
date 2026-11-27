@@ -8,9 +8,11 @@ Impact check gate uses three states:
   injected -> verified (MC_IMPACT_CHECK_COMPLETE marker found in transcript)
 """
 import hashlib
+import io
 import json
 import os
 import re
+import stat
 import time
 
 CACHE_DIR = "/tmp"
@@ -361,29 +363,47 @@ def add_bayes_offered_tables(session_id: str, tables: list[str]) -> None:
 
 # --- dbt project config cache ---
 
-def _find_dbt_project_yml(file_path: str) -> str | None:
-    """Walk up from file_path to find dbt_project.yml."""
+def find_dbt_project_ymls(file_path: str) -> list[str]:
+    """Every dbt_project.yml above file_path, nearest first.
+
+    Only regular files count (os.path.isfile follows symlinks): a directory or FIFO
+    with that name is not a project, and reading a FIFO would block.
+    """
+    found = []
     directory = os.path.dirname(os.path.abspath(file_path))
     while True:
         candidate = os.path.join(directory, "dbt_project.yml")
         if os.path.isfile(candidate):
-            return candidate
+            found.append(candidate)
         parent = os.path.dirname(directory)
         if parent == directory:
-            return None
+            return found
         directory = parent
-
-
-def find_dbt_project_dir(file_path: str) -> str | None:
-    """The folder holding the dbt_project.yml above file_path, or None."""
-    project_yml = _find_dbt_project_yml(file_path)
-    return os.path.dirname(project_yml) if project_yml else None
 
 
 def _dbt_config_cache_path(project_yml_path: str) -> str:
     """Stable cache path for a given dbt_project.yml location."""
     key = hashlib.md5(project_yml_path.encode()).hexdigest()[:12]
     return os.path.join(CACHE_DIR, f"{DBT_CONFIG_PREFIX}{key}")
+
+
+def _read_regular_file(path: str) -> str:
+    """The text of path, opened without blocking and read only if the opened file is a
+    regular one: a FIFO swapped in after discovery would otherwise block the hook."""
+    fd = os.open(path, os.O_RDONLY | getattr(os, "O_NONBLOCK", 0))
+    try:
+        if not stat.S_ISREG(os.fstat(fd).st_mode):
+            raise OSError(f"not a regular file: {path}")
+        with os.fdopen(fd, "rb") as f:
+            fd = -1
+            data = f.read()
+    finally:
+        if fd >= 0:
+            os.close(fd)
+    try:
+        return data.decode("utf-8")
+    except UnicodeDecodeError as e:
+        raise OSError(f"not UTF-8: {path}") from e
 
 
 def _parse_dbt_project_paths(project_yml_path: str) -> dict:
@@ -395,13 +415,14 @@ def _parse_dbt_project_paths(project_yml_path: str) -> dict:
       model-paths:
         - models
         - other
+
+    Raises OSError if the file can't be read as a regular UTF-8 file, so a
+    failed read is never taken for a project with default paths.
     """
     result = {}
-    try:
-        with open(project_yml_path, "r", encoding="utf-8") as f:
-            lines = f.readlines()
-    except (OSError, UnicodeDecodeError):
-        return result
+    # Split as text-mode open() did: on \n, \r\n and \r only. str.splitlines() would
+    # also split on U+2028 and others inside a quoted value and read it as a key.
+    lines = io.StringIO(_read_regular_file(project_yml_path), newline=None)
 
     current_key = None
     for line in lines:
@@ -440,18 +461,27 @@ def _parse_dbt_project_paths(project_yml_path: str) -> dict:
 
 
 def get_dbt_paths(file_path: str) -> dict:
-    """Get dbt project paths for the project containing file_path.
+    """Get dbt project paths for the nearest project containing file_path.
+
+    Returns defaults if no dbt_project.yml found, or if it can't be read.
+    """
+    project_ymls = find_dbt_project_ymls(file_path)
+    if not project_ymls:
+        return dict(DBT_DEFAULT_PATHS)
+    try:
+        return get_dbt_project_paths(project_ymls[0])
+    except OSError:
+        return dict(DBT_DEFAULT_PATHS)
+
+
+def get_dbt_project_paths(project_yml: str) -> dict:
+    """Get the paths one dbt_project.yml configures, with defaults for the rest.
 
     Returns dict with keys: model-paths, macro-paths, snapshot-paths,
     seed-paths, analysis-paths. Uses cached result if dbt_project.yml
-    hasn't changed (same mtime).
-
-    Returns defaults if no dbt_project.yml found.
+    hasn't changed (same mtime). Raises OSError if the file can't be read, and
+    caches nothing then.
     """
-    project_yml = _find_dbt_project_yml(file_path)
-    if not project_yml:
-        return dict(DBT_DEFAULT_PATHS)
-
     cache_path = _dbt_config_cache_path(project_yml)
     mtime = os.path.getmtime(project_yml)
 

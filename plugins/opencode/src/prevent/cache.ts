@@ -22,6 +22,7 @@ import {
   writeSync,
   closeSync,
   constants,
+  fstatSync,
 } from "fs";
 import { join, dirname, resolve } from "path";
 import { createHash } from "crypto";
@@ -246,21 +247,30 @@ export function getPendingValidationTables(sessionId: string): string[] {
 
 // --- dbt project config cache ---
 
-function findDbtProjectYml(filePath: string): string | null {
-  let directory = dirname(resolve(filePath));
-  while (true) {
-    const candidate = join(directory, "dbt_project.yml");
-    if (existsSync(candidate)) return candidate;
-    const parent = dirname(directory);
-    if (parent === directory) return null;
-    directory = parent;
+/** True if path is a regular file, following symlinks; false on any error. */
+function isRegularFile(path: string): boolean {
+  try {
+    return statSync(path).isFile();
+  } catch {
+    return false;
   }
 }
 
-/** The folder holding the dbt_project.yml above filePath, or null. */
-export function findDbtProjectDir(filePath: string): string | null {
-  const projectYml = findDbtProjectYml(filePath);
-  return projectYml ? dirname(projectYml) : null;
+/**
+ * Every dbt_project.yml above filePath, nearest first. Only regular files
+ * count: a directory or FIFO with that name is not a project, and reading a
+ * FIFO would block.
+ */
+export function findDbtProjectYmls(filePath: string): string[] {
+  const found: string[] = [];
+  let directory = dirname(resolve(filePath));
+  while (true) {
+    const candidate = join(directory, "dbt_project.yml");
+    if (isRegularFile(candidate)) found.push(candidate);
+    const parent = dirname(directory);
+    if (parent === directory) return found;
+    directory = parent;
+  }
 }
 
 function dbtConfigCachePath(projectYmlPath: string): string {
@@ -271,14 +281,30 @@ function dbtConfigCachePath(projectYmlPath: string): string {
   return join(CACHE_DIR, `${DBT_CONFIG_PREFIX}${key}`);
 }
 
+/**
+ * The text of path, opened without blocking and read only if the opened file is
+ * a regular one: a FIFO swapped in after discovery would otherwise block the
+ * hook. Throws if it can't be read. Invalid UTF-8 is replaced, as main's
+ * readFileSync(path, "utf-8") did, so a stray byte in a comment keeps the
+ * settings around it.
+ */
+function readRegularFile(path: string): string {
+  const fd = openSync(path, constants.O_RDONLY | (constants.O_NONBLOCK ?? 0));
+  try {
+    if (!fstatSync(fd).isFile()) throw new Error(`not a regular file: ${path}`);
+    return readFileSync(fd, "utf-8");
+  } finally {
+    closeSync(fd);
+  }
+}
+
+/**
+ * Parse path configs from dbt_project.yml. Throws if the file can't be read,
+ * so a failed read is never taken for a project with default paths.
+ */
 function parseDbtProjectPaths(projectYmlPath: string): Partial<DbtPaths> {
   const result: Partial<DbtPaths> = {};
-  let lines: string[];
-  try {
-    lines = readFileSync(projectYmlPath, "utf-8").split("\n");
-  } catch {
-    return result;
-  }
+  const lines = readRegularFile(projectYmlPath).split("\n");
 
   let currentKey: string | null = null;
   const knownKeys = Object.keys(DBT_DEFAULT_PATHS);
@@ -328,10 +354,43 @@ function parseDbtProjectPaths(projectYmlPath: string): Partial<DbtPaths> {
   return result;
 }
 
+/**
+ * dbt project paths for the nearest project containing filePath, or defaults
+ * when there is none, it isn't a regular file, or it can't be read.
+ */
 export function getDbtPaths(filePath: string): DbtPaths {
-  const projectYml = findDbtProjectYml(filePath);
-  if (!projectYml) return { ...DBT_DEFAULT_PATHS };
+  const nearest = findNearestDbtProjectEntry(filePath);
+  if (nearest === null || !isRegularFile(nearest)) return { ...DBT_DEFAULT_PATHS };
+  try {
+    return getDbtProjectPaths(nearest);
+  } catch {
+    return { ...DBT_DEFAULT_PATHS };
+  }
+}
 
+/**
+ * The nearest entry of any kind named dbt_project.yml above filePath, as main's
+ * lookup found it: a directory or FIFO there still marks the nearest project
+ * (with default settings), so this rule never gates less than main did. Only a
+ * regular file is ever read.
+ */
+function findNearestDbtProjectEntry(filePath: string): string | null {
+  let directory = dirname(resolve(filePath));
+  while (true) {
+    const candidate = join(directory, "dbt_project.yml");
+    if (existsSync(candidate)) return candidate;
+    const parent = dirname(directory);
+    if (parent === directory) return null;
+    directory = parent;
+  }
+}
+
+/**
+ * The paths one dbt_project.yml configures, with defaults for the rest. Cached
+ * while the file's mtime is unchanged. Throws if the file can't be stat'ed or
+ * read, and caches nothing then.
+ */
+export function getDbtProjectPaths(projectYml: string): DbtPaths {
   const cachePath = dbtConfigCachePath(projectYml);
   const mtime = statSync(projectYml).mtimeMs;
 
