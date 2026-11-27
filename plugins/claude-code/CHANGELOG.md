@@ -5,6 +5,12 @@ All notable changes to the Monte Carlo Agent Toolkit plugin for Claude Code will
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.33.4] - 2026-11-27
+
+### Changed
+
+- Cortex Code: a CoCo Desktop release whose publish was cancelled now gets its `coco-desktop-v<version>` tag on the next release, instead of waiting for someone to run the workflow by hand. GitHub keeps only the newest waiting publish, so when several version bumps merge close together, the middle release's publish was cancelled. Each publish now also publishes every release on `main` that is newer than the oldest `coco-desktop-v*` tag and has none yet, oldest first, and the `coco-desktop` branch ends on the highest version. A release that fails to publish no longer stops the others: the run publishes the rest, then fails and names it. The job summary lists what each run published. Publishes now build with `main`'s builder, so a run never builds a release newer than its builder.
+
 ## [1.33.3] - 2026-11-25
 
 ### Fixed
