@@ -91,7 +91,9 @@ jobs:
       cancel-in-progress: false
     steps:
       # main, not the release commit: a run can publish releases newer than its own, and must
-      # build them with a builder at least as new as they are.
+      # build them with a builder at least as new as they are. A re-run keeps its original
+      # commit's copy of this file but gets main's script, so the script must keep accepting
+      # every flag older copies pass (a revert of --backfill breaks re-runs of later jobs).
       - uses: actions/checkout@v4
         with:
           ref: main

@@ -39,9 +39,15 @@ BRANCH = "coco-desktop"
 TAG_PREFIX = "coco-desktop-v"
 PLUGIN = "plugins/cortex-code"
 BUILD_INPUTS = [PLUGIN, "skills", "LICENSE"]
-SOURCE_TAG = re.compile(r"^v(\d+)\.(\d+)\.(\d+)$")
-RELEASE_REF = re.compile(r"refs/tags/(v\d+\.\d+\.\d+)")
-PIN_REF = re.compile(rf"refs/tags/{TAG_PREFIX}(\d+\.\d+\.\d+)")
+# ASCII digits, no leading zeros: \d would also match other scripts' digits, which int() accepts.
+_PART = r"(?:0|[1-9][0-9]*)"
+VERSION = rf"{_PART}\.{_PART}\.{_PART}"
+SOURCE_TAG = re.compile(rf"v{VERSION}")
+RELEASE_REF = re.compile(rf"refs/tags/(v{VERSION})")
+PIN_REF = re.compile(rf"refs/tags/{TAG_PREFIX}({VERSION})")
+# The first release with a CoCo Desktop build. Backfill never goes below it, even if a stray lower
+# pin appears: the ruleset stops pins being moved or deleted, not created.
+FIRST_COCO_RELEASE = (1, 32, 0)
 
 
 class PublishError(Exception):
@@ -79,10 +85,10 @@ def is_ancestor(repo: Path, commit: str, ref: str) -> bool:
     return result.returncode == 0
 
 
-def remote_tag_listing(repo: Path, remote: str) -> tuple[dict[str, str], set[tuple[int, ...]]]:
-    """The remote's release tags (name -> tag object id) and pinned versions. --refs leaves out the
-    peeled ^{} lines, so an annotated tag maps to its tag object, as `rev-parse refs/tags/<tag>` does."""
-    releases, pinned = {}, set()
+def remote_tag_listing(repo: Path, remote: str) -> tuple[dict[str, str], dict[tuple[int, ...], str]]:
+    """The remote's release tags (name -> tag object id) and pins (version -> object id). --refs leaves
+    out the peeled ^{} lines, so an annotated tag maps to its tag object, as `rev-parse refs/tags/<tag>` does."""
+    releases, pinned = {}, {}
     # Split on git's own separators only: other tags' names can hold Unicode whitespace or line breaks.
     for line in git(repo, "ls-remote", "--refs", "--tags", remote).split("\n"):
         if not line:
@@ -91,7 +97,7 @@ def remote_tag_listing(repo: Path, remote: str) -> tuple[dict[str, str], set[tup
         if match := RELEASE_REF.fullmatch(ref):
             releases[match.group(1)] = oid
         elif match := PIN_REF.fullmatch(ref):
-            pinned.add(version_tuple(match.group(1)))
+            pinned[version_tuple(match.group(1))] = oid
     return releases, pinned
 
 
@@ -112,7 +118,7 @@ def highest_pin(listing: str) -> str | None:
         ref = line.split()[-1].removesuffix("^{}")
         name = ref.removeprefix("refs/tags/")
         version = name.removeprefix(TAG_PREFIX)
-        if re.fullmatch(r"\d+\.\d+\.\d+", version):
+        if re.fullmatch(VERSION, version):
             pins[version_tuple(version)] = name
     return pins[max(pins)] if pins else None
 
@@ -145,7 +151,7 @@ def check_source(tag: str, repo: Path, remote: str, expect_sha: str | None = Non
     """Check that tag is a release this run may publish and return its commit. With check_remote,
     the local tag must be the remote's (remote_oid, None if the remote has no such tag). Without
     check_manifest, the plugin version is left for publish() to check."""
-    if not SOURCE_TAG.match(tag):
+    if not SOURCE_TAG.fullmatch(tag):
         raise PublishError(f"source tag {tag!r} is not v<major>.<minor>.<patch>")
     version = tag[1:]
 
@@ -169,14 +175,22 @@ def check_source(tag: str, repo: Path, remote: str, expect_sha: str | None = Non
             raise PublishError(f"{tag} is not on {require_ancestor}")
     if not check_manifest:
         return source_sha
-    try:
-        manifest = json.loads(git(repo, "show", f"{source_sha}:{PLUGIN}/.cortex-plugin/plugin.json"))
-    except json.JSONDecodeError as exc:
-        raise PublishError(f"{tag} has an unreadable {PLUGIN}/.cortex-plugin/plugin.json: {exc}") from exc
-    found = manifest.get("version") if isinstance(manifest, dict) else None
+    found = plugin_version(repo, tag, source_sha)
     if found != version:
         raise PublishError(f"{tag} has plugin version {found}, not {version}")
     return source_sha
+
+
+def plugin_version(repo: Path, tag: str, commit: str):
+    """The Cortex Code plugin's version at commit. An unreadable manifest is an error, not a mismatch."""
+    path = f"{PLUGIN}/.cortex-plugin/plugin.json"
+    try:
+        manifest = json.loads(git(repo, "show", f"{commit}:{path}"))
+    except json.JSONDecodeError as exc:
+        raise PublishError(f"{tag} has an unreadable {path}: {exc}") from exc
+    if not isinstance(manifest, dict):
+        raise PublishError(f"{tag} has a {path} that isn't a JSON object")
+    return manifest.get("version")
 
 
 def publish(tag: str, repo: Path = Path("."), remote: str = "origin", expect_sha: str | None = None,
@@ -205,7 +219,11 @@ def publish(tag: str, repo: Path = Path("."), remote: str = "origin", expect_sha
     existing_pin = remote_ref(repo, remote, f"refs/tags/{pin}")
     if existing_pin:
         if git(repo, "rev-parse", f"{existing_pin}^{{tree}}") != tree:
-            raise PublishError(f"{pin} already exists with different files; bump the version instead of retagging")
+            raise PublishError(
+                f"{pin} already exists with different files. A pin never moves: if {tag}'s source changed, "
+                "bump the version; if only scripts/build_coco_desktop.py changed since it was pinned, "
+                "the pin is fine and there is nothing to do"
+            )
         return {"action": "unchanged", "tag": pin, "commit": existing_pin}
 
     head_version = None
@@ -263,9 +281,14 @@ def publish_all(tag: str, repo: Path = Path("."), remote: str = "origin", expect
 
     A release qualifies if its v<X.Y.Z> tag is on the remote, its commit is on require_ancestor,
     its version is newer than the oldest pin and it has no pin. With no pins yet, only tag is
-    published. If tag itself isn't a valid release on the remote and on require_ancestor, or the
-    remote's tags can't be listed, this raises PublishError before anything is pushed. After that,
-    a release that fails, the run's own included, is recorded under "failed" and the rest still run.
+    published, and never a release before FIRST_COCO_RELEASE. If tag itself isn't a valid release on
+    the remote and on require_ancestor, or the remote's tags can't be listed, this raises PublishError
+    before anything is pushed. After that, a release that fails, the run's own included, is recorded
+    under "failed" and the rest still run.
+
+    tag is not rebuilt if it already has a pin: a re-run after a builder change would otherwise fail
+    on a pin that is fine. A backfilled release whose Cortex Code plugin version isn't its tag's
+    shipped no Cortex release (only another plugin's manifest was bumped): it goes under "skipped".
     """
     if not require_ancestor:
         raise PublishError("backfill needs require_ancestor, the branch releases must be on")
@@ -275,11 +298,11 @@ def publish_all(tag: str, repo: Path = Path("."), remote: str = "origin", expect
                  check_manifest=False)
     boundary = git(repo, "rev-parse", f"{require_ancestor}^{{commit}}")
 
-    sources, failed = [tag], []
+    sources, failed, skipped = [tag], [], []
     floor = min(pinned, default=None)
     for name, oid in releases.items():
         version = version_tuple(name[1:])
-        if floor is None or version <= floor or version in pinned or name == tag:
+        if floor is None or version <= floor or version < FIRST_COCO_RELEASE or version in pinned or name == tag:
             continue
         # One old release must not stop the others, or the release this run is for.
         try:
@@ -292,7 +315,19 @@ def publish_all(tag: str, repo: Path = Path("."), remote: str = "origin", expect
     results = []
     for name in sources:
         own = name == tag
+        pin = f"{TAG_PREFIX}{name[1:]}"
         try:
+            if own and version_tuple(name[1:]) in pinned:
+                results.append({"source": name, "action": "already pinned", "tag": pin,
+                                "commit": pinned[version_tuple(name[1:])]})
+                continue
+            if not own:
+                found = plugin_version(repo, name, git(repo, "rev-parse", f"{releases[name]}^{{commit}}"))
+                if found != name[1:]:
+                    skipped.append({"source": name, "tag": pin,
+                                    "reason": f"{name} has Cortex Code plugin version {found}, so it shipped no "
+                                              "Cortex release to pin"})
+                    continue
             result = publish(name, repo, remote, expect_sha=expect_sha if own else None,
                              require_ancestor=require_ancestor if own else boundary, dry_run=dry_run,
                              remote_oid=releases[name])
@@ -300,7 +335,7 @@ def publish_all(tag: str, repo: Path = Path("."), remote: str = "origin", expect
             failed.append(_failure(name, own, exc))
             continue
         results.append({"source": name, **result})
-    return {"results": results, "failed": failed}
+    return {"results": results, "failed": failed, "skipped": skipped}
 
 
 def annotation(level: str, message: str) -> str:
@@ -322,12 +357,15 @@ def summary_markdown(tag: str, report: dict | None, error: str | None = None) ->
     rows = [(r["source"], r["tag"], r["action"] + (" (dry run)" if r.get("dry_run") else ""), r["commit"][:12])
             for r in report["results"]]
     rows += [(f["source"], f["tag"], "failed", "") for f in report["failed"]]
+    rows += [(s["source"], s["tag"], "skipped", "") for s in report.get("skipped", [])]
     rows.sort(key=lambda row: version_tuple(row[0][1:]))
     lines += ["| Release | Pin | Result | Commit |", "| --- | --- | --- | --- |"]
     lines += [f"| {source} | {pin} | {action} | {commit} |" for source, pin, action, commit in rows]
     lines.append("")
     for f in report["failed"]:
         lines += [f"**{f['source']}** failed:", "", *_fenced(f["error"])]
+    for s in report.get("skipped", []):
+        lines += [f"**{s['source']}** skipped: {s['reason']}", ""]
     return "\n".join(lines)
 
 
@@ -373,6 +411,9 @@ def main(argv: list[str] | None = None) -> int:
     for f in report["failed"]:
         print(f"error: {f['source']}: {f['error']}", file=sys.stderr)
         print(annotation("error" if f["own"] else "warning", f"{f['source']}: {f['error']}"), file=sys.stderr)
+    for s in report["skipped"]:
+        print(f"skipped: {s['source']}: {s['reason']}", file=sys.stderr)
+        print(annotation("warning", f"{s['source']}: {s['reason']}"), file=sys.stderr)
     print(json.dumps(report, indent=2))
     return 1 if report["failed"] else 0
 

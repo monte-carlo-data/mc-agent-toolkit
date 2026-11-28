@@ -477,6 +477,9 @@ class BackfillTest(RepoFixture):
         self.assertEqual([f["source"] for f in result["failed"]],
                          ["v9.9.10", "v9.9.11", "v9.9.12", "v9.9.13", "v9.9.14"])
         self.assertEqual([r["source"] for r in result["results"]], ["v9.9.15"])
+        errors = {f["source"]: f["error"] for f in result["failed"]}
+        self.assertIn("isn't a JSON object", errors["v9.9.12"])
+        self.assertEqual(result["skipped"], [])
         self.assertEqual(self.pins(), ["9.9.15", "9.9.9"])
         self.assertEqual(self.remote_git("rev-parse", "refs/heads/coco-desktop^"), self.dist_tag("9.9.9"))
         self.assertEqual(err.count("::warning"), 5)
@@ -557,7 +560,7 @@ class BackfillTest(RepoFixture):
         result = self.backfill("v9.9.12")
         self.assertEqual(result["failed"], [])
         self.assertEqual([(r["source"], r["action"]) for r in result["results"]],
-                         [("v9.9.11", "pinned"), ("v9.9.12", "unchanged")])
+                         [("v9.9.11", "pinned"), ("v9.9.12", "already pinned")])
         after = self.remote_refs().splitlines()
         self.assertEqual(sorted(set(after) - set(before.splitlines())),
                          [f"refs/tags/coco-desktop-v9.9.11 {self.dist_tag('9.9.11')}"])
@@ -737,11 +740,119 @@ class BackfillTest(RepoFixture):
         step = workflow[workflow.index("- name: Publish CoCo Desktop build"):]
         step = "\n".join(line for line in step.splitlines() if not line.strip().startswith("#"))
         self.assertIn("--require-ancestor HEAD", step)
+        self.assertIn("--backfill", step)
         self.assertNotIn("origin/main", step)
+        job = workflow[workflow.index("  publish-coco-desktop:"):workflow.index("- name: Publish CoCo Desktop build")]
+        self.assertRegex(job, r"uses: actions/checkout@v\d+\n\s+with:\n\s+ref: main\n")
         calls = [line.strip() for line in step.splitlines() if "publish_coco_desktop.py" in line]
         self.assertEqual(len(calls), 2)
         for call in calls:
             self.assertTrue(call.endswith('-- "$TAG"'), call)
+
+    def test_rerunning_a_pinned_release_after_a_builder_change_does_not_fail(self):
+        self.ship("9.9.9")
+        self.publish("v9.9.9")
+        pin = self.dist_tag("9.9.9")
+        builder = publish_mod._load_builder
+        def changed_builder():
+            module = builder()
+            original = module.build
+            def build(plugin, out, **kwargs):
+                report = original(plugin, out, **kwargs)
+                (Path(out) / "NEW_BUILDER_FILE").write_text("new\n")
+                return report
+            module.build = build
+            return module
+        publish_mod._load_builder = changed_builder
+        try:
+            result = self.backfill("v9.9.9")
+            with self.assertRaisesRegex(publish_mod.PublishError, "only scripts/build_coco_desktop.py changed"):
+                self.publish("v9.9.9")
+        finally:
+            publish_mod._load_builder = builder
+        self.assertEqual(result["failed"], [])
+        self.assertEqual([(r["source"], r["action"], r["commit"]) for r in result["results"]],
+                         [("v9.9.9", "already pinned", pin)])
+
+    def test_cli_with_the_push_runs_arguments_backfills_a_gap(self):
+        self.ship("9.9.9")
+        self.publish("v9.9.9")
+        self.ship("9.9.10")
+        sha = self.ship("9.9.11")
+        summary = self.tmp / "summary.md"
+        code, out, err = self.run_cli("--expect-sha", sha, "--backfill", "--require-ancestor", "main",
+                                      "--summary", str(summary), "--", "v9.9.11")
+        self.assertEqual(code, 0, err)
+        self.assertNotIn("::", err)
+        self.assertEqual(self.pins(), ["9.9.10", "9.9.11", "9.9.9"])
+        self.assertEqual(json.loads(out)["failed"], [])
+
+    def test_cli_reports_a_failed_own_release_as_an_error_after_the_gaps(self):
+        self.ship("9.9.9")
+        self.publish("v9.9.9")
+        self.ship("9.9.10")
+        (self.plugin / "README.md").write_text("# Fixture, still 9.9.10\n")
+        self.git("commit", "-qam", "tagged 9.9.11 but declares 9.9.10")
+        self.git("tag", "v9.9.11")
+        self.git("push", "-q", "origin", "main", "refs/tags/v9.9.11")
+        sha = self.git("rev-parse", "HEAD")
+        code, _, err = self.run_cli("--expect-sha", sha, "--backfill", "--require-ancestor", "main", "--", "v9.9.11")
+        self.assertEqual(code, 1)
+        self.assertEqual(self.pins(), ["9.9.10", "9.9.9"])
+        self.assertIn("::error::v9.9.11:", err)
+        self.assertNotIn("::warning::", err)
+
+    def test_a_stray_low_pin_does_not_open_releases_before_the_first_coco_release(self):
+        first = publish_mod.FIRST_COCO_RELEASE
+        publish_mod.FIRST_COCO_RELEASE = (9, 9, 10)  # stands in for 1.32.0
+        try:
+            self.ship("9.9.9")  # before the first CoCo release: never published
+            self.ship("9.9.10")
+            self.publish("v9.9.10")
+            self.git("push", "-q", "origin", f"{self.dist_head()}:refs/tags/coco-desktop-v0.0.1")
+            self.ship("9.9.11")
+            result = self.backfill("v9.9.11")
+        finally:
+            publish_mod.FIRST_COCO_RELEASE = first
+        self.assertEqual(self.processed(result), ["v9.9.11"])
+        self.assertNotIn("9.9.9", self.pins())
+
+    def test_versions_must_be_plain_ascii_without_leading_zeros(self):
+        self.ship("9.9.9")
+        self.publish("v9.9.9")
+        self.ship("9.9.10")  # a real gap, with a lookalike pin that must not hide it
+        self.git("push", "-q", "origin", f"{self.dist_head()}:refs/tags/coco-desktop-v٩.٩.١٠")
+        self.set_version("9.9.12")
+        self.git("commit", "-qam", "lookalike release tags")
+        self.git("tag", "v٩.٩.١٢")  # Arabic-Indic digits for 9.9.12
+        self.git("tag", "v09.9.12")
+        self.git("push", "-q", "origin", "main", "refs/tags/v٩.٩.١٢", "refs/tags/v09.9.12")
+        self.ship("9.9.13")
+        result = self.backfill("v9.9.13")
+        self.assertEqual(result["failed"], [])
+        self.assertEqual(self.processed(result), ["v9.9.10", "v9.9.13"])
+        with self.assertRaisesRegex(publish_mod.PublishError, "v<major>"):
+            self.publish("v09.9.12")
+
+    def test_a_gap_whose_cortex_plugin_was_not_bumped_is_skipped_with_a_warning(self):
+        # Only the Claude Code manifest was bumped: the v tag is right, but no Cortex release shipped.
+        self.ship("9.9.9")
+        self.publish("v9.9.9")
+        (self.plugin / "README.md").write_text("# Fixture, Cortex still 9.9.9\n")
+        self.git("commit", "-qam", "release 9.9.10, Claude Code manifest only")
+        self.git("tag", "v9.9.10")
+        self.git("push", "-q", "origin", "main", "refs/tags/v9.9.10")
+        self.ship("9.9.11")
+        summary = self.tmp / "summary.md"
+        code, out, err = self.run_cli("v9.9.11", "--backfill", "--require-ancestor", "main", "--summary", str(summary))
+        self.assertEqual(code, 0, err)
+        report = json.loads(out)
+        self.assertEqual(report["failed"], [])
+        self.assertEqual([s["source"] for s in report["skipped"]], ["v9.9.10"])
+        self.assertIn("plugin version 9.9.9", report["skipped"][0]["reason"])
+        self.assertIn("::warning::v9.9.10:", err)
+        self.assertIn("| v9.9.10 | coco-desktop-v9.9.10 | skipped |", summary.read_text())
+        self.assertEqual(self.pins(), ["9.9.11", "9.9.9"])
 
     def test_annotations_escape_newlines_and_percent(self):
         self.assertEqual(publish_mod.annotation("warning", "50% done\r\nnext"), "::warning::50%25 done%0D%0Anext")
