@@ -215,7 +215,7 @@ Setup and agent-routing skills are exempt from this rule. Setup skills are invok
    - Without a commands entry, the skill will not be discoverable as `mc-agent-toolkit:<skill-name>`.
    - If the skill has sub-commands (e.g., `/mc-validate`), add additional `.md` files in the same directory.
 3. If the skill needs hooks, create adapters in `plugins/claude-code/hooks/<skill-name>/` following the two-layer pattern (see below).
-4. Bump the `version` in `plugins/claude-code/.claude-plugin/plugin.json`.
+4. Bump the version with `./scripts/bump-version.sh` (see [Version bumping](#version-bumping)). It updates all six plugin manifests; bumping only one leaves the others' releases out of step.
 5. Test locally with `claude --plugin-dir ./plugins/claude-code`.
 
 ## Updating an existing skill
@@ -277,10 +277,11 @@ Commit the resulting changes as part of your PR.
 
 ### Automated checks
 
-Two automated checks help catch missing version bumps:
+Three automated checks help catch missing or partial version bumps:
 
 - **`/ship`** — before opening a PR, checks whether the diff touches shipped content (`skills/`, `plugins/`) without a version bump, and prompts you to run the script.
 - **`/code-review`** — the `versioning` reviewer agent runs on every PR and flags missing or inconsistent version bumps as an ISSUE-level finding, with a suggested bump level.
+- **CI** (`validate.yml`, "Every plugin manifest holds the same version") fails a PR whose six plugin manifests don't all hold the same version (`scripts/check_plugin_versions.py`, which reads the list from `bump-version.sh`). The release tags `v<version>` from the Claude Code manifest alone, so a manifest left behind ships a release with no matching build for that editor.
 
 ### GitHub Release
 
@@ -290,7 +291,10 @@ When a version bump merges to `main`, the GitHub Actions workflow (`.github/work
 
 The same workflow then publishes the Cortex Code plugin in CoCo Desktop's format. `scripts/publish_coco_desktop.py` builds `plugins/cortex-code` at the release tag with `scripts/build_coco_desktop.py`. It commits the result to the `coco-desktop` branch, which **Add from GitHub** and **Sync** install from, and tags it `coco-desktop-v<version>`. Never commit to that branch by hand; the workflow overwrites it on the next release.
 
-- **Re-running is safe.** If the publish job fails, re-run it, or run the workflow by hand (`workflow_dispatch`) with the release tag, e.g. `v1.32.0`. A manual run only publishes a tag whose commit is on `main`. A version that is already published with the same files is left alone. Publishes run one at a time, and GitHub keeps only the newest waiting one, so if three version bumps merge within one publish, the middle one is cancelled: its Actions run shows as cancelled, and running the workflow by hand with its tag adds its pin.
+- **Missing pins fill themselves in.** Publishes run one at a time, and GitHub keeps only the newest waiting one, so if three version bumps merge within one publish, the middle one's publish is cancelled. To cover that, every publish also publishes each release that has no pin yet: a `v<X.Y.Z>` tag on `main` as the run checked it out, newer than the oldest `coco-desktop-v*` pin. A release merged after the run started is left to its own publish, which is queued behind it. It goes oldest first, so missing releases newer than the branch land on it in order, and the branch ends on the highest version; one older than the branch gets its pin on a side commit. The job summary lists what each run published.
+- **A release that fails doesn't block the others.** The run keeps going and publishes its own release, then fails, naming the release that didn't publish. That release fails again on every later run until it's fixed. If its build fails, fix `scripts/build_coco_desktop.py` on `main`: every publish builds with `main`'s builder.
+- **A release whose Cortex Code plugin wasn't bumped is skipped.** If a release's `plugins/cortex-code/.cortex-plugin/plugin.json` doesn't hold its tag's version (for example, only the Claude Code manifest was bumped), it shipped no Cortex release, so there is nothing to pin. Its own publish fails, which is the moment to bump again with `./scripts/bump-version.sh`. Later runs skip it with a warning in the job summary and don't fail. The `v` tag and its GitHub Release are still right; leave them. CI's manifest version check stops this on a PR; the skip covers a release that got past it.
+- **Re-running is safe.** To retry without waiting for the next release, re-run the failed job, or run the workflow by hand (`workflow_dispatch`) from `main` with any release tag, e.g. `v1.32.0`; it fills every gap either way. A manual run only publishes tags whose commits are on `main`. A run doesn't rebuild its own release if that release already has a pin, so a re-run after a builder change on `main` reports it as already pinned. Running `scripts/publish_coco_desktop.py` without `--backfill` does rebuild it, and fails rather than retag if the files differ; when only the builder changed, the pin is fine.
 - **A pin tag never moves.** If `coco-desktop-v<version>` already exists with different files, the job fails. Bump the version instead of retagging.
 - **Releases only move forward.** The branch only moves to a newer version. Publishing an older tag adds its pin tag on a side commit and leaves the branch where it is. If the branch is ever deleted, the job refuses to recreate it, since the release it is publishing may be older than one already pinned: push the commit of the highest-version `coco-desktop-v*` tag (not the most recently created one, which can be an older release published late) to `refs/heads/coco-desktop` by hand, then re-run. The job's error names that tag.
 - **Check the build locally** with `python3 scripts/build_coco_desktop.py plugins/cortex-code <out-dir>`. It prints a JSON report of what it converted, and it fails rather than producing a copy Desktop would reject.

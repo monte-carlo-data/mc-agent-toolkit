@@ -137,6 +137,24 @@ jobs:
           print(f"OK: {len(files)} JSON files are valid")
           EOF
 
+  # The release tags v<version> from the Claude Code manifest alone, so a manifest left behind
+  # ships a release with no matching build for that editor.
+  plugin-versions-agree:
+    name: Every plugin manifest holds the same version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Checker tests
+        run: python3 scripts/tests/test_check_plugin_versions.py
+
+      - name: Plugin manifests agree on the version
+        run: python3 scripts/check_plugin_versions.py
+
   skill-tool-routing:
     name: Skills route Monte Carlo MCP tools without client tool IDs
     runs-on: ubuntu-latest
